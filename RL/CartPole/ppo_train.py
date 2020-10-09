@@ -16,7 +16,7 @@ env_name = "CartPoleCont-v0"
 
 env = make_vec_env(env_name)
 # Automatically normalize the input features and reward
-env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=10.)
+env = VecNormalize(env, norm_obs=False, norm_reward=False, clip_obs=100.)
 
 policy_kwargs = dict(net_arch=[dict(pi=[64, 32], vf=[64, 32])])
 
@@ -24,16 +24,16 @@ model = PPO2("MlpPolicy",
              tensorboard_log=tensorboard_dir,
              verbose=1,
              env=env,
-             gamma=0.96,
+             gamma=1,
              n_steps=1000,
-             lam=0.96,
+             lam=1,
              policy_kwargs=policy_kwargs)
 
-model.learn(total_timesteps=600000, tb_log_name=name)
+model.learn(total_timesteps=800000, tb_log_name=name)
 
 model.save(log_dir)
 stats_path = os.path.join(stats_dir)
 env.save(stats_path)
 
 now = datetime.now()
-print("%s.%s.%s. %s:%s" %(now.year, now.month, now.day, now.hour, now.minute))
+print("%s.%s.%s., %s:%s" %(now.year, now.month, now.day, now.hour, now.minute))

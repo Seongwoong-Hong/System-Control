@@ -18,18 +18,19 @@ env = make_vec_env(env_name)
 # Automatically normalize the input features and reward
 env = VecNormalize(env, norm_obs=False, norm_reward=False, clip_obs=100.)
 
-policy_kwargs = dict(net_arch=[dict(pi=[64, 32], vf=[64, 32])])
+policy_kwargs = dict(net_arch=[dict(pi=[16], vf=[16])])
 
 model = PPO2("MlpPolicy",
              tensorboard_log=tensorboard_dir,
              verbose=1,
              env=env,
-             gamma=0.96,
+             gamma=1,
              n_steps=1000,
-             lam=0.96,
+             nminibatches=50,
+             lam=1,
              policy_kwargs=policy_kwargs)
 
-model.learn(total_timesteps=600000, tb_log_name=name)
+model.learn(total_timesteps=800000, tb_log_name=name)
 
 model.save(log_dir)
 stats_path = os.path.join(stats_dir)

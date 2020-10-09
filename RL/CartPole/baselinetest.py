@@ -7,7 +7,7 @@ from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines import PPO2, DDPG
 from matplotlib import pyplot as plt
 
-name = "IP_ctl/ppo_ctl_2"
+name = "IP_ctl/ppo_ctl_1"
 log_dir = "tmp/" + name + ".zip"
 stats_dir = "tmp/" + name + ".pkl"
 env_name = "CartPoleCont-v0"
@@ -83,7 +83,7 @@ env.close()
 
 from matplotlib import pyplot as plt
 
-plt.plot(info['actu'])
+# plt.plot(info[0]['action'])
 
 # fig = plt.figure()
 # ax = fig.gca(projection='3d')
