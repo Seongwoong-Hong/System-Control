@@ -1,0 +1,19 @@
+<mujoco model="IP-custom">
+	<compiler angle="radian" coordinate="local" inertiafromgeom="false"/>
+	<default>
+		<joint damping="0.0"/>
+		<geom contype="0" friction="0.0 0.0 0.0" rgba="0.7 0.7 0 1"/>
+	</default>
+	<option gravity="0 0 -9.81" integrator="RK4" timestep="0.001"/>
+	<size nstack="3000" nuserdata="100" nuser_actuator="10"/>
+	<worldbody>
+		<body name="pole" pos="0 0 0">
+			<joint axis="0 1 0" limited="false" name="hinge" pos="0 0 0" type="hinge"/>
+			<geom fromto="0 0 0 0 0 1.6" name="cpole" rgba="0 0.7 0.7 1" size="0.045" type="capsule"/>
+			<inertial pos="0 0 0.966" mass="43.16" diaginertia="1.4795 1.4795 0.01"/>
+		</body>
+	</worldbody>
+	<actuator>
+    	<motor ctrllimited="true" ctrlrange='-1 1' gear="100" joint="hinge"/>
+	</actuator>
+</mujoco>

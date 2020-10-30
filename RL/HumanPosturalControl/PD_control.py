@@ -1,4 +1,4 @@
-#!/home/biomechserver/anaconda3/envs/baseline/bin/python3
+#!/home/biomechserver/anaconda3/gym_custom/baseline/bin/python3
 
 import gym, os, math
 import numpy as np

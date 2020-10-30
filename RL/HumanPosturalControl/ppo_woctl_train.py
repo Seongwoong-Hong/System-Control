@@ -1,4 +1,4 @@
-#!/home/biomechserver/anaconda3/envs/garage/bin/python3
+#!/home/biomechserver/anaconda3/gym_custom/garage/bin/python3
 
 import os
 import tensorflow as tf

@@ -1,6 +1,11 @@
 import numpy as np
-import gym, math, torch, time
+import gym, math, torch, time, gym_envs
 from matplotlib import pyplot as plt
+
+class NormalizedActions(gym.ActionWrapper):
+    def action(self, action):
+        # action *= 0.5 * (self.action_space.high - self.action_space.low)
+        return np.clip(action, self.action_space.low, self.action_space.high)
 
 def iLQR(x, u, model):
     n = u[:, 0, 0].__len__()
@@ -26,7 +31,8 @@ def BackwardPass(x, u, model):
     ns = x[0, :, 0].__len__()
     na = u[0, :, 0].__len__()
     Q, R = model.Q, model.R
-    Vk, vk = Q, Q @ x[-1]
+    # Vk, vk = Q, Q @ x[-1]
+    Vk, vk = np.zeros([4, 4]), np.zeros([4, 1])
     K, d = np.zeros([n, 1, ns]), np.zeros([n, na])
     for k in range(n):
         idx = n - 1 - k
@@ -79,7 +85,7 @@ def cal_dynamics(state, model):
     return Fk
 
 if __name__ == "__main__":
-    model = gym.make("CartPoleCont-v0")
+    model = NormalizedActions(gym.make("CartPoleCont-v0"))
     n, ns, na = 1000, 4, 1
     x, u = np.zeros([n, ns, 1]), np.zeros([n, na, 1])
     x[0] = model.reset().reshape(ns, 1)
@@ -87,10 +93,10 @@ if __name__ == "__main__":
     model.Q = np.diag([1, 1, 1, 1])
     model.R = 0.001
     model.set_state(x0)
-    model.render('human')
+    # model.render('human')
     for i in range(n - 1):
         ob, _, _, _ = model.step(u[i][0])
-        model.render('human')
+        # model.render('human')
         x[i + 1] = ob.reshape(ns, 1)
     model.close()
 

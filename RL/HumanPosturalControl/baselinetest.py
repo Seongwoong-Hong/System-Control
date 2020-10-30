@@ -1,4 +1,4 @@
-#!/home/biomechserver/anaconda3/envs/baseline/bin/python3
+#!/home/biomechserver/anaconda3/gym_custom/baseline/bin/python3
 
 import os
 import gym
@@ -29,23 +29,23 @@ rew_result = []
 coeff_result = []
 max_step = 2999
 
-# for _ in range(1):
-#     step = 0
-#     obs = env.reset()
-#     # env.env_method('set_state', np.array([0.1]), np.array([0.05]))
-#     obs = env.normalize_obs(env.env_method('_get_obs'))
-#     # obs = np.concatenate((env.get_attr('data')[0].qpos, env.get_attr('data')[0].qvel, env.get_attr('data')[0].qfrc_constraint))
-#     done = False
-#     while (not done) and bool(step < max_step):
-#         env.render("human")
-#         act, _ = model.predict(obs, deterministic=True)
-#         obs, rew, done, _ = env.step(act)
-#         action = env.get_attr('data')[0].qfrc_actuator
-#         coeff_result.append(act.squeeze().tolist())
-#         act_result.append(action.squeeze().tolist())
-#         rew_result.append(rew.squeeze().tolist())
-#         obs_result.append(env.get_original_obs().squeeze().tolist())
-#         step += 1
+for _ in range(1):
+    step = 0
+    obs = env.reset()
+    # env.env_method('set_state', np.array([0.1]), np.array([0.05]))
+    obs = env.normalize_obs(env.env_method('_get_obs'))
+    # obs = np.concatenate((env.get_attr('data')[0].qpos, env.get_attr('data')[0].qvel, env.get_attr('data')[0].qfrc_constraint))
+    done = False
+    while (not done) and bool(step < max_step):
+        env.render("human")
+        act, _ = model.predict(obs, deterministic=True)
+        obs, rew, _, _ = env.step(act)
+        action = env.get_attr('data')[0].qfrc_actuator
+        coeff_result.append(act.squeeze().tolist())
+        act_result.append(action.squeeze().tolist())
+        rew_result.append(rew.squeeze().tolist())
+        obs_result.append(env.get_original_obs().squeeze().tolist())
+        step += 1
 # for _ in range(10):
 
 import copy
@@ -59,8 +59,6 @@ obs = env.reset()
 nobs = env.normalize_obs(env.env_method('_get_obs'))
 act, _ = model.predict(nobs, deterministic=True)
 nobs, rew, done, info = env.step(act)
-
-
 
 # for i in range(100):
 #     for j in range(100):
@@ -93,7 +91,7 @@ env.close()
 
 from matplotlib import pyplot as plt
 
-plt.plot(info['actu'])
+# plt.plot(info['actu'])
 
 # fig = plt.figure()
 # ax = fig.gca(projection='3d')
