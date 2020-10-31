@@ -2,7 +2,7 @@ import gym, gym_envs, os
 import numpy as np
 
 from RL.algo.torch.ppo import PPO
-from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.utils import set_random_seed
 
@@ -21,7 +21,7 @@ def make_env(env_id, rank, Wrapper_class = None, seed=0):
     :param rank: (int) index of the subprocess
     """
     def _init():
-        env = gym.make(env_id)
+        env = gym.make(env_id, max_ep=1000)
         env.seed(seed + rank)
         if Wrapper_class is not None:
             env = Wrapper_class(env)
@@ -30,29 +30,31 @@ def make_env(env_id, rank, Wrapper_class = None, seed=0):
     return _init
 
 if __name__ == '__main__':
-    name = "ppo_ctl_1"
-    log_dir = "tmp/IP_ctl/" + name
-    stats_dir = "tmp/IP_ctl/" + name + ".pkl"
+    name = "ppo_ctl_2"
+    log_dir = "tmp/IP_ctl/torch/" + name
+    stats_dir = "tmp/IP_ctl/torch/" + name + ".pkl"
     tensorboard_dir = os.path.join(os.path.dirname(__file__), "tmp", "log", "torch")
     env_name = "CartPoleCont-v0"
     # Create the vectorized environment
-    s_env = NormalizedActions(gym.make(env_name, max_ep=1000))
-    env = make_vec_env(s_env, n_envs=5, wrapper_class=NormalizedActions)
+    env = make_vec_env(env_name, n_envs=10, wrapper_class=NormalizedActions)
+    env = VecNormalize(env, norm_obs=False, norm_reward=False, clip_obs=10., clip_reward=10., )
     policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
     # Stable Baselines provides you with make_vec_env() helper
     # which does exactly the previous steps for you:
     # env = make_vec_env(env_id, n_envs=num_cpu, seed=0)
 
     model = PPO('MlpPolicy',
-             tensorboard_log=tensorboard_dir,
-             verbose=1,
-             env=env,
-             gamma=1,
-             n_steps=32000,
-             gae_lambda=1,
-             policy_kwargs=policy_kwargs)
+                tensorboard_log=tensorboard_dir,
+                verbose=1,
+                env=env,
+                gamma=1,
+                n_steps=6400,
+                ent_coef=0.01,
+                gae_lambda=1,
+                device='cpu',
+                policy_kwargs=policy_kwargs)
 
-    model.learn(total_timesteps=32000000, tb_log_name=name)
+    model.learn(total_timesteps=4800000, tb_log_name=name)
 
     model.save(log_dir)
     stats_path = os.path.join(stats_dir)

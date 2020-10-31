@@ -75,10 +75,10 @@ log_dir = "tmp/IP_ctl/tf/" + name
 stats_dir = "tmp/IP_ctl/tf/" + name + ".pkl"
 tensorboard_dir = os.path.join(os.path.dirname(__file__), "tmp", "log", "tf")
 env_name = "CartPoleCont-v0"
-s_env = gym.make(env_name, max_ep=1000)
-env = make_vec_env(s_env, n_envs=5, wrapper_class=NormalizedActions)
+# s_env = gym.make(env_name, max_ep=1000)
+env = make_vec_env(env_name, n_envs=10, wrapper_class=NormalizedActions)
 # Automatically normalize the input features and reward
-env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_obs=100., clip_reward=100.,)
+env = VecNormalize(env, norm_obs=False, norm_reward=False, clip_obs=10., clip_reward=10.,)
 
 policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
 
@@ -90,11 +90,11 @@ model = PPO2("MlpPolicy",
              noptepochs=10,
              env=env,
              gamma=1,
-             n_steps=16000,
+             n_steps=6400,
              lam=1,
              policy_kwargs=policy_kwargs)
 
-model.learn(total_timesteps=8000000, tb_log_name=name)
+model.learn(total_timesteps=4800000, tb_log_name=name)
 
 model.save(log_dir)
 stats_path = os.path.join(stats_dir)

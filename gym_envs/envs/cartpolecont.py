@@ -26,10 +26,10 @@ class CartPoleContEnv(gym.Env):
     Observation:
         Type: Box(4)
         Num	Observation               Min             Max
-        1	Cart Position             -4.8            4.8
         0	Cart Velocity             -Inf            Inf
-        4	Pole Angle                -24 deg         24 deg
+        1	Cart Position             -5              5
         3	Pole Velocity At Tip      -Inf            Inf
+        4	Pole Angle                -4 rad          4 rad
 
     Actions:
         Type: Continuous(1,1)
@@ -68,7 +68,7 @@ class CartPoleContEnv(gym.Env):
         self.max_ep = max_ep
 
         # Angle at which to fail the episode
-        self.theta_threshold_radians = 0.5 * math.pi
+        self.theta_threshold_radians = 4
         self.x_threshold = 5
 
         # Angle limit set to 2 * theta_threshold_radians so failing observation
@@ -121,13 +121,18 @@ class CartPoleContEnv(gym.Env):
 
         self.set_state([x_dot, x, theta_dot, theta])
 
-        reward = -0.00025 * (self.state.T @ self.Q @ self.state + action * self.R * action) + 0.004
+        reward = 1.025 - 0.1 * (self.state.T @ self.Q @ self.state + action * self.R * action)
 
         self.traj_len += 1
         done = False
         if self.traj_len == self.max_ep:
             done = True
             self.traj_len = 0
+        elif theta > self.theta_threshold_radians or theta < -self.theta_threshold_radians or x > self.x_threshold or x < -self.x_threshold:
+            done = True
+            self.traj_len = 0
+            reward -= 1
+
         return self.state.squeeze(), reward[0], done, {'action':action}
 
     def reset(self):

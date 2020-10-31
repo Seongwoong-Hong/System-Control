@@ -93,14 +93,28 @@ def make_env(env_id, rank, Wrapper_class = None, seed=0, env_kwargs=None):
         return env
     return _init
 
+def make_env(env_id, rank, Wrapper_class = None, seed=0):
+    def _init():
+        env = gym.make(env_id, max_ep=1000)
+        env.seed(seed + rank)
+        if Wrapper_class is not None:
+            env = Wrapper_class(env)
+        env.seed(seed + rank)
+        env.action_space.seed(seed + rank)
+        return env
+    return _init
 
-if __name__=="__main__":
-    name = "ppo_ctl_5"
-    log_dir = "tmp/IP_ctl/" + name
-    stats_dir = "tmp/IP_ctl/" + name + ".pkl"
+if __name__ == "__main__":
+    name = "ppo_ctl_6"
+    log_dir = "tmp/IP_ctl/tf/" + name
+    stats_dir = "tmp/IP_ctl/tf/" + name + ".pkl"
     tensorboard_dir = os.path.join(os.path.dirname(__file__), "tmp", "log", "tf")
     env_name = "CartPoleCont-v0"
-    env = SubprocVecEnv([make_env(env_name, i, NormalizedActions) for i in range(5)])
+    # s_env = gym.make(env_name, max_ep=1000)
+    env = SubprocVecEnv([make_env(env_name, i, NormalizedActions) for i in range(10)])
+    # Automatically normalize the input features and reward
+    env = VecNormalize(env, norm_obs=False, norm_reward=False, clip_obs=10., clip_reward=10.,)
+
     policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
 
     # callback = SaveGifCallback(save_freq=5e+6, save_path=log_dir, fps=50)
@@ -111,15 +125,15 @@ if __name__=="__main__":
                  noptepochs=10,
                  env=env,
                  gamma=1,
-                 n_steps=16000,
+                 n_steps=6400,
                  lam=1,
                  policy_kwargs=policy_kwargs)
 
-    model.learn(total_timesteps=8000000, tb_log_name=name)
+    model.learn(total_timesteps=4800000, tb_log_name=name)
 
     model.save(log_dir)
     stats_path = os.path.join(stats_dir)
-    # env.save(stats_path)
+    env.save(stats_path)
 
     now = datetime.now()
     print("%s.%s.%s., %s:%s" %(now.year, now.month, now.day, now.hour, now.minute))

@@ -1,11 +1,8 @@
-#!/home/biomechserver/anaconda3/gym_custom/baseline/bin/python3
-
 import os
 import gym, gym_envs
 import numpy as np
-from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
-from stable_baselines.common import make_vec_env
 from stable_baselines import PPO2, DDPG
+from RL.algo.torch.ppo import PPO
 from matplotlib import pyplot as plt
 from matplotlib import animation
 
@@ -15,7 +12,7 @@ class NormalizedActions(gym.ActionWrapper):
         return np.clip(action, self.action_space.low, self.action_space.high)
 
 a = "tf/"
-name = "IP_ctl/" + a + "ppo_ctl_4"
+name = "IP_ctl/" + a + "ppo_ctl_6"
 log_dir = "tmp/" + name + ".zip"
 stats_dir = "tmp/" + name + ".pkl"
 env_name = "CartPoleContTest-v0"
@@ -79,5 +76,5 @@ for _ in range(1):
 env.close()
 # save_frames_as_gif(frames)
 print(-np.sum(cost_result), np.sum(np.exp(cost_result)))
-plt.plot(cost_result)
+plt.plot(-cost_result)
 plt.show()
