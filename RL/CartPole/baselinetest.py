@@ -1,7 +1,8 @@
 import os
-import gym, gym_envs
+import gym, gym_envs, imageio
 import numpy as np
 from stable_baselines import PPO2, DDPG
+from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
 from RL.algo.torch.ppo import PPO
 from matplotlib import pyplot as plt
 from matplotlib import animation
@@ -12,22 +13,32 @@ class NormalizedActions(gym.ActionWrapper):
         return np.clip(action, self.action_space.low, self.action_space.high)
 
 a = "tf/"
-name = "IP_ctl/" + a + "ppo_ctl_6"
+name = "IP_ctl/" + a + "ppo_ctl_Comp"
 log_dir = "tmp/" + name + ".zip"
 stats_dir = "tmp/" + name + ".pkl"
 env_name = "CartPoleContTest-v0"
 stats_path = os.path.join(stats_dir)
 
 # Load the agent
-model = PPO2.load(log_dir)
+if a == "tf/":
+    model = PPO2.load(log_dir)
+    env = NormalizedActions(gym.make(id=env_name, max_ep=1000))
+    # env = DummyVecEnv([lambda: NormalizedActions(gym.make(id=env_name, max_ep=1000))])
+    # env = VecNormalize.load(stats_path, env)
+elif a == "torch/":
+    model = PPO.load(log_dir)
+    env = NormalizedActions(gym.make(id=env_name, max_ep=1000))
+
+else:
+    raise ValueError("Check typo")
 
 # Load the saved statistics
 # env = DummyVecEnv([lambda: gym.make(env_name)])
-env = NormalizedActions(gym.make(id=env_name, max_ep=1000))
 #  do not update them at test time
 env.training = False
 # reward normalization is not needed at test time
 env.norm_reward = False
+
 
 max_step = 1000
 obs_result = np.zeros((4, max_step))
@@ -55,7 +66,7 @@ frames = []
 for _ in range(1):
     step = 0
     obs = env.reset()
-    env.set_state(np.array([0, 0, 0, np.pi/12]))
+    env.set_state(np.array([0, 0, 0, 1.2]))
     obs = env.__getattr__('state')
     # env.env_method('set_state', np.array([0.1]), np.array([0.05]))
     # obs = env.normalize_obs(env.env_method('_get_obs'))
@@ -75,6 +86,10 @@ for _ in range(1):
 
 env.close()
 # save_frames_as_gif(frames)
-print(-np.sum(cost_result), np.sum(np.exp(cost_result)))
-plt.plot(-cost_result)
+# imageio.mimsave("anim.gif", [np.array(frames) for i, img in enumerate(frames) if i%2 == 0], fps=29)
+print(np.sum(cost_result))
+plt.plot(cost_result)
+plt.show()
+
+plt.plot(act_result)
 plt.show()

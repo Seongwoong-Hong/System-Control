@@ -42,19 +42,20 @@ if __name__ == '__main__':
     # Stable Baselines provides you with make_vec_env() helper
     # which does exactly the previous steps for you:
     # env = make_vec_env(env_id, n_envs=num_cpu, seed=0)
+    model = PPO.load(path="tmp/IP_ctl/torch/ppo_ctl_1.zip", env=env, tensorboard_log=tensorboard_dir)
 
-    model = PPO('MlpPolicy',
-                tensorboard_log=tensorboard_dir,
-                verbose=1,
-                env=env,
-                gamma=1,
-                n_steps=6400,
-                ent_coef=0.01,
-                gae_lambda=1,
-                device='cpu',
-                policy_kwargs=policy_kwargs)
+    # model = PPO('MlpPolicy',
+    #             tensorboard_log=tensorboard_dir,
+    #             verbose=1,
+    #             env=env,
+    #             gamma=1,
+    #             n_steps=6400,
+    #             ent_coef=0.01,
+    #             gae_lambda=1,
+    #             device='cpu',
+    #             policy_kwargs=policy_kwargs)
 
-    model.learn(total_timesteps=4800000, tb_log_name=name)
+    model.learn(total_timesteps=3200000, tb_log_name=name)
 
     model.save(log_dir)
     stats_path = os.path.join(stats_dir)

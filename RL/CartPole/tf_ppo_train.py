@@ -5,7 +5,7 @@ import numpy as np
 import gym, gym_envs
 from stable_baselines.common.callbacks import BaseCallback
 from stable_baselines.common.policies import ActorCriticPolicy, RecurrentActorCriticPolicy
-from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines.common.vec_env import DummyVecEnv, VecNormalize, SubprocVecEnv
 from stable_baselines.common import make_vec_env, SetVerbosity, tf_util
 from stable_baselines import PPO2
 
@@ -69,36 +69,60 @@ class SaveGifCallback(BaseCallback):
                 self.c_count += 1
         return True
 
+def make_env(env_id, rank, Wrapper_class = None, seed=0, limit=0.2):
+    def _init():
+        env = gym.make(env_id, max_ep=1000, limit=limit)
+        env.seed(seed + rank)
+        if Wrapper_class is not None:
+            env = Wrapper_class(env)
+        env.seed(seed + rank)
+        env.action_space.seed(seed + rank)
+        return env
+    return _init
 
-name = "ppo_ctl_5"
-log_dir = "tmp/IP_ctl/tf/" + name
-stats_dir = "tmp/IP_ctl/tf/" + name + ".pkl"
-tensorboard_dir = os.path.join(os.path.dirname(__file__), "tmp", "log", "tf")
-env_name = "CartPoleCont-v0"
-# s_env = gym.make(env_name, max_ep=1000)
-env = make_vec_env(env_name, n_envs=10, wrapper_class=NormalizedActions)
-# Automatically normalize the input features and reward
-env = VecNormalize(env, norm_obs=False, norm_reward=False, clip_obs=10., clip_reward=10.,)
+if __name__ == "__main__":
+    name = "ppo_ctl_10"
+    log_dir = "tmp/IP_ctl/tf/" + name
+    stats_dir = "tmp/IP_ctl/tf/" + name + ".pkl"
+    tensorboard_dir = os.path.join(os.path.dirname(__file__), "tmp", "log", "tf")
+    env_id = "CartPoleCont-v0"
+    num_cpu = 10
+    env = SubprocVecEnv([make_env(env_id, i, NormalizedActions) for i in range(num_cpu)])
+    # Automatically normalize the input features and reward
+    env = VecNormalize(env, norm_obs=False, norm_reward=False, clip_obs=10., clip_reward=10.,)
 
-policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
+    policy_kwargs = dict(net_arch=[dict(pi=[256, 128], vf=[256, 128])])
+    model = PPO2("MlpPolicy",
+                 tensorboard_log=tensorboard_dir,
+                 verbose=1,
+                 noptepochs=10,
+                 env=env,
+                 gamma=1,
+                 nminibatches=100,
+                 n_steps=6400,
+                 lam=1,
+                 policy_kwargs=policy_kwargs)
+    model.save(log_dir)
+    model.learn(total_timesteps=6400000, tb_log_name=name+"1st")
+    model.save(log_dir + "1st")
+    del model
 
-# callback = SaveGifCallback(save_freq=5e+6, save_path=log_dir, fps=50)
+    env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, limit=0.2) for i in range(num_cpu)])
+    model = PPO2.load(load_path=log_dir + "1st", env=env, tensorboard_log=tensorboard_dir)
+    model.learn(total_timesteps=4800000, tb_log_name=name + "2nd")
+    model.save(log_dir + "2nd")
+    del model
 
-model = PPO2("MlpPolicy",
-             tensorboard_log=tensorboard_dir,
-             verbose=1,
-             noptepochs=10,
-             env=env,
-             gamma=1,
-             n_steps=6400,
-             lam=1,
-             policy_kwargs=policy_kwargs)
+    env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, limit=0.5) for i in range(num_cpu)])
+    model = PPO2.load(load_path=log_dir + "2nd", env=env, tensorboard_log=tensorboard_dir)
+    model.learn(total_timesteps=4800000, tb_log_name=name + "3rd")
+    model.save(log_dir + "3rd")
+    del model
 
-model.learn(total_timesteps=4800000, tb_log_name=name)
-
-model.save(log_dir)
-stats_path = os.path.join(stats_dir)
-env.save(stats_path)
-
-now = datetime.now()
-print("%s.%s.%s., %s:%s" %(now.year, now.month, now.day, now.hour, now.minute))
+    env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, limit=0.7) for i in range(num_cpu)])
+    model = PPO2.load(load_path=log_dir + "3rd", env=env, tensorboard_log=tensorboard_dir)
+    model.learn(total_timesteps=4800000, tb_log_name=name + "4th")
+    model.save(log_dir + "4th")
+    del model
+    now = datetime.now()
+    print("%s.%s.%s., %s:%s" %(now.year, now.month, now.day, now.hour, now.minute))

@@ -69,33 +69,9 @@ class SaveGifCallback(BaseCallback):
                 self.c_count += 1
         return True
 
-def make_env(env_id, rank, Wrapper_class = None, seed=0, env_kwargs=None):
-    """
-    Utility function for multiprocessed env.
-
-    :param env_id: (str) the environment ID
-    :param num_env: (int) the number of environments you wish to have in subprocesses
-    :param seed: (int) the inital seed for RNG
-    :param rank: (int) index of the subprocess
-    """
-    env_kwargs = {} if env_kwargs is None else env_kwargs
-    def _init():
-        if isinstance(env_id, str):
-            env = gym.make(env_id)
-            if len(env_kwargs) > 0:
-                warnings.warn("No environment class was passed (only an env ID) so `env_kwargs` will be ignored")
-        else:
-            env = env_id(**env_kwargs)
-        env.seed(seed + rank)
-        env.action_space.seed(seed + rank)
-        if Wrapper_class is not None:
-            env = Wrapper_class(env)
-        return env
-    return _init
-
 def make_env(env_id, rank, Wrapper_class = None, seed=0):
     def _init():
-        env = gym.make(env_id, max_ep=1000)
+        env = gym.make(env_id, max_ep=1000, limit=1.3)
         env.seed(seed + rank)
         if Wrapper_class is not None:
             env = Wrapper_class(env)
@@ -105,35 +81,58 @@ def make_env(env_id, rank, Wrapper_class = None, seed=0):
     return _init
 
 if __name__ == "__main__":
-    name = "ppo_ctl_6"
+    name = "ppo_ctl_try"
     log_dir = "tmp/IP_ctl/tf/" + name
     stats_dir = "tmp/IP_ctl/tf/" + name + ".pkl"
     tensorboard_dir = os.path.join(os.path.dirname(__file__), "tmp", "log", "tf")
     env_name = "CartPoleCont-v0"
     # s_env = gym.make(env_name, max_ep=1000)
+    limit = 0.2
     env = SubprocVecEnv([make_env(env_name, i, NormalizedActions) for i in range(10)])
+    test_env = NormalizedActions(gym.make(id=env_name, max_ep=1000, limit=limit))
     # Automatically normalize the input features and reward
     env = VecNormalize(env, norm_obs=False, norm_reward=False, clip_obs=10., clip_reward=10.,)
 
-    policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
+    policy_kwargs = dict(net_arch=[dict(pi=[256, 128], vf=[256, 128])])
 
     # callback = SaveGifCallback(save_freq=5e+6, save_path=log_dir, fps=50)
-
+    # model = PPO2.load(load_path="tmp/IP_ctl/tf/ppo_ctl_Comp.zip", env=env, tensorboard_log=tensorboard_dir, n_steps=6400)
     model = PPO2("MlpPolicy",
                  tensorboard_log=tensorboard_dir,
                  verbose=1,
-                 noptepochs=10,
+                 noptepochs=12,
                  env=env,
                  gamma=1,
                  n_steps=6400,
                  lam=1,
                  policy_kwargs=policy_kwargs)
-
-    model.learn(total_timesteps=4800000, tb_log_name=name)
+    prev_cost, curr_cost = np.inf, 0
+    while (True):
+        model.learn(total_timesteps=1600000, tb_log_name=name+'_'+str(limit))
+        _ = test_env.reset()
+        test_env.set_state(np.array([0, 0, 0, limit]))
+        obs = test_env.__getattr__('state')
+        done = False
+        step = 0
+        while not done:
+            act, _ = model.predict(obs, deterministic=True)
+            obs, cost, done, info = test_env.step(act)
+            curr_cost += cost
+            step += 1
+        if step >= 1000:
+            limit += 0.1
+            break
+        if curr_cost > prev_cost:
+            model = PPO2.load(load_path="tmp/IP_ctl/ppo_ctl_try_p.zip", env=env, tensorboard_log=tensorboard_dir, n_steps=6400)
+            curr_cost = 0
+        else:
+            model.save("tmp/IP_ctl/ppo_ctl_try_p.zip")
+            prev_cost = curr_cost
+            curr_cost = 0
 
     model.save(log_dir)
-    stats_path = os.path.join(stats_dir)
-    env.save(stats_path)
 
     now = datetime.now()
     print("%s.%s.%s., %s:%s" %(now.year, now.month, now.day, now.hour, now.minute))
+    env.close()
+    del model
