@@ -16,7 +16,7 @@ class CartPoleContTestEnv(gym.Env):
 
     def step(self, action):
         state, rew, done, info = self.env.step(action)
-        cost = -(state.T @ self.env.Q @ state + action * self.env.R * action)
+        cost = 0.5 * (state.T @ self.env.Q @ state + action * self.env.R * action)
         return state, cost, done, info
 
     def reset(self):
