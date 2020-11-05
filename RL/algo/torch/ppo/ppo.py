@@ -146,12 +146,14 @@ class PPO(OnPolicyAlgorithm):
         entropy_losses, all_kl_divs = [], []
         pg_losses, value_losses = [], []
         clip_fractions = []
-
+        returns = []
         # train for gradient_steps epochs
         for epoch in range(self.n_epochs):
             approx_kl_divs = []
             # Do a complete pass on the rollout buffer
             for rollout_data in self.rollout_buffer.get(self.batch_size):
+                r = rollout_data.returns.mean()
+                returns.append(r.item())
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
@@ -238,6 +240,7 @@ class PPO(OnPolicyAlgorithm):
         logger.record("train/clip_range", clip_range)
         if self.clip_range_vf is not None:
             logger.record("train/clip_range_vf", clip_range_vf)
+        logger.record("train/returns", np.mean(returns))
 
     def learn(
         self,
