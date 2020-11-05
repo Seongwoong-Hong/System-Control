@@ -1,9 +1,10 @@
 import gym
+import numpy as np
 from gym_envs.envs.cartpolecont import CartPoleContEnv
 
 class CartPoleContTestEnv(gym.Env):
-    def __init__(self, max_ep):
-        self.env = CartPoleContEnv(max_ep)
+    def __init__(self, max_ep, limit=np.pi):
+        self.env = CartPoleContEnv(max_ep, limit=limit)
         self.action_space = self.env.action_space
         self.observation_space = self.env.observation_space
         self.reward_range = self.env.reward_range
