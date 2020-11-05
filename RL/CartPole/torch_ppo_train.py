@@ -54,10 +54,10 @@ if __name__ == '__main__':
                 device='cpu',
                 policy_kwargs=policy_kwargs)
 
-    model.learn(total_timesteps=3200000, tb_log_name=name)
+    model.learn(total_timesteps=3200000, tb_log_name=name+"_"+str(limit))
     # model = PPO.load(path=log_dir, env=env, tensorboard_log=tensorboard_dir)
-    prev_cost, curr_cost = np.inf, 0
-    for _ in range(3):
+    prev_rew, curr_rew = -np.inf, 0
+    for _ in range(10):
         test_env = NormalizedActions(gym.make(id=env_id, max_ep=1000, limit=limit))
         while(True):
             model.learn(total_timesteps=3200000, tb_log_name=name+"_"+str(limit))
@@ -68,19 +68,20 @@ if __name__ == '__main__':
             step = 0
             while not done:
                 act, _ = model.predict(obs, deterministic=True)
-                obs, cost, done, info = test_env.step(act)
-                curr_cost += cost
+                obs, rew, done, info = test_env.step(act)
+                curr_rew += rew
                 step += 1
             if step >= 1000:
                 break
-            if curr_cost > prev_cost:
+            if curr_cost < prev_cost:
                 model = PPO.load(load_path="tmp/IP_ctl/ppo_ctl_try_p.zip", env=env, tensorboard_log=tensorboard_dir)
+                print("Previous model is better")
                 curr_cost = 0
             else:
                 model.save("tmp/IP_ctl/ppo_ctl_try_p.zip")
                 prev_cost = curr_cost
                 curr_cost = 0
-        limit += 0.1
+        limit += 0.2
         env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, limit=limit) for i in range(num_cpu)])
 
     model.save(log_dir)
