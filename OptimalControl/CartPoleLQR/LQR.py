@@ -1,17 +1,11 @@
 import numpy as np
-import gym, math, torch, time, gym_envs
+import gym, time, gym_envs
 from matplotlib import pyplot as plt
-from matplotlib import animation
 
 def LQR(x0, u, n, model):
     K = BackwardPass(n, model)
     x, u, J = ForwardPass(x0, u, n, K, model)
     return x, u, J
-
-def costfn(xt, ut, model):
-    Q, R = model.Q, model.R
-    cost = 0.5 * (xt.T @ Q @ xt + ut.T * R * ut)
-    return cost.squeeze()
 
 def BackwardPass(n, model):
     Q, R = model.Q, model.R
@@ -27,22 +21,6 @@ def BackwardPass(n, model):
         Vk = Qk[0:-1, 0:-1] + Qk[0:-1, [-1]] @ K[idx] + K[idx].T @ Qk[[-1], 0:-1] + K[idx].T * Qk[-1, -1] @ K[idx]
     return K
 
-def save_frames_as_gif(frames, path='./', filename='gym_animation.gif'):
-
-    #Mess with this to change frame size
-    plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
-
-    patch = plt.imshow(frames[0])
-    plt.axis('off')
-
-    def animate(i):
-        patch.set_data(frames[i])
-
-    anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
-    anim.save(path + filename, writer='imagemagick', fps=60)
-
-
-
 def ForwardPass(x0, u, n, K, model):
     J = np.zeros(n)
     x_op = np.zeros([n, 4, 1])
@@ -55,22 +33,24 @@ def ForwardPass(x0, u, n, K, model):
     for k in range(n):
         uk = u[k] + K[k] @ xk
         x_op[k], u_op[k] = xk, uk
-        J[k] = costfn(xk, uk, model)
-        ob, _, _, _ = model.step(uk[0])
+        ob, cost, _, _ = model.step(uk[0])
         frames.append(model.render('rgb_array'))
         xk = ob.reshape(4, 1)
+        J[k] = cost
+    model.saving_gif(name="LQR.gif", frames=frames)
     model.close()
-    # save_frames_as_gif(frames)
     return x_op, u_op, J
 
 if __name__ == "__main__":
     n = 1000
     model = gym.make(id="CartPoleContTest-v0", max_ep=n)
     u = np.zeros([n, 1, 1])
-    x0 = np.array([0, 0, 0, np.pi * 1/6]).reshape(4, 1)
+    x0 = np.array([0, 0, 0, np.pi * 1/4]).reshape(4, 1)
     model.Q = np.diag([1, 1, 1, 1])
     model.R = 0.001
     x_op, u_op, J = LQR(x0, u, n, model)
     plt.plot(J)
     plt.show()
-    print(np.sum(J), np.sum(np.exp(-J)))
+    plt.plot(u_op.squeeze())
+    plt.show()
+    print(np.sum(J))
