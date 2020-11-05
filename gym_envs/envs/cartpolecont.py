@@ -133,7 +133,7 @@ class CartPoleContEnv(gym.Env):
         if self.traj_len == self.max_ep:
             done = True
             self.traj_len = 0
-        elif theta > 2*np.pi or theta < -2*np.pi or x > self.x_threshold+2.5 or x < -self.x_threshold-2.5:
+        elif theta > 2*self.limit or theta < -2*self.limit or x > self.x_threshold+2.5 or x < -self.x_threshold-2.5:
             done = True
             reward -= 2 * (1000 - self.traj_len)
             self.traj_len = 0
