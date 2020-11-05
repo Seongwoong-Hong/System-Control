@@ -12,12 +12,11 @@ class NormalizedActions(gym.ActionWrapper):
         action *= 0.125 * (self.action_space.high - self.action_space.low)
         return np.clip(action, self.action_space.low, self.action_space.high)
 
-a = "tf/"
-name = "IP_ctl/" + a + "ppo_ctl_Comp"
+a = "torch/"
+# name = "IP_ctl/" + a + "ppo_ctl_Comp"
+name = "IP_ctl/" + "ppo_ctl_try_p"
 log_dir = "tmp/" + name + ".zip"
-stats_dir = "tmp/" + name + ".pkl"
 env_name = "CartPoleContTest-v0"
-stats_path = os.path.join(stats_dir)
 
 # Load the agent
 if a == "tf/":
@@ -45,28 +44,12 @@ obs_result = np.zeros((4, max_step))
 act_result = np.zeros(max_step)
 cost_result = np.zeros(max_step)
 rew_result = np.zeros(max_step)
-# coeff_result = []
-
-
-def save_frames_as_gif(frames, path='./', filename='gym_animation.gif'):
-
-    #Mess with this to change frame size
-    plt.figure(figsize=(frames[0].shape[1] / 72.0, frames[0].shape[0] / 72.0), dpi=72)
-
-    patch = plt.imshow(frames[0])
-    plt.axis('off')
-
-    def animate(i):
-        patch.set_data(frames[i])
-
-    anim = animation.FuncAnimation(plt.gcf(), animate, frames = len(frames), interval=50)
-    anim.save(path + filename, writer='imagemagick', fps=60)
 
 frames = []
 for _ in range(1):
     step = 0
     obs = env.reset()
-    env.set_state(np.array([0, 0, 0, 1.2]))
+    env.set_state(np.array([0, 0, 0, 0.7]))
     obs = env.__getattr__('state')
     # env.env_method('set_state', np.array([0.1]), np.array([0.05]))
     # obs = env.normalize_obs(env.env_method('_get_obs'))
@@ -74,7 +57,8 @@ for _ in range(1):
     done = False
     while (not done) and (step < max_step):
         obs_result[:, step] = env.__getattr__('state')
-        frames.append(env.render("rgb_array"))
+        frame = env.render("rgb_array")
+        frames.append(frame)
         act, _ = model.predict(obs, deterministic=True)
         obs, cost, done, info = env.step(act)
         action = info['action']
@@ -85,8 +69,7 @@ for _ in range(1):
         step += 1
 
 env.close()
-# save_frames_as_gif(frames)
-# imageio.mimsave("anim.gif", [np.array(frames) for i, img in enumerate(frames) if i%2 == 0], fps=29)
+imageio.mimsave("anim.gif", [np.array(frames) for i, img in enumerate(frames) if i%2 == 0], fps=25)
 print(np.sum(cost_result))
 plt.plot(cost_result)
 plt.show()
