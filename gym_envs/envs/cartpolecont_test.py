@@ -1,4 +1,4 @@
-import gym
+import gym, imageio
 import numpy as np
 from gym_envs.envs.cartpolecont import CartPoleContEnv
 
@@ -28,6 +28,13 @@ class CartPoleContTestEnv(gym.Env):
 
     def set_state(self, state):
         self.env.set_state(state)
+
+    def saving_gif(self, name="anim.gif", frames=None):
+        if frames is None:
+            raise ValueError("There are no frame inputs")
+        print("Saving input frames as gif...")
+        fps = 1/2*self.tau
+        imageio.mimsave(name, [np.array(frame) for i, frame in enumerate(frames) if i % 2 == 0], fps=fps)
 
     def close(self):
         self.env.close()
