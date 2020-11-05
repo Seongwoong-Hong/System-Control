@@ -44,18 +44,18 @@ if __name__ == '__main__':
     # which does exactly the previous steps for you:
     # env = make_vec_env(env_id, n_envs=num_cpu, seed=0)
     model = PPO('MlpPolicy',
-                tensorboard_log=tensorboard_dir,
-                verbose=1,
-                env=env,
-                gamma=1,
-                n_steps=6400,
-                ent_coef=0.01,
-                gae_lambda=1,
-                device='cpu',
-                policy_kwargs=policy_kwargs)
-
+               tensorboard_log=tensorboard_dir,
+               verbose=1,
+               env=env,
+               gamma=1,
+               n_steps=6400,
+               ent_coef=0.01,
+               gae_lambda=1,
+               device='cpu',
+               policy_kwargs=policy_kwargs)
+    
+    # model = PPO.load(path="tmp/IP_ctl/ppo_ctl_try_p.zip", env=env, tensorboard_log=tensorboard_dir)
     model.learn(total_timesteps=3200000, tb_log_name=name+"_"+str(limit))
-    # model = PPO.load(path=log_dir, env=env, tensorboard_log=tensorboard_dir)
     prev_rew, curr_rew = -np.inf, 0
     for _ in range(10):
         test_env = NormalizedActions(gym.make(id=env_id, max_ep=1000, limit=limit))
@@ -71,16 +71,16 @@ if __name__ == '__main__':
                 obs, rew, done, info = test_env.step(act)
                 curr_rew += rew
                 step += 1
-            if step >= 1000:
-                break
-            if curr_cost < prev_cost:
+            if curr_rew < prev_rew:
                 model = PPO.load(load_path="tmp/IP_ctl/ppo_ctl_try_p.zip", env=env, tensorboard_log=tensorboard_dir)
                 print("Previous model is better")
-                curr_cost = 0
+                curr_rew = 0
             else:
                 model.save("tmp/IP_ctl/ppo_ctl_try_p.zip")
-                prev_cost = curr_cost
-                curr_cost = 0
+                prev_rew = curr_rew
+                curr_rew = 0
+            if step >= 1000:
+                break
         limit += 0.2
         env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, limit=limit) for i in range(num_cpu)])
 
