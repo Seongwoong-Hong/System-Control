@@ -1,4 +1,4 @@
-import gym, gym_envs, os
+import gym, gym_envs, os, shutil
 import numpy as np
 from datetime import datetime
 from RL.algo.torch.ppo import PPO
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     prev_rew, curr_rew = -np.inf, 0
     for _ in range(10):
         test_env = NormalizedActions(gym.make(id=env_id, max_ep=1000, limit=limit))
-        for _ in range(5):
+        for i in range(15):
             model.learn(total_timesteps=1600000, tb_log_name=name+"_%.2f" %(limit))
             test_env.reset()
             test_env.set_state(np.array([0, 0, 0, limit]))
@@ -68,11 +68,13 @@ if __name__ == '__main__':
                 obs, rew, done, info = test_env.step(act)
                 curr_rew += rew
                 step += 1
+            if i > 2:
+                shutil.rmtree(os.path.join(tensorboard_dir, name) + "_%.2f_%d" %(limit, i-2))
             if step >= 1000:
                 break
         model.save(log_dir + "_%.2f.zip" %(limit))
         if step < 1000:
-            print("Didn't Learn the Current Curriculum")
+            print("Can't Learn the Current Curriculum")
             break
         limit += 0.20
         env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, limit=limit) for i in range(num_cpu)])
