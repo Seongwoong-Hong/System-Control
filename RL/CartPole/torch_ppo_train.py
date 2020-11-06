@@ -3,7 +3,6 @@ import numpy as np
 from datetime import datetime
 from RL.algo.torch.ppo import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv
-from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.utils import set_random_seed
 
 class NormalizedActions(gym.ActionWrapper):
@@ -42,7 +41,6 @@ if __name__ == '__main__':
     policy_kwargs = dict(net_arch=[dict(pi=[256, 128], vf=[256, 128])])
     # Stable Baselines provides you with make_vec_env() helper
     # which does exactly the previous steps for you:
-    # env = make_vec_env(env_id, n_envs=num_cpu, seed=0)
     model = PPO('MlpPolicy',
                tensorboard_log=tensorboard_dir,
                verbose=1,
@@ -54,14 +52,13 @@ if __name__ == '__main__':
                device='cpu',
                policy_kwargs=policy_kwargs)
     
-    # model = PPO.load(path="tmp/IP_ctl/ppo_ctl_try_p.zip", env=env, tensorboard_log=tensorboard_dir)
-    model.learn(total_timesteps=3200000, tb_log_name=name+"_"+str(limit))
+    # model = PPO.load(path="tmp/IP_ctl/ppo_ctl_try_p.zip", env=env, tensorboard_log=tensorboard_dir, device='cpu')
     prev_rew, curr_rew = -np.inf, 0
     for _ in range(10):
         test_env = NormalizedActions(gym.make(id=env_id, max_ep=1000, limit=limit))
-        while(True):
-            model.learn(total_timesteps=3200000, tb_log_name=name+"_"+str(limit))
-            _ = test_env.reset()
+        for _ in range(5):
+            model.learn(total_timesteps=1600000, tb_log_name=name+"_%.2f" %(limit))
+            test_env.reset()
             test_env.set_state(np.array([0, 0, 0, limit]))
             obs = test_env.__getattr__('state')
             done = False
@@ -71,17 +68,11 @@ if __name__ == '__main__':
                 obs, rew, done, info = test_env.step(act)
                 curr_rew += rew
                 step += 1
-            if curr_rew < prev_rew:
-                model = PPO.load(load_path="tmp/IP_ctl/ppo_ctl_try_p.zip", env=env, tensorboard_log=tensorboard_dir)
-                print("Previous model is better")
-                curr_rew = 0
-            else:
-                model.save("tmp/IP_ctl/ppo_ctl_try_p.zip")
-                prev_rew = curr_rew
-                curr_rew = 0
             if step >= 1000:
                 break
-        limit += 0.2
+
+        model.save(log_dir + "_%.2f.zip" %(limit))
+        limit += 0.20
         env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, limit=limit) for i in range(num_cpu)])
 
     model.save(log_dir)
