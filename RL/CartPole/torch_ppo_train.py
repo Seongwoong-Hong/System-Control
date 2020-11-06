@@ -70,7 +70,9 @@ if __name__ == '__main__':
                 step += 1
             if step >= 1000:
                 break
-
+        if step < 1000:
+            print("Didn't Learn the Current Curriculum")
+            break
         model.save(log_dir + "_%.2f.zip" %(limit))
         limit += 0.20
         env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, limit=limit) for i in range(num_cpu)])
