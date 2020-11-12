@@ -54,7 +54,7 @@ class CartPoleContEnv(gym.Env):
         'video.frames_per_second': 50
     }
 
-    def __init__(self, max_ep=1000, limit=np.pi/6):
+    def __init__(self, max_ep=1000, high=np.pi/6, low=0):
         self.gravity = 9.81
         self.masscart = 5.0
         self.masspole = 1.0
@@ -70,7 +70,8 @@ class CartPoleContEnv(gym.Env):
         # Angle at which to fail the episode
         self.theta_threshold_radians = 4
         self.x_threshold = 5
-        self.limit = limit
+        self.high = high
+        self.low = low
         # Angle limit set to 2 * theta_threshold_radians so failing observation
         # is still within bounds.
         high = np.array([self.x_threshold * 2,
@@ -121,7 +122,7 @@ class CartPoleContEnv(gym.Env):
 
         self.set_state([x_dot, x, theta_dot, theta])
 
-        reward = 1.025 - 0.1 * (self.state.T @ self.Q @ self.state + action * self.R * action)
+        reward = 1.025 - 0.25 * (self.state.T @ self.Q @ self.state + action * self.R * action)
         # torch/ppo_ct l_1,2 use this reward
         # tf/ppo_ctl_5,6 second learn use this reward
 
@@ -133,15 +134,15 @@ class CartPoleContEnv(gym.Env):
         if self.traj_len == self.max_ep:
             done = True
             self.traj_len = 0
-        elif theta > 2*self.limit or theta < -2*self.limit or x > self.x_threshold+2.5 or x < -self.x_threshold-2.5:
-            done = True
-            reward -= 2 * (1000 - self.traj_len)
-            self.traj_len = 0
+        #elif theta > 2*self.limit or theta < -2*self.limit or x > self.x_threshold+2.5 or x < -self.x_threshold-2.5:
+        #    done = True
+        #    reward -= 2 * (1000 - self.traj_len)
+        #    self.traj_len = 0
 
         return self.state.squeeze(), reward[0], done, {'action':action}
 
     def reset(self):
-        self.state = self.np_random.uniform(low=-self.limit, high=self.limit, size=(4,))
+        self.state = self.np_random.uniform(low=self.low, high=self.high, size=(4,))
         # torch/ppo_ctl_2 use this reset
 
         self.state[0], self.state[1] = 0, 0
