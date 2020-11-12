@@ -37,8 +37,9 @@ if __name__ == '__main__':
     num_cpu = 10  # Number of processes to use
     high = 0.2  # Initial Limit
     low = 0.0
+    seed = 0
     # Create the vectorized environment
-    env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, high=high, low=low) for i in range(num_cpu)])
+    env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, seed=seed, high=high, low=low) for i in range(num_cpu)])
     policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
 
     model = PPO('MlpPolicy',
@@ -78,7 +79,8 @@ if __name__ == '__main__':
             break
         high += 0.10
         low += 0.10
-        env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, high=high, low=low) for i in range(num_cpu)])
+        seed += num_cpu
+        env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, seed=seed, high=high, low=low) for i in range(num_cpu)])
         model.set_env(env)
 
     model.save(log_dir)
