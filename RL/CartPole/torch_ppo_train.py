@@ -10,7 +10,7 @@ class NormalizedActions(gym.ActionWrapper):
         action *= 0.125 * (self.action_space.high - self.action_space.low)
         return np.clip(action, self.action_space.low, self.action_space.high)
 
-def make_env(env_id, rank, Wrapper_class = None, seed=0, limit=0.2):
+def make_env(env_id, rank, Wrapper_class = None, seed=0, high=0, low=0):
     """
     Utility function for multiprocessed env.
 
@@ -20,7 +20,7 @@ def make_env(env_id, rank, Wrapper_class = None, seed=0, limit=0.2):
     :param rank: (int) index of the subprocess
     """
     def _init():
-        env = gym.make(env_id, max_ep=1000, limit=limit)
+        env = gym.make(env_id, max_ep=1000, high=high, low=low)
         env.seed(seed + rank)
         if Wrapper_class is not None:
             env = Wrapper_class(env)
@@ -35,14 +35,15 @@ if __name__ == '__main__':
     tensorboard_dir = os.path.join(os.path.dirname(__file__), "tmp", "log", "torch")
     env_id = "CartPoleCont-v0"
     num_cpu = 10  # Number of processes to use
-    limit = 0.2  # Initial Limit
+    high = 0.2  # Initial Limit
+    low = 0.0
     # Create the vectorized environment
-    env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, limit=limit) for i in range(num_cpu)])
+    env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, high=high, low=low) for i in range(num_cpu)])
     policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
 
     model = PPO('MlpPolicy',
                tensorboard_log=tensorboard_dir,
-               verbose=1,
+               verbose=0,
                env=env,
                gamma=1,
                n_steps=6400,
@@ -52,11 +53,13 @@ if __name__ == '__main__':
                policy_kwargs=policy_kwargs)
 
     for _ in range(10):
-        test_env = NormalizedActions(gym.make(id=env_id, max_ep=1000, limit=limit))
+        test_env = NormalizedActions(gym.make(id=env_id, max_ep=1000, high=high, low=low))
         for i in range(10):
-            model.learn(total_timesteps=3200000, tb_log_name=name+"_%.2f" %(limit))
+            if i > 2:
+                shutil.rmtree(os.path.join(tensorboard_dir, name) + "_%.2f_%d" %(high, i-2))
+            # model.learn(total_timesteps=3200000, tb_log_name=name+"_%.2f" %(high))
             test_env.reset()
-            test_env.set_state(np.array([0, 0, 0, limit]))
+            test_env.set_state(np.array([0, 0, 0, high]))
             obs = test_env.__getattr__('state')
             done = False
             step = 0
@@ -64,17 +67,18 @@ if __name__ == '__main__':
                 act, _ = model.predict(obs, deterministic=True)
                 obs, rew, done, info = test_env.step(act)
                 step += 1
-            if i > 2:
-                shutil.rmtree(os.path.join(tensorboard_dir, name) + "_%.2f_%d" %(limit, i-2))
-            print("Test Step: %d" %(step))
-            if step >= 1000:
+            print("theta: %.2f, x: %.2f" % (obs[1], obs[3]))
+            if abs(obs[1]) < 0.05 and abs(obs[3]) < 0.05:
+                fail = False
                 break
-        model.save(log_dir + "_%.2f.zip" %(limit))
-        if step < 1000:
-            print("Can't Learn the Current Curriculum. Last limit value is %.2f" %(limit))
+            fail = True
+        model.save(log_dir + "_%.2f.zip" %(high))
+        if fail:
+            print("Can't Learn the Current Curriculum. Last limit value is %.2f" %(high))
             break
-        limit += 0.20
-        env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, limit=limit) for i in range(num_cpu)])
+        high += 0.10
+        low += 0.10
+        env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, high=high, low=low) for i in range(num_cpu)])
         model.set_env(env)
 
     model.save(log_dir)
