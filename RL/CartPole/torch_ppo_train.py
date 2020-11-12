@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     model = PPO('MlpPolicy',
                tensorboard_log=tensorboard_dir,
-               verbose=0,
+               verbose=1,
                env=env,
                gamma=1,
                n_steps=6400,
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         for i in range(10):
             if i > 2:
                 shutil.rmtree(os.path.join(tensorboard_dir, name) + "_%.2f_%d" %(high, i-2))
-            # model.learn(total_timesteps=3200000, tb_log_name=name+"_%.2f" %(high))
+            model.learn(total_timesteps=3200000, tb_log_name=name+"_%.2f" %(high))
             test_env.reset()
             test_env.set_state(np.array([0, 0, 0, high]))
             obs = test_env.__getattr__('state')
@@ -68,8 +68,8 @@ if __name__ == '__main__':
                 act, _ = model.predict(obs, deterministic=True)
                 obs, rew, done, info = test_env.step(act)
                 step += 1
-            print("theta: %.2f, x: %.2f" % (obs[1], obs[3]))
-            if abs(obs[1]) < 0.05 and abs(obs[3]) < 0.05:
+            print("theta: %.2f, x: %.2f" % (obs[3], obs[1]))
+            if abs(obs[3]) < 0.025 and abs(obs[1]) < 0.05:
                 fail = False
                 break
             fail = True
