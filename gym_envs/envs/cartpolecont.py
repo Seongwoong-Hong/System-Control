@@ -134,15 +134,18 @@ class CartPoleContEnv(gym.Env):
         if self.traj_len == self.max_ep:
             done = True
             self.traj_len = 0
-        #elif theta > 2*self.limit or theta < -2*self.limit or x > self.x_threshold+2.5 or x < -self.x_threshold-2.5:
-        #    done = True
-        #    reward -= 2 * (1000 - self.traj_len)
-        #    self.traj_len = 0
+        elif theta > 2*self.high or theta < -2*self.high or x > self.x_threshold+2.5 or x < -self.x_threshold-2.5:
+           done = True
+           reward -= 2 * (1000 - self.traj_len)
+           self.traj_len = 0
 
         return self.state.squeeze(), reward[0], done, {'action':action}
 
     def reset(self):
-        self.state = self.np_random.uniform(low=self.low, high=self.high, size=(4,))
+        if np.random.uniform() < 0.5:
+            self.state = self.np_random.uniform(low=self.low, high=self.high, size=(4,))
+        else:
+            self.state = self.np_random.uniform(low=-self.high, high=-self.low, size=(4,))
         # torch/ppo_ctl_2 use this reset
 
         self.state[0], self.state[1] = 0, 0
