@@ -29,7 +29,7 @@ def make_env(env_id, rank, Wrapper_class = None, seed=0, high=0, low=0):
     return _init
 
 if __name__ == '__main__':
-    name = "ppo_ctl_try1"
+    name = "ppo_ctl_try4"
     log_dir = "tmp/IP_ctl/torch/" + name
     stats_dir = "tmp/IP_ctl/torch/" + name + ".pkl"
     tensorboard_dir = os.path.join(os.path.dirname(__file__), "tmp", "log", "torch")
@@ -39,7 +39,7 @@ if __name__ == '__main__':
     low = 0.0
     seed = 0
     # Create the vectorized environment
-    env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, seed=seed, high=high, low=low) for i in range(num_cpu)])
+    env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, high=high, low=low) for i in range(num_cpu)])
     policy_kwargs = dict(net_arch=[dict(pi=[128, 128], vf=[128, 128])])
 
     model = PPO('MlpPolicy',
@@ -53,7 +53,7 @@ if __name__ == '__main__':
                device='cpu',
                policy_kwargs=policy_kwargs)
 
-    for _ in range(10):
+    for _ in range(12):
         test_env = NormalizedActions(gym.make(id=env_id, max_ep=1000, high=high, low=low))
         for i in range(10):
             if i > 2:
@@ -68,8 +68,8 @@ if __name__ == '__main__':
                 act, _ = model.predict(obs, deterministic=True)
                 obs, rew, done, info = test_env.step(act)
                 step += 1
-            print("theta: %.2f, x: %.2f" % (obs[3], obs[1]))
-            if abs(obs[3]) < 0.025 and abs(obs[1]) < 0.05:
+            print("theta: %.2f, x: %.2f, step: %d" % (obs[3], obs[1], step))
+            if step >= 1000:
                 fail = False
                 break
             fail = True
@@ -79,8 +79,7 @@ if __name__ == '__main__':
             break
         high += 0.10
         low += 0.10
-        seed += num_cpu
-        env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, seed=seed, high=high, low=low) for i in range(num_cpu)])
+        env = SubprocVecEnv([make_env(env_id, i, NormalizedActions, high=high, low=low) for i in range(num_cpu)])
         model.set_env(env)
 
     model.save(log_dir)
