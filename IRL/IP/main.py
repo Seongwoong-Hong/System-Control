@@ -27,6 +27,26 @@ class RewfromMat(nn.Module):
     def forward(self, obs):
         return self.layer1(obs)
 
+    def learn(self, sampleL, sampleE, epoch):
+        self.train()
+        for _ in range(epoch):
+            E_trans = copy.deepcopy(rollout.flatten_trajectories(sampleE))
+            IOCLoss, w = 0, 0
+            for i in range(E_trans.__len__()):
+                IOCLoss -= rwfn(torch.from_numpy(E_trans[i]['obs']).double())
+            IOCLoss /= sampleE.__len__()
+            for L_traj in sampleL:
+                wi = 1
+                trans = copy.deepcopy(rollout.flatten_trajectories([L_traj]))
+                for i in range(trans.__len__()):
+                    wi *= torch.exp(-rwfn(torch.from_numpy(trans[i]['obs']).double())) / torch.exp(
+                        trans[i]['infos']['log_probs'])
+                w += wi
+            IOCLoss += torch.log(w / sampleE.__len__())
+            optimizer.zero_grad()
+            IOCLoss.backward()
+            optimizer.step()
+
 def generate_trajectories(
     policy,
     venv: VecEnv,
@@ -79,21 +99,6 @@ def generate_trajectories(
 
     return trajectories
 
-def cal_sample_cost(sampleL, sampleE, rwfn):
-    E_trans = copy.deepcopy(rollout.flatten_trajectories(sampleE))
-    IOCLoss, w = 0, 0
-    for i in range(E_trans.__len__()):
-        IOCLoss -= rwfn(torch.from_numpy(E_trans[i]['obs']).double())
-    IOCLoss /= sampleE.__len__()
-    for L_traj in sampleL:
-        wi = 1
-        trans = copy.deepcopy(rollout.flatten_trajectories([L_traj]))
-        for i in range(trans.__len__()):
-            wi *= torch.exp(-rwfn(torch.from_numpy(trans[i]['obs']).double()))/torch.exp(trans[i]['infos']['log_probs'])
-        w += wi
-    IOCLoss += torch.log(w/sampleE.__len__())
-    return IOCLoss
-
 if __name__ == "__main__":
     n_steps, n_episodes = 200, 10
     env_id = "IP_custom-v2"
@@ -118,13 +123,9 @@ if __name__ == "__main__":
         # update cost function
         for k in range(10):
             with torch.no_grad():
-                sampleL = generate_trajectories(algo.policy, env, sample_until) #sample trajectory
-            sampleE = random.sample(trajectories, 5) #Expert Demo trajectory
-            # todo: cal_sample_cost: calculate IOC Loss using expert and experienced trajectories and rew func.
-            IOCLoss = cal_sample_cost(sampleL, sampleE, rwfn.train()) #calculate sample's cost again
-            optimizer.zero_grad()
-            IOCLoss.backward()
-            optimizer.step()
+                sampleL = generate_trajectories(algo.policy, env, sample_until)
+            sampleE = random.sample(trajectories, 5)
+            rwfn.learn(sampleL, sampleE, 10)
         env = DummyVecEnv([lambda: RewardWrapper(gym.make(env_id, n_steps=n_steps), rwfn.eval())])
         algo.set_env(env)
         algo.learn(total_timesteps=100)
