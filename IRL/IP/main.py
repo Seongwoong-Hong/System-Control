@@ -1,4 +1,4 @@
-import torch, gym, gym_envs, pickle, random
+import torch, gym, gym_envs, pickle, random, copy
 import numpy as np
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv
 from stable_baselines3.common.base_class import BaseAlgorithm
@@ -17,7 +17,7 @@ class RewardWrapper(gym.RewardWrapper):
         return observation, self.reward(observation), done, info
 
     def reward(self, observation):
-        return self.rwfn.forward(torch.from_numpy(observation).float())
+        return self.rwfn.forward(torch.from_numpy(observation).double())
 
 class RewfromMat(nn.Module):
     def __init__(self, inp):
@@ -80,26 +80,26 @@ def generate_trajectories(
     return trajectories
 
 def cal_sample_cost(sampleL, sampleE, rwfn):
-    E_trans = rollout.flatten_trajectories(sampleE)
+    E_trans = copy.deepcopy(rollout.flatten_trajectories(sampleE))
     IOCLoss, w = 0, 0
     for i in range(E_trans.__len__()):
-        IOCLoss -= rwfn(torch.from_numpy(E_trans[i]['obs']).float())
+        IOCLoss -= rwfn(torch.from_numpy(E_trans[i]['obs']).double())
     IOCLoss /= sampleE.__len__()
     for L_traj in sampleL:
-        c, log_q = 0, 0
-        trans = rollout.flatten_trajectories([L_traj])
+        wi = 1
+        trans = copy.deepcopy(rollout.flatten_trajectories([L_traj]))
         for i in range(trans.__len__()):
-            c -= rwfn(torch.from_numpy(trans[i]['obs']).float())
-            log_q += trans[i]['infos']['log_probs']
-        w += torch.exp(-c)/torch.exp(log_q)
+            wi *= torch.exp(-rwfn(torch.from_numpy(trans[i]['obs']).double()))/torch.exp(trans[i]['infos']['log_probs'])
+        w += wi
     IOCLoss += torch.log(w/sampleE.__len__())
     return IOCLoss
 
 if __name__ == "__main__":
     n_steps, n_episodes = 200, 10
-    env = gym.make("IP_custom-v2", n_steps=n_steps)
+    env_id = "IP_custom-v2"
+    env = gym.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
-    rwfn = RewfromMat(num_obs).float()
+    rwfn = RewfromMat(num_obs).double()
     env = DummyVecEnv([lambda: env])
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
     algo = PPO("MlpPolicy",
@@ -118,14 +118,13 @@ if __name__ == "__main__":
         # update cost function
         for k in range(10):
             with torch.no_grad():
-                sampleT = generate_trajectories(algo.policy, env, sample_until) #sample trajectory
-            sampleD = random.sample(trajectories, 5) #Expert Demo trajectory
+                sampleL = generate_trajectories(algo.policy, env, sample_until) #sample trajectory
+            sampleE = random.sample(trajectories, 5) #Expert Demo trajectory
             # todo: cal_sample_cost: calculate IOC Loss using expert and experienced trajectories and rew func.
-            IOCLoss = cal_sample_cost(sampleT, sampleD, rwfn) #calculate sample's cost again
+            IOCLoss = cal_sample_cost(sampleL, sampleE, rwfn.train()) #calculate sample's cost again
             optimizer.zero_grad()
             IOCLoss.backward()
             optimizer.step()
-        with torch.no_grad():
-            env = DummyVecEnv([lambda: RewardWrapper(env, rwfn)])
-            algo.set_env(env)
-            algo.learn(total_timesteps=100)
+        env = DummyVecEnv([lambda: RewardWrapper(gym.make(env_id, n_steps=n_steps), rwfn.eval())])
+        algo.set_env(env)
+        algo.learn(total_timesteps=100)
