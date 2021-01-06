@@ -20,9 +20,17 @@ class RewardWrapper(gym.RewardWrapper):
         return self.rwfn.forward(torch.from_numpy(observation).double())
 
 class RewfromMat(nn.Module):
-    def __init__(self, inp):
+    def __init__(self,
+                 inp,
+                 optimizer_class=torch.optim.Adam,
+                 lr = 1e-5):
         super(RewfromMat, self).__init__()
         self.layer1 = nn.Linear(inp, 1)
+        self.optimizer_class = optimizer_class
+        self._build(lr)
+
+    def _build(self, lr):
+        self.optimizer = self.optimizer_class(self.parameters(), lr)
 
     def forward(self, obs):
         return self.layer1(obs)
@@ -33,19 +41,21 @@ class RewfromMat(nn.Module):
             E_trans = copy.deepcopy(rollout.flatten_trajectories(sampleE))
             IOCLoss, w = 0, 0
             for i in range(E_trans.__len__()):
-                IOCLoss -= rwfn(torch.from_numpy(E_trans[i]['obs']).double())
+                IOCLoss -= self.forward(torch.from_numpy(E_trans[i]['obs']).double())
             IOCLoss /= sampleE.__len__()
             for L_traj in sampleL:
                 wi = 1
                 trans = copy.deepcopy(rollout.flatten_trajectories([L_traj]))
                 for i in range(trans.__len__()):
-                    wi *= torch.exp(-rwfn(torch.from_numpy(trans[i]['obs']).double())) / torch.exp(
-                        trans[i]['infos']['log_probs'])
-                w += wi
+                    wi *= torch.exp(-self.forward(torch.from_numpy(trans[i]['obs']).double())) \
+                          / torch.exp(trans[i]['infos']['log_probs'])
+                w += wi / 4 # q(x0) = prob(init_th) * prob(init_dth) (1/2 * 1/2)
             IOCLoss += torch.log(w / sampleE.__len__())
-            optimizer.zero_grad()
+            self.optimizer.zero_grad()
             IOCLoss.backward()
-            optimizer.step()
+            self.optimizer.step()
+
+        return self
 
 def generate_trajectories(
     policy,
@@ -117,15 +127,18 @@ if __name__ == "__main__":
                verbose=1,
                device='cpu')
     with open("demos/expert.pkl", "rb") as f:
-        trajectories = pickle.load(f)
-    optimizer = torch.optim.Adam(rwfn.parameters(), lr=1e-5)
+        expert_trajs = pickle.load(f)
+        learner_trajs = []
     for _ in range(10):
         # update cost function
         for k in range(10):
             with torch.no_grad():
-                sampleL = generate_trajectories(algo.policy, env, sample_until)
-            sampleE = random.sample(trajectories, 5)
+                learner_trajs += generate_trajectories(algo.policy, env, sample_until)
+            sampleL = random.sample(learner_trajs, 10)
+            sampleE = random.sample(expert_trajs, 5)
             rwfn.learn(sampleL, sampleE, 10)
+
+        # update policy
         env = DummyVecEnv([lambda: RewardWrapper(gym.make(env_id, n_steps=n_steps), rwfn.eval())])
         algo.set_env(env)
         algo.learn(total_timesteps=100)
