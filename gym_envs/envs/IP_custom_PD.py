@@ -28,8 +28,13 @@ class IP_custom_PD(mujoco_env.MujocoEnv, utils.EzPickle):
         return ob, rew, done, info
 
     def reset_model(self):
-        # q = np.array([0.5, 3.14])
-        q = np.concatenate([self.np_random.uniform(size=1, low=-1, high=1), self.np_random.uniform(size=1, low=-1, high=1)])
+        q = np.array([[1, -0.5],
+                     [0.5, 0.5],
+                     [0.7, 0.0],
+                     [-0.5, 1]])
+        idx = int(np.floor(np.random.uniform(size=1, low=0, high=4)))
+        if idx==4: idx = 3
+        q = q[idx]
         self.set_state(np.array([q[1]]), np.array([q[0]]))
         return self._get_obs()
 
