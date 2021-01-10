@@ -1,6 +1,6 @@
 import torch, gym, gym_envs, pickle, random, copy
 import numpy as np
-from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, SubprocVecEnv
 from stable_baselines3.common.base_class import BaseAlgorithm
 from algo.torch.ppo import PPO
 from imitation.data import rollout, types
@@ -17,128 +17,109 @@ class RewardWrapper(gym.RewardWrapper):
         return observation, self.reward(observation), done, info
 
     def reward(self, observation):
-        return self.rwfn.forward(torch.from_numpy(observation).double())
+        return self.rwfn.forward(torch.from_numpy(observation).to(rwfn.device))
 
 class RewfromMat(nn.Module):
     def __init__(self,
                  inp,
+                 device = 'cpu',
                  optimizer_class=torch.optim.Adam,
-                 lr = 1e-5):
+                 lr = 1e-4):
         super(RewfromMat, self).__init__()
-        self.layer1 = nn.Linear(inp, 1)
+        self.device = device
+        self.layer1 = nn.Linear(inp, 2*inp)
+        self.layer2 = nn.Linear(2*inp, 1)
+        self.relu = nn.ReLU()
         self.optimizer_class = optimizer_class
         self._build(lr)
 
     def _build(self, lr):
         self.optimizer = self.optimizer_class(self.parameters(), lr)
 
-    def forward(self, obs):
-        return self.layer1(obs)
+    def sample_trajectory_sets(self, learner_trans, expert_trans):
+        self.sampleL = random.sample(learner_trans, 10)
+        self.sampleE = random.sample(expert_trans, 5)
 
-    def learn(self, sampleL, sampleE, epoch):
+    def forward(self, obs):
+        out = self.layer1(obs)
+        return self.layer2(out)
+
+    def learn(self, epoch):
         self.train()
         for _ in range(epoch):
-            E_trans = copy.deepcopy(rollout.flatten_trajectories(sampleE))
-            IOCLoss, w = 0, 0
-            for i in range(E_trans.__len__()):
-                IOCLoss -= self.forward(torch.from_numpy(E_trans[i]['obs']).double())
-            IOCLoss /= sampleE.__len__()
-            for L_traj in sampleL:
-                wi = 1
-                trans = copy.deepcopy(rollout.flatten_trajectories([L_traj]))
-                for i in range(trans.__len__()):
-                    wi *= torch.exp(-self.forward(torch.from_numpy(trans[i]['obs']).double())) \
-                          / torch.exp(trans[i]['infos']['log_probs'])
-                w += wi / 4 # q(x0) = prob(init_th) * prob(init_dth) (1/2 * 1/2)
-            IOCLoss += torch.log(w / sampleE.__len__())
+            IOCLoss = 0.0
+            for E_trans in self.sampleE:
+                for i in range(len(E_trans)):
+                    IOCLoss -= self.forward(torch.from_numpy(E_trans[i]['obs']).to(self.device))
+            IOCLoss /= len(self.sampleE)
+            for trans_i in self.sampleE+self.sampleL:
+                temp, cost = 0.0, 0.0
+                for trans_j in self.sampleE+self.sampleL:
+                    for t in range(len(trans_i)):
+                        cost -= self.forward(torch.from_numpy(trans_i[t]['obs']).to(self.device))
+                        with torch.no_grad():
+                            temp += torch.exp(self.forward(torch.from_numpy(trans_j[t]['obs']).to(self.device)) \
+                                            - self.forward(torch.from_numpy(trans_i[t]['obs']).to(self.device)) \
+                                            + trans_i[t]['infos']['log_probs'] - trans_j[t]['infos']['log_probs'])
+                IOCLoss -= cost / temp
             self.optimizer.zero_grad()
             IOCLoss.backward()
             self.optimizer.step()
-
+        print("Loss: {:.2f}".format(IOCLoss.item()))
         return self
 
-def generate_trajectories(
-    policy,
-    venv: VecEnv,
-    sample_until: rollout.GenTrajTerminationFn,
-    *,
-    deterministic_policy: bool = False,
-    rng: np.random.RandomState = np.random,
+def get_trajectories_probs(
+        trajectories,
+        policy,
+        rng: np.random.RandomState = np.random
 ) -> Sequence[types.TrajectoryWithRew]:
-
-    get_action = policy.forward
-    if isinstance(policy, BaseAlgorithm):
-        policy.set_env(venv)
-
-    trajectories = []
-    trajectories_accum = rollout.TrajectoryAccumulator()
-    obs = venv.reset()
-    for env_idx, ob in enumerate(obs):
-        trajectories_accum.add_step(dict(obs=ob), env_idx)
-
-    active = np.ones(venv.num_envs, dtype=np.bool)
-    while np.any(active):
-        th_obs = torch.as_tensor(obs)
-        acts, _, log_probs = get_action(th_obs)
-        obs, rews, dones, infos = venv.step(acts)
-        infos[0]['log_probs'] = log_probs
-        dones &= active
-
-        new_trajs = trajectories_accum.add_steps_and_auto_finish(
-            acts, obs, rews, dones, infos
-        )
-        trajectories.extend(new_trajs)
-
-        if sample_until(trajectories):
-            active &= ~dones
-    rng.shuffle(trajectories)
-
-    # Sanity checks.
-    for trajectory in trajectories:
-        n_steps = len(trajectory.acts)
-        # extra 1 for the end
-        exp_obs = (n_steps + 1,) + venv.observation_space.shape
-        real_obs = trajectory.obs.shape
-        assert real_obs == exp_obs, f"expected shape {exp_obs}, got {real_obs}"
-        exp_act = (n_steps,) + venv.action_space.shape
-        real_act = trajectory.acts.shape
-        assert real_act == exp_act, f"expected shape {exp_act}, got {real_act}"
-        exp_rew = (n_steps,)
-        real_rew = trajectory.rews.shape
-        assert real_rew == exp_rew, f"expected shape {exp_rew}, got {real_rew}"
-
-    return trajectories
+    transitions = []
+    for traj in trajectories:
+        trans = copy.deepcopy(rollout.flatten_trajectories_with_rew([traj]))
+        for i in range(trans.__len__()):
+            obs = trans[i]['obs'].reshape(1, -1)
+            acts = trans[i]['acts'].reshape(1, -1)
+            latent_pi, _, latent_sde = policy._get_latent(torch.from_numpy(obs).to(policy.device))
+            distribution = policy._get_action_dist_from_latent(latent_pi, latent_sde=latent_sde)
+            log_probs = distribution.log_prob(torch.from_numpy(acts).to(policy.device))
+            trans[i]['infos']['log_probs'] = log_probs
+        transitions.append(trans)
+    return transitions
 
 if __name__ == "__main__":
     n_steps, n_episodes = 200, 10
+    device = 'cuda'
     env_id = "IP_custom-v2"
     env = gym.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
-    rwfn = RewfromMat(num_obs).double()
+    rwfn = RewfromMat(num_obs, device=device).double().to(device)
     env = DummyVecEnv([lambda: env])
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
+    print("Start Guided Cost Learning...")
+    print("Used environment is {}".format(env_id))
     algo = PPO("MlpPolicy",
                env=env,
-               n_steps=n_steps,
-               batch_size=200,
+               n_steps=2048,
+               batch_size=128,
                gamma=0.99,
                gae_lambda=0.95,
-               ent_coef=0.05,
+               ent_coef=0.01,
                verbose=1,
-               device='cpu')
+               device=device)
     with open("demos/expert.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
         learner_trajs = []
     for _ in range(10):
         # update cost function
-        for k in range(10):
+        for k in range(40):
             with torch.no_grad():
-                learner_trajs += generate_trajectories(algo.policy, env, sample_until)
-            sampleL = random.sample(learner_trajs, 10)
-            sampleE = random.sample(expert_trajs, 5)
-            rwfn.learn(sampleL, sampleE, 10)
+                learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
+                expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
+                learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
+            rwfn.sample_trajectory_sets(learner_trans, expert_trans)
+            rwfn.learn(epoch=50)
 
         # update policy
         env = DummyVecEnv([lambda: RewardWrapper(gym.make(env_id, n_steps=n_steps), rwfn.eval())])
         algo.set_env(env)
-        algo.learn(total_timesteps=100)
+        algo.learn(total_timesteps=1024000)
