@@ -52,16 +52,19 @@ class RewfromMat(nn.Module):
                 for i in range(len(E_trans)):
                     IOCLoss -= self.forward(torch.from_numpy(E_trans[i]['obs']).to(self.device))
             IOCLoss /= len(self.sampleE)
-            for trans_i in self.sampleE+self.sampleL:
-                temp, cost = 0.0, 0.0
-                for trans_j in self.sampleE+self.sampleL:
-                    for t in range(len(trans_i)):
-                        cost -= self.forward(torch.from_numpy(trans_i[t]['obs']).to(self.device))
+            for trans_j in self.sampleE+self.sampleL:
+                cost, wjZ = 0, 0
+                for t in range(len(trans_j)):
+                    cost -= self.forward(torch.from_numpy(trans_j[t]['obs']).to(self.device))
+                for trans_k in self.sampleE+self.sampleL:
+                    temp = 0
+                    for t in range(len(trans_k)):
                         with torch.no_grad():
-                            temp += torch.exp(self.forward(torch.from_numpy(trans_j[t]['obs']).to(self.device)) \
-                                            - self.forward(torch.from_numpy(trans_i[t]['obs']).to(self.device)) \
-                                            + trans_i[t]['infos']['log_probs'] - trans_j[t]['infos']['log_probs'])
-                IOCLoss -= cost / temp
+                            temp += -self.forward(torch.from_numpy(trans_k[t]['obs']).to(self.device)) \
+                                    + self.forward(torch.from_numpy(trans_j[t]['obs']).to(self.device)) \
+                                    - trans_k[t]['infos']['log_probs'] + trans_j[t]['infos']['log_probs']
+                    wjZ += temp
+                IOCLoss -= cost / wjZ
             self.optimizer.zero_grad()
             IOCLoss.backward()
             self.optimizer.step()
