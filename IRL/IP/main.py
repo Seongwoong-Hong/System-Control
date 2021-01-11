@@ -1,11 +1,10 @@
-import torch, gym, gym_envs, pickle, random, copy
-import numpy as np
-from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, SubprocVecEnv
-from stable_baselines3.common.base_class import BaseAlgorithm
+import torch, gym, pickle
+from stable_baselines3.common.vec_env import DummyVecEnv
+from common.callbacks import VideoRecorderCallback
+from common.rollouts import get_trajectories_probs
 from algo.torch.ppo import PPO
-from imitation.data import rollout, types
-from torch import nn
-from typing import Sequence
+from algo.torch.IRL import RewfromMat
+from imitation.data import rollout
 
 class RewardWrapper(gym.RewardWrapper):
     def __init__(self, env, rwfn):
@@ -19,87 +18,18 @@ class RewardWrapper(gym.RewardWrapper):
     def reward(self, observation):
         return self.rwfn.forward(torch.from_numpy(observation).to(rwfn.device))
 
-class RewfromMat(nn.Module):
-    def __init__(self,
-                 inp,
-                 device = 'cpu',
-                 optimizer_class=torch.optim.Adam,
-                 lr = 1e-4):
-        super(RewfromMat, self).__init__()
-        self.device = device
-        self.layer1 = nn.Linear(inp, 2*inp)
-        self.layer2 = nn.Linear(2*inp, 1)
-        self.relu = nn.ReLU()
-        self.optimizer_class = optimizer_class
-        self._build(lr)
-
-    def _build(self, lr):
-        self.optimizer = self.optimizer_class(self.parameters(), lr)
-
-    def sample_trajectory_sets(self, learner_trans, expert_trans):
-        self.sampleL = random.sample(learner_trans, 10)
-        self.sampleE = random.sample(expert_trans, 5)
-
-    def forward(self, obs):
-        out = self.layer1(obs)
-        return self.layer2(out)
-
-    def learn(self, epoch):
-        self.train()
-        for _ in range(epoch):
-            IOCLoss = 0.0
-            for E_trans in self.sampleE:
-                for i in range(len(E_trans)):
-                    IOCLoss -= self.forward(torch.from_numpy(E_trans[i]['obs']).to(self.device))
-            IOCLoss /= len(self.sampleE)
-            for trans_j in self.sampleE+self.sampleL:
-                cost, wjZ = 0, 0
-                for t in range(len(trans_j)):
-                    cost -= self.forward(torch.from_numpy(trans_j[t]['obs']).to(self.device))
-                for trans_k in self.sampleE+self.sampleL:
-                    temp = 0
-                    for t in range(len(trans_k)):
-                        with torch.no_grad():
-                            temp += -self.forward(torch.from_numpy(trans_k[t]['obs']).to(self.device)) \
-                                    + self.forward(torch.from_numpy(trans_j[t]['obs']).to(self.device)) \
-                                    - trans_k[t]['infos']['log_probs'] + trans_j[t]['infos']['log_probs']
-                    wjZ += temp
-                IOCLoss -= cost / wjZ
-            self.optimizer.zero_grad()
-            IOCLoss.backward()
-            self.optimizer.step()
-        print("Loss: {:.2f}".format(IOCLoss.item()))
-        return self
-
-def get_trajectories_probs(
-        trajectories,
-        policy,
-        rng: np.random.RandomState = np.random
-) -> Sequence[types.TrajectoryWithRew]:
-    transitions = []
-    for traj in trajectories:
-        trans = copy.deepcopy(rollout.flatten_trajectories_with_rew([traj]))
-        for i in range(trans.__len__()):
-            obs = trans[i]['obs'].reshape(1, -1)
-            acts = trans[i]['acts'].reshape(1, -1)
-            latent_pi, _, latent_sde = policy._get_latent(torch.from_numpy(obs).to(policy.device))
-            distribution = policy._get_action_dist_from_latent(latent_pi, latent_sde=latent_sde)
-            log_probs = distribution.log_prob(torch.from_numpy(acts).to(policy.device))
-            trans[i]['infos']['log_probs'] = log_probs
-        transitions.append(trans)
-    return transitions
-
 if __name__ == "__main__":
     n_steps, n_episodes = 200, 10
     device = 'cuda'
     env_id = "IP_custom-v2"
+    tensorboard_dir = "tmp/log"
+    model_dir = "tmp/model"
     env = gym.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
     rwfn = RewfromMat(num_obs, device=device).double().to(device)
     env = DummyVecEnv([lambda: env])
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
-    print("Start Guided Cost Learning...")
-    print("Used environment is {}".format(env_id))
+    print("Start Guided Cost Learning...  Using {} environment".format(env_id))
     algo = PPO("MlpPolicy",
                env=env,
                n_steps=2048,
@@ -108,13 +38,15 @@ if __name__ == "__main__":
                gae_lambda=0.95,
                ent_coef=0.01,
                verbose=1,
-               device=device)
+               device=device,
+               tensorboard_log=tensorboard_dir)
+    video_recorder = VideoRecorderCallback(gym.make(env_id, n_steps=n_steps), render_freq=50000)
     with open("demos/expert.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
         learner_trajs = []
     for _ in range(10):
         # update cost function
-        for k in range(40):
+        for k in range(20):
             with torch.no_grad():
                 learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
                 expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
@@ -125,4 +57,6 @@ if __name__ == "__main__":
         # update policy
         env = DummyVecEnv([lambda: RewardWrapper(gym.make(env_id, n_steps=n_steps), rwfn.eval())])
         algo.set_env(env)
-        algo.learn(total_timesteps=1024000)
+        algo.learn(total_timesteps=1024000, callback=video_recorder)
+    torch.save(rwfn, model_dir+"rwfn.pt")
+    algo.save(model_dir+"ppo")
