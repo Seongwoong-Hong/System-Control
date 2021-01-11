@@ -1,0 +1,1 @@
+from algo.torch.IRL.rewardfnc import RewfromMat
