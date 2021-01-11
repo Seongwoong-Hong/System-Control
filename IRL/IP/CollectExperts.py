@@ -1,9 +1,7 @@
 import gym, gym_envs
 import torch as th
-import numpy as np
 from imitation.data import rollout, types
 from stable_baselines3.common.policies import BasePolicy
-from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 class ExpertPolicy(BasePolicy):
@@ -22,7 +20,7 @@ class ExpertPolicy(BasePolicy):
         return -(self.P*observation[0][0] + self.D*observation[0][1]).reshape(1, 1)
 
 if __name__ == "__main__":
-    n_steps, n_episodes = 100, 20
+    n_steps, n_episodes = 200, 10
     env = DummyVecEnv([lambda: gym.make("IP_custom-v2", n_steps=n_steps)])
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
     ExpertPolicy = ExpertPolicy(env.observation_space, env.action_space)
