@@ -1,5 +1,4 @@
 import numpy as np
-import math, csv
 from gym import utils, spaces
 from gym.envs.mujoco import mujoco_env
 import os
@@ -13,9 +12,8 @@ class IP_custom_PD(mujoco_env.MujocoEnv, utils.EzPickle):
         self.action_space = spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype='float64')
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype='float64')
 
-
     def step(self, a):
-        self.do_simulation(a/100, self.frame_skip)
+        self.do_simulation(a/1000, self.frame_skip)
         ob = self._get_obs()
         rew = - (ob[0] ** 2 + 0.01 * self.sim.data.qfrc_actuator ** 2)
         done = False
@@ -28,13 +26,7 @@ class IP_custom_PD(mujoco_env.MujocoEnv, utils.EzPickle):
         return ob, rew, done, info
 
     def reset_model(self):
-        q = np.array([[1, -0.5],
-                     [0.5, 0.5],
-                     [0.7, 0.0],
-                     [-0.5, 1]])
-        idx = int(np.floor(np.random.uniform(size=1, low=0, high=4)))
-        if idx==4: idx = 3
-        q = q[idx]
+        q = np.random.uniform(size=2, low=-0.5, high=0.5)
         self.set_state(np.array([q[1]]), np.array([q[0]]))
         return self._get_obs()
 
