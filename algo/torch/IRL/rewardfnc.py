@@ -14,6 +14,7 @@ class RewfromMat(nn.Module):
         self.relu = nn.ReLU()
         self.optimizer_class = optimizer_class
         self._build(lr)
+        self.evalmod = False
 
     def _build(self, lr):
         self.optimizer = self.optimizer_class(self.parameters(), lr)
@@ -23,11 +24,16 @@ class RewfromMat(nn.Module):
         self.sampleE = random.sample(expert_trans, 5)
 
     def forward(self, obs):
-        out = self.layer1(obs)
-        return self.layer2(out)
+        if self.evalmod:
+            with torch.no_grad():
+                out = self.layer1(obs)
+                return self.layer2(out)
+        else:
+            out = self.layer1(obs)
+            return self.layer2(out)
 
     def learn(self, epoch):
-        self.train()
+        self._train()
         for _ in range(epoch):
             IOCLoss = 0.0
             for E_trans in self.sampleE:
@@ -52,3 +58,11 @@ class RewfromMat(nn.Module):
             self.optimizer.step()
         print("Loss: {:.2f}".format(IOCLoss.item()))
         return self
+
+    def _train(self):
+        self.evalmod = False
+        return self.train()
+
+    def _eval(self):
+        self.evalmod = True
+        return self.eval()
