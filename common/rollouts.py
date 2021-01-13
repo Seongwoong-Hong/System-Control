@@ -12,11 +12,11 @@ def get_trajectories_probs(
     for traj in trajectories:
         trans = copy.deepcopy(rollout.flatten_trajectories_with_rew([traj]))
         for i in range(trans.__len__()):
-            obs = trans[i]['obs'].reshape(1, -1)
-            acts = trans[i]['acts'].reshape(1, -1)
-            latent_pi, _, latent_sde = policy._get_latent(torch.from_numpy(obs).to(policy.device))
+            obs = torch.from_numpy(trans[i]['obs'].reshape(1, -1)).to(policy.device)
+            acts = torch.from_numpy(trans[i]['acts'].reshape(1, -1)).to(policy.device)
+            latent_pi, _, latent_sde = policy._get_latent(obs)
             distribution = policy._get_action_dist_from_latent(latent_pi, latent_sde=latent_sde)
-            log_probs = distribution.log_prob(torch.from_numpy(acts).to(policy.device))
-            trans[i]['infos']['log_probs'] = log_probs
+            log_probs = distribution.log_prob(acts)
+            trans[i]['infos']['log_probs'], trans[i]['infos']['rwinp'] = log_probs, torch.cat((obs, acts), dim=1)
         transitions.append(trans)
     return transitions
