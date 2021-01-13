@@ -4,12 +4,7 @@ import gym, cv2
 import torch as th
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
-from mujoco_py import GlfwContext
-
-class Video(object):
-    def __init__(self, frames: th.Tensor, fps:Union[float, int]):
-        self.frames = frames
-        self.fps = fps
+from stable_baselines3.common.logger import Video
 
 class VideoRecorderCallback(BaseCallback):
     def __init__(self, path: str, eval_env: gym.Env, render_freq: int, n_eval_episodes: int = 1, deterministic: bool = True):
@@ -41,8 +36,8 @@ class VideoRecorderCallback(BaseCallback):
                 :param _globals: A dictionary containing all global variables of the callback's scope
                 """
                 screen = self._eval_env.render(mode="rgb_array")
-                # PyTorch uses CxHxW vs HxWxC gym (and tensorflow) image convention
-                screens.append(screen)
+                # Mujoco uses HxWxC image convention, cv2 need HxWxC image convention
+                screens.append(screen.transpose(2, 0, 1))
 
             evaluate_policy(
                 self.model,
@@ -51,15 +46,20 @@ class VideoRecorderCallback(BaseCallback):
                 n_eval_episodes=self._n_eval_episodes,
                 deterministic=self._deterministic,
             )
-            filename = self.path + "/video_" + str(self.num) + ".avi"
+            self.logger.record(
+                "trajectory/video",
+                Video(th.ByteTensor([screens]), fps=int(1/self._eval_env.dt)),
+                exclude=("stdout", "log", "json", "csv")
+            )
+            # filename = self.path + "/video_" + str(self.num) + ".avi"
 
-            fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-            width, height, _ = screens[0].shape
-            writer = cv2.VideoWriter(filename, fourcc, 1/self._eval_env.dt, (width, height))
-            for render in screens:
-                img = cv2.cvtColor(render, cv2.COLOR_RGB2BGR)
-                writer.write(img)
-            writer.release()
+            # fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+            # width, height, _ = screens[0].shape
+            # writer = cv2.VideoWriter(filename, fourcc, 1/self._eval_env.dt, (width, height))
+            # for render in screens:
+            #     img = cv2.cvtColor(render, cv2.COLOR_RGB2BGR)
+            #     writer.write(img)
+            # writer.release()
 
-            self.num += 1
+            # self.num += 1
         return True
