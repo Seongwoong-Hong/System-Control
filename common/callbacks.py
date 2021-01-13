@@ -23,6 +23,7 @@ class VideoRecorderCallback(BaseCallback):
         self._deterministic = deterministic
         self.path = path
         self.num = 0
+        self.fps = int(1/eval_env.dt)
 
     def _on_step(self) -> bool:
         if self.n_calls % self._render_freq == 0:
@@ -48,7 +49,7 @@ class VideoRecorderCallback(BaseCallback):
             )
             self.logger.record(
                 "trajectory/video",
-                Video(th.ByteTensor([screens]), fps=int(1/self._eval_env.dt)),
+                Video(th.ByteTensor([screens]), fps=self.fps),
                 exclude=("stdout", "log", "json", "csv")
             )
             # filename = self.path + "/video_" + str(self.num) + ".avi"
