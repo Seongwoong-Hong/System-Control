@@ -9,9 +9,7 @@ class RewfromMat(nn.Module):
                  lr=1e-4):
         super(RewfromMat, self).__init__()
         self.device = device
-        self.layer1 = nn.Linear(inp, 2*inp)
-        self.layer2 = nn.Linear(2*inp, 1)
-        self.relu = nn.ReLU()
+        self.layer1 = nn.Linear(inp, inp)
         self.optimizer_class = optimizer_class
         self._build(lr)
         self.evalmod = False
@@ -27,10 +25,10 @@ class RewfromMat(nn.Module):
         if self.evalmod:
             with torch.no_grad():
                 out = self.layer1(obs)
-                return self.layer2(out)
+                return out @ out.T
         else:
             out = self.layer1(obs)
-            return self.layer2(out)
+            return out @ out.T
 
     def learn(self, epoch):
         self._train()
@@ -38,20 +36,20 @@ class RewfromMat(nn.Module):
             IOCLoss = 0.0
             for E_trans in self.sampleE:
                 for i in range(len(E_trans)):
-                    IOCLoss -= self.forward(torch.from_numpy(E_trans[i]['obs']).to(self.device))
+                    IOCLoss -= self.forward(E_trans[i]['infos']['rwinp'])
             IOCLoss /= len(self.sampleE)
             for trans_j in self.sampleE+self.sampleL:
                 cost, wjZ = 0, 0
                 for t in range(len(trans_j)):
-                    cost -= self.forward(torch.from_numpy(trans_j[t]['obs']).to(self.device))
+                    cost -= self.forward(trans_j[t]['infos']['rwinp'])
                 for trans_k in self.sampleE+self.sampleL:
                     temp = 0
-                    for t in range(len(trans_k)):
-                        with torch.no_grad():
-                            temp += -self.forward(torch.from_numpy(trans_k[t]['obs']).to(self.device)) \
-                                    + self.forward(torch.from_numpy(trans_j[t]['obs']).to(self.device)) \
+                    with torch.no_grad():
+                        for t in range(len(trans_k)):
+                            temp += -self.forward(trans_k[t]['infos']['rwinp']) \
+                                    + self.forward(trans_j[t]['infos']['rwinp']) \
                                     - trans_k[t]['infos']['log_probs'] + trans_j[t]['infos']['log_probs']
-                    wjZ += temp
+                        wjZ += torch.exp(temp)
                 IOCLoss -= cost / wjZ
             self.optimizer.zero_grad()
             IOCLoss.backward()
