@@ -53,7 +53,6 @@ class RewfromMat(nn.Module):
                 trans_j = (self.sampleE+self.sampleL)[j]
                 cost, Zwjs = 0, 0
                 for k in range(len(self.sampleE+self.sampleL)):
-                    s = wjr[k] - wjr[j] + wjp[k] - wjp[j]
                     Zwjs += torch.exp(wjr[k] - wjr[j] + wjp[k] - wjp[j])
                 for t in range(len(trans_j)):
                     cost -= self.forward(trans_j[t]['infos']['rwinp'])
