@@ -19,26 +19,26 @@ class RewfromMat(nn.Module):
 
     def sample_trajectory_sets(self, learner_trans, expert_trans):
         self.sampleL = random.sample(learner_trans, 10)
-        self.sampleE = random.sample(expert_trans, 5)
+        self.sampleE = random.sample(expert_trans, 10)
 
     def forward(self, obs):
         if self.evalmod:
             with torch.no_grad():
                 out = self.layer1(obs)
-                return out @ out.T
+                return -out @ out.T
         else:
             out = self.layer1(obs)
-            return out @ out.T
+            return -out @ out.T
 
     def learn(self, epoch):
         self._train()
         for _ in range(epoch):
-            IOCLoss = 0.0
+            IOCLoss1, IOCLoss2 = 0, 0
             # Calculate learned cost loss
             for E_trans in self.sampleE:
                 for i in range(len(E_trans)):
-                    IOCLoss -= self.forward(E_trans[i]['infos']['rwinp'])
-            IOCLoss /= len(self.sampleE)
+                    IOCLoss1 -= self.forward(E_trans[i]['infos']['rwinp'])
+            IOCLoss1 /= len(self.sampleE)
             # Calculate Max Ent. Loss
             wjr, wjp = [], []
             with torch.no_grad():
@@ -48,19 +48,20 @@ class RewfromMat(nn.Module):
                         r += self.forward(trans_k[t]['infos']['rwinp'])
                         p += trans_k[t]['infos']['log_probs']
                     wjr.append(r)
-                    wjp.append(-p)
+                    wjp.append(p)
             for j in range(len(self.sampleE+self.sampleL)):
                 trans_j = (self.sampleE+self.sampleL)[j]
                 cost, Zwjs = 0, 0
                 for k in range(len(self.sampleE+self.sampleL)):
-                    Zwjs += torch.exp(wjr[k] - wjr[j] + wjp[k] - wjp[j])
+                    Zwjs += torch.exp(wjr[k] - wjr[j]) / torch.exp(wjp[k] - wjp[j])
                 for t in range(len(trans_j)):
                     cost -= self.forward(trans_j[t]['infos']['rwinp'])
-                IOCLoss -= cost / Zwjs
+                IOCLoss2 -= cost / Zwjs
+            # IOCLoss = IOCLoss1 + IOCLoss2
             self.optimizer.zero_grad()
-            IOCLoss.backward()
+            IOCLoss1.backward()
             self.optimizer.step()
-        print("Loss: {:.2f}".format(IOCLoss.item()))
+        print("Loss for Expert cost: {:.2f}, Loss for Max Ent.: {:.2f}".format(IOCLoss1.item(), IOCLoss2.item()))
         return self
 
     def _train(self):
