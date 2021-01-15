@@ -3,39 +3,37 @@ from torch import nn
 
 class NNCost(nn.Module):
     def __init__(self,
-                 inp,
+                 arch,
                  device='cpu',
                  optimizer_class=torch.optim.Adam,
+                 act_fcn=nn.Tanh,
                  lr=3e-5):
         super(NNCost, self).__init__()
         self.device = device
-        self.layer1 = nn.Linear(inp, 4*inp)
-        self.layer2 = nn.Linear(4*inp, 2*inp)
-        self.layer3 = nn.Linear(2*inp, 1)
-        self.tanh = nn.Tanh()
         self.optimizer_class = optimizer_class
-        self._build(lr)
+        self.act_fnc = act_fcn
+        self._build(lr, arch)
         self.evalmod = False
 
-    def _build(self, lr):
+    def _build(self, lr, arch):
+        layers = []
+        for i in range(len(arch)-1):
+            layers.append(nn.Linear(arch[i], arch[i+1]))
+            layers.append(self.act_fnc())
+        layers.append(nn.Linear(arch[-1], 1))
+        self.layers = nn.Sequential(*layers)
         self.optimizer = self.optimizer_class(self.parameters(), lr)
 
     def sample_trajectory_sets(self, learner_trans, expert_trans):
-        self.sampleL = random.sample(learner_trans, 5)
         self.sampleE = random.sample(expert_trans, 10)
+        self.sampleL = random.sample(learner_trans, 10)
 
     def forward(self, obs):
         if self.evalmod:
             with torch.no_grad():
-                out = self.tanh(self.layer1(obs))
-                out = self.tanh(self.layer2(out))
-                out = self.tanh(self.layer3(out))
-                return out
+                return self.layers(obs)
         else:
-            out = self.tanh(self.layer1(obs))
-            out = self.tanh(self.layer2(out))
-            out = self.tanh(self.layer3(out))
-            return out
+            return self.layers(obs)
 
     def learn(self, epoch):
         self._train()
