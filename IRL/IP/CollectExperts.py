@@ -17,7 +17,7 @@ if __name__ == "__main__":
     n_steps, n_episodes = 100, 10
     env = DummyVecEnv([lambda: gym.make("IP_custom-v2", n_steps=n_steps)])
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
-    ExpertPolicy = ExpertPolicy(env.observation_space, env.action_space)
+    ExpertPolicy = ExpertPolicy(env)
     trajectories = rollout.generate_trajectories(ExpertPolicy, env, sample_until, deterministic_policy=True)
     types.save("demos/expert_bar_100.pkl", trajectories)
     print("Expert Trajectories are saved")
