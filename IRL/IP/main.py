@@ -14,6 +14,7 @@ if __name__ == "__main__":
         raise SyntaxError("Please enter name for logging")
     elif len(sys.argv) == 2:
         name = sys.argv[1]
+        device = 'cuda:0'
     elif len(sys.argv) == 3:
         name = sys.argv[1]
         device = sys.argv[2]
@@ -27,7 +28,8 @@ if __name__ == "__main__":
     env = gym.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
-    costfn = NNCost(num_obs+num_act, device=device).double().to(device)
+    inp = num_obs+num_act
+    costfn = NNCost(arch=[inp, 4*inp, 2*inp], device=device).double().to(device)
     env = DummyVecEnv([lambda: env])
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
     print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
