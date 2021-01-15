@@ -3,9 +3,9 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 from common.callbacks import VideoRecorderCallback
 from common.rollouts import get_trajectories_probs
-from common.wrappers import RewardWrapper
+from common.wrappers import CostWrapper
+from common.modules import NNCost
 from algo.torch.ppo import PPO
-from algo.torch.IRL import RewfromMat
 from imitation.data import rollout
 from mujoco_py import GlfwContext
 
@@ -19,18 +19,18 @@ if __name__ == "__main__":
         device = sys.argv[2]
     else:
         raise SyntaxError("Too many system inputs")
-    n_steps, n_episodes = 40, 10
+    n_steps, n_episodes = 100, 10
     env_id = "IP_custom-v2"
     log_dir = os.path.join(os.path.dirname(__file__), "tmp", "log")
     model_dir = os.path.join(os.path.dirname(__file__), "tmp", "model")
-    expert_dir = os.path.join(os.path.dirname(__file__), "demos", "expert_bar_40.pkl")
+    expert_dir = os.path.join(os.path.dirname(__file__), "demos", "expert_bar_100.pkl")
     env = gym.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
-    rwfn = RewfromMat(num_obs+num_act, device=device).double().to(device)
+    costfn = NNCost(num_obs+num_act, device=device).double().to(device)
     env = DummyVecEnv([lambda: env])
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
-    print("Start Guided Cost Learning...  Using {} environment.\nName for logging is {}".format(env_id, name))
+    print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
     GlfwContext(offscreen=True)
     algo = PPO("MlpPolicy",
                env=env,
@@ -56,12 +56,12 @@ if __name__ == "__main__":
                 learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
                 expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
                 learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
-            rwfn.sample_trajectory_sets(learner_trans, expert_trans)
-            rwfn.learn(epoch=50)
+            costfn.sample_trajectory_sets(learner_trans, expert_trans)
+            costfn.learn(epoch=50)
 
         # update policy
-        env = DummyVecEnv([lambda: RewardWrapper(gym.make(env_id, n_steps=n_steps), rwfn._eval())])
+        env = DummyVecEnv([lambda: CostWrapper(gym.make(env_id, n_steps=n_steps), costfn._eval())])
         algo.set_env(env)
         algo.learn(total_timesteps=512000, callback=video_recorder, tb_log_name=name)
-    torch.save(rwfn, model_dir+"/"+name+"_rwfn.pt")
+    torch.save(costfn, model_dir+"/"+name+"_costfn.pt")
     algo.save(model_dir+"/"+name+"_ppo")
