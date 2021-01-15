@@ -5,10 +5,9 @@ from scipy import linalg
 from stable_baselines3.common.policies import BasePolicy
 
 class LQRPolicy(BasePolicy):
-    def __init__(self,
-                 observation_space:gym.spaces.Space,
-                 action_space:gym.spaces.Space):
-
+    def __init__(self, env):
+        observation_space = env.observation_space
+        action_space = env.action_space
         super(LQRPolicy, self).__init__(
             observation_space,
             action_space)
@@ -22,7 +21,7 @@ class LQRPolicy(BasePolicy):
         return K[1], K[0]
 
     def _build_env(self):
-        return NotImplementedError
+        raise NotImplementedError
 
     def forward(self):
         return None
