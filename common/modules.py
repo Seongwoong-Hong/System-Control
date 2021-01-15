@@ -44,7 +44,7 @@ class NNCost(nn.Module):
             # Calculate learned cost loss
             for E_trans in self.sampleE:
                 for i in range(len(E_trans)):
-                    IOCLoss1 += self.forward(E_trans[i]['infos']['cost_inp'])
+                    IOCLoss1 += self.forward(E_trans[i]['infos']['rwinp'])
             IOCLoss1 /= len(self.sampleE)
             # Calculate Max Ent. Loss
             wjr, wjp = [], []
@@ -52,7 +52,7 @@ class NNCost(nn.Module):
                 for trans_k in self.sampleE + self.sampleL:
                     r, p = 0, 0
                     for t in range(len(trans_k)):
-                        r -= self.forward(trans_k[t]['infos']['cost_inp'])
+                        r -= self.forward(trans_k[t]['infos']['rwinp'])
                         p += trans_k[t]['infos']['log_probs']
                     wjr.append(r)
                     wjp.append(p)
@@ -62,7 +62,7 @@ class NNCost(nn.Module):
                 for k in range(len(self.sampleE+self.sampleL)):
                     Zwjs += torch.exp(wjr[k] - wjr[j]) / torch.exp(wjp[k] - wjp[j])
                 for t in range(len(trans_j)):
-                    cost += self.forward(trans_j[t]['infos']['cost_inp'])
+                    cost += self.forward(trans_j[t]['infos']['rwinp'])
                 IOCLoss2 -= cost / Zwjs
             IOCLoss = IOCLoss1 + IOCLoss2
             self.optimizer.zero_grad()
