@@ -21,15 +21,16 @@ if __name__ == "__main__":
         raise SyntaxError("Too many system inputs")
     n_steps, n_episodes = 100, 5
     env_id = "IP_custom-v2"
-    log_dir = os.path.join(os.path.dirname(__file__), "tmp", "log", name)
+    current_path = os.path.dirname(__file__)
+    log_dir = os.path.join(current_path, "tmp", "log", name)
     if not os.path.isdir(log_dir):
         os.mkdir(log_dir)
-    model_dir = os.path.join(os.path.dirname(__file__), "tmp", "model")
-    expert_dir = os.path.join(os.path.dirname(__file__), "demos", "expert_bar_100.pkl")
+    model_dir = os.path.join(current_path, "tmp", "model")
+    expert_dir = os.path.join(current_path, "demos", "expert_bar_100.pkl")
 
     ## Copy used file to logging folder
-    shutil.copy(os.path.abspath("../../common/modules.py"), log_dir)
-    shutil.copy(os.path.abspath("../../gym_envs/envs/IP_custom_PD.py"), log_dir)
+    shutil.copy(os.path.abspath(current_path + "/../../common/modules.py"), log_dir)
+    shutil.copy(os.path.abspath(current_path + "/../../gym_envs/envs/IP_custom_PD.py"), log_dir)
     shutil.copy(os.path.abspath(__file__), log_dir)
 
     env = gym.make(env_id, n_steps=n_steps)
