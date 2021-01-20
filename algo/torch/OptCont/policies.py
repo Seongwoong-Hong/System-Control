@@ -12,6 +12,7 @@ class LQRPolicy(BasePolicy):
             observation_space,
             action_space)
 
+        self.gear = env.model.actuator_gear[0, 0]
         self.P, self.D = self._get_gains()
 
     def _get_gains(self):
@@ -27,4 +28,4 @@ class LQRPolicy(BasePolicy):
         return None
 
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
-        return -(self.P*observation[0][1] + self.D*observation[0][0]).reshape(1, 1)
+        return -1/self.gear * (self.P*observation[0][1] + self.D*observation[0][0]).reshape(1, 1)
