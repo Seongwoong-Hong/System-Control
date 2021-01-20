@@ -11,10 +11,10 @@ class ActionRewardWrapper(gym.RewardWrapper):
 
     def step(self, action):
         observation, reward, done, info = self.env.step(self.action(action))
-        return observation, self.reward(observation, self.action(action)), done, info
+        return observation, self.reward(np.append(observation, self.action(action))), done, info
 
-    def reward(self, observation, action):
-        rwinp = torch.from_numpy(np.append(observation, action)).to(self.rwfn.device)
+    def reward(self, obs):
+        rwinp = torch.from_numpy(obs).to(self.rwfn.device)
         return self.rwfn.forward(rwinp)
 
 class ActionWrapper(gym.ActionWrapper):
@@ -26,24 +26,24 @@ class RewardWrapper(gym.RewardWrapper):
         super(RewardWrapper, self).__init__(env)
         self.rwfn = rwfn
 
-    def step(self, action):
+    def step(self, action: np.ndarray):
         observation, reward, done, info = self.env.step(action)
-        return observation, self.reward(observation, action), done, info
+        return observation, self.reward(np.append(observation, action)), done, info
 
-    def reward(self, observation, action):
-        rwinp = torch.from_numpy(np.append(observation, action)).to(self.rwfn.device)
+    def reward(self, obs):
+        rwinp = torch.from_numpy(obs).to(self.rwfn.device)
         return self.rwfn.forward(rwinp)
 
 
 class CostWrapper(gym.RewardWrapper):
-    def __init__(self, env, rwfn):
+    def __init__(self, env, costfn):
         super(CostWrapper, self).__init__(env)
-        self.rwfn = rwfn
+        self.costfn = costfn
 
-    def step(self, action):
+    def step(self, action: np.ndarray):
         observation, reward, done, info = self.env.step(action)
-        return observation, self.reward(observation, action), done, info
+        return observation, self.reward(np.append(observation, action)), done, info
 
-    def reward(self, observation, action):
-        rwinp = torch.from_numpy(np.append(observation, action)).to(self.rwfn.device)
-        return -self.rwfn.forward(rwinp)
+    def reward(self, obs):
+        cost_inp = torch.from_numpy(obs).to(self.costfn.device)
+        return -self.costfn.forward(cost_inp)
