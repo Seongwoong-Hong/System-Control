@@ -20,17 +20,19 @@ if __name__ == "__main__":
     else:
         raise SyntaxError("Too many system inputs")
     n_steps, n_episodes = 100, 5
-    env_id = "IP_custom-v2"
+    env_id = "IP_custom-v1"
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, "tmp", "log", name)
     if not os.path.isdir(log_dir):
         os.mkdir(log_dir)
-    model_dir = os.path.join(current_path, "tmp", "model")
+    model_dir = os.path.join(current_path, "tmp", "model", name)
+    if not os.path.isdir(model_dir):
+        os.mkdir(model_dir)
     expert_dir = os.path.join(current_path, "demos", "expert_bar_100.pkl")
 
     ## Copy used file to logging folder
     shutil.copy(os.path.abspath(current_path + "/../../common/modules.py"), log_dir)
-    shutil.copy(os.path.abspath(current_path + "/../../gym_envs/envs/IP_custom_PD.py"), log_dir)
+    shutil.copy(os.path.abspath(current_path + "/../../gym_envs/envs/IP_custom_cont.py"), log_dir)
     shutil.copy(os.path.abspath(__file__), log_dir)
 
     env = gym.make(env_id, n_steps=n_steps)
@@ -38,13 +40,13 @@ if __name__ == "__main__":
     num_act = env.action_space.shape[0]
     inp = num_obs+num_act
     costfn = NNCost(arch=[inp], device=device, num_samp=5).double().to(device)
-    env = DummyVecEnv([lambda: env])
+    env = DummyVecEnv([lambda: CostWrapper(env, costfn)])
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
     print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
     GlfwContext(offscreen=True)
     algo = PPO("MlpPolicy",
                env=env,
-               n_steps=2048,
+               n_steps=4096,
                batch_size=128,
                gamma=0.99,
                gae_lambda=0.95,
@@ -55,11 +57,11 @@ if __name__ == "__main__":
     video_recorder = VideoRecorderCallback(log_dir+"/video/"+name,
                                            gym.make(env_id, n_steps=n_steps),
                                            n_eval_episodes=5,
-                                           render_freq=102400)
+                                           render_freq=204800)
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
         learner_trajs = []
-    for _ in range(40):
+    for i in range(50):
         # update cost function
         for k in range(10):
             with torch.no_grad():
@@ -72,6 +74,7 @@ if __name__ == "__main__":
         # update policy using PPO
         env = DummyVecEnv([lambda: CostWrapper(gym.make(env_id, n_steps=n_steps), costfn._eval())])
         algo.set_env(env)
-        algo.learn(total_timesteps=409600, callback=video_recorder, tb_log_name=name)
-    torch.save(costfn, model_dir+"/"+name+"_costfn.pt")
-    algo.save(model_dir+"/"+name+"_ppo")
+        algo.learn(total_timesteps=204800, callback=video_recorder, tb_log_name=name)
+        if (i+1) % 5 == 0:
+            torch.save(costfn, model_dir+"/costfn{}.pt".format(i+1))
+            algo.save(model_dir+"/ppo{}".format(i+1))
