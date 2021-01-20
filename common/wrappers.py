@@ -47,3 +47,23 @@ class CostWrapper(gym.RewardWrapper):
     def reward(self, obs):
         cost_inp = torch.from_numpy(obs).to(self.costfn.device)
         return -self.costfn.forward(cost_inp)
+
+class ActionCostWrapper(gym.RewardWrapper):
+    def __init__(self, env, costfn):
+        super(ActionCostWrapper, self).__init__(env)
+        self.gear = env.model.actuator_gear[0, 0]
+        self.costfn = costfn
+
+    def step(self, action: np.ndarray):
+        observation, reward, done, info = self.env.step(self.action(action))
+        return observation, self.reward(np.append(observation, action)), done, info
+
+    def action(self, action: np.ndarray):
+        return self.gear * action
+
+    def reverse_action(self, action: np.ndarray):
+        return action / self.gear
+
+    def reward(self, obs):
+        cost_inp = torch.from_numpy(obs).to(self.costfn.device)
+        return -self.costfn.forward(cost_inp)
