@@ -19,31 +19,34 @@ if __name__ == "__main__":
         device = sys.argv[2]
     else:
         raise SyntaxError("Too many system inputs")
-    n_steps, n_episodes = 100, 5
-    env_id = "IP_custom-v1"
     current_path = os.path.dirname(__file__)
+
     log_dir = os.path.join(current_path, "tmp", "log", name)
     if not os.path.isdir(log_dir):
         os.mkdir(log_dir)
-    model_dir = os.path.join(current_path, "tmp", "model", name)
-    if not os.path.isdir(model_dir):
-        os.mkdir(model_dir)
-    expert_dir = os.path.join(current_path, "demos", "expert_bar_100.pkl")
-
     ## Copy used file to logging folder
     shutil.copy(os.path.abspath(current_path + "/../../common/modules.py"), log_dir)
     shutil.copy(os.path.abspath(current_path + "/../../gym_envs/envs/IP_custom_cont.py"), log_dir)
     shutil.copy(os.path.abspath(__file__), log_dir)
 
+    model_dir = os.path.join(current_path, "tmp", "model", name)
+    if not os.path.isdir(model_dir):
+        os.mkdir(model_dir)
+
+    expert_dir = os.path.join(current_path, "demos", "expert_bar_100.pkl")
+
+    n_steps, n_episodes = 100, 10
+    env_id = "IP_custom-v1"
     env = gym.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
     inp = num_obs+num_act
-    costfn = NNCost(arch=[inp], device=device, num_samp=5).double().to(device)
+    costfn = NNCost(arch=[num_obs], device=device, num_samp=n_episodes, lr=1e-4).double().to(device)
     env = DummyVecEnv([lambda: CostWrapper(env, costfn)])
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
     print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
     GlfwContext(offscreen=True)
+
     algo = PPO("MlpPolicy",
                env=env,
                n_steps=4096,
