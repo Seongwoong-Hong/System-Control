@@ -14,9 +14,7 @@ def get_trajectories_probs(
         for i in range(trans.__len__()):
             obs = torch.from_numpy(trans[i]['obs'].reshape(1, -1)).to(policy.device)
             acts = torch.from_numpy(trans[i]['acts'].reshape(1, -1)).to(policy.device)
-            latent_pi, _, latent_sde = policy._get_latent(obs)
-            distribution = policy._get_action_dist_from_latent(latent_pi, latent_sde=latent_sde)
-            log_probs = distribution.log_prob(acts)
-            trans[i]['infos']['log_probs'], trans[i]['infos']['rwinp'] = log_probs, torch.cat((obs, acts), dim=1)
+            log_probs = policy._get_log_prob_from_act(obs, acts)
+            trans[i]['infos']['log_probs'], trans[i]['infos']['rwinp'] = log_probs, torch.cat((obs, acts), dim=1).reshape(-1)
         transitions.append(trans)
     return transitions
