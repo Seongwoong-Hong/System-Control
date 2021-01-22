@@ -48,32 +48,33 @@ if __name__ == "__main__":
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
     print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
     GlfwContext(offscreen=True)
+    with open(expert_dir, "rb") as f:
+        expert_trajs = pickle.load(f)
+        learner_trajs = []
+
+    algo = PPO(MlpPolicy,
+               env=env,
+               n_steps=4096,
+               batch_size=128,
+               gamma=0.99,
+               gae_lambda=0.95,
+               ent_coef=0.1,
+               verbose=0,
+               device=device,
+               tensorboard_log=log_dir)
+    with torch.no_grad():
+        learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
+        expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
+        learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
 
     video_recorder = VideoRecorderCallback(log_dir+"/video/"+name,
                                            gym.make(env_id, n_steps=n_steps),
                                            n_eval_episodes=5,
                                            render_freq=409600)
-    with open(expert_dir, "rb") as f:
-        expert_trajs = pickle.load(f)
-        learner_trajs = []
-    for i in range(50):
-        algo = PPO(MlpPolicy,
-                   env=env,
-                   n_steps=4096,
-                   batch_size=128,
-                   gamma=0.99,
-                   gae_lambda=0.95,
-                   ent_coef=0.01,
-                   verbose=0,
-                   device=device,
-                   tensorboard_log=log_dir)
 
+    for i in range(50):
         if i > 4:
             shutil.rmtree(os.path.join(log_dir, name) + "_%d" % (i - 4))
-        with torch.no_grad():
-            learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
-            expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
-            learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
         # update cost function
         start = datetime.datetime.now()
         for k in range(50):
@@ -85,6 +86,23 @@ if __name__ == "__main__":
         env = DummyVecEnv([lambda: CostWrapper(gym.make(env_id, n_steps=n_steps), costfn._eval())])
         algo.set_env(env)
         algo.learn(total_timesteps=409600, callback=video_recorder, tb_log_name=name)
+
+        with torch.no_grad():
+            learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
+            expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
+            learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
+
+        algo = PPO(MlpPolicy,
+                   env=env,
+                   n_steps=4096,
+                   batch_size=128,
+                   gamma=0.99,
+                   gae_lambda=0.95,
+                   ent_coef=0.1,
+                   verbose=0,
+                   device=device,
+                   tensorboard_log=log_dir)
+
         if (i+1) % 5 == 0:
             torch.save(costfn, model_dir+"/costfn{}.pt".format(i+1))
             algo.save(model_dir+"/ppo{}".format(i+1))
