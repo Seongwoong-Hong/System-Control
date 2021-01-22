@@ -1,13 +1,20 @@
 from typing import Any, Dict, Union
-
+import numpy as np
 import gym, cv2
-import torch as th
+import torch
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.logger import Video
+from stable_baselines3.common.logger import Video, Figure
+from matplotlib import pyplot as plt
+from matplotlib import cm
 
-class VideoRecorderCallback(BaseCallback):
-    def __init__(self, path: str, eval_env: gym.Env, render_freq: int, n_eval_episodes: int = 1, deterministic: bool = True):
+class VFCustomCallback(BaseCallback):
+    def __init__(self, path: str,
+                 eval_env: gym.Env,
+                 render_freq: int,
+                 n_eval_episodes: int = 1,
+                 deterministic: bool = True,
+                 costfn: torch.nn.Module = None):
         """
         Records a video of an agent's trajectory traversing ``eval_env`` and logs it to TensorBoard
 
@@ -24,6 +31,7 @@ class VideoRecorderCallback(BaseCallback):
         self.path = path
         self.num = 0
         self.fps = int(1/eval_env.dt)
+        self.costfn = costfn
 
     def _on_step(self) -> bool:
         if self.n_calls % self._render_freq == 0:
@@ -47,20 +55,42 @@ class VideoRecorderCallback(BaseCallback):
                 n_eval_episodes=self._n_eval_episodes,
                 deterministic=self._deterministic,
             )
+
+            fig = self.draw_figure()
+
             self.logger.record(
                 "trajectory/video",
-                Video(th.ByteTensor([screens]), fps=self.fps),
+                Video(torch.ByteTensor([screens]), fps=self.fps),
                 exclude=("stdout", "log", "json", "csv")
             )
-            # filename = self.path + "/video_" + str(self.num) + ".avi"
-
-            # fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-            # width, height, _ = screens[0].shape
-            # writer = cv2.VideoWriter(filename, fourcc, 1/self._eval_env.dt, (width, height))
-            # for render in screens:
-            #     img = cv2.cvtColor(render, cv2.COLOR_RGB2BGR)
-            #     writer.write(img)
-            # writer.release()
-
-            # self.num += 1
+            self.logger.record(
+                "trajectory/cost",
+                Figure(fig, close=True),
+                exclude=("stdout", "log", "json", "csv")
+            )
+            plt.close()
         return True
+
+    def draw_figure(self) -> plt.figure:
+        th, dth = np.meshgrid(np.linspace(-0.15, 0.15, 100), np.linspace(-0.15, 0.15, 100))
+        pact = np.zeros((100, 100), dtype=np.float64)
+        cost = np.zeros(th.shape)
+        for i in range(th.shape[0]):
+            for j in range(th.shape[1]):
+                pact[i][j], _ = self.model.predict(np.append(th[i][j], dth[i][j]), deterministic=True)
+                inp = torch.Tensor((th[i][j], dth[i][j], pact[i][j])).double()
+                cost[i][j] = self.costfn(inp).item()
+
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+        ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+        surf1 = ax1.plot_surface(th, dth, cost, cmap=cm.coolwarm)
+        surf2 = ax2.plot_surface(th, dth, pact, cmap=cm.coolwarm)
+        fig.colorbar(surf1, ax=ax1)
+        fig.colorbar(surf2, ax=ax2)
+        ax1.view_init(azim=0, elev=90)
+        ax2.view_init(azim=0, elev=90)
+        return fig
+
+    def _set_costfn(self, costfn: torch.nn.Module = None):
+        self.costfn = costfn
