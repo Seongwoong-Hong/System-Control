@@ -1,6 +1,6 @@
 import torch, gym, gym_envs, pickle, os, sys, shutil, datetime
 from stable_baselines3.common.vec_env import DummyVecEnv
-from common.callbacks import VideoRecorderCallback
+from common.callbacks import VFCustomCallback
 from common.rollouts import get_trajectories_probs
 from common.wrappers import CostWrapper
 from common.modules import NNCost
@@ -32,13 +32,13 @@ if __name__ == "__main__":
         os.mkdir(model_dir)
     ## Copy used file to logging folder
     shutil.copy(os.path.abspath(current_path + "/../../common/modules.py"), model_dir)
-    shutil.copy(os.path.abspath(current_path + "/../../gym_envs/envs/IP_custom_cont.py"), model_dir)
+    shutil.copy(os.path.abspath(current_path + "/../../gym_envs/envs/IP_custom_PD.py"), model_dir)
     shutil.copy(os.path.abspath(__file__), model_dir)
 
-    expert_dir = os.path.join(current_path, "demos", "expert_bar_100.pkl")
+    expert_dir = os.path.join(current_path, "demos", "expert_broad.pkl")
 
     n_steps, n_episodes = 100, 10
-    env_id = "IP_custom-v1"
+    env_id = "IP_custom-v2"
     env = gym.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
@@ -48,6 +48,7 @@ if __name__ == "__main__":
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
     print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
     GlfwContext(offscreen=True)
+
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
         learner_trajs = []
@@ -62,15 +63,17 @@ if __name__ == "__main__":
                verbose=0,
                device=device,
                tensorboard_log=log_dir)
+
     with torch.no_grad():
         learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
         expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
         learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
 
-    video_recorder = VideoRecorderCallback(log_dir+"/video/"+name,
-                                           gym.make(env_id, n_steps=n_steps),
-                                           n_eval_episodes=5,
-                                           render_freq=409600)
+    video_recorder = VFCustomCallback(log_dir+"/video/"+name,
+                                      gym.make(env_id, n_steps=n_steps),
+                                      n_eval_episodes=5,
+                                      render_freq=409600,
+                                      costfn=costfn)
 
     for i in range(50):
         if i > 4:
@@ -82,6 +85,7 @@ if __name__ == "__main__":
             costfn.learn(epoch=10)
         delta = datetime.datetime.now() - start
         print("Cost Optimization Takes {}. Now start {}th policy optimization...".format(str(delta), i+1))
+        video_recorder._set_costfn(costfn=costfn)
         # update policy using PPO
         env = DummyVecEnv([lambda: CostWrapper(gym.make(env_id, n_steps=n_steps), costfn._eval())])
         algo.set_env(env)
