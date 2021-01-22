@@ -28,4 +28,8 @@ class LQRPolicy(BasePolicy):
         return None
 
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
-        return -1/self.gear * (self.P*observation[0][1] + self.D*observation[0][0]).reshape(1, 1)
+        action = -1/self.gear * (self.P*observation[0][1] + self.D*observation[0][0]).reshape(1, 1)
+        if deterministic:
+            return action
+        else:
+            return action + 0.1*th.randn((1, 1))
