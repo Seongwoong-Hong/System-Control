@@ -43,7 +43,7 @@ if __name__ == "__main__":
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
     inp = num_obs+num_act
-    costfn = NNCost(arch=[num_obs], device=device, num_expert=10, num_samp=n_episodes, lr=3e-4).double().to(device)
+    costfn = NNCost(arch=[num_obs, num_obs], device=device, num_expert=10, num_samp=n_episodes, lr=3e-4).double().to(device)
     env = DummyVecEnv([lambda: CostWrapper(env, costfn)])
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
     print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
@@ -53,13 +53,14 @@ if __name__ == "__main__":
         expert_trajs = pickle.load(f)
         learner_trajs = []
 
+
     algo = PPO(MlpPolicy,
                env=env,
                n_steps=4096,
                batch_size=128,
                gamma=0.99,
                gae_lambda=0.95,
-               ent_coef=0.1,
+               ent_coef=0.16,
                verbose=0,
                device=device,
                tensorboard_log=log_dir)
@@ -91,22 +92,22 @@ if __name__ == "__main__":
         algo.set_env(env)
         algo.learn(total_timesteps=409600, callback=video_recorder, tb_log_name=name)
 
+        if (i + 1) % 2 == 0:
+            torch.save(costfn, model_dir + "/costfn{}.pt".format(i + 1))
+            algo.save(model_dir + "/ppo{}".format(i + 1))
+
         with torch.no_grad():
             learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
             expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
             learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
-
+        et = 0.16 - (0.16-0.01)/50*(i+1)
         algo = PPO(MlpPolicy,
                    env=env,
                    n_steps=4096,
                    batch_size=128,
                    gamma=0.99,
                    gae_lambda=0.95,
-                   ent_coef=0.1,
+                   ent_coef=et,
                    verbose=0,
                    device=device,
                    tensorboard_log=log_dir)
-
-        if (i+1) % 5 == 0:
-            torch.save(costfn, model_dir+"/costfn{}.pt".format(i+1))
-            algo.save(model_dir+"/ppo{}".format(i+1))
