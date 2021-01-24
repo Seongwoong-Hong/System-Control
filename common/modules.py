@@ -10,7 +10,8 @@ class NNCost(nn.Module):
                  act_fcn=nn.Tanh,
                  lr: float = 3e-5,
                  num_expert: int = 10,
-                 num_samp: int = 10):
+                 num_samp: int = 10,
+                 param_reg: float = None):
         # The first argument of the arch must be an input size
         super(NNCost, self).__init__()
         self.device = device
@@ -20,6 +21,7 @@ class NNCost(nn.Module):
         self.evalmod = False
         self.num_expert = num_expert
         self.num_samp = num_samp
+        self.param_reg = param_reg
 
     def _build(self, lr, arch):
         layers = []
@@ -45,7 +47,7 @@ class NNCost(nn.Module):
     def learn(self, epoch: int):
         self._train()
         for _ in range(epoch):
-            IOCLoss1, IOCLoss2 = 0, 0
+            IOCLoss1, IOCLoss2, paramLoss = 0, 0, 0
             # Calculate learned cost loss
             for E_trans in self.sampleE:
                 for i in range(len(E_trans)):
@@ -60,11 +62,12 @@ class NNCost(nn.Module):
                     temp -= self.forward(trans_j[t]['infos']['rwinp'])+trans_j[t]['infos']['log_probs']
                 x[j] = temp
             IOCLoss2 = -torch.logsumexp(x, 0)
-            param_norm = 0
-            for param in self.parameters():
-                param_norm += torch.norm(param)
-            paramLoss = 1 - torch.norm(param_norm)
-            IOCLoss = IOCLoss1 + IOCLoss2 + 0.05 * paramLoss
+            if self.param_reg is not None:
+                param_norm = 0
+                for param in self.parameters():
+                    param_norm += torch.norm(param)
+                paramLoss = self.param_reg * (1 - torch.norm(param_norm))
+            IOCLoss = IOCLoss1 + IOCLoss2 + paramLoss
             self.optimizer.zero_grad()
             IOCLoss.backward()
             self.optimizer.step()
