@@ -26,7 +26,7 @@ class NNCost(nn.Module):
         for i in range(len(arch)-1):
             layers.append(nn.Linear(arch[i], arch[i+1]))
             layers.append(self.act_fnc())
-        layers.append(nn.Linear(arch[-1], 1))
+        layers.append(nn.Linear(arch[-1], 1, bias=True))
         self.layers = nn.Sequential(*layers)
         self.aparam = nn.Linear(1, 1, bias=False)
         self.optimizer = self.optimizer_class(self.parameters(), lr)
@@ -60,7 +60,11 @@ class NNCost(nn.Module):
                     temp -= self.forward(trans_j[t]['infos']['rwinp'])+trans_j[t]['infos']['log_probs']
                 x[j] = temp
             IOCLoss2 = -torch.logsumexp(x, 0)
-            IOCLoss = IOCLoss1 + IOCLoss2
+            param_norm = 0
+            for param in self.parameters():
+                param_norm += torch.norm(param)
+            paramLoss = 1 - torch.norm(param_norm)
+            IOCLoss = IOCLoss1 + IOCLoss2 + 0.05 * paramLoss
             self.optimizer.zero_grad()
             IOCLoss.backward()
             self.optimizer.step()
