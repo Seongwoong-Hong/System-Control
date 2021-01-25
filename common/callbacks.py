@@ -78,7 +78,7 @@ class VFCustomCallback(BaseCallback):
         for i in range(th.shape[0]):
             for j in range(th.shape[1]):
                 pact[i][j], _ = self.model.predict(np.append(th[i][j], dth[i][j]), deterministic=True)
-                inp = torch.Tensor((th[i][j], dth[i][j], pact[i][j])).double()
+                inp = torch.Tensor((th[i][j], dth[i][j], pact[i][j])).double().to(self.model.device)
                 cost[i][j] = self.costfn(inp).item()
 
         fig = plt.figure()
@@ -94,3 +94,57 @@ class VFCustomCallback(BaseCallback):
 
     def _set_costfn(self, costfn: torch.nn.Module = None):
         self.costfn = costfn
+
+class VideoCallback(BaseCallback):
+    def __init__(self, path: str,
+                 eval_env: gym.Env,
+                 render_freq: int,
+                 n_eval_episodes: int = 1,
+                 deterministic: bool = True,
+                 costfn: torch.nn.Module = None):
+        """
+        Records a video of an agent's trajectory traversing ``eval_env`` and logs it to TensorBoard
+
+        :param eval_env: A gym environment from which the trajectory is recorded
+        :param render_freq: Render the agent's trajectory every eval_freq call of the callback.
+        :param n_eval_episodes: Number of episodes to render
+        :param deterministic: Whether to use deterministic or stochastic policy
+        """
+        super().__init__()
+        self._eval_env = eval_env
+        self._render_freq = render_freq
+        self._n_eval_episodes = n_eval_episodes
+        self._deterministic = deterministic
+        self.path = path
+        self.num = 0
+        self.fps = int(1/eval_env.dt)
+        self.costfn = costfn
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self._render_freq == 0:
+            screens = []
+
+            def grab_screens(_locals: Dict[str, Any], _globals: Dict[str, Any]) -> None:
+                """
+                Renders the environment in its current state, recording the screen in the captured `screens` list
+
+                :param _locals: A dictionary containing all local variables of the callback's scope
+                :param _globals: A dictionary containing all global variables of the callback's scope
+                """
+                screen = self._eval_env.render(mode="rgb_array")
+                # Mujoco uses HxWxC image convention, cv2 need HxWxC image convention
+                screens.append(screen.transpose(2, 0, 1))
+
+            evaluate_policy(
+                self.model,
+                self._eval_env,
+                callback=grab_screens,
+                n_eval_episodes=self._n_eval_episodes,
+                deterministic=self._deterministic,
+            )
+            self.logger.record(
+                "trajectory/video",
+                Video(torch.ByteTensor([screens]), fps=self.fps),
+                exclude=("stdout", "log", "json", "csv")
+            )
+        return True
