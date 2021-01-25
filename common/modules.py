@@ -11,17 +11,20 @@ class NNCost(nn.Module):
                  lr: float = 3e-5,
                  num_expert: int = 10,
                  num_samp: int = 10,
+                 num_act: int = 1,
                  param_reg: float = None):
         # The first argument of the arch must be an input size
         super(NNCost, self).__init__()
         self.device = device
         self.optimizer_class = optimizer_class
         self.act_fnc = act_fcn
-        self._build(lr, arch)
         self.evalmod = False
         self.num_expert = num_expert
         self.num_samp = num_samp
         self.param_reg = param_reg
+        self.num_act = num_act
+
+        self._build(lr, arch)
 
     def _build(self, lr, arch):
         layers = []
@@ -30,7 +33,7 @@ class NNCost(nn.Module):
             layers.append(self.act_fnc())
         layers.append(nn.Linear(arch[-1], 1, bias=True))
         self.layers = nn.Sequential(*layers)
-        self.aparam = nn.Linear(1, 1, bias=False)
+        self.aparam = nn.Linear(self.num_act, 1, bias=False)
         self.optimizer = self.optimizer_class(self.parameters(), lr)
 
     def sample_trajectory_sets(self, learner_trans, expert_trans):
@@ -40,9 +43,9 @@ class NNCost(nn.Module):
     def forward(self, obs):
         if self.evalmod:
             with torch.no_grad():
-                return self.layers(obs[:-1])**2 + self.aparam(obs[-1:])**2
+                return self.layers(obs[:-self.num_act])**2 + self.aparam(obs[-self.num_act:])**2
         else:
-            return self.layers(obs[:-1])**2 + self.aparam(obs[-1:])**2
+            return self.layers(obs[:-self.num_act])**2 + self.aparam(obs[-self.num_act:])**2
 
     def learn(self, epoch: int):
         self._train()
