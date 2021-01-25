@@ -1,27 +1,36 @@
+import os
 import numpy as np
 from gym import utils
 from gym.envs.mujoco import mujoco_env
 
 class IDP_custom(mujoco_env.MujocoEnv, utils.EzPickle):
 
-    def __init__(self):
-        mujoco_env.MujocoEnv.__init__(self, 'IDP_custom.xml', 1)
+    def __init__(self, n_steps=None):
+        self.traj_len = 0
+        self.n_steps = n_steps
+        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 25)
         utils.EzPickle.__init__(self)
+        self.init_qpos = np.array([0.1, 0.25])
 
     def step(self, action):
         self.do_simulation(action, self.frame_skip)
         ob = self._get_obs()
-        alive_bonus = 1
-        action_bonus = -abs(action[0] - (-8*ob[0] - 0.2*ob[2])) - abs(action[1] - (-2*ob[1] - 0.2*ob[3]))
-        r = alive_bonus + action_bonus
-        done = bool(abs(ob[0]) >= .3) or bool(abs(ob[1]) >= .3)
-        return ob, r, done, {}
+        r = 0
+        done = False
+        info = {}
+        if self.n_steps is None:
+            pass
+        elif self.traj_len == self.n_steps:
+            done = True
+            info = {"terminal observation": ob}
+            self.traj_len = 0
+        self.traj_len += 1
+        return ob, r, done, info
 
     def _get_obs(self):
         return np.concatenate([
             self.sim.data.qpos, # link angles
-            np.clip(self.sim.data.qvel, -10, 10),
-            np.clip(self.sim.data.qfrc_constraint, -10, 10)
+            np.clip(self.sim.data.qvel, -10, 10)
         ]).ravel()
 
     def reset_model(self):
