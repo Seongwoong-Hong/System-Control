@@ -5,6 +5,7 @@ from typing import List
 class NNCost(nn.Module):
     def __init__(self,
                  arch: List[int],
+                 device: str,
                  optimizer_class=torch.optim.Adam,
                  act_fcn=nn.Tanh,
                  lr: float = 3e-5,
@@ -25,6 +26,7 @@ class NNCost(nn.Module):
         :param decay_coeff: The coefficient for preventing parameter decaying loss
         """
         super(NNCost, self).__init__()
+        self.device = device
         self.optimizer_class = optimizer_class
         self.act_fnc = act_fcn
         self.evalmod = False
