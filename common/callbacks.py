@@ -1,4 +1,5 @@
-from typing import Any, Dict, Union
+from typing import Any, Dict, List
+from copy import deepcopy
 import numpy as np
 import gym, cv2
 import torch
@@ -14,7 +15,8 @@ class VFCustomCallback(BaseCallback):
                  render_freq: int,
                  n_eval_episodes: int = 1,
                  deterministic: bool = True,
-                 costfn: torch.nn.Module = None):
+                 costfn: torch.nn.Module = None,
+                 draw_dim: List[int] = [0, 1, 0]):
         """
         Records a video of an agent's trajectory traversing ``eval_env`` and logs it to TensorBoard
 
@@ -22,6 +24,8 @@ class VFCustomCallback(BaseCallback):
         :param render_freq: Render the agent's trajectory every eval_freq call of the callback.
         :param n_eval_episodes: Number of episodes to render
         :param deterministic: Whether to use deterministic or stochastic policy
+        :param draw_dim: First two arguments are for observation dimension that are input for drawing a figure
+                         and third argument is for action dimension that is a output for figure.
         """
         super().__init__()
         self._eval_env = eval_env
@@ -32,6 +36,7 @@ class VFCustomCallback(BaseCallback):
         self.num = 0
         self.fps = int(1/eval_env.dt)
         self.costfn = costfn
+        self.draw_dim = draw_dim
 
     def _on_step(self) -> bool:
         if self.n_calls % self._render_freq == 0:
@@ -56,7 +61,7 @@ class VFCustomCallback(BaseCallback):
                 deterministic=self._deterministic,
             )
 
-            fig = self.draw_figure()
+            fig = self.draw_figure(self._eval_env, self.draw_dim)
 
             self.logger.record(
                 "trajectory/video",
@@ -71,25 +76,35 @@ class VFCustomCallback(BaseCallback):
             plt.close()
         return True
 
-    def draw_figure(self) -> plt.figure:
-        th, dth = np.meshgrid(np.linspace(-0.15, 0.15, 100), np.linspace(-0.15, 0.15, 100))
+    def draw_figure(self, env, draw_dim) -> plt.figure:
+        ndim, nact = env.observation_space.shape[0], env.action_space.shape[0]
+        d1, d2 = np.meshgrid(np.linspace(-0.25, 0.25, 100), np.linspace(-0.25, 0.25, 100))
         pact = np.zeros((100, 100), dtype=np.float64)
-        cost = np.zeros(th.shape)
-        for i in range(th.shape[0]):
-            for j in range(th.shape[1]):
-                pact[i][j], _ = self.model.predict(np.append(th[i][j], dth[i][j]), deterministic=True)
-                inp = torch.Tensor((th[i][j], dth[i][j], pact[i][j])).double().to(self.model.device)
+        cost = np.zeros(d1.shape)
+        for i in range(d1.shape[0]):
+            for j in range(d1.shape[1]):
+                iobs = np.zeros(ndim)
+                iobs[draw_dim[0]], iobs[draw_dim[1]] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
+                iacts, _ = self.model.predict(np.array(iobs), deterministic=True)
+                pact[i][j] = iacts[draw_dim[2]]
+                inp = torch.from_numpy(np.append(iobs, iacts)).double().to(self.model.device)
                 cost[i][j] = self.costfn(inp).item()
-
+        cost /= np.amax(cost)
+        title_list = ["norm_cost", "abs_action"]
+        yval_list = [cost, np.abs(pact)]
+        xlabel, ylabel = "d1", "d2"
+        max_list = [1.0, 0.5]
+        min_list = [0.0, 0.0]
         fig = plt.figure()
-        ax1 = fig.add_subplot(1, 2, 1, projection='3d')
-        ax2 = fig.add_subplot(1, 2, 2, projection='3d')
-        surf1 = ax1.plot_surface(th, dth, cost, cmap=cm.coolwarm)
-        surf2 = ax2.plot_surface(th, dth, pact, cmap=cm.coolwarm)
-        fig.colorbar(surf1, ax=ax1)
-        fig.colorbar(surf2, ax=ax2)
-        ax1.view_init(azim=0, elev=90)
-        ax2.view_init(azim=0, elev=90)
+        for i in range(2):
+            ax = fig.add_subplot(1, 2, (i + 1))
+            surf = ax.pcolor(d1, d2, yval_list[i], cmap=cm.coolwarm, shading='auto', vmax=max_list[i],
+                             vmin=min_list[i])
+            clb = fig.colorbar(surf, ax=ax)
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+            clb.ax.set_title(title_list[i])
+
         return fig
 
     def _set_costfn(self, costfn: torch.nn.Module = None):
