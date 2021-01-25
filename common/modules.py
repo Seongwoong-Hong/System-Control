@@ -12,8 +12,19 @@ class NNCost(nn.Module):
                  num_expert: int = 10,
                  num_samp: int = 10,
                  num_act: int = 1,
-                 param_reg: float = None):
-        # The first argument of the arch must be an input size
+                 decay_coeff: float = 0.0):
+        """
+        :param arch: The architecture of a Neural Network form of the cost function.
+            The first argument of the arch must be an input size.
+        :param device: The device(cpu or cuda) you want to use.
+        :param optimizer: The optimizer for stochastic gradient descent.
+        :param act_fcn: The activation function for each layers of the cost function.
+        :param lr: learning rate
+        :param num_expert: How many expert trajectories you use when optimizing cost function.
+        :param num_samp: How many sample trajectories from current policy you us when optimizing cost function.
+        :param num_act: Number of actions of your current environment.
+        :param decay_coeff: The coefficient for preventing parameter decaying loss
+        """
         super(NNCost, self).__init__()
         self.device = device
         self.optimizer_class = optimizer_class
@@ -21,7 +32,7 @@ class NNCost(nn.Module):
         self.evalmod = False
         self.num_expert = num_expert
         self.num_samp = num_samp
-        self.param_reg = param_reg
+        self.decay_coeff = decay_coeff
         self.num_act = num_act
 
         self._build(lr, arch)
@@ -51,25 +62,27 @@ class NNCost(nn.Module):
         self._train()
         for _ in range(epoch):
             IOCLoss1, IOCLoss2, paramLoss = 0, 0, 0
+            # Calculate the loss for preventing parameter decaying
+            param_norm = 0
+            for param in self.parameters():
+                param_norm += torch.norm(param)
+            paramLoss = self.decay_coeff * (1 - torch.norm(param_norm))
+
             # Calculate learned cost loss
             for E_trans in self.sampleE:
-                for i in range(len(E_trans)):
-                    IOCLoss1 += self.forward(E_trans[i]['infos']['rwinp'])
+                for info in E_trans.infos:
+                    IOCLoss1 += self.forward(info['rwinp'])
             IOCLoss1 /= len(self.sampleE)
+
             # Calculate Max Ent. Loss
             x = torch.zeros(len(self.sampleE+self.sampleL)).double()
-            for j in range(len(self.sampleE+self.sampleL)):
-                trans_j = (self.sampleE+self.sampleL)[j]
+            for j, trans_j in enumerate(self.sampleE+self.sampleL):
                 temp = 0
-                for t in range(len(trans_j)):
-                    temp -= self.forward(trans_j[t]['infos']['rwinp'])+trans_j[t]['infos']['log_probs']
+                for info in trans_j.infos:
+                    temp -= self.forward(info['rwinp'])+info['log_probs']
                 x[j] = temp
             IOCLoss2 = -torch.logsumexp(x, 0)
-            if self.param_reg is not None:
-                param_norm = 0
-                for param in self.parameters():
-                    param_norm += torch.norm(param)
-                paramLoss = self.param_reg * (1 - torch.norm(param_norm))
+
             IOCLoss = IOCLoss1 + IOCLoss2 + paramLoss
             self.optimizer.zero_grad()
             IOCLoss.backward()
