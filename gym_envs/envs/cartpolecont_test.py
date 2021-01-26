@@ -1,10 +1,13 @@
-import gym, imageio
+import gym
+import imageio
 import numpy as np
+
 from gym_envs.envs.cartpolecont import CartPoleContEnv
 
+
 class CartPoleContTestEnv(gym.Env):
-    def __init__(self, max_ep, limit=np.pi):
-        self.env = CartPoleContEnv(max_ep, limit=limit)
+    def __init__(self, max_ep, high=np.pi, low=0):
+        self.env = CartPoleContEnv(max_ep, high=high, low=low)
         self.action_space = self.env.action_space
         self.observation_space = self.env.observation_space
         self.reward_range = self.env.reward_range
@@ -33,7 +36,7 @@ class CartPoleContTestEnv(gym.Env):
         if frames is None:
             raise ValueError("There are no frame inputs")
         print("Saving input frames as gif...")
-        fps = 1/2*self.tau
+        fps = int(1/self.tau)
         imageio.mimsave(name, [np.array(frame) for i, frame in enumerate(frames) if i % 2 == 0], fps=fps)
 
     def close(self):

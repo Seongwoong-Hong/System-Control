@@ -7,7 +7,7 @@
   <option gravity="0 0 -9.81" integrator="RK4" timestep="0.001"/>
   <size nstack="3000" nuserdata="100" nuser_actuator="10"/>
   <worldbody>
-    <geom name="floor" pos="0 0 -3.0" rgba="0.8 0.9 0.8 1" size="40 40 40" type="plane"/>
+    <geom name="floor" pos="0 0 -3.0" rgba="0.1 0.1 0.1 1" size="40 40 40" type="plane"/>
     <body name="leg" pos="0 0 0">
       <joint axis="0 1 0" limited="false" name="hinge" pos="0 0 0" type="hinge"/>
       <geom fromto="0 0 0 0 0 1.0" name="cpole" rgba="0 0.7 0.7 1" size="0.045" type="capsule"/>

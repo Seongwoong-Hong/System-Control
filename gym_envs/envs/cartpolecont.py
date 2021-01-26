@@ -90,6 +90,15 @@ class CartPoleContEnv(gym.Env):
         self.steps_beyond_done = None
         self.traj_len = 0
 
+        self.np_random = None
+
+        # parameters for render
+        self.carttrans = None
+        self.poletrans = None
+        self.axle = None
+        self.track = None
+        self._pole_geom = None
+
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
@@ -106,7 +115,8 @@ class CartPoleContEnv(gym.Env):
         # For the interested reader:
         # https://coneural.org/florian/papers/05_cart_pole.pdf
         temp = (force + self.polemass_length * theta_dot ** 2 * sintheta) / self.total_mass
-        thetaacc = (self.gravity * sintheta - costheta * temp) / (self.length * (4.0 / 3.0 - self.masspole * costheta ** 2 / self.total_mass))
+        thetaacc = (self.gravity * sintheta - costheta * temp) /\
+                   (self.length * (4.0 / 3.0 - self.masspole * costheta ** 2 / self.total_mass))
         xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
 
         if self.kinematics_integrator == 'euler':
@@ -122,7 +132,7 @@ class CartPoleContEnv(gym.Env):
 
         self.set_state([x_dot, x, theta_dot, theta])
 
-        reward = 1.025 - 0.25 * (self.state.T @ self.Q @ self.state + action * self.R * action)
+        reward = 1.025 - 0.01 * (self.state.T @ self.Q @ self.state + force * self.R * force)
         # torch/ppo_ct l_1,2 use this reward
         # tf/ppo_ctl_5,6 second learn use this reward
 
@@ -135,21 +145,18 @@ class CartPoleContEnv(gym.Env):
             done = True
             self.traj_len = 0
         elif theta > 2*self.high or theta < -2*self.high or x > self.x_threshold+2.5 or x < -self.x_threshold-2.5:
-           done = True
-           reward -= 2 * (1000 - self.traj_len)
-           self.traj_len = 0
+            done = True
+            reward -= 2 * (self.max_ep - self.traj_len)
+            self.traj_len = 0
 
-        return self.state.squeeze(), reward[0], done, {'action':action}
+        return self.state.squeeze(), reward[0], done, {'action': action}
 
     def reset(self):
         if np.random.uniform() < 0.5:
             self.state = self.np_random.uniform(low=self.low, high=self.high, size=(4,))
         else:
             self.state = self.np_random.uniform(low=-self.high, high=-self.low, size=(4,))
-        # torch/ppo_ctl_2 use this reset
-
         self.state[0], self.state[1] = 0, 0
-        # self.state = np.array([0, 0, 0, -math.pi/3])
         self.steps_beyond_done = None
         self.traj_len = 0
         return self.state.squeeze()
@@ -208,7 +215,8 @@ class CartPoleContEnv(gym.Env):
         return self.viewer.render(return_rgb_array=mode == 'rgb_array')
 
     def set_state(self, state):
-        self.state = np.concatenate((np.array([state[0]]), np.array([state[1]]), np.array([state[2]]), np.array([state[3]]))).squeeze()
+        self.state = np.concatenate((np.array([state[0]]), np.array([state[1]]),
+                                     np.array([state[2]]), np.array([state[3]]))).squeeze()
 
     def close(self):
         if self.viewer:

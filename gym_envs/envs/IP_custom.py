@@ -1,19 +1,21 @@
-import numpy as np
-import math, csv, os, gym, mujoco_py
-from gym import utils, spaces, error
-from gym.envs.mujoco import mujoco_env
-from gym.utils import seeding
-from collections import OrderedDict
-from os import path
+import csv
+import math
+import mujoco_py
+import os
 
-class IP_custom(mujoco_env.MujocoEnv, utils.EzPickle):
+import numpy as np
+from gym import utils, spaces
+from gym.envs.mujoco import mujoco_env
+
+
+class IPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
-        data_path = ["trajectory1.csv", "trajectory2.csv", "trajectory3.csv", "trajectory4.csv", "trajectory5.csv", "trajectory6.csv", "trajectory7.csv"]
+        data_path = ["trajectory1.csv", "trajectory2.csv", "trajectory3.csv",
+                     "trajectory4.csv", "trajectory5.csv", "trajectory6.csv", "trajectory7.csv"]
         self.trajdata = TrajData(data_path, 3000)
         utils.EzPickle.__init__(self)
-        fullpath = "/home/biomechserver/anaconda3/envs/baseline/lib/python3.7/site-packages/gym/envs/mujoco/assets/IP_custom.xml"
-        frame_skip = 1
-        self.frame_skip = frame_skip
+        fullpath = os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml")
+        self.frame_skip = 1
         self.model = mujoco_py.load_model_from_path(fullpath)
         self.sim = mujoco_py.MjSim(self.model)
         self.data = self.sim.data
@@ -66,12 +68,13 @@ class IP_custom(mujoco_env.MujocoEnv, utils.EzPickle):
         v.cam.trackbodyid = 0
         v.cam.distance = self.model.stat.extent
 
+
 class TrajData:
     def __init__(self, path, n_steps):
         self.frame = 0
         self.ep_len = 0
         self.path = path
-        self.data = [None, None, None] * n_steps
+        self.data = np.array((3, n_steps))
 
     def reset_frame(self, frame=0):
         self.frame = frame
@@ -87,7 +90,5 @@ class TrajData:
     def open_file(self, nb):
         with open(self.path[nb], 'r') as f:
             reader = csv.reader(f)
-            i = 0
-            for txt in reader:
-                self.data[i] = np.array([float(txt[0])] + [float(txt[1])] + [float(txt[2])])
-                i += 1
+            for i, txt in enumerate(reader):
+                self.data[i] = np.array([float(txt[0]), float(txt[1]), float(txt[2])])

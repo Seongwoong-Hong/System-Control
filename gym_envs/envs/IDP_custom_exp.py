@@ -3,7 +3,8 @@ import numpy as np
 from gym import utils, spaces
 from gym.envs.mujoco import mujoco_env
 
-class IDP_custom_exp(mujoco_env.MujocoEnv, utils.EzPickle):
+
+class IDPCustomExp(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def __init__(self, n_steps=None):
         self.traj_len = 0
@@ -11,16 +12,16 @@ class IDP_custom_exp(mujoco_env.MujocoEnv, utils.EzPickle):
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 25)
         utils.EzPickle.__init__(self)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
-        self.init_group = np.array([[[ 0.10, 0.10], [ 0.05, -0.05]],
-                                    [[ 0.15, 0.10], [-0.05,  0.05]],
-                                    [[-0.16, 0.20], [ 0.10, -0.10]],
-                                    [[-0.10, 0.06], [ 0.05, -0.10]],
-                                    [[ 0.05, 0.15], [-0.20, -0.20]],
-                                    [[-0.05, 0.05], [ 0.15,  0.15]],
-                                    [[ 0.12, 0.05], [-0.10, -0.15]],
-                                    [[-0.08, 0.15], [ 0.05, -0.15]],
-                                    [[-0.15, 0.20], [-0.10,  0.05]],
-                                    [[ 0.20, 0.01], [ 0.09, -0.15]]])
+        self.init_group = np.array([[[+0.10, +0.10], [+0.05, -0.05]],
+                                    [[+0.15, +0.10], [-0.05, +0.05]],
+                                    [[-0.16, +0.20], [+0.10, -0.10]],
+                                    [[-0.10, +0.06], [+0.05, -0.10]],
+                                    [[+0.05, +0.15], [-0.20, -0.20]],
+                                    [[-0.05, +0.05], [+0.15, +0.15]],
+                                    [[+0.12, +0.05], [-0.10, -0.15]],
+                                    [[-0.08, +0.15], [+0.05, -0.15]],
+                                    [[-0.15, +0.20], [-0.10, +0.05]],
+                                    [[+0.20, +0.01], [+0.09, -0.15]]])
         self.i = 0
 
     def step(self, action):
@@ -40,7 +41,7 @@ class IDP_custom_exp(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def _get_obs(self):
         return np.concatenate([
-            self.sim.data.qpos, # link angles
+            self.sim.data.qpos,  # link angles
             self.sim.data.qvel
         ]).ravel()
 
