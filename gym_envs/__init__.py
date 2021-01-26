@@ -12,26 +12,26 @@ register(
 # expert: v0, agent: v1
 # v2 environment is not used yet
 register(
-    id='IP_custom-v2',
-    entry_point='gym_envs.envs:IP_custom',
-    )
-
-register(
     id='IP_custom-v1',
-    entry_point='gym_envs.envs:IP_custom_cont'
+    entry_point='gym_envs.envs:IPCustomCont'
 )
 
 register(
     id='IP_custom-v0',
-    entry_point='gym_envs.envs:IP_custom_exp'
+    entry_point='gym_envs.envs:IPCustomExp'
+)
+
+register(
+    id='IP_custom-v2',
+    entry_point='gym_envs.envs:IPCustom',
+)
+
+register(
+    id='IDP_custom-v0',
+    entry_point='gym_envs.envs:IDPCustomExp',
 )
 
 register(
     id='IDP_custom-v1',
-    entry_point='gym_envs.envs:IDP_custom',
-    )
-
-register(
-    id='IDP_custom-v0',
-    entry_point='gym_envs.envs:IDP_custom_exp',
-    )
+    entry_point='gym_envs.envs:IDPCustom',
+)
