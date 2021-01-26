@@ -1,6 +1,9 @@
 # This file is here just to define MlpPolicy/CnnPolicy
 # that work for PPO
-from stable_baselines3.common.policies import ActorCriticCnnPolicy, register_policy, BasePolicy, create_sde_features_extractor
+from stable_baselines3.common.policies import (ActorCriticCnnPolicy,
+                                               register_policy,
+                                               BasePolicy,
+                                               create_sde_features_extractor)
 
 import collections
 from functools import partial
@@ -163,7 +166,8 @@ class ActorCriticPolicy(BasePolicy):
 
         :param n_envs:
         """
-        assert isinstance(self.action_dist, StateDependentNoiseDistribution), "reset_noise() is only available when using gSDE"
+        assert isinstance(self.action_dist, StateDependentNoiseDistribution),\
+            "reset_noise() is only available when using gSDE"
         self.action_dist.sample_weights(self.log_std, batch_size=n_envs)
 
     def _build_mlp_extractor(self) -> None:
@@ -322,11 +326,12 @@ class ActorCriticPolicy(BasePolicy):
         values = self.value_net(latent_vf)
         return values, log_prob, distribution.entropy()
 
-    def _get_log_prob_from_act(self, observation: th.Tensor, action: th.Tensor) -> th.Tensor:
+    def get_log_prob_from_act(self, observation: th.Tensor, action: th.Tensor) -> th.Tensor:
         latent_pi, _, latent_sde = self._get_latent(observation)
         distribution = self._get_action_dist_from_latent(latent_pi, latent_sde=latent_sde)
         log_prob = distribution.log_prob(action)
         return log_prob
+
 
 MlpPolicy = ActorCriticPolicy
 CnnPolicy = ActorCriticCnnPolicy

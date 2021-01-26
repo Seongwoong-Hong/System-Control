@@ -7,9 +7,9 @@ from torch.nn import functional as F
 
 from stable_baselines3.common import logger
 from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
-from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback
 from stable_baselines3.common.utils import explained_variance, get_schedule_fn
+from algo.torch.ppo.policies import ActorCriticPolicy
 
 
 class PPO(OnPolicyAlgorithm):
@@ -253,7 +253,7 @@ class PPO(OnPolicyAlgorithm):
         tb_log_name: str = "PPO",
         eval_log_path: Optional[str] = None,
         reset_num_timesteps: bool = True,
-    ) -> "PPO":
+    ) -> "OnPolicyAlgorithm":
 
         return super(PPO, self).learn(
             total_timesteps=total_timesteps,

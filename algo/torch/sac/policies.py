@@ -359,7 +359,7 @@ class SACPolicy(BasePolicy):
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
         return self.actor(observation, deterministic)
 
-    def _get_log_prob_from_act(self, observation: th.Tensor, action: th.Tensor) -> th.Tensor:
+    def get_log_prob_from_act(self, observation: th.Tensor, action: th.Tensor) -> th.Tensor:
         mu, log_std, _ = self.actor.get_action_dist_params(observation)
         distribution = self.actor.action_dist.proba_distribution(mu, log_std)
         log_prob = distribution.log_prob(action)

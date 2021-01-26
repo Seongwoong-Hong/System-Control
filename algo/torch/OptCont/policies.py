@@ -4,14 +4,16 @@ import numpy as np
 from scipy import linalg
 from stable_baselines3.common.policies import BasePolicy
 
+
 class LQRPolicy(BasePolicy):
-    def __init__(self, env):
+    def __init__(self, env, noise_lv: float = 0.25):
         observation_space = env.observation_space
         action_space = env.action_space
         super(LQRPolicy, self).__init__(
             observation_space,
             action_space)
 
+        self.noise_lv = noise_lv
         self.gear = env.model.actuator_gear[0, 0]
         self.K = self._get_gains()
 
@@ -33,8 +35,7 @@ class LQRPolicy(BasePolicy):
         return None
 
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
-        action = -1/self.gear * (self.K @ observation.T).reshape(1, -1)
-        if deterministic:
-            return action
-        else:
-            return action + 0.1*th.randn((1, 1))
+        if not deterministic:
+            self.K += self.noise_lv * np.random.randn(*self.K.shape)
+
+        return -1/self.gear * (self.K @ observation.T).reshape(1, -1)
