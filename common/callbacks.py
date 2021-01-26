@@ -1,13 +1,15 @@
-from typing import Any, Dict, List
 from copy import deepcopy
+from typing import Any, Dict, Sequence
+
+import gym
 import numpy as np
-import gym, cv2
 import torch
+from matplotlib import cm
+from matplotlib import pyplot as plt
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Video, Figure
-from matplotlib import pyplot as plt
-from matplotlib import cm
+
 
 class VFCustomCallback(BaseCallback):
     def __init__(self, path: str,
@@ -16,7 +18,7 @@ class VFCustomCallback(BaseCallback):
                  n_eval_episodes: int = 1,
                  deterministic: bool = True,
                  costfn: torch.nn.Module = None,
-                 draw_dim: List[int] = [0, 1, 0]):
+                 draw_dim: Sequence[int] = (0, 1, 0)):
         """
         Records a video of an agent's trajectory traversing ``eval_env`` and logs it to TensorBoard
 
@@ -61,7 +63,7 @@ class VFCustomCallback(BaseCallback):
                 deterministic=self._deterministic,
             )
 
-            fig = self.draw_figure(self._eval_env, self.draw_dim)
+            fig = self._draw_figure(self._eval_env, self.draw_dim)
 
             self.logger.record(
                 "trajectory/video",
@@ -76,7 +78,7 @@ class VFCustomCallback(BaseCallback):
             plt.close()
         return True
 
-    def draw_figure(self, env, draw_dim) -> plt.figure:
+    def _draw_figure(self, env, draw_dim) -> plt.figure:
         ndim, nact = env.observation_space.shape[0], env.action_space.shape[0]
         d1, d2 = np.meshgrid(np.linspace(-0.25, 0.25, 100), np.linspace(-0.25, 0.25, 100))
         pact = np.zeros((100, 100), dtype=np.float64)
@@ -107,8 +109,9 @@ class VFCustomCallback(BaseCallback):
 
         return fig
 
-    def _set_costfn(self, costfn: torch.nn.Module = None):
+    def set_costfn(self, costfn: torch.nn.Module = None):
         self.costfn = costfn
+
 
 class VideoCallback(BaseCallback):
     def __init__(self, path: str,

@@ -1,6 +1,9 @@
-import torch, random, time
-from torch import nn
 from typing import List
+
+import random
+import torch
+from torch import nn
+
 
 class NNCost(nn.Module):
     def __init__(self,
@@ -34,6 +37,8 @@ class NNCost(nn.Module):
         self.num_samp = num_samp
         self.decay_coeff = decay_coeff
         self.num_act = num_act
+        self.sampleE = [None]
+        self.sampleL = [None]
 
         self._build(lr, arch)
 
@@ -58,8 +63,9 @@ class NNCost(nn.Module):
         else:
             return self.layers(obs[:-self.num_act])**2 + self.aparam(obs[-self.num_act:])**2
 
-    def learn(self, epoch: int):
-        self._train()
+    def learn(self, epoch: int = 10):
+        self.train_()
+        IOCLoss1, IOCLoss2, paramLoss = None, None, None
         for _ in range(epoch):
             IOCLoss1, IOCLoss2, paramLoss = 0, 0, 0
             # Calculate the loss for preventing parameter decaying
@@ -90,10 +96,10 @@ class NNCost(nn.Module):
         print("Loss for Expert cost: {:.2f}, Loss for Max Ent.: {:.2f}".format(IOCLoss1.item(), IOCLoss2.item()))
         return self
 
-    def _train(self):
+    def train_(self):
         self.evalmod = False
         return self.train()
 
-    def _eval(self):
+    def eval_(self):
         self.evalmod = True
         return self.eval()

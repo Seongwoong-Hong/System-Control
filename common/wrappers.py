@@ -1,13 +1,17 @@
-import gym, torch
+import gym
 import numpy as np
+import torch
+
 
 class ActionRewardWrapper(gym.RewardWrapper):
     def __init__(self, env, rwfn):
         super(ActionRewardWrapper, self).__init__(env)
         self.rwfn = rwfn
 
+    # noinspection PyMethodMayBeStatic
     def action(self, action):
-        return action
+        new_action = 2 * action
+        return new_action
 
     def step(self, action):
         observation, reward, done, info = self.env.step(self.action(action))
@@ -17,9 +21,14 @@ class ActionRewardWrapper(gym.RewardWrapper):
         rwinp = torch.from_numpy(obs).to(self.rwfn.device)
         return self.rwfn.forward(rwinp)
 
+
 class ActionWrapper(gym.ActionWrapper):
     def action(self, action):
         return action
+
+    def reverse_action(self, action):
+        return 1/action
+
 
 class RewardWrapper(gym.RewardWrapper):
     def __init__(self, env, rwfn):
@@ -47,6 +56,7 @@ class CostWrapper(gym.RewardWrapper):
     def reward(self, obs):
         cost_inp = torch.from_numpy(obs).to(self.costfn.device)
         return -self.costfn.forward(cost_inp)
+
 
 class ActionCostWrapper(gym.RewardWrapper):
     def __init__(self, env, costfn):
