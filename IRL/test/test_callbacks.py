@@ -1,10 +1,13 @@
-import gym, gym_envs, os, torch
+import gym
+import gym_envs
+import os
+from mujoco_py import GlfwContext
 from stable_baselines3.common.vec_env import DummyVecEnv
+
+from algo.torch.ppo import PPO, MlpPolicy
 from common.callbacks import VFCustomCallback
 from common.modules import NNCost
 from common.wrappers import CostWrapper
-from algo.torch.ppo import PPO
-from mujoco_py import GlfwContext
 
 if __name__ == "__main__":
     n_steps, n_episodes = 40, 10
@@ -13,11 +16,17 @@ if __name__ == "__main__":
     env = gym.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
-    name = "2021-1-22-15-20-34"
-    model_dir = os.path.join("..", "tmp", "log", name, "model")
-    algo = PPO.load(model_dir + "/ppo50.zip")
-    costfn = torch.load(model_dir + "/costfn50.pt").to(algo.device)
+    # name = "2021-1-22-15-20-34"
+    # model_dir = os.path.join("..", "tmp", "log", name, "model")
+    # algo = PPO.load(model_dir + "/ppo50.zip")
+    costfn = NNCost(arch=[num_obs], device='cpu', num_act=num_act).double().to('cpu')
     env = DummyVecEnv([lambda: CostWrapper(env, costfn)])
+    algo = PPO(MlpPolicy,
+               env=env,
+               verbose=1,
+               device='cpu',
+               tensorboard_log=log_dir)
+
     GlfwContext(offscreen=True)
 
     video_recorder = VFCustomCallback(log_dir+"/video/bar",
@@ -26,7 +35,7 @@ if __name__ == "__main__":
                                       render_freq=4096,
                                       costfn=costfn)
     for _ in range(2):
-        video_recorder._set_costfn(costfn=costfn)
+        # video_recorder._set_costfn(costfn=costfn)
         env = DummyVecEnv([lambda: gym.make(env_id, n_steps=n_steps)])
         algo.set_env(env)
         algo.learn(total_timesteps=4096, callback=video_recorder, tb_log_name="test_callback")

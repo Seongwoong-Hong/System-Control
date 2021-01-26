@@ -1,9 +1,10 @@
-import gym, gym_envs
+import gym
+import gym_envs
 import numpy as np
-from common.wrappers import ActionCostWrapper, CostWrapper
-from common.modules import NNCost
 from stable_baselines3.common.vec_env import DummyVecEnv
 
+from common.modules import NNCost
+from common.wrappers import CostWrapper
 
 if __name__ == "__main__":
     n_steps = 100

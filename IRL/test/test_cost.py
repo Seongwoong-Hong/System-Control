@@ -1,19 +1,23 @@
-import os, torch, gym, gym_envs
+import gym
+import gym_envs
+import os
+import torch
+
 import numpy as np
-from algo.torch.ppo import PPO
-from common.modules import NNCost
-from matplotlib import pyplot as plt
 from matplotlib import cm
+from matplotlib import pyplot as plt
+
 from IRL.project_policies import def_policy
+from algo.torch.ppo import PPO
 
 env_type = "IP"
-name = "{}/2021-1-25-16-4-52".format(env_type)
-# nums = np.linspace(2, 20, 10)
-nums = [2]
+name = "{}/2021-1-25-22-51-3".format(env_type)
+nums = np.linspace(2, 30, 15)
+# nums = [4]
 for num in nums:
     model_dir = os.path.join("..", "tmp", "log", name, "model")
-    costfn = torch.load(model_dir + "/costfn%d.pt"%(num)).to('cpu')
-    algo = PPO.load(model_dir + "/ppo%d.zip"%(num))
+    costfn = torch.load(model_dir + "/costfn%d.pt" % num).to('cpu')
+    algo = PPO.load(model_dir + "/ppo%d.zip" % num)
     # algo = PPO.load(model_dir + "/extra_ppo.zip".format(name))
     env = gym.make("{}_custom-v1".format(env_type), n_steps=100)
     draw_dim = [0, 1, 0]
@@ -37,7 +41,7 @@ for num in nums:
             pact[i][j] = ipacts[draw_dim[2]]
             iacts, _ = exp.predict(iobs, deterministic=True)
             act[i][j] = iacts[draw_dim[2]]
-            inp = torch.from_numpy(np.append(iobs, iacts)).double()
+            inp = torch.from_numpy(np.append(iobs, ipacts)).double()
             cost_agt[i][j] = costfn(inp).item()
             cost_exp[i][j] = iobs @ exp.Q @ iobs.T + iacts @ exp.R @ iacts.T * exp.gear**2
 
@@ -51,7 +55,8 @@ for num in nums:
     fig = plt.figure()
     for i in range(4):
         ax = fig.add_subplot(2, 2, (i+1))
-        surf = ax.pcolor(d1, d2, yval_list[i], cmap=cm.coolwarm, shading='auto', vmax=max_list[i], vmin=min_list[i])
+        surf = ax.pcolor(d1, d2, yval_list[i], cmap=cm.coolwarm,
+                         shading='auto', vmax=max_list[i], vmin=min_list[i])
         clb = fig.colorbar(surf, ax=ax)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
