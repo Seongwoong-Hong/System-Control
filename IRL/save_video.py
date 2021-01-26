@@ -1,21 +1,13 @@
 import os, torch, gym, gym_envs, time, cv2
 import numpy as np
 from algo.torch.ppo import PPO
-from algo.torch.OptCont.policies import LQRPolicy
 from common.wrappers import CostWrapper
 from matplotlib import pyplot as plt
 from mujoco_py import GlfwContext
+from IRL.project_policies import def_policy
 
-class ExpertPolicy(LQRPolicy):
-    def _build_env(self):
-        m, g, h, I = 5.0, 9.81, 0.5, 1.667
-        self.Q = np.array([[1, 0], [0, 1]])
-        self.R = 0.001
-        self.A = np.array([[0, m*g*h/I], [1, 0]])
-        self.B = np.array([[1/I], [0]])
-        return self.A, self.B, self.Q, self.R
 
-def VideoRecorde(imgs, filename, dt):
+def video_record(imgs, filename, dt):
     fourcc = cv2.VideoWriter_fourcc(*'MJPG')
     width, height, _ = imgs[0].shape
     writer = cv2.VideoWriter(filename, fourcc, 1 / dt, (width, height))
@@ -23,15 +15,17 @@ def VideoRecorde(imgs, filename, dt):
         img = cv2.cvtColor(img1, cv2.COLOR_RGB2BGR)
         writer.write(img)
 
+
 GlfwContext(offscreen=True)
-name = "2021-1-24-0-23-35"
+env_type = "IDP"
+name = "{}/2021-1-24-0-23-35".format(env_type)
 num = 4
 model_dir = os.path.join("tmp", "log", name, "model")
 costfn = torch.load(model_dir + "/costfn{}.pt".format(num))
 # algo = PPO.load(model_dir + "/ppo{}.zip".format(num))
 algo = PPO.load(model_dir + "/extra_ppo.zip")
-env = CostWrapper(gym.make("IP_custom-v1", n_steps=100), costfn)
-exp = ExpertPolicy(env)
+env = CostWrapper(gym.make("{}_custom-v1".format(env_type), n_steps=100), costfn)
+exp = def_policy(env_type, env)
 dt = env.dt
 qs = np.array([[0.20, 0.06],
                [-0.20, -0.06],
@@ -48,6 +42,7 @@ for q in qs:
     env.set_state(np.array([q[0]]), np.array([q[1]]))
     imgs1.append(env.render("rgb_array"))
     done = False
+
     while not done:
         act, _ = exp.predict(obs, deterministic=True)
         obs, rew, done, info = env.step(act)
@@ -61,6 +56,7 @@ for q in qs:
     done = False
     env.set_state(np.array([q[0]]), np.array([q[1]]))
     imgs2.append(env.render("rgb_array"))
+
     while not done:
         act, _ = algo.predict(obs, deterministic=True)
         obs, rew, done, info = env.step(act)
@@ -79,5 +75,5 @@ for q in qs:
     plt.show()
     # print(sum(rew1_list), sum(rew2_list))
 
-VideoRecorde(imgs1, "videos/{}_expert.avi".format(name), dt)
-VideoRecorde(imgs2, "videos/{}_agent.avi".format(name), dt)
+video_record(imgs1, "videos/{}_expert.avi".format(name), dt)
+video_record(imgs2, "videos/{}_agent.avi".format(name), dt)
