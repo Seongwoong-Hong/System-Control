@@ -1,10 +1,17 @@
-import os, torch, gym, gym_envs, time, cv2
+import cv2
+import gym
+import gym_envs
+import os
+import time
+import torch
+
 import numpy as np
-from algo.torch.ppo import PPO
-from common.wrappers import CostWrapper
 from matplotlib import pyplot as plt
 from mujoco_py import GlfwContext
+
 from IRL.project_policies import def_policy
+from algo.torch.ppo import PPO
+from common.wrappers import CostWrapper
 
 
 def video_record(imgs, filename, dt):
@@ -18,19 +25,19 @@ def video_record(imgs, filename, dt):
 
 GlfwContext(offscreen=True)
 env_type = "IDP"
-name = "{}/2021-1-24-0-23-35".format(env_type)
+name = "{}/2021-1-27-11-25-37".format(env_type)
 num = 4
 model_dir = os.path.join("tmp", "log", name, "model")
 costfn = torch.load(model_dir + "/costfn{}.pt".format(num))
-# algo = PPO.load(model_dir + "/ppo{}.zip".format(num))
-algo = PPO.load(model_dir + "/extra_ppo.zip")
-env = CostWrapper(gym.make("{}_custom-v1".format(env_type), n_steps=100), costfn)
+algo = PPO.load(model_dir + "/ppo{}.zip".format(num))
+# algo = PPO.load(model_dir + "/extra_ppo.zip")
+env = CostWrapper(gym.make("{}_custom-v1".format(env_type), n_steps=200), costfn)
 exp = def_policy(env_type, env)
 dt = env.dt
-qs = np.array([[0.20, 0.06],
-               [-0.20, -0.06],
-               [0.25, -0.1],
-               [-0.25, 0.1]])
+qs = env.reset().reshape(1, -1)
+qs = np.append(qs, env.reset().reshape(1, -1), 0)
+qs = np.append(qs, env.reset().reshape(1, -1), 0)
+qs = np.append(qs, env.reset().reshape(1, -1), 0)
 imgs1, imgs2 = [], []
 
 for q in qs:
@@ -39,30 +46,30 @@ for q in qs:
     cost1_list = []
     cost2_list = []
     obs = env.reset()
-    env.set_state(np.array([q[0]]), np.array([q[1]]))
     imgs1.append(env.render("rgb_array"))
     done = False
 
     while not done:
         act, _ = exp.predict(obs, deterministic=True)
         obs, rew, done, info = env.step(act)
-        cost = obs @ exp.Q @ obs.T + act*act*exp.R*exp.gear**2
+        cost = obs @ exp.Q @ obs.T + (act * exp.gear) @ exp.R @ (act.T * exp.gear)
         imgs1.append(env.render("rgb_array"))
-        rew1_list.append(act.item())
+        # rew1_list.append(act.item())
         cost1_list.append(cost.item())
         time.sleep(dt)
     print(obs)
-    env.reset()
+
+    obs = env.reset()
     done = False
-    env.set_state(np.array([q[0]]), np.array([q[1]]))
+    # env.set_state(np.array([q[0]]), np.array([q[1]]))
     imgs2.append(env.render("rgb_array"))
 
     while not done:
         act, _ = algo.predict(obs, deterministic=True)
         obs, rew, done, info = env.step(act)
-        cost = obs @ exp.Q @ obs.T + act*act*exp.R*exp.gear**2
+        cost = obs @ exp.Q @ obs.T + (act * exp.gear) @ exp.R @ (act.T * exp.gear)
         imgs2.append(env.render("rgb_array"))
-        rew2_list.append(act.item())
+        # rew2_list.append(act.item())
         cost2_list.append(cost.item())
         time.sleep(dt)
     print(obs)
