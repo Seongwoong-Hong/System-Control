@@ -10,7 +10,7 @@ class IPCustomExp(mujoco_env.MujocoEnv, utils.EzPickle):
         self.traj_len = 0
         self.n_steps = n_steps
         utils.EzPickle.__init__(self)
-        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml"), 25)
+        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml"), 20)
         self.init_group = np.array([[+0.30, -0.15],
                                     [-0.30, +0.15],
                                     [+0.15, +0.15],

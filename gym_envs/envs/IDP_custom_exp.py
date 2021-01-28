@@ -9,7 +9,7 @@ class IDPCustomExp(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self, n_steps=None):
         self.traj_len = 0
         self.n_steps = n_steps
-        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 25)
+        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 20)
         utils.EzPickle.__init__(self)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
         self.init_group = np.array([[[+0.10, +0.10], [+0.05, -0.05]],
@@ -60,4 +60,4 @@ class IDPCustomExp(mujoco_env.MujocoEnv, utils.EzPickle):
         v = self.viewer
         v.cam.trackbodyid = 0
         v.cam.distance = self.model.stat.extent * 0.5
-        v.cam.lookat[2] = 0.12250000000000005  # v.model.stat.center[2]
+        v.cam.lookat[2] = 0.5  # 0.12250000000000005  # v.model.stat.center[2]
