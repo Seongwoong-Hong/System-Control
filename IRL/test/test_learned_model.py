@@ -15,14 +15,14 @@ class LocalCW(CostWrapper):
         return -1e20*self.costfn.forward(cost_inp)
 
 
-env_type = "IP"
-name = "{}/confirm".format(env_type)
-num = 4
+env_type = "IDP"
+name = "{}/2021-1-25-15-19-30".format(env_type)
+num = 14
 model_dir = os.path.join("..", "tmp", "log", name, "model")
 costfn = torch.load(model_dir + "/costfn{}.pt".format(num))
-algo = PPO.load(model_dir + "/extra_ppo.zip")
+# algo = PPO.load(model_dir + "/test_ppo.zip")
 # algo = PPO.load(model_dir + "/ppo{}.zip".format(num))
-env = CostWrapper(gym.make("{}_custom-v1".format(env_type), n_steps=100), costfn)
+env = CostWrapper(gym.make("{}_custom-v1".format(env_type), n_steps=200), costfn)
 exp = def_policy(env_type, env)
 dt = env.dt
 
@@ -31,7 +31,8 @@ for _ in range(5):
     obs = env.reset()
     env.render()
     while not done:
-        act, _ = algo.predict(obs, deterministic=True)
+        act, _ = exp.predict(obs, deterministic=True)
         obs, rew, done, info = env.step(act)
         env.render()
         time.sleep(dt)
+

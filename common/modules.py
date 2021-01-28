@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 
-class NNCost(nn.Module):
+class CostNet(nn.Module):
     def __init__(self,
                  arch: List[int],
                  device: str,
@@ -28,7 +28,7 @@ class NNCost(nn.Module):
         :param num_act: Number of actions of your current environment.
         :param decay_coeff: The coefficient for preventing parameter decaying loss
         """
-        super(NNCost, self).__init__()
+        super(CostNet, self).__init__()
         self.device = device
         self.optimizer_class = optimizer_class
         self.act_fnc = act_fcn

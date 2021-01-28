@@ -10,16 +10,17 @@ from matplotlib import pyplot as plt
 from IRL.project_policies import def_policy
 from algo.torch.ppo import PPO
 
+
 env_type = "IP"
-name = "{}/2021-1-25-22-51-3".format(env_type)
+name = "{}/2021-1-27-23-28-53".format(env_type)
 nums = np.linspace(2, 30, 15)
-# nums = [4]
+# nums = [6]
 for num in nums:
     model_dir = os.path.join("..", "tmp", "log", name, "model")
     costfn = torch.load(model_dir + "/costfn%d.pt" % num).to('cpu')
     algo = PPO.load(model_dir + "/ppo%d.zip" % num)
     # algo = PPO.load(model_dir + "/extra_ppo.zip".format(name))
-    env = gym.make("{}_custom-v1".format(env_type), n_steps=100)
+    env = gym.make("{}_custom-v1".format(env_type), n_steps=200)
     draw_dim = [0, 1, 0]
     exp = def_policy(env_type, env)
     dt = env.dt

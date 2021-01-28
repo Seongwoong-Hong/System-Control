@@ -6,7 +6,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 from algo.torch.ppo import PPO, MlpPolicy
 from common.callbacks import VFCustomCallback
-from common.modules import NNCost
+from common.modules import CostNet
 from common.wrappers import CostWrapper
 
 if __name__ == "__main__":
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     # name = "2021-1-22-15-20-34"
     # model_dir = os.path.join("..", "tmp", "log", name, "model")
     # algo = PPO.load(model_dir + "/ppo50.zip")
-    costfn = NNCost(arch=[num_obs], device='cpu', num_act=num_act).double().to('cpu')
+    costfn = CostNet(arch=[num_obs], device='cpu', num_act=num_act).double().to('cpu')
     env = DummyVecEnv([lambda: CostWrapper(env, costfn)])
     algo = PPO(MlpPolicy,
                env=env,
