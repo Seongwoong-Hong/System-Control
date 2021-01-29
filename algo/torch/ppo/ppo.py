@@ -75,6 +75,7 @@ class PPO(OnPolicyAlgorithm):
         clip_range: float = 0.2,
         clip_range_vf: Optional[float] = None,
         ent_coef: float = 0.0,
+        ent_schedule: float = 1.0,
         vf_coef: float = 0.5,
         max_grad_norm: float = 0.5,
         use_sde: bool = False,
@@ -115,6 +116,7 @@ class PPO(OnPolicyAlgorithm):
         self.clip_range = clip_range
         self.clip_range_vf = clip_range_vf
         self.target_kl = target_kl
+        self.ent_schedule = ent_schedule
 
         if _init_setup_model:
             self._setup_model()
@@ -255,6 +257,7 @@ class PPO(OnPolicyAlgorithm):
         reset_num_timesteps: bool = True,
     ) -> "OnPolicyAlgorithm":
 
+        self.ent_coef *= self.ent_schedule
         return super(PPO, self).learn(
             total_timesteps=total_timesteps,
             callback=callback,
