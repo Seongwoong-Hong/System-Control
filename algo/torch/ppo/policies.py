@@ -37,6 +37,7 @@ class ActorCriticPolicy(BasePolicy):
     :param action_space: Action space
     :param lr_schedule: Learning rate schedule (could be constant)
     :param net_arch: The specification of the policy and value networks.
+    :param log_std_range: The clip range of log std of the policy.
     :param activation_fn: Activation function
     :param ortho_init: Whether to use or not orthogonal initialization
     :param use_sde: Whether to use State Dependent Exploration or not
@@ -68,6 +69,7 @@ class ActorCriticPolicy(BasePolicy):
         action_space: gym.spaces.Space,
         lr_schedule: Schedule,
         net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
+        log_std_range: Optional[List[float]] = None,
         activation_fn: Type[nn.Module] = nn.Tanh,
         ortho_init: bool = True,
         use_sde: bool = False,
@@ -105,6 +107,11 @@ class ActorCriticPolicy(BasePolicy):
                 net_arch = [dict(pi=[64, 64], vf=[64, 64])]
             else:
                 net_arch = []
+
+        if log_std_range is None:
+            self.log_std_low, self.log_std_high = -3, 3
+        else:
+            self.log_std_low, self.log_std_high = log_std_range
 
         self.net_arch = net_arch
         self.activation_fn = activation_fn
@@ -281,9 +288,10 @@ class ActorCriticPolicy(BasePolicy):
         :return: Action distribution
         """
         mean_actions = self.action_net(latent_pi)
+        log_std = th.clamp(self.log_std, self.log_std_low, self.log_std_high)
 
         if isinstance(self.action_dist, DiagGaussianDistribution):
-            return self.action_dist.proba_distribution(mean_actions, self.log_std)
+            return self.action_dist.proba_distribution(mean_actions, log_std)
         elif isinstance(self.action_dist, CategoricalDistribution):
             # Here mean_actions are the logits before the softmax
             return self.action_dist.proba_distribution(action_logits=mean_actions)
@@ -294,7 +302,7 @@ class ActorCriticPolicy(BasePolicy):
             # Here mean_actions are the logits (before rounding to get the binary actions)
             return self.action_dist.proba_distribution(action_logits=mean_actions)
         elif isinstance(self.action_dist, StateDependentNoiseDistribution):
-            return self.action_dist.proba_distribution(mean_actions, self.log_std, latent_sde)
+            return self.action_dist.proba_distribution(mean_actions, log_std, latent_sde)
         else:
             raise ValueError("Invalid action distribution")
 
