@@ -20,17 +20,15 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         raise SyntaxError("Please enter the type of environment you use")
     elif len(sys.argv) == 2:
-        env_type = sys.argv[1]
         device = 'cpu'
-        now = datetime.datetime.now()
-        name = env_type + "/%s-%s-%s-%s-%s-%s" % (now.year, now.month, now.day, now.hour, now.minute, now.second)
     elif len(sys.argv) == 3:
         device = sys.argv[2]
-        env_type = sys.argv[1]
-        now = datetime.datetime.now()
-        name = env_type + "/%s-%s-%s-%s-%s-%s" % (now.year, now.month, now.day, now.hour, now.minute, now.second)
     else:
         raise SyntaxError("Too many system inputs")
+
+    env_type = sys.argv[1]
+    now = datetime.datetime.now()
+    name = env_type + "/%s-%s-%s-%s-%s-%s" % (now.year, now.month, now.day, now.hour, now.minute, now.second)
     current_path = os.path.dirname(__file__)
 
     log_dir = os.path.join(current_path, "tmp", "log", name)
@@ -48,7 +46,7 @@ if __name__ == "__main__":
     expert_dir = os.path.join(current_path, "demos", env_type, "expert.pkl")
 
     n_steps, n_episodes = 200, 10
-    steps_for_learn = 512000
+    steps_for_learn = 1024000
     env_id = "{}_custom-v0".format(env_type)
     env = gym.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
@@ -77,11 +75,14 @@ if __name__ == "__main__":
                batch_size=256,
                gamma=0.99,
                gae_lambda=0.95,
-               ent_coef=0.015,
+               ent_coef=0.03,
+               ent_schedule=0.9,
                clip_range=0.2,
                verbose=0,
                device=device,
-               tensorboard_log=log_dir)
+               tensorboard_log=log_dir,
+               policy_kwargs={'log_std_range': [-3, 2]},
+               )
 
     video_recorder = VFCustomCallback(log_dir + "/video/" + name,
                                       gym.make(env_id, n_steps=n_steps),
