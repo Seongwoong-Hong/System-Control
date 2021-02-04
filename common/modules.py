@@ -44,10 +44,14 @@ class CostNet(nn.Module):
 
     def _build(self, lr, arch):
         layers = []
-        for i in range(len(arch)-1):
-            layers.append(nn.Linear(arch[i], arch[i+1]))
-            layers.append(self.act_fnc())
-        layers.append(nn.Linear(arch[-1], 1, bias=True))
+        if self.act_fnc is not None:
+            for i in range(len(arch)-1):
+                layers.append(nn.Linear(arch[i], arch[i+1]))
+                layers.append(self.act_fnc())
+        else:
+            for i in range(len(arch)-1):
+                layers.append(nn.Linear(arch[i], arch[i+1]))
+        layers.append(nn.Linear(arch[-1], 1, bias=False))
         self.layers = nn.Sequential(*layers)
         self.aparam = nn.Linear(self.num_act, 1, bias=False)
         self.optimizer = self.optimizer_class(self.parameters(), lr)
@@ -77,15 +81,15 @@ class CostNet(nn.Module):
             # Calculate learned cost loss
             for E_trans in self.sampleE:
                 for info in E_trans.infos:
-                    IOCLoss1 += self.forward(info['rwinp'])
+                    IOCLoss1 += self.forward(info['rwinp'].to(self.device))
             IOCLoss1 /= len(self.sampleE)
 
             # Calculate Max Ent. Loss
-            x = torch.zeros(len(self.sampleE+self.sampleL)).double()
+            x = torch.zeros(len(self.sampleE+self.sampleL)).double().to(self.device)
             for j, trans_j in enumerate(self.sampleE+self.sampleL):
                 temp = 0
                 for info in trans_j.infos:
-                    temp -= self.forward(info['rwinp'])+info['log_probs']
+                    temp -= self.forward(info['rwinp'].to(self.device))+info['log_probs']
                 x[j] = temp
             IOCLoss2 = -torch.logsumexp(x, 0)
 
