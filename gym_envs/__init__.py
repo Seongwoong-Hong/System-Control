@@ -1,4 +1,4 @@
-from gym.envs.registration import register
+from gym.envs.registration import register, make
 
 register(
     id="CartPoleCont-v0",
@@ -35,4 +35,9 @@ register(
 register(
     id='IDP_custom-v1',
     entry_point='gym_envs.envs:IDPCustom',
+)
+
+register(
+    id='IDP_human-v0',
+    entry_point='gym_envs.envs:IDPHuman',
 )
