@@ -1,10 +1,11 @@
 from typing import List
 
+import sys
 import random
 import torch
 from torch import nn
 
-from stable_baselines3.common import logger, utils
+from stable_baselines3.common.logger import Logger, HumanOutputFormat
 
 
 class CostNet(nn.Module):
@@ -47,8 +48,6 @@ class CostNet(nn.Module):
         self._build(lr, arch)
 
     def _build(self, lr, arch):
-        # configure logger for logging
-        utils.configure_logger(self.verbose)
         # configure neural net layers for the cost function
         layers = []
         if self.act_fnc is not None:
@@ -63,10 +62,6 @@ class CostNet(nn.Module):
         self.aparam = nn.Linear(self.num_act, 1, bias=False)
         self.optimizer = self.optimizer_class(self.parameters(), lr)
 
-    def sample_trajectory_sets(self, learner_trans, expert_trans):
-        self.sampleE = random.sample(expert_trans, self.num_expert)
-        self.sampleL = random.sample(learner_trans, self.num_samp)
-
     def forward(self, obs):
         if self.evalmod:
             with torch.no_grad():
@@ -74,30 +69,41 @@ class CostNet(nn.Module):
         else:
             return self.layers(obs[:-self.num_act])**2 + self.aparam(obs[-self.num_act:])**2
 
-    def learn(self, epoch: int = 10):
+    def _setup_learn(self, learner_trans, expert_trans):
         self.train_()
+        logger = None
+        # configure logger for logging
+        if self.verbose >= 1:
+            logger = Logger(folder=None, output_formats=[HumanOutputFormat(sys.stdout)])
+        # sample trajectories that will use for learning
+        sampleE = random.sample(expert_trans, self.num_expert)
+        sampleL = random.sample(learner_trans, self.num_samp)
+        return logger, sampleE, sampleL
+
+    def learn(self, learner_trans, expert_trans, epoch: int = 10):
+        logger, sampleE, sampleL = self._setup_learn(learner_trans, expert_trans)
         IOCLoss1, IOCLoss2, lcrLoss, monoLoss, paramLoss = None, None, None, None, None
         for _ in range(epoch):
             IOCLoss1, IOCLoss2, lcrLoss, monoLoss, paramLoss = 0, 0, 0, 0, 0
-            # Calculate the loss for preventing parameter decaying
+            # prevent parameter decaying
             param_norm = 0
             for param in self.parameters():
                 param_norm += torch.norm(param)
             paramLoss = self.decay_coeff * (1 - torch.norm(param_norm))
 
             # Calculate learned cost loss
-            prevC = self.forward(self.sampleE[0].infos[0]['rwinp'].to(self.device))
-            for E_trans in self.sampleE:
+            prevC = self.forward(sampleE[0].infos[0]['rwinp'].to(self.device))
+            for E_trans in sampleE:
                 for info in E_trans.infos:
                     currC = self.forward(info['rwinp'].to(self.device))
                     IOCLoss1 += currC
                     monoLoss += torch.max(torch.zeros(1).to(self.device), currC - prevC - 1) ** 2
                     prevC = torch.empty_like(currC).copy_(currC)
-            IOCLoss1 /= len(self.sampleE)
+            IOCLoss1 /= len(sampleE)
 
             # Calculate Max Ent. Loss
-            x = torch.zeros(len(self.sampleE+self.sampleL)).double().to(self.device)
-            for j, trans_j in enumerate(self.sampleE+self.sampleL):
+            x = torch.zeros(len(sampleE+sampleL)).double().to(self.device)
+            for j, trans_j in enumerate(sampleE+sampleL):
                 temp = 0
                 temp -= self.forward(trans_j.infos[0]['rwinp']).to(self.device)+trans_j.infos[0]['log_probs']
                 Cp = self.forward(trans_j.infos[0]['rwinp']).to(self.device)
@@ -112,15 +118,17 @@ class CostNet(nn.Module):
                 x[j] = temp
             IOCLoss2 = -torch.logsumexp(x, 0)
 
-            IOCLoss = IOCLoss1 + IOCLoss2 + monoLoss + lcrLoss
+            IOCLoss = IOCLoss1 + IOCLoss2 + monoLoss + lcrLoss + paramLoss
             self.optimizer.zero_grad()
             IOCLoss.backward()
             self.optimizer.step()
-        logger.record("train/Expert_Cost_loss", IOCLoss1.item())
-        logger.record("train/Max_Ent._Cost_loss", IOCLoss2.item())
-        logger.record("train/Mono_Regularization", monoLoss.item())
-        logger.record("train/lcr_Regularization", lcrLoss.item())
-        logger.dump()
+        if self.verbose >= 1:
+            exclude = ("tensorboard", "json", "csv")
+            logger.record("Cost/Expert_Cost_loss", IOCLoss1.item(), exclude=exclude)
+            logger.record("Cost/Max_Ent._Cost_loss", IOCLoss2.item(), exclude=exclude)
+            logger.record("Cost/Mono_Regularization", monoLoss.item(), exclude=exclude)
+            logger.record("Cost/lcr_Regularization", lcrLoss.item(), exclude=exclude)
+            logger.dump()
         return self
 
     def train_(self):
