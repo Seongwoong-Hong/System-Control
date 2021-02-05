@@ -4,6 +4,8 @@ import random
 import torch
 from torch import nn
 
+from stable_baselines3.common import logger, utils
+
 
 class CostNet(nn.Module):
     def __init__(self,
@@ -15,7 +17,9 @@ class CostNet(nn.Module):
                  num_expert: int = 10,
                  num_samp: int = 10,
                  num_act: int = 1,
-                 decay_coeff: float = 0.0):
+                 decay_coeff: float = 0.0,
+                 verbose: int = 1,
+                 ):
         """
         :param arch: The architecture of a Neural Network form of the cost function.
             The first argument of the arch must be an input size.
@@ -39,10 +43,13 @@ class CostNet(nn.Module):
         self.num_act = num_act
         self.sampleE = [None]
         self.sampleL = [None]
-
+        self.verbose = verbose
         self._build(lr, arch)
 
     def _build(self, lr, arch):
+        # configure logger for logging
+        utils.configure_logger(self.verbose)
+        # configure neural net layers for the cost function
         layers = []
         if self.act_fnc is not None:
             for i in range(len(arch)-1):
@@ -69,9 +76,9 @@ class CostNet(nn.Module):
 
     def learn(self, epoch: int = 10):
         self.train_()
-        IOCLoss1, IOCLoss2, paramLoss = None, None, None
+        IOCLoss1, IOCLoss2, lcrLoss, monoLoss, paramLoss = None, None, None, None, None
         for _ in range(epoch):
-            IOCLoss1, IOCLoss2, paramLoss = 0, 0, 0
+            IOCLoss1, IOCLoss2, lcrLoss, monoLoss, paramLoss = 0, 0, 0, 0, 0
             # Calculate the loss for preventing parameter decaying
             param_norm = 0
             for param in self.parameters():
@@ -79,25 +86,41 @@ class CostNet(nn.Module):
             paramLoss = self.decay_coeff * (1 - torch.norm(param_norm))
 
             # Calculate learned cost loss
+            prevC = self.forward(self.sampleE[0].infos[0]['rwinp'].to(self.device))
             for E_trans in self.sampleE:
                 for info in E_trans.infos:
-                    IOCLoss1 += self.forward(info['rwinp'].to(self.device))
+                    currC = self.forward(info['rwinp'].to(self.device))
+                    IOCLoss1 += currC
+                    monoLoss += torch.max(torch.zeros(1).to(self.device), currC - prevC - 1) ** 2
+                    prevC = torch.empty_like(currC).copy_(currC)
             IOCLoss1 /= len(self.sampleE)
 
             # Calculate Max Ent. Loss
             x = torch.zeros(len(self.sampleE+self.sampleL)).double().to(self.device)
             for j, trans_j in enumerate(self.sampleE+self.sampleL):
                 temp = 0
-                for info in trans_j.infos:
-                    temp -= self.forward(info['rwinp'].to(self.device))+info['log_probs']
+                temp -= self.forward(trans_j.infos[0]['rwinp']).to(self.device)+trans_j.infos[0]['log_probs']
+                Cp = self.forward(trans_j.infos[0]['rwinp']).to(self.device)
+                Cc = self.forward(trans_j.infos[0]['rwinp']).to(self.device)
+                Cf = self.forward(trans_j.infos[0]['rwinp']).to(self.device)
+                for info in trans_j[1:].infos:
+                    Cc.copy_(Cf)
+                    Cf = self.forward(info['rwinp']).to(self.device)
+                    temp -= Cf+info['log_probs']
+                    lcrLoss += (Cf - 2*Cc + Cp) ** 2
+                    Cp.copy_(Cc)
                 x[j] = temp
             IOCLoss2 = -torch.logsumexp(x, 0)
 
-            IOCLoss = IOCLoss1 + IOCLoss2 + paramLoss
+            IOCLoss = IOCLoss1 + IOCLoss2 + monoLoss + lcrLoss
             self.optimizer.zero_grad()
             IOCLoss.backward()
             self.optimizer.step()
-        print("Loss for Expert cost: {:.2f}, Loss for Max Ent.: {:.2f}".format(IOCLoss1.item(), IOCLoss2.item()))
+        logger.record("train/Expert_Cost_loss", IOCLoss1.item())
+        logger.record("train/Max_Ent._Cost_loss", IOCLoss2.item())
+        logger.record("train/Mono_Regularization", monoLoss.item())
+        logger.record("train/lcr_Regularization", lcrLoss.item())
+        logger.dump()
         return self
 
     def train_(self):
