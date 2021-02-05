@@ -1,4 +1,3 @@
-import gym
 import gym_envs
 import numpy as np
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -10,7 +9,7 @@ if __name__ == "__main__":
     n_steps = 100
     device = 'cpu'
     env_id = "IP_custom-v1"
-    env = gym.make(env_id, n_steps=n_steps)
+    env = gym_envs.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
     inp = num_obs + num_act

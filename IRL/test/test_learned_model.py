@@ -1,4 +1,3 @@
-import gym
 import gym_envs
 import os
 import time
@@ -14,13 +13,13 @@ from common.wrappers import CostWrapper
 
 
 env_type = "IDP"
-name = "{}/2021-1-29-12-52-56".format(env_type)
-num = 14
+name = "{}/2021-1-31-3-47-3".format(env_type)
+num = 30
 model_dir = os.path.join("..", "tmp", "log", name, "model")
 costfn = torch.load(model_dir + "/costfn{}.pt".format(num))
 # algo = PPO.load(model_dir + "/extra_ppo.zip")
 algo = PPO.load(model_dir + "/ppo{}.zip".format(num))
-env = CostWrapper(gym.make("{}_custom-v1".format(env_type), n_steps=200), costfn)
+env = CostWrapper(gym_envs.make("{}_custom-v0".format(env_type), n_steps=200), costfn)
 exp = def_policy(env_type, env)
 dt = env.dt
 init_obs = env.reset().reshape(1, -1)
@@ -60,19 +59,45 @@ for iobs in init_obs:
         act, _ = algo.predict(obs, deterministic=True)
         obs, rew, done, info = env.step(act)
         cost = obs @ exp.Q @ obs.T + (act * exp.gear) @ exp.R @ (act.T * exp.gear)
+        env.render()
         # rew2_list.append(act.item())
         cost2_list.append(cost.item())
         obs2_list = np.append(obs2_list, obs.reshape(1, -1), 0)
         time.sleep(dt)
     print(obs)
 
-    fig = plt.figure()
-    ax1 = fig.add_subplot(1, 2, 1)
-    ax2 = fig.add_subplot(1, 2, 2)
-    ax1.plot(obs1_list[:, 0])
-    ax2.plot(obs2_list[:, 0])
-    ax1.plot(obs1_list[:, 1])
-    ax2.plot(obs1_list[:, 1])
+    t = np.linspace(0, obs1_list.shape[0], obs1_list.shape[0])*0.02
+    plt.rc("axes", labelsize=18)
+    plt.rc("xtick", labelsize=15)
+    plt.rc("ytick", labelsize=15)
+    plt.ylim((-0.21, 0.06))
+    plt.plot(t, obs1_list[:, 0])
+    plt.plot(t, obs2_list[:, 0])
+    plt.xlabel("time(s)")
+    plt.ylabel(r"$\theta_1$(rad)")
+    plt.axhline(y=0, color='k', linestyle="--")
+    plt.ylim()
     plt.show()
+
+    plt.rc("axes", labelsize=18)
+    plt.rc("xtick", labelsize=15)
+    plt.rc("ytick", labelsize=15)
+    plt.ylim((-0.06, 0.21))
+    plt.plot(t, obs1_list[:, 1])
+    plt.plot(t, obs2_list[:, 1])
+    plt.xlabel("time(s)")
+    plt.ylabel(r"$\theta_2$(rad)")
+    plt.axhline(y=0, color="k", linestyle="--")
+    plt.show()
+    # fig1 = plt.figure()
+    # # ax1 = fig.add_subplot(1, 2, 1)
+    # # ax2 = fig.add_subplot(1, 2, 2)
+    # fig1.plot(obs1_list[:, 0])
+    # fig1.plot(obs2_list[:, 0])
+    #
+    # fig2 = plt.figure()
+    # fig2.plot(obs1_list[:, 1])
+    # fig2.plot(obs2_list[:, 1])
+    # plt.show()
 
 env.close()

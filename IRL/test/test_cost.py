@@ -1,4 +1,3 @@
-import gym
 import gym_envs
 import os
 import torch
@@ -11,17 +10,18 @@ from IRL.project_policies import def_policy
 from algo.torch.ppo import PPO
 
 
-env_type = "IP"
-name = "{}/2021-1-27-23-28-53".format(env_type)
+env_type = "IDP"
+name = "{}/2021-1-31-3-47-3".format(env_type)
 nums = np.linspace(2, 30, 15)
-# nums = [6]
+# nums = [14]
 for num in nums:
     model_dir = os.path.join("..", "tmp", "log", name, "model")
     costfn = torch.load(model_dir + "/costfn%d.pt" % num).to('cpu')
     algo = PPO.load(model_dir + "/ppo%d.zip" % num)
     # algo = PPO.load(model_dir + "/extra_ppo.zip".format(name))
-    env = gym.make("{}_custom-v1".format(env_type), n_steps=200)
+    env = gym_envs.make("{}_custom-v1".format(env_type), n_steps=200)
     draw_dim = [0, 1, 0]
+    dim_names = ["q1(rad)", "q2(rad)", "dq1(rad/s)", "dq2(rad/s)"]
     exp = def_policy(env_type, env)
     dt = env.dt
     size = 100
@@ -50,7 +50,7 @@ for num in nums:
     cost_exp /= np.amax(cost_exp)
     title_list = ["norm_cost", "norm_cost", "abs_action", "abs_action"]
     yval_list = [cost_agt, cost_exp, np.abs(pact), np.abs(act)]
-    xlabel, ylabel = "theta1(rad)", "theta2(rad/s)"
+    xlabel, ylabel = dim_names[draw_dim[0]], dim_names[draw_dim[1]]
     max_list = [1.0, 1.0, 0.3, 0.3]
     min_list = [0.0, 0.0, 0.0, 0.0]
     fig = plt.figure()

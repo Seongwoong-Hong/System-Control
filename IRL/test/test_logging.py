@@ -1,4 +1,3 @@
-import gym
 import gym_envs
 import os
 import shutil
@@ -15,7 +14,7 @@ if __name__ == "__main__":
     shutil.copy(os.path.abspath("../../common/modules.py"), log_dir)
     shutil.copy(os.path.abspath("../../gym_envs/envs/IP_custom_exp.py"), log_dir)
     shutil.copy(os.path.abspath(__file__), log_dir)
-    env = gym.make("IP_custom-v1")
+    env = gym_envs.make("IP_custom-v1")
 
     algo = PPO("MlpPolicy",
                env=env,

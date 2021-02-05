@@ -1,4 +1,3 @@
-import gym
 import gym_envs
 import numpy as np
 import os
@@ -9,7 +8,7 @@ from imitation.data.rollout import flatten_trajectories
 from IRL.project_policies import def_policy
 
 env_type = "IDP"
-env = gym.make("{}_custom-v0".format(env_type))
+env = gym_envs.make("{}_custom-v0".format(env_type))
 exp = def_policy(env_type, env)
 expert_dir = os.path.join("..", "demos", env_type, "expert.pkl")
 with open(expert_dir, "rb") as f:
