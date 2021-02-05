@@ -1,0 +1,26 @@
+<mujoco model="IDP_custom">
+  <compiler angle="radian" coordinate="local" inertiafromgeom="false"/>
+  <default>
+    <joint damping="0.0"/>
+    <geom contype="0" friction="0.0 0.0 0.0"/>
+  </default>
+  <option gravity="0 0 -9.81" integrator="RK4" timestep="0.001"/>
+  <size nstack="3000" nuserdata="100" nuser_actuator="10"/>
+  <worldbody>
+    <geom name="floor" pos="0 0 -3" rgba="1 1 1 1" size="40 40 40" type="plane"/>
+    <body name="leg" pos="0 0 0">
+      <joint axis="0 1 0" limited="false" name="hinge" pos="0 0 0" type="hinge"/>
+      <geom fromto="0 0 0 0 0 0.9222" name="cpole" rgba="0.9 0.4 0.0 0.7" size="0.045" type="capsule"/>
+      <inertial pos="0 0 0.50982" mass="22.0892" diaginertia="7.937 7.937 0.01"/>
+      <body name="body" pos ="0 0 0.9222">
+        <joint axis="0 1 0" limited="false" name="hinge2" pos="0 0 0" type="hinge"/>
+        <geom fromto="0 0 0 0 0 0.8178" name="cpole2" rgba="0.8 0.4 0.0 0.7" size="0.045" type="capsule"/>
+        <inertial pos="0 0 0.30624" mass="46.5108" diaginertia="11.996 11.996 0.01"/>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor ctrllimited="true" ctrlrange='-1 1' gear="1000" joint="hinge"/>
+    <motor ctrllimited="true" ctrlrange='-1 1' gear="1000" joint="hinge2"/>
+  </actuator>
+</mujoco>
