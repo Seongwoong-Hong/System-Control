@@ -92,10 +92,10 @@ class CostNet(nn.Module):
             paramLoss = self.decay_coeff * torch.max(torch.zeros(1).to(self.device), (1 - torch.norm(param_norm)))
 
             # Calculate learned cost loss
-            prevC = self.forward(sampleE[0].infos[0]['rwinp'].to(self.device))
+            prevC = self.forward(sampleE[0].infos[0]['rwinp'])
             for E_trans in sampleE:
                 for info in E_trans.infos:
-                    currC = self.forward(info['rwinp'].to(self.device))
+                    currC = self.forward(info['rwinp'])
                     IOCLoss1 += currC
                     monoLoss += torch.max(torch.zeros(1).to(self.device), currC - prevC - 1) ** 2
                     prevC = torch.empty_like(currC).copy_(currC)
@@ -105,13 +105,13 @@ class CostNet(nn.Module):
             x = torch.zeros(len(sampleE+sampleL)).double().to(self.device)
             for j, trans_j in enumerate(sampleE+sampleL):
                 temp = 0
-                temp -= self.forward(trans_j.infos[0]['rwinp']).to(self.device)+trans_j.infos[0]['log_probs']
-                Cp = self.forward(trans_j.infos[0]['rwinp']).to(self.device)
-                Cc = self.forward(trans_j.infos[0]['rwinp']).to(self.device)
-                Cf = self.forward(trans_j.infos[0]['rwinp']).to(self.device)
+                temp -= self.forward(trans_j.infos[0]['rwinp'])+trans_j.infos[0]['log_probs']
+                Cp = self.forward(trans_j.infos[0]['rwinp'])
+                Cc = self.forward(trans_j.infos[0]['rwinp'])
+                Cf = self.forward(trans_j.infos[0]['rwinp'])
                 for info in trans_j[1:].infos:
                     Cc.copy_(Cf)
-                    Cf = self.forward(info['rwinp']).to(self.device)
+                    Cf = self.forward(info['rwinp'])
                     temp -= Cf+info['log_probs']
                     lcrLoss += (Cf - 2*Cc + Cp) ** 2
                     Cp.copy_(Cc)
