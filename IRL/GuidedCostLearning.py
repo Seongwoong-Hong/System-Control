@@ -1,5 +1,4 @@
 import datetime
-import gym
 import gym_envs
 import os
 import pickle
@@ -46,13 +45,14 @@ if __name__ == "__main__":
     expert_dir = os.path.join(current_path, "demos", env_type, "expert.pkl")
 
     n_steps, n_episodes = 200, 10
-    steps_for_learn = 1024000
+    steps_for_learn = 1536000
     env_id = "{}_custom-v0".format(env_type)
-    env = gym.make(env_id, n_steps=n_steps)
+    env = gym_envs.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
 
     costfn = CostNet(arch=[num_obs, num_obs],
+                     act_fcn=None,
                      device=device,
                      num_expert=10,
                      num_samp=n_episodes,
@@ -61,7 +61,7 @@ if __name__ == "__main__":
                      num_act=num_act
                      ).double().to(device)
 
-    env = DummyVecEnv([lambda: CostWrapper(gym.make(env_id, n_steps=n_steps), costfn)])
+    env = DummyVecEnv([lambda: CostWrapper(env, costfn)])
     GlfwContext(offscreen=True)
 
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
@@ -69,33 +69,36 @@ if __name__ == "__main__":
         expert_trajs = pickle.load(f)
         learner_trajs = []
 
-    algo = PPO(MlpPolicy,
-               env=env,
-               n_steps=4096,
-               batch_size=256,
-               gamma=0.99,
-               gae_lambda=0.95,
-               ent_coef=0.03,
-               ent_schedule=0.9,
-               clip_range=0.2,
-               verbose=0,
-               device=device,
-               tensorboard_log=log_dir,
-               policy_kwargs={'log_std_range': [-3, 2]},
-               )
-
     video_recorder = VFCustomCallback(log_dir + "/video/" + name,
-                                      gym.make(env_id, n_steps=n_steps),
+                                      gym_envs.make(env_id, n_steps=n_steps),
                                       n_eval_episodes=5,
                                       render_freq=steps_for_learn,
                                       costfn=costfn)
 
     print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
-    for i in range(30):
+    for i in range(10):
         # remove old tensorboard log
-        if i > 4:
-            shutil.rmtree(os.path.join(log_dir, "log") + "_%d" % (i - 4))
+        if i > 3 and (i - 3) % 5 != 0:
+            shutil.rmtree(os.path.join(log_dir, "log") + "_%d" % (i - 3))
 
+        print("Now start {}th policy optimization...".format(i + 1))
+        # update policy using PPO
+        env = DummyVecEnv([lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps), costfn.eval_())])
+        algo = PPO(MlpPolicy,
+                   env=env,
+                   n_steps=4096,
+                   batch_size=256,
+                   gamma=0.99,
+                   gae_lambda=0.95,
+                   ent_coef=0.015,
+                   ent_schedule=1.0,
+                   verbose=0,
+                   device=device,
+                   tensorboard_log=log_dir,
+                   policy_kwargs={'log_std_range': [-5, 5],
+                                  'net_arch': [{'pi': [128, 128], 'vf': [64, 64]}]},
+                   )
+        algo.learn(total_timesteps=steps_for_learn, callback=video_recorder, tb_log_name="log")
         # Add sample trajectories from current policy
         with torch.no_grad():
             learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
@@ -104,17 +107,11 @@ if __name__ == "__main__":
 
         # update cost function
         start = datetime.datetime.now()
-        for k in range(50):
-            costfn.sample_trajectory_sets(learner_trans, expert_trans)
-            costfn.learn(epoch=10)
+        for k in range(25):
+            costfn.learn(learner_trans, expert_trans, epoch=20)
         delta = datetime.datetime.now() - start
-        print("Cost Optimization Takes {}. Now start {}th policy optimization...".format(str(delta), i+1))
+        print("Cost Optimization Takes {}.".format(str(delta)))
         video_recorder.set_costfn(costfn=costfn)
-
-        # update policy using PPO
-        env = DummyVecEnv([lambda: CostWrapper(gym.make(env_id, n_steps=n_steps), costfn.eval_())])
-        algo.set_env(env)
-        algo.learn(total_timesteps=steps_for_learn, callback=video_recorder, tb_log_name="log")
 
         # save updated policy
         if (i + 1) % 2 == 0:
