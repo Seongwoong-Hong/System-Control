@@ -25,7 +25,7 @@ class CostNet(nn.Module):
         :param arch: The architecture of a Neural Network form of the cost function.
             The first argument of the arch must be an input size.
         :param device: The device(cpu or cuda) you want to use.
-        :param optimizer: The optimizer for stochastic gradient descent.
+        :param optimizer_class: The optimizer for stochastic gradient descent.
         :param act_fcn: The activation function for each layers of the cost function.
         :param lr: learning rate
         :param num_expert: How many expert trajectories you use when optimizing cost function.
@@ -89,7 +89,7 @@ class CostNet(nn.Module):
             param_norm = 0
             for param in self.parameters():
                 param_norm += torch.norm(param)
-            paramLoss = self.decay_coeff * (1 - torch.norm(param_norm))
+            paramLoss = self.decay_coeff * torch.max(torch.zeros(1).to(self.device), (1 - torch.norm(param_norm)))
 
             # Calculate learned cost loss
             prevC = self.forward(sampleE[0].infos[0]['rwinp'].to(self.device))
@@ -128,6 +128,7 @@ class CostNet(nn.Module):
             logger.record("Cost/Max_Ent._Cost_loss", IOCLoss2.item(), exclude=exclude)
             logger.record("Cost/Mono_Regularization", monoLoss.item(), exclude=exclude)
             logger.record("Cost/lcr_Regularization", lcrLoss.item(), exclude=exclude)
+            logger.record("Cost/param_Regularization", paramLoss.item(), exclude=exclude)
             logger.dump()
         return self
 
