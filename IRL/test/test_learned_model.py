@@ -13,12 +13,12 @@ from common.wrappers import CostWrapper
 
 
 env_type = "IDP"
-name = "{}/2021-1-31-3-47-3".format(env_type)
-num = 30
+name = "{}/2021-2-5-20-33-56".format(env_type)
+num = 2
 model_dir = os.path.join("..", "tmp", "log", name, "model")
 costfn = torch.load(model_dir + "/costfn{}.pt".format(num))
-# algo = PPO.load(model_dir + "/extra_ppo.zip")
-algo = PPO.load(model_dir + "/ppo{}.zip".format(num))
+algo = PPO.load(model_dir + "/extra_ppo.zip")
+# algo = PPO.load(model_dir + "/ppo{}.zip".format(num))
 env = CostWrapper(gym_envs.make("{}_custom-v0".format(env_type), n_steps=200), costfn)
 exp = def_policy(env_type, env)
 dt = env.dt

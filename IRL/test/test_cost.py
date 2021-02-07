@@ -11,9 +11,9 @@ from algo.torch.ppo import PPO
 
 
 env_type = "IDP"
-name = "{}/2021-1-31-3-47-3".format(env_type)
-nums = np.linspace(2, 30, 15)
-# nums = [14]
+name = "{}/2021-2-5-21-4-22".format(env_type)
+nums = np.linspace(2, 10, 5)
+# nums = [2]
 for num in nums:
     model_dir = os.path.join("..", "tmp", "log", name, "model")
     costfn = torch.load(model_dir + "/costfn%d.pt" % num).to('cpu')
@@ -51,7 +51,7 @@ for num in nums:
     title_list = ["norm_cost", "norm_cost", "abs_action", "abs_action"]
     yval_list = [cost_agt, cost_exp, np.abs(pact), np.abs(act)]
     xlabel, ylabel = dim_names[draw_dim[0]], dim_names[draw_dim[1]]
-    max_list = [1.0, 1.0, 0.3, 0.3]
+    max_list = [1.0, 1.0, 0.5, 0.5]
     min_list = [0.0, 0.0, 0.0, 0.0]
     fig = plt.figure()
     for i in range(4):

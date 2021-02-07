@@ -32,28 +32,42 @@ if __name__ == "__main__":
                env=env,
                ent_coef=0.05,
                ent_schedule=0.9,
-               verbose=1,
+               verbose=0,
                device='cpu',
+               tensorboard_log='./'
                )
+
+
 
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
         learner_trajs = []
+
+    with torch.no_grad():
+        learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
+        expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
+        learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
+
     for _ in range(20):
+
+        for k in range(1):
+            costfn.learn(learner_trans, expert_trans, epoch=3)
+        torch.save(costfn, "./costfn{}.pt".format(1 + 1))
+
+        env = DummyVecEnv([lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps), costfn)])
+        algo.set_env(env)
+        algo.learn(total_timesteps=2048)
+
         with torch.no_grad():
             learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
             expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
             learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
-        for k in range(10):
-            costfn.sample_trajectory_sets(learner_trans, expert_trans)
-            costfn.learn(epoch=10)
 
-        env = VecNormalize(venv=DummyVecEnv([lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps), costfn)]),
-                           norm_obs=False,
-                           clip_reward=1000.0,
-                           clip_obs=1000.0,
-                           gamma=1,
-                           epsilon=1e-10,
-                           )
-        algo.set_env(env)
-        algo.learn(total_timesteps=2048)
+        algo = PPO(MlpPolicy,
+                   env=env,
+                   ent_coef=0.05,
+                   ent_schedule=0.9,
+                   verbose=0,
+                   device='cpu',
+                   tensorboard_log='./'
+                   )

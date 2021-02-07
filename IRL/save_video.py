@@ -1,5 +1,4 @@
 import cv2
-import gym
 import gym_envs
 import os
 import time
@@ -31,7 +30,7 @@ model_dir = os.path.join("tmp", "log", name, "model")
 costfn = torch.load(model_dir + "/costfn{}.pt".format(num))
 algo = PPO.load(model_dir + "/ppo{}.zip".format(num))
 # algo = PPO.load(model_dir + "/extra_ppo.zip")
-env = CostWrapper(gym.make("{}_custom-v1".format(env_type), n_steps=200), costfn)
+env = CostWrapper(gym_envs.make("{}_custom-v1".format(env_type), n_steps=200), costfn)
 exp = def_policy(env_type, env)
 dt = env.dt
 init_obs = env.reset().reshape(1, -1)
