@@ -12,7 +12,7 @@ from stable_baselines3.common.logger import Video, Figure
 
 
 class VFCustomCallback(BaseCallback):
-    def __init__(self, path: str,
+    def __init__(self,
                  eval_env: gym.Env,
                  render_freq: int,
                  n_eval_episodes: int = 1,
@@ -34,7 +34,6 @@ class VFCustomCallback(BaseCallback):
         self._render_freq = render_freq
         self._n_eval_episodes = n_eval_episodes
         self._deterministic = deterministic
-        self.path = path
         self.num = 0
         self.fps = int(1/eval_env.dt)
         self.costfn = costfn
@@ -62,8 +61,8 @@ class VFCustomCallback(BaseCallback):
                 n_eval_episodes=self._n_eval_episodes,
                 deterministic=self._deterministic,
             )
-
-            fig = self._draw_figure(self._eval_env, self.draw_dim)
+            with torch.no_grad():
+                fig = self._draw_figure(self._eval_env, self.draw_dim)
 
             self.logger.record(
                 "trajectory/video",
