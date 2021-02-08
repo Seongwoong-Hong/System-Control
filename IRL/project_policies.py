@@ -1,4 +1,6 @@
 from algo.torch.OptCont import LQRPolicy
+from algo.torch.ppo import PPO
+from algo.torch.sac import SAC
 import numpy as np
 
 
@@ -30,10 +32,47 @@ class IDPPolicy(LQRPolicy):
         return self.A, self.B, self.Q, self.R
 
 
-def def_policy(env_type, env):
+def def_policy(env_type, env, **kwargs):
+    device, log_dir = 'cpu', None
+    for key, value in kwargs.items():
+        if 'device' == key:
+            device = value
+        elif 'log_dir' == key:
+            log_dir = value
+
     if env_type == "IP":
         return IPPolicy(env)
     elif env_type == "IDP":
         return IDPPolicy(env)
+    elif env_type == "ppo":
+        from algo.torch.ppo import MlpPolicy
+        return PPO(MlpPolicy,
+                   env=env,
+                   n_steps=4096,
+                   batch_size=256,
+                   gamma=0.99,
+                   gae_lambda=0.95,
+                   ent_coef=0.015,
+                   ent_schedule=1.0,
+                   verbose=0,
+                   device=device,
+                   tensorboard_log=log_dir,
+                   policy_kwargs={'log_std_range': [-5, 5],
+                                  'net_arch': [{'pi': [64, 64], 'vf': [64, 64]}]},
+                   )
+
+    elif env_type == "sac":
+        from algo.torch.sac import MlpPolicy
+        return SAC(MlpPolicy,
+                   env=env,
+                   batch_size=256,
+                   train_freq=4096,
+                   gamma=0.99,
+                   ent_coef='auto',
+                   verbose=0,
+                   device=device,
+                   tensorboard_log=log_dir,
+                   policy_kwargs={'net_arch': {'pi': [64, 64], 'qf': [64, 64]}},
+                   )
     else:
         raise NameError("Not implemented policy name")
