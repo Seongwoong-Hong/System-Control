@@ -32,7 +32,7 @@ class IDPPolicy(LQRPolicy):
         return self.A, self.B, self.Q, self.R
 
 
-def def_policy(env_type, env, **kwargs):
+def def_policy(algo_type, env, **kwargs):
     device, log_dir = 'cpu', None
     for key, value in kwargs.items():
         if 'device' == key:
@@ -40,11 +40,11 @@ def def_policy(env_type, env, **kwargs):
         elif 'log_dir' == key:
             log_dir = value
 
-    if env_type == "IP":
+    if algo_type == "IP":
         return IPPolicy(env)
-    elif env_type == "IDP":
+    elif algo_type == "IDP":
         return IDPPolicy(env)
-    elif env_type == "ppo":
+    elif algo_type == "ppo":
         from algo.torch.ppo import MlpPolicy
         return PPO(MlpPolicy,
                    env=env,
@@ -61,7 +61,7 @@ def def_policy(env_type, env, **kwargs):
                                   'net_arch': [{'pi': [64, 64], 'vf': [64, 64]}]},
                    )
 
-    elif env_type == "sac":
+    elif algo_type == "sac":
         from algo.torch.sac import MlpPolicy
         return SAC(MlpPolicy,
                    env=env,
