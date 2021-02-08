@@ -9,7 +9,7 @@ from imitation.data import rollout
 from mujoco_py import GlfwContext
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from algo.torch.ppo import PPO, MlpPolicy
+from IRL.project_policies import def_policy
 from common.callbacks import VFCustomCallback
 from common.modules import CostNet
 from common.rollouts import get_trajectories_probs
@@ -20,17 +20,24 @@ if __name__ == "__main__":
         raise SyntaxError("Please enter the type of environment you use")
     elif len(sys.argv) == 2:
         device = 'cpu'
+        algo_type = 'ppo'
     elif len(sys.argv) == 3:
         device = sys.argv[2]
+        algo_type = 'ppo'
+    elif len(sys.argv) == 4:
+        device = sys.argv[2]
+        algo_type = sys.argv[3]
     else:
         raise SyntaxError("Too many system inputs")
 
     env_type = sys.argv[1]
     now = datetime.datetime.now()
-    name = env_type + "/%s-%s-%s-%s-%s-%s" % (now.year, now.month, now.day, now.hour, now.minute, now.second)
     current_path = os.path.dirname(__file__)
-
-    log_dir = os.path.join(current_path, "tmp", "log", name)
+    log_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type)
+    if not os.path.isdir(log_dir):
+        os.mkdir(log_dir)
+    name = "/%s-%s-%s-%s-%s-%s" % (now.year, now.month, now.day, now.hour, now.minute, now.second)
+    log_dir += name
     if not os.path.isdir(log_dir):
         os.mkdir(log_dir)
 
@@ -41,18 +48,19 @@ if __name__ == "__main__":
     shutil.copy(os.path.abspath(current_path + "/../common/modules.py"), model_dir)
     shutil.copy(os.path.abspath(current_path + "/../gym_envs/envs/{}_custom_exp.py".format(env_type)), model_dir)
     shutil.copy(os.path.abspath(__file__), model_dir)
+    shutil.copy(os.path.abspath(current_path + "/project_policies.py"), model_dir)
 
     expert_dir = os.path.join(current_path, "demos", env_type, "expert.pkl")
 
     n_steps, n_episodes = 200, 15
-    steps_for_learn = 819200
+    steps_for_learn = 512000
     env_id = "{}_custom-v0".format(env_type)
     env = gym_envs.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
 
     costfn = CostNet(arch=[num_obs, num_obs],
-                     act_fcn=None,
+                     act_fcn=torch.nn.ReLU,
                      device=device,
                      num_expert=5,
                      num_samp=n_episodes,
@@ -69,29 +77,15 @@ if __name__ == "__main__":
         expert_trajs = pickle.load(f)
         learner_trajs = []
 
-    algo = PPO(MlpPolicy,
-               env=env,
-               n_steps=4096,
-               batch_size=256,
-               gamma=0.99,
-               gae_lambda=0.95,
-               ent_coef=0.015,
-               ent_schedule=1.0,
-               verbose=0,
-               device=device,
-               tensorboard_log=log_dir,
-               policy_kwargs={'log_std_range': [-5, 5],
-                              'net_arch': [{'pi': [64, 64], 'vf': [64, 64]}]},
-               )
+    algo = def_policy(algo_type, env, device=device, log_dir=log_dir)
 
-    video_recorder = VFCustomCallback(log_dir + "/video/" + name,
-                                      gym_envs.make(env_id, n_steps=n_steps),
+    video_recorder = VFCustomCallback(gym_envs.make(env_id, n_steps=n_steps),
                                       n_eval_episodes=5,
                                       render_freq=steps_for_learn,
                                       costfn=costfn)
 
     print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
-    for i in range(10):
+    for i in range(30):
         # remove old tensorboard log
         if i > 3 and (i - 3) % 5 != 0:
             shutil.rmtree(os.path.join(log_dir, "log") + "_%d" % (i - 3))
@@ -105,7 +99,7 @@ if __name__ == "__main__":
         # update cost function
         start = datetime.datetime.now()
         for k in range(25):
-            costfn.learn(learner_trans, expert_trans, epoch=10)
+            costfn.learn(learner_trans, expert_trans, epoch=15)
         delta = datetime.datetime.now() - start
         print("Cost Optimization Takes {}. Now start {}th policy optimization...".format(str(delta), i+1))
         # update policy using PPO
