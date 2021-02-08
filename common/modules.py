@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Type
 
 import sys
 import random
@@ -12,8 +12,8 @@ class CostNet(nn.Module):
     def __init__(self,
                  arch: List[int],
                  device: str,
-                 optimizer_class=torch.optim.Adam,
-                 act_fcn=nn.Tanh,
+                 optimizer_class: Type[torch.optim.Optimizer] = torch.optim.Adam,
+                 act_fcn: Type[nn.Module] = None,
                  lr: float = 3e-5,
                  num_expert: int = 10,
                  num_samp: int = 10,
@@ -32,6 +32,7 @@ class CostNet(nn.Module):
         :param num_samp: How many sample trajectories from current policy you us when optimizing cost function.
         :param num_act: Number of actions of your current environment.
         :param decay_coeff: The coefficient for preventing parameter decaying loss
+        :param verbose: The verbosity level. 0: no outputs, 1: info
         """
         super(CostNet, self).__init__()
         self.device = device
