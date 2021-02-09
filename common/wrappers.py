@@ -18,7 +18,7 @@ class ActionRewardWrapper(gym.RewardWrapper):
         return observation, self.reward(np.append(observation, self.action(action))), done, info
 
     def reward(self, obs):
-        rwinp = torch.from_numpy(obs).to(self.rwfn.device)
+        rwinp = torch.from_numpy(obs).reshape(1, -1).to(self.rwfn.device)
         return self.rwfn.forward(rwinp)
 
 
@@ -40,7 +40,7 @@ class RewardWrapper(gym.RewardWrapper):
         return observation, self.reward(np.append(observation, action)), done, info
 
     def reward(self, obs):
-        rwinp = torch.from_numpy(obs).to(self.rwfn.device)
+        rwinp = torch.from_numpy(obs).reshape(1, -1).to(self.rwfn.device)
         return self.rwfn.forward(rwinp)
 
 
@@ -54,7 +54,7 @@ class CostWrapper(gym.RewardWrapper):
         return observation, self.reward(np.append(observation, action)), done, info
 
     def reward(self, obs):
-        cost_inp = torch.from_numpy(obs).to(self.costfn.device)
+        cost_inp = torch.from_numpy(obs).reshape(1, -1).to(self.costfn.device)
         return -self.costfn.forward(cost_inp)
 
 
@@ -75,5 +75,5 @@ class ActionCostWrapper(gym.RewardWrapper):
         return action / self.gear
 
     def reward(self, obs):
-        cost_inp = torch.from_numpy(obs).to(self.costfn.device)
+        cost_inp = torch.from_numpy(obs).reshape(1, -1).to(self.costfn.device)
         return -self.costfn.forward(cost_inp)
