@@ -88,7 +88,7 @@ class VFCustomCallback(BaseCallback):
                 iobs[draw_dim[0]], iobs[draw_dim[1]] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
                 iacts, _ = self.model.predict(np.array(iobs), deterministic=True)
                 pact[i][j] = iacts[draw_dim[2]]
-                inp = torch.from_numpy(np.append(iobs, iacts)).double().to(self.model.device)
+                inp = torch.from_numpy(np.append(iobs, iacts)).double().to(self.model.device).reshape(1, -1)
                 cost[i][j] = self.costfn(inp).item()
         cost /= np.amax(cost)
         title_list = ["norm_cost", "abs_action"]
