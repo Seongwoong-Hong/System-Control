@@ -66,9 +66,9 @@ class CostNet(nn.Module):
     def forward(self, obs):
         if self.evalmod:
             with torch.no_grad():
-                return self.layers(obs[:-self.num_act])**2 + self.aparam(obs[-self.num_act:])**2
+                return self.layers(obs[:, :-self.num_act])**2 + self.aparam(obs[:, -self.num_act:])**2
         else:
-            return self.layers(obs[:-self.num_act])**2 + self.aparam(obs[-self.num_act:])**2
+            return self.layers(obs[:, :-self.num_act])**2 + self.aparam(obs[:, -self.num_act:])**2
 
     def _setup_learn(self, learner_trans, expert_trans):
         self.train_()
@@ -93,30 +93,19 @@ class CostNet(nn.Module):
             paramLoss = self.decay_coeff * torch.max(torch.zeros(1).to(self.device), (1 - torch.norm(param_norm)))
 
             # Calculate learned cost loss
-            prevC = self.forward(sampleE[0].infos[0]['rwinp'])
             for E_trans in sampleE:
-                for info in E_trans.infos:
-                    currC = self.forward(info['rwinp'])
-                    IOCLoss1 += currC
-                    monoLoss += torch.max(torch.zeros(1).to(self.device), currC - prevC - 1) ** 2
-                    prevC = torch.empty_like(currC).copy_(currC)
-            IOCLoss1 /= len(sampleE)
+                costs = self.forward(E_trans[:, :-1])
+                monoLoss += torch.sum(torch.max(torch.zeros(*costs.shape[:-1], device=self.device),
+                                                costs[1:] - costs[:-1] - 1) ** 2)
+                IOCLoss1 += costs
+            IOCLoss1 = torch.mean(IOCLoss1)
 
             # Calculate Max Ent. Loss
             x = torch.zeros(len(sampleE+sampleL)).double().to(self.device)
-            for j, trans_j in enumerate(sampleE+sampleL):
-                temp = 0
-                temp -= self.forward(trans_j.infos[0]['rwinp'])+trans_j.infos[0]['log_probs']
-                Cp = self.forward(trans_j.infos[0]['rwinp'])
-                Cc = self.forward(trans_j.infos[0]['rwinp'])
-                Cf = self.forward(trans_j.infos[0]['rwinp'])
-                for info in trans_j[1:].infos:
-                    Cc.copy_(Cf)
-                    Cf = self.forward(info['rwinp'])
-                    temp -= Cf+info['log_probs']
-                    lcrLoss += (Cf - 2*Cc + Cp) ** 2
-                    Cp.copy_(Cc)
-                x[j] = temp
+            for j, trans_j in enumerate(sampleE + sampleL):
+                costs = self.forward(trans_j[:, :-1])
+                x[j] = -torch.sum(costs + trans_j[:, -1])
+                lcrLoss += torch.sum((costs[2:] - 2*costs[1:-1] + costs[:-2]) ** 2)
             IOCLoss2 = -torch.logsumexp(x, 0)
 
             IOCLoss = IOCLoss1 + IOCLoss2 + monoLoss + lcrLoss + paramLoss
