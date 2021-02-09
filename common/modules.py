@@ -92,7 +92,7 @@ class CostNet(nn.Module):
                 param_norm += torch.norm(param)
             paramLoss = self.decay_coeff * torch.max(torch.zeros(1).to(self.device), (1 - torch.norm(param_norm)))
 
-            # Calculate learned cost loss
+            # Calculate learned cost loss and mono Regularization term
             for E_trans in sampleE:
                 costs = self.forward(E_trans[:, :-1])
                 monoLoss += torch.sum(torch.max(torch.zeros(*costs.shape[:-1], device=self.device),
@@ -100,13 +100,13 @@ class CostNet(nn.Module):
                 IOCLoss1 += costs
             IOCLoss1 = torch.mean(IOCLoss1)
 
-            # Calculate Max Ent. Loss
+            # Calculate Max Ent. Loss and lcr Regularization term
             x = torch.zeros(len(sampleE+sampleL)).double().to(self.device)
             for j, trans_j in enumerate(sampleE + sampleL):
                 costs = self.forward(trans_j[:, :-1])
                 x[j] = -torch.sum(costs + trans_j[:, -1])
                 lcrLoss += torch.sum((costs[2:] - 2*costs[1:-1] + costs[:-2]) ** 2)
-            IOCLoss2 = -torch.logsumexp(x, 0)
+            IOCLoss2 = torch.logsumexp(x, 0)
 
             IOCLoss = IOCLoss1 + IOCLoss2 + monoLoss + lcrLoss + paramLoss
             self.optimizer.zero_grad()
