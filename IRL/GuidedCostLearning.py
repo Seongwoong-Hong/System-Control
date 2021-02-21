@@ -52,8 +52,8 @@ if __name__ == "__main__":
 
     expert_dir = os.path.join(current_path, "demos", env_type, "expert.pkl")
 
-    n_steps, n_episodes = 200, 15
-    steps_for_learn = 512000
+    n_steps, n_episodes = 200, 5
+    steps_for_learn = 1536000
     env_id = "{}_custom-v0".format(env_type)
     env = gym_envs.make(env_id, n_steps=n_steps)
     num_obs = env.observation_space.shape[0]
@@ -62,7 +62,7 @@ if __name__ == "__main__":
     costfn = CostNet(arch=[num_obs, num_obs],
                      act_fcn=torch.nn.ReLU,
                      device=device,
-                     num_expert=5,
+                     num_expert=15,
                      num_samp=n_episodes,
                      lr=3e-4,
                      decay_coeff=0.0,
@@ -91,20 +91,27 @@ if __name__ == "__main__":
             shutil.rmtree(os.path.join(log_dir, "log") + "_%d" % (i - 3))
 
         # Add sample trajectories from current policy
+        learner_trajs = []
         with torch.no_grad():
-            learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
+            for _ in range(10):
+                learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
             expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
             learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
 
         # update cost function
         start = datetime.datetime.now()
-        for k in range(25):
-            costfn.learn(learner_trans, expert_trans, epoch=15)
+        for k in range(60):
+            costfn.learn(learner_trans, expert_trans, epoch=100)
         delta = datetime.datetime.now() - start
         print("Cost Optimization Takes {}. Now start {}th policy optimization...".format(str(delta), i+1))
+        print("The Name for logging in {}".format(name))
         # update policy using PPO
         env = DummyVecEnv([lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps), costfn.eval_())])
         algo.set_env(env)
+        with torch.no_grad():
+            for n, param in algo.policy.named_parameters():
+                if 'log_std' in n:
+                    param.copy_(torch.zeros(*param.shape))
         algo.learn(total_timesteps=steps_for_learn, callback=video_recorder, tb_log_name="log")
         video_recorder.set_costfn(costfn=costfn)
 
