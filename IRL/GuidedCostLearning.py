@@ -7,13 +7,14 @@ import sys
 import torch
 from imitation.data import rollout
 from mujoco_py import GlfwContext
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 from IRL.project_policies import def_policy
 from common.callbacks import VFCustomCallback
 from common.modules import CostNet
 from common.rollouts import get_trajectories_probs
 from common.wrappers import CostWrapper
+from scipy import io
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
@@ -46,20 +47,25 @@ if __name__ == "__main__":
         os.mkdir(model_dir)
     # Copy used file to logging folder
     shutil.copy(os.path.abspath(current_path + "/../common/modules.py"), model_dir)
-    shutil.copy(os.path.abspath(current_path + "/../gym_envs/envs/{}_custom_exp.py".format(env_type)), model_dir)
+    shutil.copy(os.path.abspath(current_path + "/../gym_envs/envs/{}_custom.py".format(env_type)), model_dir)
     shutil.copy(os.path.abspath(__file__), model_dir)
     shutil.copy(os.path.abspath(current_path + "/project_policies.py"), model_dir)
 
-    expert_dir = os.path.join(current_path, "demos", env_type, "expert.pkl")
+    sub = "sub01"
+    expert_dir = os.path.join(current_path, "demos", env_type, sub + ".pkl")
+    pltqs = []
+    for i in range(35):
+        file = os.path.join(current_path, "demos", env_type, sub, sub + "i%d.mat" % (i+1))
+        pltqs += [io.loadmat(file)['pltq']]
 
-    n_steps, n_episodes = 200, 5
+    n_steps, n_episodes = 600, 5
     steps_for_learn = 1536000
     env_id = "{}_custom-v0".format(env_type)
-    env = gym_envs.make(env_id, n_steps=n_steps)
+    env = gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs)
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
 
-    costfn = CostNet(arch=[num_obs, num_obs],
+    costfn = CostNet(arch=[num_obs, 2*num_obs],
                      act_fcn=torch.nn.ReLU,
                      device=device,
                      num_expert=15,
@@ -69,7 +75,7 @@ if __name__ == "__main__":
                      num_act=num_act
                      ).double().to(device)
 
-    env = DummyVecEnv([lambda: CostWrapper(env, costfn)])
+    env = SubprocVecEnv([lambda: CostWrapper(env, costfn) for i in range(5)])
     GlfwContext(offscreen=True)
 
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
@@ -79,9 +85,9 @@ if __name__ == "__main__":
 
     algo = def_policy(algo_type, env, device=device, log_dir=log_dir)
 
-    video_recorder = VFCustomCallback(gym_envs.make(env_id, n_steps=n_steps),
+    video_recorder = VFCustomCallback(gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs),
                                       n_eval_episodes=5,
-                                      render_freq=steps_for_learn,
+                                      render_freq=int(steps_for_learn/5),
                                       costfn=costfn)
 
     print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
@@ -92,12 +98,13 @@ if __name__ == "__main__":
 
         # Add sample trajectories from current policy
         learner_trajs = []
+        env = SubprocVecEnv([lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs), costfn)])
         with torch.no_grad():
             for _ in range(10):
                 learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
             expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
             learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
-
+        del env
         # update cost function
         start = datetime.datetime.now()
         for k in range(60):
@@ -106,7 +113,8 @@ if __name__ == "__main__":
         print("Cost Optimization Takes {}. Now start {}th policy optimization...".format(str(delta), i+1))
         print("The Name for logging in {}".format(name))
         # update policy using PPO
-        env = DummyVecEnv([lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps), costfn.eval_())])
+        env = SubprocVecEnv([
+            lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs), costfn.eval_()) for i in range(5)])
         algo.set_env(env)
         with torch.no_grad():
             for n, param in algo.policy.named_parameters():
