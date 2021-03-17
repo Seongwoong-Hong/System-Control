@@ -11,8 +11,9 @@ from algo.torch.ppo import PPO
 
 
 env_type = "IDP"
-name = "{}/2021-2-5-21-4-22".format(env_type)
-nums = np.linspace(2, 10, 5)
+algo_type = "ppo"
+name = "{}/{}/2021-2-9-22-25-45".format(env_type, algo_type)
+nums = np.linspace(2, 30, 15)
 # nums = [2]
 for num in nums:
     model_dir = os.path.join("..", "tmp", "log", name, "model")
@@ -42,7 +43,7 @@ for num in nums:
             pact[i][j] = ipacts[draw_dim[2]]
             iacts, _ = exp.predict(iobs, deterministic=True)
             act[i][j] = iacts[draw_dim[2]]
-            inp = torch.from_numpy(np.append(iobs, ipacts)).double()
+            inp = torch.from_numpy(np.append(iobs, ipacts)).reshape(1, -1).double()
             cost_agt[i][j] = costfn(inp).item()
             cost_exp[i][j] = iobs @ exp.Q @ iobs.T + iacts @ exp.R @ iacts.T * exp.gear**2
 
