@@ -28,19 +28,21 @@ class IDPPolicy(LQRPolicy):
                            [0, 0, 0, 1],
                            [m1*g*h1/I1, 0, 0, 0],
                            [0, m2*g*h2/I2, 0, 0]])
-        self.B = np.array([[0, 0], [0, 0],
-                           [1/I1, -1/I1], [0, 1/I2]])
+        self.B = np.array([[0, 0],
+                           [0, 0],
+                           [1/I1, -1/I1],
+                           [0, 1/I2]])
         return self.A, self.B, self.Q, self.R
 
 
 class HPCPolicy(LQRPolicy):
     def _build_env(self):
         m1, m2, h1, h2, I1, I2, g = 22.0892, 46.5108, 0.50982, 0.30624, 7.937, 11.996, 9.81
-        self.Q = np.array([[1, 0, 0, 0],
+        self.Q = np.array([[0.15, 0, 0, 0],
                            [0, 1, 0, 0],
                            [0, 0, 0, 0],
                            [0, 0, 0, 0]])
-        self.R = 1e-6*np.array([[1, 0],
+        self.R = 1e-5*np.array([[1, 0],
                                 [0, 1]])
         self.A = np.array([[0, 0, 1, 0],
                            [0, 0, 0, 1],
@@ -51,22 +53,22 @@ class HPCPolicy(LQRPolicy):
         return self.A, self.B, self.Q, self.R
 
 
-def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0):
+def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, action_space=None, observation_space=None):
     if algo_type == "IP":
         return IPPolicy(env)
     elif algo_type == "IDP":
         return IDPPolicy(env)
     elif algo_type == "HPC":
-        return HPCPolicy(env)
+        return HPCPolicy(env, action_space=action_space, observation_space=observation_space)
     elif algo_type == "ppo":
         from algo.torch.ppo import MlpPolicy
         return PPO(MlpPolicy,
                    env=env,
-                   n_steps=2048,
+                   n_steps=1024,
                    batch_size=512,
-                   gamma=0.99,
+                   gamma=0.975,
                    gae_lambda=0.95,
-                   ent_coef=0.01,
+                   ent_coef=0.015,
                    ent_schedule=1.0,
                    clip_range=0.175,
                    verbose=verbose,

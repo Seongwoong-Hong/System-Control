@@ -65,7 +65,7 @@ if __name__ == "__main__":
     num_obs = env.observation_space.shape[0]
     num_act = env.action_space.shape[0]
 
-    costfn = CostNet(arch=[num_obs, 2*num_obs],
+    costfn = CostNet(arch=[num_obs, 2*num_obs, 4*num_obs],
                      act_fcn=torch.nn.ReLU,
                      device=device,
                      num_expert=15,
@@ -75,7 +75,7 @@ if __name__ == "__main__":
                      num_act=num_act
                      ).double().to(device)
 
-    env = SubprocVecEnv([lambda: CostWrapper(env, costfn) for i in range(5)])
+    env = DummyVecEnv([lambda: CostWrapper(env, costfn) for i in range(10)])
     GlfwContext(offscreen=True)
 
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
@@ -98,7 +98,7 @@ if __name__ == "__main__":
 
         # Add sample trajectories from current policy
         learner_trajs = []
-        env = SubprocVecEnv([lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs), costfn)])
+        env = DummyVecEnv([lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs), costfn)])
         with torch.no_grad():
             for _ in range(10):
                 learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
@@ -113,8 +113,8 @@ if __name__ == "__main__":
         print("Cost Optimization Takes {}. Now start {}th policy optimization...".format(str(delta), i+1))
         print("The Name for logging in {}".format(name))
         # update policy using PPO
-        env = SubprocVecEnv([
-            lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs), costfn.eval_()) for i in range(5)])
+        env = DummyVecEnv([
+            lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs), costfn.eval_()) for i in range(10)])
         algo.set_env(env)
         with torch.no_grad():
             for n, param in algo.policy.named_parameters():

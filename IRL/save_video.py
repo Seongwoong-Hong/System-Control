@@ -24,13 +24,15 @@ def video_record(imgs, filename, dt):
 
 GlfwContext(offscreen=True)
 env_type = "IDP"
-name = "{}/2021-1-29-12-52-56".format(env_type)
+algo_type = "ppo"
+name = "{}/{}/2021-2-9-16-19-31".format(env_type, algo_type)
 num = 14
 model_dir = os.path.join("tmp", "log", name, "model")
-costfn = torch.load(model_dir + "/costfn{}.pt".format(num))
-algo = PPO.load(model_dir + "/ppo{}.zip".format(num))
-# algo = PPO.load(model_dir + "/extra_ppo.zip")
-env = CostWrapper(gym_envs.make("{}_custom-v1".format(env_type), n_steps=200), costfn)
+# costfn = torch.load(model_dir + "/costfn{}.pt".format(num))
+# algo = PPO.load(model_dir + "/ppo{}.zip".format(num))
+algo = PPO.load(model_dir + "/extra_ppo")
+env = gym_envs.make("{}_custom-v1".format(env_type), n_steps=200)
+# env = CostWrapper(gym_envs.make("{}_custom-v1".format(env_type), n_steps=200), costfn)
 exp = def_policy(env_type, env)
 dt = env.dt
 init_obs = env.reset().reshape(1, -1)

@@ -6,7 +6,7 @@ from scipy import io
 
 if __name__ == '__main__':
     env_type = "HPC"
-    n_steps, n_episodes = 300, 5
+    n_steps, n_episodes = 600, 5
     env_id = "{}_custom-v0".format(env_type)
     env = DummyVecEnv([lambda: gym_envs.make(env_id, n_steps=n_steps)])
     trajectories = []
