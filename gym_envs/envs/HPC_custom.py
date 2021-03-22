@@ -6,10 +6,12 @@ from gym.envs.mujoco import mujoco_env
 
 
 class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self, n_steps=None, bsp=None, pltqs=None):
+    def __init__(self, n_steps=None, bsp=None, pltqs=None, order=None):
         self.traj_len = 0
         self.n_steps = n_steps
         self.pltqs = pltqs
+        self.order = order
+        self.reset_num = 0
         if pltqs is not None:
             self.pltq = random.sample(self.pltqs, 1)[0]
         else:
@@ -50,7 +52,12 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def reset_model(self):
         self.set_state(self.init_qpos, self.init_qvel)
         if self.pltqs is not None:
-            self.pltq = random.sample(self.pltqs, 1)[0] / self.model.actuator_gear[0, 0]
+            if self.order is None:
+                self.pltq = random.sample(self.pltqs, 1)[0] / self.model.actuator_gear[0, 0]
+            else:
+                od = self.reset_num % len(self.order)
+                self.pltq = self.pltqs[od] / self.model.actuator_gear[0, 0]
+                self.reset_num += 1
         return self._get_obs()
 
     def viewer_setup(self):
