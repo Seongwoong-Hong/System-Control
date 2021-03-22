@@ -10,25 +10,22 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         self.traj_len = 0
         self.n_steps = n_steps
         self.pltqs = pltqs
+        self.pltq = None
         self.order = order
         self.reset_num = 0
-        if pltqs is not None:
-            self.pltq = random.sample(self.pltqs, 1)[0]
-        else:
-            self.pltq = np.array([[0, 0]])
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml"), 5)
         utils.EzPickle.__init__(self)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
+        self._sample_pltqs()
         if bsp is not None:
             self.bsp = bsp
         self.traj_len = 0
 
     def step(self, action):
-        if self.pltqs is not None:
-            action += self.pltq[self.traj_len, :].reshape(-1)
-        self.do_simulation(action, self.frame_skip)
+        self._set_plt_torque()
+        self.do_simulation(action + self.plt_torque, self.frame_skip)
         ob = self._get_obs()
         r = -(ob[0] ** 2 + ob[1] ** 2 + 1e-6 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         done = False
@@ -46,19 +43,39 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         return np.concatenate([
             self.sim.data.qpos,  # link angles
             self.sim.data.qvel,   # link angular velocities
-            self.pltq[self.traj_len, :],
+            self.plt_torque,
         ]).ravel()
 
     def reset_model(self):
+        self._sample_pltqs()
+        self.reset_num += 1
         self.set_state(self.init_qpos, self.init_qvel)
+        return self._get_obs()
+
+    def set_state(self, qpos, qvel):
+        super().set_state(qpos, qvel)
+        self._set_plt_torque()
+
+    def set_pltqs(self, pltqs, order=None):
+        self.pltqs = pltqs
+        self.order = order
+        self._sample_pltqs()
+
+    def _set_plt_torque(self):
+        if self.pltq is not None:
+            self.plt_torque = self.pltq[self.traj_len, :].reshape(-1)
+        else:
+            self.plt_torque = np.array([0, 0])
+
+    def _sample_pltqs(self):
         if self.pltqs is not None:
             if self.order is None:
                 self.pltq = random.sample(self.pltqs, 1)[0] / self.model.actuator_gear[0, 0]
             else:
                 od = self.reset_num % len(self.order)
                 self.pltq = self.pltqs[od] / self.model.actuator_gear[0, 0]
-                self.reset_num += 1
-        return self._get_obs()
+        else:
+            self.pltq = None
 
     def viewer_setup(self):
         v = self.viewer
