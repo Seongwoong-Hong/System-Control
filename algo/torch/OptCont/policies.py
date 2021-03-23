@@ -1,4 +1,3 @@
-import gym
 import torch as th
 import numpy as np
 from scipy import linalg
@@ -6,9 +5,14 @@ from stable_baselines3.common.policies import BasePolicy
 
 
 class LQRPolicy(BasePolicy):
-    def __init__(self, env, noise_lv: float = 0.25):
-        observation_space = env.observation_space
-        action_space = env.action_space
+    def __init__(self, env, noise_lv: float = 0.25,
+                 observation_space=None,
+                 action_space=None,
+                 ):
+        if observation_space is None:
+            observation_space = env.observation_space
+        if action_space is None:
+            action_space = env.action_space
         super(LQRPolicy, self).__init__(
             observation_space,
             action_space)
