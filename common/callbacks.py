@@ -113,7 +113,7 @@ class VFCustomCallback(BaseCallback):
 
 
 class VideoCallback(BaseCallback):
-    def __init__(self, path: str,
+    def __init__(self,
                  eval_env: gym.Env,
                  render_freq: int,
                  n_eval_episodes: int = 1,
@@ -132,7 +132,6 @@ class VideoCallback(BaseCallback):
         self._render_freq = render_freq
         self._n_eval_episodes = n_eval_episodes
         self._deterministic = deterministic
-        self.path = path
         self.num = 0
         self.fps = int(1/eval_env.dt)
         self.costfn = costfn
