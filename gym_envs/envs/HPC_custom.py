@@ -27,7 +27,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         self._set_plt_torque()
         self.do_simulation(action + self.plt_torque, self.frame_skip)
         ob = self._get_obs()
-        r = -(ob[0] ** 2 + ob[1] ** 2 + 1e-6 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
+        r = -(ob[0] ** 2 + 0.75*ob[1] ** 2 + 1e-3 * action @ np.eye(2, 2) @ action.T)
         done = False
         info = {}
         if self.n_steps is None:
@@ -35,6 +35,9 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         elif (self.traj_len + 1) == self.n_steps:
             done = True
             info = {"terminal observation": ob}
+            self.traj_len = 0
+        if abs(ob[0]) > 2 or abs(ob[1]) > 3:
+            done = True
             self.traj_len = 0
         self.traj_len += 1
         return ob, r, done, info

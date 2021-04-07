@@ -8,16 +8,16 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self, n_steps=None):
         self.traj_len = 0
         self.n_steps = n_steps
-        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 20)
+        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 8)
         utils.EzPickle.__init__(self)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
-        self.init_qpos = np.array([0.1, 0.1])
+        self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
 
     def step(self, action):
         self.do_simulation(action, self.frame_skip)
         ob = self._get_obs()
-        r = -(ob[0] ** 2 + ob[1] ** 2 + 0.0001 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
+        r = -0.01 * (ob[0] ** 2 + ob[1] ** 2 + 0.0001 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         done = False
         info = {}
         if self.n_steps is None:
@@ -26,6 +26,8 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
             done = True
             info = {"terminal observation": ob}
             self.traj_len = 0
+        if abs(ob[0]) > 2 or abs(ob[1]) > 3:
+            done = True
         self.traj_len += 1
         return ob, r, done, info
 
@@ -37,7 +39,7 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def reset_model(self):
         self.set_state(
-            self.init_qpos + self.np_random.uniform(low=-.05, high=.05, size=self.model.nq),
+            self.init_qpos + self.np_random.uniform(low=-.15, high=.15, size=self.model.nq),
             self.init_qvel + self.np_random.randn(self.model.nv) * .15
         )
         return self._get_obs()
