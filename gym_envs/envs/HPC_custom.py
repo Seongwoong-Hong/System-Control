@@ -9,8 +9,8 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self, n_steps=None, bsp=None, pltqs=None):
         self.traj_len = 0
         self.n_steps = n_steps
-        self.pltqs = pltqs
-        self.pltq = None
+        self._pltqs = pltqs
+        self._pltq = None
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml"), 5)
         utils.EzPickle.__init__(self)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
@@ -21,7 +21,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
             self.bsp = bsp
         self.traj_len = 0
 
-    def step(self, action):
+    def step(self, action: np.ndarray):
         self.do_simulation(action + self.plt_torque, self.frame_skip)
         ob = self._get_obs()
         r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-6 * action @ np.eye(2, 2) @ action.T)
@@ -59,11 +59,22 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         else:
             return np.array([0, 0])
 
-    def _set_pltqs(self):
-        if self.pltqs is not None:
-            self.pltq = random.sample(self.pltqs, 1)[0] / self.model.actuator_gear[0, 0]
+    @property
+    def pltq(self):
+        return self._pltq
+
+    @pltq.setter
+    def pltq(self, ext_pltq):
+        if len(ext_pltq) == self.n_steps:
+            self._pltq = ext_pltq
         else:
-            self.pltq = None
+            raise TypeError("Input pltq length is wrong")
+
+    def _set_pltqs(self):
+        if self._pltqs is not None:
+            self._pltq = random.sample(self._pltqs, 1)[0] / self.model.actuator_gear[0, 0]
+        else:
+            self._pltq = None
 
     def viewer_setup(self):
         v = self.viewer
@@ -75,7 +86,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
 class IDPHumanExp(IDPHuman):
     def __init__(self, n_steps=None, bsp=None, pltqs=None):
         super().__init__(n_steps=n_steps, bsp=bsp)
-        self.pltqs = pltqs
+        self._pltqs = pltqs
         self.order = 0
         self._set_pltqs()
 
@@ -86,7 +97,7 @@ class IDPHumanExp(IDPHuman):
         return self._get_obs()
 
     def _set_pltqs(self):
-        if self.pltqs is not None:
-            self.pltq = self.pltqs[self.order % len(self.pltqs)] / self.model.actuator_gear[0, 0]
+        if self._pltqs is not None:
+            self._pltq = self._pltqs[self.order % len(self._pltqs)] / self.model.actuator_gear[0, 0]
         else:
-            self.pltq = None
+            self._pltq = None
