@@ -38,6 +38,11 @@ register(
 )
 
 register(
-    id='IDP_human-v0',
+    id='HPC_custom-v0',
+    entry_point='gym_envs.envs:IDPHumanExp',
+)
+
+register(
+    id='HPC_custom-v1',
     entry_point='gym_envs.envs:IDPHuman',
 )
