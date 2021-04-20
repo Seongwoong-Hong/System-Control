@@ -39,8 +39,8 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def reset_model(self):
         self.set_state(
-            self.init_qpos + self.np_random.uniform(low=-.15, high=.15, size=self.model.nq),
-            self.init_qvel + self.np_random.randn(self.model.nv) * .15
+            self.init_qpos + self.np_random.uniform(low=-.2, high=.2, size=self.model.nq),
+            self.init_qvel + self.np_random.uniform(low=-.2, high=.2, size=self.model.nv)
         )
         return self._get_obs()
 
@@ -49,3 +49,30 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         v.cam.trackbodyid = 0
         v.cam.distance = self.model.stat.extent * 0.5
         v.cam.lookat[2] = 0.5  # 0.12250000000000005  # v.model.stat.center[2]
+
+
+class IDPCustomExp(IDPCustom):
+    def __init__(self, n_steps=None):
+        super().__init__(n_steps=n_steps)
+        self.init_group = np.array([[[+0.10, +0.10], [+0.05, -0.05]],
+                                    [[+0.15, +0.10], [-0.05, +0.05]],
+                                    [[-0.16, +0.20], [+0.10, -0.10]],
+                                    [[-0.10, +0.06], [+0.05, -0.10]],
+                                    [[+0.05, +0.15], [-0.20, -0.20]],
+                                    [[-0.05, +0.05], [+0.15, +0.15]],
+                                    [[+0.12, +0.05], [-0.10, -0.15]],
+                                    [[-0.08, +0.15], [+0.05, -0.15]],
+                                    [[-0.15, +0.20], [-0.10, +0.05]],
+                                    [[+0.20, +0.01], [+0.09, -0.15]]])
+        self.i = 0
+
+    def reset_model(self):
+        if self.i >= len(self.init_group):
+            self.i = 0
+        q = self.init_group[self.i]
+        self.set_state(
+            q[0].reshape(self.model.nq),
+            q[1].reshape(self.model.nv)
+        )
+        self.i += 1
+        return self._get_obs()
