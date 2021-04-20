@@ -74,8 +74,10 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
 
 class IDPHumanExp(IDPHuman):
     def __init__(self, n_steps=None, bsp=None, pltqs=None):
-        super().__init__(n_steps=n_steps, bsp=bsp, pltqs=pltqs)
+        super().__init__(n_steps=n_steps, bsp=bsp)
+        self.pltqs = pltqs
         self.order = 0
+        self._set_pltqs()
 
     def reset_model(self):
         self.traj_len = 0
