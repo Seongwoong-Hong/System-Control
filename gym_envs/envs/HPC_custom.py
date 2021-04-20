@@ -70,3 +70,21 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         v.cam.trackbodyid = 0
         v.cam.distance = self.model.stat.extent * 0.5
         v.cam.lookat[2] = 0.5  # 0.12250000000000005  # v.model.stat.center[2]
+
+
+class IDPHumanExp(IDPHuman):
+    def __init__(self, n_steps=None, bsp=None, pltqs=None):
+        super().__init__(n_steps=n_steps, bsp=bsp, pltqs=pltqs)
+        self.order = 0
+
+    def reset_model(self):
+        self.traj_len = 0
+        self.order += 1
+        self.set_state(self.init_qpos, self.init_qvel)
+        return self._get_obs()
+
+    def _set_pltqs(self):
+        if self.pltqs is not None:
+            self.pltq = self.pltqs[self.order % len(self.pltqs)] / self.model.actuator_gear[0, 0]
+        else:
+            self.pltq = None
