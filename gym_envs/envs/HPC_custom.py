@@ -7,7 +7,7 @@ from gym.envs.mujoco import mujoco_env
 
 class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self, n_steps=None, bsp=None, pltqs=None):
-        self.__traj_len__ = 0
+        self.__timesteps__ = 0
         self.n_steps = n_steps
         self._pltqs = pltqs
         self._pltq = None
@@ -23,17 +23,17 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def step(self, action: np.ndarray):
         self.do_simulation(action + self.plt_torque, self.frame_skip)
-        self.__traj_len__ += 1
+        self.__timesteps__ += 1
         ob = self._get_obs()
         r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-6 * action @ np.eye(2, 2) @ action.T)
         done = False
         info = {}
         if self.n_steps is None:
             pass
-        elif self.__traj_len__ + 1 == self.n_steps:
+        elif self.__timesteps__ + 1 == self.n_steps:
             done = True
             info = {"terminal observation": ob}
-            self.__traj_len__ = 0
+            self.__timesteps__ = 0
             self._order += 1
         return ob, r, done, info
 
@@ -45,7 +45,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         ]).ravel()
 
     def reset_model(self):
-        self.__traj_len__ = 0
+        self.__timesteps__ = 0
         self.set_state(self.init_qpos, self.init_qvel)
         return self._get_obs()
 
@@ -58,13 +58,13 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         return self._order % len(self._pltqs)
 
     @property
-    def traj_len(self):
-        return self.__traj_len__
+    def timesteps(self):
+        return self.__timesteps__
 
     @property
     def plt_torque(self):
         if self.pltq is not None:
-            return self.pltq[self.__traj_len__, :].reshape(-1)
+            return self.pltq[self.__timesteps__, :].reshape(-1)
         else:
             return np.array([0, 0])
 
@@ -80,7 +80,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
             raise TypeError("Input pltq length is wrong")
 
     def _set_pltqs(self):
-        self.__traj_len__ = 0
+        self.__timesteps__ = 0
         if self._pltqs is not None:
             self._pltq = random.sample(self._pltqs, 1)[0] / self.model.actuator_gear[0, 0]
         else:
