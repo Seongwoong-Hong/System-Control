@@ -6,7 +6,7 @@ from gym.envs.mujoco import mujoco_env
 
 class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self, n_steps=None):
-        self.traj_len = 0
+        self.__timesteps__ = 0
         self.n_steps = n_steps
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 8)
         utils.EzPickle.__init__(self)
@@ -22,14 +22,18 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         info = {}
         if self.n_steps is None:
             pass
-        elif self.traj_len == self.n_steps:
+        elif self.__timesteps__ == self.n_steps:
             done = True
             info = {"terminal observation": ob}
-            self.traj_len = 0
+            self.__timesteps__ = 0
         if abs(ob[0]) > 2 or abs(ob[1]) > 3:
             done = True
-        self.traj_len += 1
+        self.__timesteps__ += 1
         return ob, r, done, info
+
+    @property
+    def timesteps(self):
+        return self.__timesteps__
 
     def _get_obs(self):
         return np.concatenate([
@@ -67,9 +71,7 @@ class IDPCustomExp(IDPCustom):
         self.i = 0
 
     def reset_model(self):
-        if self.i >= len(self.init_group):
-            self.i = 0
-        q = self.init_group[self.i]
+        q = self.init_group[self.i % len(self.init_group)]
         self.set_state(
             q[0].reshape(self.model.nq),
             q[1].reshape(self.model.nv)
