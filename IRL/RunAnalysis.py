@@ -27,23 +27,24 @@ if __name__ == "__main__":
 
     num_list, rew_list = [], []
     num = 0
-    while os.path.isdir(ana_dir + "/{}".format(num)):
+    while os.path.isfile(ana_dir + "/{}/model/gen.zip".format(num)):
         pltqs = []
         if env_type == "HPC":
             for i in [0, 5, 10, 15, 20, 25, 30]:
                 file = os.path.join(current_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
                 pltqs += [io.loadmat(file)['pltq']]
-            env = gym_envs.make(env_id, n_steps=None, pltqs=pltqs)
+            env = gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs)
         else:
-            env = gym_envs.make(env_id, n_steps=None)
+            env = gym_envs.make(env_id, n_steps=n_steps)
         policy = PPO.load(ana_dir + "/{}/model/gen.zip".format(num))
         rew = 0
         for _ in range(7):
             obs = env.reset()
-            for _ in range(600):
+            done = False
+            while not done:
                 act, _ = policy.predict(obs, deterministic=True)
                 rew += obs[:4] @ Q @ obs[:4] + act @ R @ act
-                obs, _, _, _ = env.step(act)
+                obs, _, done, _ = env.step(act)
         rew_list.append(7 / rew)
         num_list.append(num)
         num += 1
