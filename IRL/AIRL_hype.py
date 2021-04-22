@@ -4,7 +4,6 @@ import pickle
 import pathlib
 import gym_envs
 import datetime
-import time
 import random
 import numpy as np
 
@@ -14,38 +13,40 @@ from imitation.data import rollout
 from imitation.util import logger
 
 from algo.torch.ppo import PPO, MlpPolicy
-from common.callbacks import VideoCallback
-from mujoco_py import GlfwContext
 from scipy import io
 
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "HPC"
     algo_type = "ppo"
-    env_id = "{}_custom-v0".format(env_type)
+    env_id = "{}_custom-v1".format(env_type)
     n_steps = 600
     device = "cpu"
     current_path = os.path.dirname(__file__)
-    GlfwContext(offscreen=True)
     sub = "sub01"
-    expert_dir = os.path.join(current_path, "demos", env_type, "expert" + ".pkl")
+    # expert_dir = os.path.join(current_path, "demos", env_type, sub + ".pkl")
+    expert_dir = os.path.join(current_path, "demos", env_type, "lqrDivTest.pkl")
     pltqs = []
 
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
 
+    for i in range(35):
+        file = os.path.join(current_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
+        pltqs += [io.loadmat(file)['pltq']]
+
+    env = DummyVecEnv([lambda: gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs) for _ in range(10)])
+
     transitions = rollout.flatten_trajectories(expert_trajs)
     for i in range(200):
-        gamma = np.random.choice(np.linspace(0.95, 0.995, num=10))
-        gae_lambda = np.random.choice(np.linspace(0.94, 0.96, num=5))
+        b_size = random.sample([8, 16, 32], 1)[0]
+        n_epochs = random.sample([2, 4, 6, 10], 1)[0]
         entropy_weight = np.random.choice(np.linspace(0.1, 0.5, num=5))
         lr = np.log10(np.random.choice(np.logspace(3e-5, 1e-2, num=6)))
 
-        env = DummyVecEnv([lambda: gym_envs.make(env_id, n_steps=n_steps) for _ in range(10)])
-
         now = datetime.datetime.now()
         current_path = os.path.dirname(__file__)
-        log_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, "AIRL_hype_tune2")
+        log_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, "AIRL_div_test")
         if not os.path.isdir(log_dir):
             os.mkdir(log_dir)
         name = "/" + str(i)
@@ -59,11 +60,11 @@ if __name__ == "__main__":
             os.mkdir(model_dir)
         # Copy used file to logging folder
         shutil.copy(os.path.abspath(__file__), model_dir)
-        f = open(model_dir+"/hyper_parameters.txt", 'w')
-        f.write("gamma: {}\n".format(gamma))
-        f.write("gae_lambda: {}\n".format(gae_lambda))
+        f = open(model_dir + "/hyper_parameters.txt", 'w')
+        f.write("expert_batch_size: {}\n".format(b_size))
+        f.write("n_epochs: {}\n".format(n_epochs))
         f.write("entropy_weight: {}\n".format(entropy_weight))
-        f.write("lr: {}".format(lr))
+        f.write("lr: {}\n".format(lr))
         f.close()
         logger.configure(log_dir, format_strs=["stdout", "log", "csv", "tensorboard"])
 
@@ -71,10 +72,10 @@ if __name__ == "__main__":
                    env=env,
                    n_steps=1200,
                    batch_size=200,
-                   gamma=gamma,
-                   gae_lambda=gae_lambda,
+                   gamma=0.975,
+                   gae_lambda=0.95,
                    ent_coef=0.0,
-                   n_epochs=4,
+                   n_epochs=n_epochs,
                    ent_schedule=1.0,
                    clip_range=0.2,
                    verbose=1,
@@ -87,12 +88,12 @@ if __name__ == "__main__":
         airl_trainer = adversarial.AIRL(
             env,
             expert_data=transitions,
-            expert_batch_size=8,
+            expert_batch_size=b_size,
             gen_algo=algo,
             discrim_kwargs={"entropy_weight": entropy_weight},
             disc_opt_kwargs={"lr": lr}
         )
-        airl_trainer.train(total_timesteps=6000000)
+        airl_trainer.train(total_timesteps=3000000)
 
         disc_path = model_dir + "/discrim.pkl"
         p = pathlib.Path(disc_path)
