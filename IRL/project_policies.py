@@ -2,6 +2,7 @@ from algo.torch.OptCont import LQRPolicy
 from algo.torch.ppo import PPO
 from algo.torch.sac import SAC
 import numpy as np
+import torch as th
 
 
 class IPPolicy(LQRPolicy):
@@ -16,12 +17,14 @@ class IPPolicy(LQRPolicy):
 
 class IDPPolicy(LQRPolicy):
     def _build_env(self):
-        m1, m2, h1, h2, I1, I2, g = 5.0, 5.0, 0.5, 0.5, 1.667, 1.667, 9.81
-        # m1, m2, h1, h2, I1, I2, g = 22.0892, 46.5108, 0.50982, 0.30624, 7.937, 11.996, 9.81
+        _, m1, m2 = self.env.model.body_mass
+        _, h1, h2 = self.env.model.body_ipos[:, 2]
+        _, I1, I2 = self.env.model.body_inertia[:, 1]
+        g = 9.81
         self.Q = np.array([[1, 0, 0, 0],
                            [0, 1, 0, 0],
-                           [0, 0, 0, 0],
-                           [0, 0, 0, 0]])
+                           [0, 0, 0.1, 0],
+                           [0, 0, 0, 0.1]])
         self.R = 1e-6*np.array([[1, 0],
                                 [0, 1]])
         self.A = np.array([[0, 0, 1, 0],
@@ -35,42 +38,59 @@ class IDPPolicy(LQRPolicy):
         return self.A, self.B, self.Q, self.R
 
 
-class HPCPolicy(LQRPolicy):
-    def _build_env(self):
-        m1, m2, h1, h2, I1, I2, g = 22.0892, 46.5108, 0.50982, 0.30624, 7.937, 11.996, 9.81
-        self.Q = np.array([[0.15, 0, 0, 0],
+class HPCPolicy(IDPPolicy):
+    def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
+        noise = 0
+        if not deterministic:
+            noise = self.noise_lv * np.random.randn(*self.K.shape)
+
+        return -1/self.gear * ((self.K + noise) @ observation[:, :4].T).reshape(1, -1)
+
+
+class HPCDivPolicy(IDPPolicy):
+    def __init__(self, env, noise_lv: float = 0.25,
+                 observation_space=None,
+                 action_space=None,
+                 ):
+        super().__init__(env, noise_lv, observation_space, action_space)
+        self.Q = np.array([[0.5, 0, 0, 0],
                            [0, 1, 0, 0],
-                           [0, 0, 0, 0],
-                           [0, 0, 0, 0]])
-        self.R = 1e-5*np.array([[1, 0],
-                                [0, 1]])
-        self.A = np.array([[0, 0, 1, 0],
-                           [0, 0, 0, 1],
-                           [m1*g*h1/I1, 0, 0, 0],
-                           [0, m2*g*h2/I2, 0, 0]])
-        self.B = np.array([[0, 0], [0, 0],
-                           [1/I1, -1/I1], [0, 1/I2]])
-        return self.A, self.B, self.Q, self.R
+                           [0, 0, 0.05, 0],
+                           [0, 0, 0, 0.05]])
+        self.K2 = self._get_gains()
+
+    def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
+        if self.env.order <= 20:
+            K = self.K
+        else:
+            K = self.K2
+        if not deterministic:
+            K += self.noise_lv * np.random.randn(*K.shape)
+        return -1/self.gear * (K @ observation[:, :4].T).reshape(1, -1)
 
 
-def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, action_space=None, observation_space=None):
+def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0):
     if algo_type == "IP":
         return IPPolicy(env)
     elif algo_type == "IDP":
         return IDPPolicy(env)
     elif algo_type == "HPC":
-        return HPCPolicy(env, action_space=action_space, observation_space=observation_space)
+        return HPCPolicy(env)
+    elif algo_type == "HPCDiv":
+        return HPCDivPolicy(env)
     elif algo_type == "ppo":
         from algo.torch.ppo import MlpPolicy
         return PPO(MlpPolicy,
                    env=env,
-                   n_steps=1024,
-                   batch_size=512,
+                   n_steps=1200,
+                   batch_size=200,
                    gamma=0.975,
                    gae_lambda=0.95,
-                   ent_coef=0.015,
+                   learning_rate=3e-4,
+                   ent_coef=0.0,
+                   n_epochs=2,
                    ent_schedule=1.0,
-                   clip_range=0.175,
+                   clip_range=0.2,
                    verbose=verbose,
                    device=device,
                    tensorboard_log=log_dir,
@@ -83,14 +103,16 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, action_spa
         return SAC(MlpPolicy,
                    env=env,
                    batch_size=256,
-                   learning_starts=256,
-                   train_freq=128,
-                   gamma=0.99,
-                   ent_coef='auto_0.1',
+                   learning_starts=4096,
+                   train_freq=2048,
+                   n_episodes_rollout=-1,
+                   gradient_steps=10,
+                   gamma=0.975,
+                   ent_coef='auto_0.05',
                    verbose=verbose,
                    device=device,
                    tensorboard_log=log_dir,
-                   policy_kwargs={'net_arch': {'pi': [64, 64], 'qf': [64, 64]}},
+                   policy_kwargs={'net_arch': {'pi': [128, 128], 'qf': [128, 128]}},
                    )
     else:
         raise NameError("Not implemented policy name")
