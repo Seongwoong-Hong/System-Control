@@ -1,4 +1,6 @@
 import os
+import gym_envs
+
 from algo.torch.ppo import PPO
 from IRL.project_policies import def_policy
 from common.verification import verify_policy
@@ -16,7 +18,16 @@ def test_hpcdiv_algo(tenv):
         a_list, o_list, _ = verify_policy(tenv, algo)
 
 
-def test_learned_policy(env):
+def test_hpc_learned_policy(env):
+    name = "HPC/ppo/AIRL_div_test/" + "2"
+    model_dir = os.path.join("..", "tmp", "log", name, "model")
+    algo = PPO.load(model_dir + "/gen.zip")
+    for _ in range(10):
+        a_list, o_list, _ = verify_policy(env, algo)
+
+
+def test_idp_learned_policy():
+    env = gym_envs.make("IDP_custom-v0", n_steps=600)
     name = "IDP/ppo/AIRL_hype_tune/" + "111"
     model_dir = os.path.join("..", "tmp", "log", name, "model")
     algo = PPO.load(model_dir + "/gen.zip")
