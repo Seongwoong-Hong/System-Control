@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from algo.torch.ppo import PPO
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "HPC"
     algo_type = "ppo"
     env_id = "{}_custom-v0".format(env_type)
     n_steps = 600
@@ -16,7 +16,16 @@ if __name__ == "__main__":
     current_path = os.path.dirname(__file__)
     sub = "sub01"
     expert_dir = os.path.join(current_path, "demos", env_type, sub + ".pkl")
-    ana_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, "AIRL_hype_tune")
+    ana_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, "AIRL_test1")
+
+    pltqs = []
+    if env_type == "HPC":
+        for i in [0, 5, 10, 15, 20, 25, 30]:
+            file = os.path.join(current_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
+            pltqs += [io.loadmat(file)['pltq']]
+        env = gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs)
+    else:
+        env = gym_envs.make(env_id, n_steps=n_steps)
 
     Q = np.array([[1, 0, 0, 0],
                   [0, 1, 0, 0],
@@ -28,14 +37,6 @@ if __name__ == "__main__":
     num_list, rew_list = [], []
     num = 0
     while os.path.isfile(ana_dir + "/{}/model/gen.zip".format(num)):
-        pltqs = []
-        if env_type == "HPC":
-            for i in [0, 5, 10, 15, 20, 25, 30]:
-                file = os.path.join(current_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
-                pltqs += [io.loadmat(file)['pltq']]
-            env = gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs)
-        else:
-            env = gym_envs.make(env_id, n_steps=n_steps)
         policy = PPO.load(ana_dir + "/{}/model/gen.zip".format(num))
         rew = 0
         for _ in range(7):
