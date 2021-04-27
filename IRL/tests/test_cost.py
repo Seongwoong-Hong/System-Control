@@ -8,7 +8,6 @@ from IRL.project_policies import def_policy
 
 
 def test_draw_costmap():
-    import matplotlib.pyplot as plt
     inputs = [[[0, 1, 2, 3], [3, 4, 5, 6]]]
     fig = CostMap.draw_costmap(inputs)
 
