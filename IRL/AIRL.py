@@ -1,54 +1,35 @@
 import os
 import shutil
 import pickle
-import pathlib
-import gym_envs
 import datetime
-import time
 
-from stable_baselines3.common.vec_env import DummyVecEnv
 from imitation.algorithms import adversarial
 from imitation.data import rollout
 from imitation.util import logger
 
 from IRL.project_policies import def_policy
-from common.callbacks import VideoCallback
-from mujoco_py import GlfwContext
-from scipy import io
-
+from common.util import make_env
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "HPC"
     algo_type = "ppo"
-    env_id = "{}_custom-v0".format(env_type)
-    n_steps = 600
     device = "cpu"
     current_path = os.path.dirname(__file__)
-    GlfwContext(offscreen=True)
-    sub = "sub01"
-    expert_dir = os.path.join(current_path, "demos", env_type, "expert" + ".pkl")
-    pltqs = []
+    env = make_env(f"{env_type}_custom-v1", sub="sub01", n_steps=600)
 
+    # expert_dir = os.path.join(current_path, "demos", env_type, sub + ".pkl")
+    expert_dir = os.path.join(current_path, "demos", env_type, "learnedTest.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
-
     transitions = rollout.flatten_trajectories(expert_trajs)
-
-    # for i in range(35):
-    #     file = os.path.join(current_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
-    #     pltqs += [io.loadmat(file)['pltq']]
-
-    env = DummyVecEnv([lambda: gym_envs.make(env_id, n_steps=n_steps) for _ in range(10)])
 
     algo = def_policy(algo_type, env, device=device, log_dir=None, verbose=1)
 
     now = datetime.datetime.now()
-    current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, "AIRL")
     if not os.path.isdir(log_dir):
         os.mkdir(log_dir)
     name = "/%s-%s-%s-%s-%s-%s" % (now.year, now.month, now.day, now.hour, now.minute, now.second)
-    # name = "/14"
     log_dir += name
     if not os.path.isdir(log_dir):
         os.mkdir(log_dir)
@@ -58,29 +39,23 @@ if __name__ == "__main__":
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
     # Copy used file to logging folder
-    shutil.copy(os.path.abspath(current_path + "/../gym_envs/envs/{}_custom_exp.py".format(env_type)), model_dir)
+    shutil.copy(os.path.abspath(current_path + "/../gym_envs/envs/{}_custom.py".format(env_type)), model_dir)
     shutil.copy(os.path.abspath(__file__), model_dir)
     shutil.copy(os.path.abspath(current_path + "/project_policies.py"), model_dir)
 
     logger.configure(log_dir, format_strs=["stdout", "log", "csv", "tensorboard"])
-
-    video_recorder = VideoCallback(gym_envs.make(env_id, n_steps=n_steps),
-                                   n_eval_episodes=5,
-                                   render_freq=10)
 
     airl_trainer = adversarial.AIRL(
         env,
         expert_data=transitions,
         expert_batch_size=8,
         gen_algo=algo,
-        discrim_kwargs={"entropy_weight": 0.4},
-        disc_opt_kwargs={"lr": 1e-3}
+        discrim_kwargs={"entropy_weight": 0.1},
+        disc_opt_kwargs={"lr": 0.0060120000000000035}
     )
-    airl_trainer.train(total_timesteps=6000000)
+    airl_trainer.train(total_timesteps=2400000)
 
     disc_path = model_dir + "/discrim.pkl"
-    p = pathlib.Path(disc_path)
-    p.parent.mkdir(parents=True, exist_ok=True)
     with open(disc_path + ".tmp", "wb") as f:
         pickle.dump(airl_trainer.discrim, f)
     os.replace(disc_path + ".tmp", disc_path)

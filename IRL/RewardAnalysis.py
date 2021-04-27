@@ -1,31 +1,27 @@
 import os
-import gym_envs
 import numpy as np
 
 from scipy import io
 from matplotlib import pyplot as plt
 
 from algo.torch.ppo import PPO
+from common.util import make_env
 
 if __name__ == "__main__":
     env_type = "HPC"
     algo_type = "ppo"
-    env_id = "{}_custom-v0".format(env_type)
-    n_steps = 600
     device = "cpu"
     current_path = os.path.dirname(__file__)
     sub = "sub01"
-    expert_dir = os.path.join(current_path, "demos", env_type, sub + ".pkl")
-    ana_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, "AIRL_test1")
+    ana_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, "AIRL_test")
 
     pltqs = []
     if env_type == "HPC":
         for i in [0, 5, 10, 15, 20, 25, 30]:
             file = os.path.join(current_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
             pltqs += [io.loadmat(file)['pltq']]
-        env = gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs)
-    else:
-        env = gym_envs.make(env_id, n_steps=n_steps)
+
+    env = make_env(f"{env_type}_custom-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
 
     Q = np.array([[1, 0, 0, 0],
                   [0, 1, 0, 0],
