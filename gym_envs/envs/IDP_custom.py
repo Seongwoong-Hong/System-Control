@@ -6,7 +6,8 @@ from gym.envs.mujoco import mujoco_env
 
 class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self, n_steps=None):
-        self.__timesteps__ = 0
+        self.__timesteps = 0
+        self._order = 0
         self.n_steps = n_steps
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 8)
         utils.EzPickle.__init__(self)
@@ -16,24 +17,27 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def step(self, action):
         self.do_simulation(action, self.frame_skip)
+        self.__timesteps += 1
         ob = self._get_obs()
         r = -0.01 * (ob[0] ** 2 + ob[1] ** 2 + 0.0001 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         done = False
         info = {}
         if self.n_steps is None:
             pass
-        elif self.__timesteps__ == self.n_steps:
+        elif self.__timesteps + 1 == self.n_steps:
             done = True
             info = {"terminal observation": ob}
-            self.__timesteps__ = 0
-        if abs(ob[0]) > 2 or abs(ob[1]) > 3:
-            done = True
-        self.__timesteps__ += 1
+            self.__timesteps = 0
+            self._order += 1
         return ob, r, done, info
 
     @property
+    def order(self):
+        return self._order
+
+    @property
     def timesteps(self):
-        return self.__timesteps__
+        return self.__timesteps
 
     def _get_obs(self):
         return np.concatenate([
@@ -68,13 +72,16 @@ class IDPCustomExp(IDPCustom):
                                     [[-0.08, +0.15], [+0.05, -0.15]],
                                     [[-0.15, +0.20], [-0.10, +0.05]],
                                     [[+0.20, +0.01], [+0.09, -0.15]]])
-        self.i = 0
 
     def reset_model(self):
-        q = self.init_group[self.i % len(self.init_group)]
+        q = self.init_group[self._order % len(self.init_group)]
         self.set_state(
             q[0].reshape(self.model.nq),
             q[1].reshape(self.model.nv)
         )
-        self.i += 1
         return self._get_obs()
+
+    def exp_isend(self):
+        if self._order == len(self.init_group):
+            return True
+        return False
