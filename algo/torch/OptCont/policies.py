@@ -5,7 +5,7 @@ from stable_baselines3.common.policies import BasePolicy
 
 
 class LQRPolicy(BasePolicy):
-    def __init__(self, env, noise_lv: float = 0.25,
+    def __init__(self, env, noise_lv: float = 0.1,
                  observation_space=None,
                  action_space=None,
                  ):
@@ -17,21 +17,22 @@ class LQRPolicy(BasePolicy):
             observation_space,
             action_space)
 
+        self.env = env
         self.noise_lv = noise_lv
         self.gear = env.model.actuator_gear[0, 0]
+        self._build_env()
         self.K = self._get_gains()
 
     def _get_gains(self) -> th.Tensor:
-        A, B, Q, R = self._build_env()
-        X = linalg.solve_continuous_are(A, B, Q, R)
-        if R.shape[0] >= 2:
-            K = (np.linalg.inv(R) @ (B.T @ X))
+        X = linalg.solve_continuous_are(self.A, self.B, self.Q, self.R)
+        if self.R.shape[0] >= 2:
+            K = (np.linalg.inv(self.R) @ (self.B.T @ X))
         else:
-            K = (1/R * (B.T @ X)).reshape(-1)
+            K = (1/self.R * (self.B.T @ X)).reshape(-1)
         return th.from_numpy(K)
 
     def _build_env(self) -> np.array:
-        # returns A, B, Q, R
+        # define self.A, self.B, self.Q, self.R
         # Their types are all numpy array even though they are 1-dim value.
         raise NotImplementedError
 
@@ -39,7 +40,8 @@ class LQRPolicy(BasePolicy):
         return None
 
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
+        noise = 0
         if not deterministic:
-            self.K += self.noise_lv * np.random.randn(*self.K.shape)
+            noise = self.noise_lv * np.random.randn(*self.K.shape)
 
-        return -1/self.gear * (self.K @ observation.T).reshape(1, -1)
+        return -1 / self.gear * ((self.K + noise) @ observation.T).reshape(1, -1)
