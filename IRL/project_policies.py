@@ -25,7 +25,7 @@ class IDPPolicy(LQRPolicy):
                            [0, 1, 0, 0],
                            [0, 0, 0.1, 0],
                            [0, 0, 0, 0.1]])
-        self.R = 1e-6*np.array([[1, 0],
+        self.R = 1e-5*np.array([[1, 0],
                                 [0, 1]])
         self.A = np.array([[0, 0, 1, 0],
                            [0, 0, 0, 1],
@@ -48,7 +48,7 @@ class HPCPolicy(IDPPolicy):
 
 
 class HPCDivPolicy(IDPPolicy):
-    def __init__(self, env, noise_lv: float = 0.25,
+    def __init__(self, env, noise_lv: float = 0.1,
                  observation_space=None,
                  action_space=None,
                  ):
@@ -69,15 +69,15 @@ class HPCDivPolicy(IDPPolicy):
         return -1/self.gear * (K @ observation[:, :4].T).reshape(1, -1)
 
 
-def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0):
+def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
     if algo_type == "IP":
-        return IPPolicy(env)
+        return IPPolicy(env, **kwargs)
     elif algo_type == "IDP":
-        return IDPPolicy(env)
+        return IDPPolicy(env, **kwargs)
     elif algo_type == "HPC":
-        return HPCPolicy(env)
+        return HPCPolicy(env, **kwargs)
     elif algo_type == "HPCDiv":
-        return HPCDivPolicy(env)
+        return HPCDivPolicy(env, **kwargs)
     elif algo_type == "ppo":
         from algo.torch.ppo import MlpPolicy
         return PPO(MlpPolicy,
@@ -95,7 +95,10 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0):
                    device=device,
                    tensorboard_log=log_dir,
                    policy_kwargs={'log_std_range': [-5, 5],
-                                  'net_arch': [{'pi': [128, 128], 'vf': [128, 128]}]},
+                                  'net_arch': [{'pi': [], 'vf': [16, 16]}],
+                                  'activation_fn': th.nn.ReLU,
+                                  },
+                   **kwargs,
                    )
 
     elif algo_type == "sac":
@@ -113,6 +116,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0):
                    device=device,
                    tensorboard_log=log_dir,
                    policy_kwargs={'net_arch': {'pi': [128, 128], 'qf': [128, 128]}},
+                   **kwargs,
                    )
     else:
         raise NameError("Not implemented policy name")
