@@ -23,9 +23,9 @@ def test_cal_cost():
     cost_dir = os.path.join("..", "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model", "discrim.pkl")
     with open(cost_dir, "rb") as f:
         disc = pickle.load(f)
-    cost_fn = disc.reward_net.base_reward_net.double()
+    reward_fn = disc.reward_net.base_reward_net.double()
     orders = [i for i in range(len(expert_trajs))]
-    agent = {'transitions': transitions, 'cost_fn': cost_fn, 'orders': orders}
+    agent = {'transitions': transitions, 'cost_fn': reward_fn, 'orders': orders}
     inputs = CostMap.cal_cost([agent])
     CostMap.draw_costmap(inputs)
 
@@ -43,10 +43,10 @@ def test_process_agent(tenv):
 
 
 def test_costmap(tenv):
-    cost_dir = os.path.join("..", "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model")
-    with open(cost_dir + "/discrim.pkl", "rb") as f:
-        disc = pickle.load(f)
-    cost_fn = disc.reward_net.base_reward_net.double()
-    agent = PPO.load(cost_dir + "/gen.zip")
-    expt = def_policy("HPC", tenv)
-    cost_map = CostMap(tenv, cost_fn, agent, expt)
+    reward_dir = os.path.join("..", "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model")
+    with open(reward_dir + "/discrim.pkl", "rb") as f:
+        disc = pickle.load(f).double()
+    reward_fn = disc.reward_net.base_reward_net
+    agent = PPO.load(reward_dir + "/gen.zip")
+    # expt = def_policy("HPC", tenv)
+    cost_map = CostMap(reward_fn, tenv, agent)

@@ -28,7 +28,14 @@ def test_hpc_learned_policy(env):
 
 def test_idp_learned_policy():
     env = gym_envs.make("IDP_custom-v0", n_steps=600)
-    name = "IDP/ppo/AIRL_hype_tune/" + "104"
+    # name = "IDP/ppo/AIRL_test/" + "1"
+    name = "IDP/ppo/AIRL/2021-4-29-23-5-4"
     model_dir = os.path.join("..", "tmp", "log", name, "model")
     algo = PPO.load(model_dir + "/gen.zip")
     a_list, o_list, _ = verify_policy(env, algo)
+
+
+def test_idp_policy():
+    env = gym_envs.make("IDP_custom-v0", n_steps=600)
+    algo = def_policy("IDP", env)
+    _, _, _ = verify_policy(env, algo)

@@ -40,4 +40,6 @@ def test_draw_scatter():
         array = np.array(value)
         ax.set_title(key)
         ax.scatter(array[:, 0], array[:, 1])
+        ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+        ax.grid()
         plt.show()

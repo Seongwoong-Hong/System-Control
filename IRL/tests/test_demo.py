@@ -37,5 +37,5 @@ def test_hpcdiv(env):
 def test_idp():
     import gym_envs
     env = gym_envs.make("IDP_custom-v1", n_steps=600)
-    expert_dir = os.path.join("..", "demos", "IDP", "expert.pkl")
+    expert_dir = os.path.join("..", "demos", "IDP", "SingleTest.pkl")
     run_traj(env, expert_dir)
