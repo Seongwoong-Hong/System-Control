@@ -79,3 +79,16 @@ def remove_analyzed_result(ana_dir, entire=True, folder_num=None):
         if p.isfile(file):
             os.remove(file)
             print(f"The result file in the folder #{folder_num} is removed successfully")
+
+
+def create_path(dirname=None, filename=None):
+    assert dirname is not None or filename is not None, "Please enter directory or file name"
+    assert dirname is None or filename is None, "One of input file name or directory is none"
+    if filename is not None:
+        dirname = os.path.abspath(os.path.join(filename, os.pardir))
+    paths = []
+    while not os.path.isdir(dirname):
+        paths.append(dirname)
+        dirname = os.path.abspath(os.path.join(dirname, os.pardir))
+    for path in reversed(paths):
+        os.mkdir(path)
