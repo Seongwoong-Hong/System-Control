@@ -1,5 +1,6 @@
 import os
 import os.path as p
+import gym
 import gym_envs
 
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -30,7 +31,10 @@ def make_env(env_name, use_vec_env=True, num_envs=10, sub=None, **kwargs):
         else:
             env = gym_envs.make(env_name, **kwargs)
     else:
-        raise NameError('Unknown environment type')
+        if use_vec_env:
+            env = DummyVecEnv([lambda: gym.make(env_name, **kwargs) for _ in range(num_envs)])
+        else:
+            env = gym.make(env_name, **kwargs)
     return env
 
 
@@ -50,6 +54,8 @@ def write_analyzed_result(ana_fn,
         f = open(filename + ".tmp", "w")
         for key, value in ana_dict.items():
             f.write(f"{key}: {value}\n")
+            if verbose == 1:
+                print(f"{key}: {value}")
         f.close()
         os.replace(filename + ".tmp", filename)
         if verbose == 1:
