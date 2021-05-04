@@ -1,44 +1,38 @@
 import gym_envs
 import os
-import torch
 
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common import callbacks
+from imitation.policies import serialize
 
 from IRL.project_policies import def_policy
-from common.callbacks import VFCustomCallback
+from common.callbacks import VideoCallback
+from common.util import make_env, create_path
 from mujoco_py import GlfwContext
-from common.wrappers import CostWrapper
-from scipy import io
 
 
 if __name__ == "__main__":
-    env_type = "HPC"
+    env_type = "IDP"
     algo_type = "ppo"
-    name = "{}/{}/2021-2-9-16-19-31".format(env_type, algo_type)
-    num = 2
-
-    model_dir = os.path.join("tmp", "log", name, "model")
-    # costfn = torch.load(model_dir + "/costfn{}.pt".format(num))
-    env_id = "{}_custom-v0".format(env_type)
+    name = f"{env_type}/{algo_type}"
+    env_id = f"{env_type}_custom-v1"
     n_steps = 600
+    env = make_env(env_id, num_envs=8, n_steps=600, sub="sub01")
     device = "cpu"
     current_path = os.path.dirname(__file__)
-    log_dir = os.path.join(current_path, "tmp", "log", name)
-    if not os.path.isdir(log_dir):
-        os.mkdir(log_dir)
+    log_dir = os.path.join(current_path, "tmp", "log", name, "lqrppo")
+    model_dir = os.path.join(log_dir, "model")
+    create_path(model_dir)
     GlfwContext(offscreen=True)
-    sub = "sub01"
-    expert_dir = os.path.join(current_path, "demos", env_type, sub + ".pkl")
-    pltqs = []
-    for i in range(35):
-        file = os.path.join(current_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
-        pltqs += [io.loadmat(file)['pltq']]
-    # env = DummyVecEnv([lambda: gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs)])
-    env = SubprocVecEnv([lambda: gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs) for i in range(10)])
     algo = def_policy(algo_type, env, device=device, log_dir=log_dir)
-    # video_recorder = VFCustomCallback(gym_envs.make(env_id, n_steps=n_steps),
-    #                                   n_eval_episodes=5,
-    #                                   render_freq=1024000,
-    #                                   costfn=costfn)
-    algo.learn(total_timesteps=7168000, tb_log_name="extra")
-    algo.save(model_dir+"/extra_ppo")
+    video_recorder = VideoCallback(gym_envs.make(env_id, n_steps=n_steps),
+                                   n_eval_episodes=5,
+                                   render_freq=62500)
+    save_policy_callback = serialize.SavePolicyCallback(log_dir, None)
+    save_policy_callback = callbacks.EveryNTimesteps(125000, save_policy_callback)
+    callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
+    algo.learn(total_timesteps=5e6, tb_log_name="extra", callback=callback_list)
+    n = 0
+    while os.path.isfile(model_dir+f"/extra_{algo_type}{n}.zip"):
+        n += 1
+    algo.save(model_dir+f"/extra_{algo_type}{n}")
+    print(f"saved as extra_{algo_type}{n}")
