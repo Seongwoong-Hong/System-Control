@@ -14,7 +14,8 @@ if __name__ == "__main__":
     device = "cpu"
     current_path = os.path.dirname(__file__)
     sub = "sub01"
-    ana_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, "AIRL_Single_test")
+    name = "AIRL_easy"
+    ana_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, name)
 
     pltqs = []
     test_len = 5
@@ -24,18 +25,10 @@ if __name__ == "__main__":
             pltqs += [io.loadmat(file)['pltq']]
         test_len = len(pltqs)
 
-    env = make_env(f"{env_type}_custom-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
-
-    num_list, rew_list = [], []
-    num = 0
-    result_dict = {}
-
-    Q = np.array([[1, 0, 0, 0],
-                  [0, 1, 0, 0],
-                  [0, 0, 0, 0],
-                  [0, 0, 0, 0]])
-    R = 1e-6 * np.array([[1, 0],
-                         [0, 1]])
+    env = make_env(f"{env_type}_custom-v2", use_vec_env=False, n_steps=600, pltqs=pltqs)
+    expt_policy = PPO.load(f"tmp/log/{env_type}/{algo_type}/forward/model/extra_ppo0.zip")
+    # expt_policy = PPO.load(f"../RL/mujoco_envs/tmp/log/{name}/{algo_type}/ppo0.zip")
+    # env = make_env(f"{name}-v2", use_vec_env=False)
 
     def ana_fnc():
         param = 0
@@ -44,9 +37,13 @@ if __name__ == "__main__":
             done = False
             while not done:
                 act, _ = policy.predict(obs, deterministic=True)
-                param += obs[:4] @ Q @ obs[:4] + act @ R @ act
-                obs, _, done, _ = env.step(act)
-        return {'cost': param}
+                obs, r, done, _ = env.step(act)
+                param += r
+        return {'cost': -param}
+
+    num_list, rew_list = [], []
+    num = 0
+    result_dict = {}
 
     while os.path.isfile(ana_dir + f"/{num}/model/gen.zip"):
         policy = PPO.load(ana_dir + f"/{num}/model/gen.zip")
@@ -69,11 +66,15 @@ if __name__ == "__main__":
                 result_dict[param_name].append([param_value, rew])
             else:
                 result_dict[param_name] = [[param_value, rew]]
+    policy = expt_policy
+    expt_cost = ana_fnc()
+    print(test_len / expt_cost['cost'])
     env.close()
     for key, value in result_dict.items():
         fig = plt.figure()
         ax = fig.subplots()
         array = np.array(value)
+        print(np.argmax(array[:, 1]))
         ax.set_title(key)
         ax.scatter(array[:, 0], array[:, 1])
         ax.yaxis.set_major_locator(plt.MaxNLocator(7))
