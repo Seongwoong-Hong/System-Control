@@ -34,7 +34,7 @@ class GCLCostNet(nn.Module):
         :param decay_coeff: The coefficient for preventing parameter decaying loss
         :param verbose: The verbosity level. 0: no outputs, 1: info
         """
-        super(CostNet, self).__init__()
+        super(GCLCostNet, self).__init__()
         self.device = device
         self.optimizer_class = optimizer_class
         self.act_fnc = act_fcn
