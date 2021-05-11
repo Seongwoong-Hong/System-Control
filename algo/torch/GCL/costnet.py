@@ -8,7 +8,7 @@ from torch import nn
 from stable_baselines3.common.logger import Logger, HumanOutputFormat
 
 
-class CostNet(nn.Module):
+class GCLCostNet(nn.Module):
     def __init__(self,
                  arch: List[int],
                  device: str,
@@ -95,16 +95,16 @@ class CostNet(nn.Module):
             # Calculate learned cost loss and mono Regularization term
             for E_trans in sampleE:
                 costs = self.forward(E_trans[:, :-1])
-                monoLoss += torch.sum(torch.max(torch.zeros(*costs.shape[:-1], device=self.device),
+                monoLoss += torch.sum(torch.max(torch.zeros(*costs[:-1].shape, device=self.device),
                                                 costs[1:] - costs[:-1] - 1) ** 2)
-                IOCLoss1 += costs
-            IOCLoss1 = torch.mean(IOCLoss1)
+                IOCLoss1 += 10 * torch.sum(costs)
+            IOCLoss1 /= len(sampleE)
 
             # Calculate Max Ent. Loss and lcr Regularization term
-            x = torch.zeros(len(sampleE+sampleL)).double().to(self.device)
+            x = torch.zeros(len(sampleE + sampleL)).double().to(self.device)
             for j, trans_j in enumerate(sampleE + sampleL):
                 costs = self.forward(trans_j[:, :-1])
-                x[j] = -torch.sum(costs + trans_j[:, -1])
+                x[j] = -torch.sum(costs) - torch.sum(trans_j[:, -1])
                 lcrLoss += torch.sum((costs[2:] - 2*costs[1:-1] + costs[:-2]) ** 2)
             IOCLoss2 = torch.logsumexp(x, 0)
 
