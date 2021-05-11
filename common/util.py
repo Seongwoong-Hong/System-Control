@@ -8,7 +8,7 @@ from scipy import io
 
 
 def make_env(env_name, use_vec_env=True, num_envs=10, sub=None, **kwargs):
-    env_type = env_name[:3]
+    env_type = env_name[env_name.find("_custom")]
     if env_type == "HPC":
         if sub is not None:
             pltqs = []
@@ -24,13 +24,15 @@ def make_env(env_name, use_vec_env=True, num_envs=10, sub=None, **kwargs):
             env = DummyVecEnv([lambda: gym_envs.make(env_name, **kwargs) for _ in range(num_envs)])
         else:
             env = gym_envs.make(env_name, **kwargs)
-    elif env_type == "IDP":
+    elif env_type == "IDP" or env_type == "IP":
         kwargs.pop('pltqs', None)
         if use_vec_env:
             env = DummyVecEnv([lambda: gym_envs.make(env_name, **kwargs) for _ in range(num_envs)])
         else:
             env = gym_envs.make(env_name, **kwargs)
     else:
+        kwargs.pop('pltqs', None)
+        kwargs.pop('n_steps', None)
         if use_vec_env:
             env = DummyVecEnv([lambda: gym.make(env_name, **kwargs) for _ in range(num_envs)])
         else:
