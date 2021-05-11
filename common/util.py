@@ -8,7 +8,7 @@ from scipy import io
 
 
 def make_env(env_name, use_vec_env=True, num_envs=10, sub=None, **kwargs):
-    env_type = env_name[env_name.find("_custom")]
+    env_type = env_name[:env_name.find("_custom")]
     if env_type == "HPC":
         if sub is not None:
             pltqs = []
