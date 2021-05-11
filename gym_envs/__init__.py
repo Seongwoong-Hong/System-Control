@@ -23,7 +23,8 @@ register(
 
 register(
     id='IP_custom-v2',
-    entry_point='gym_envs.envs:IPCustom_EX'
+    entry_point='gym_envs.envs:IPCustom',
+    max_episode_steps=600,
 )
 
 
@@ -35,6 +36,12 @@ register(
 register(
     id='IDP_custom-v1',
     entry_point='gym_envs.envs:IDPCustom',
+)
+
+register(
+    id='IDP_custom-v2',
+    entry_point='gym_envs.envs:IDPCustomEasy',
+    max_episode_steps=600,
 )
 
 register(
