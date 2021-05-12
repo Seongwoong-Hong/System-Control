@@ -3,11 +3,10 @@ import os
 import pickle
 import torch
 from imitation.data import rollout
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocVecEnv
+from stable_baselines3.common.vec_env import SubprocVecEnv
 
-from algo.torch.ppo import PPO
-from IRL.project_policies import def_policy
-from common.modules import CostNet
+from IRL.scripts.project_policies import def_policy
+from algo.torch.GCL.modules import CostNet
 from common.rollouts import get_trajectories_probs
 from common.wrappers import CostWrapper
 from scipy import io

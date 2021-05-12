@@ -2,9 +2,7 @@ import os
 import pickle
 
 from common.verification import CostMap
-from stable_baselines3.common.vec_env import DummyVecEnv
 from algo.torch.ppo import PPO
-from IRL.project_policies import def_policy
 
 
 def test_draw_costmap():
@@ -36,7 +34,7 @@ def test_process_agent(tenv):
         disc = pickle.load(f)
     cost_fn = disc.reward_net.base_reward_net.double()
     algo = PPO.load(cost_dir + "/gen.zip")
-    agent = {"algo": algo, "env": DummyVecEnv([lambda: tenv]), "cost_fn": cost_fn}
+    agent = {"algo": algo, "env": tenv, "cost_fn": cost_fn}
     agents = CostMap.process_agent(agent)
     inputs = CostMap.cal_cost(agents)
     CostMap.draw_costmap(inputs)

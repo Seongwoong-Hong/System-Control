@@ -1,11 +1,10 @@
 import gym_envs
-import numpy as np
 import os
 import pickle
 import time
 from imitation.data.rollout import flatten_trajectories
 
-from IRL.project_policies import def_policy
+from IRL.scripts.project_policies import def_policy
 
 env_type = "HPC"
 env = gym_envs.make("{}_custom-v0".format(env_type), n_steps=600)

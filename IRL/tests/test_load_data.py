@@ -1,6 +1,6 @@
 import gym_envs
 import torch
-from common.modules import CostNet
+from algo.torch.GCL.modules import CostNet
 from common.wrappers import CostWrapper
 from common.rollouts import generate_trajectories_from_data
 from stable_baselines3.common.vec_env import DummyVecEnv

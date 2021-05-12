@@ -1,40 +1,18 @@
 import gym_envs
 import os
-from mujoco_py import GlfwContext
-from stable_baselines3.common.vec_env import DummyVecEnv
 
 from algo.torch.ppo import PPO, MlpPolicy
-from common.callbacks import VFCustomCallback
-from common.modules import CostNet
-from common.wrappers import CostWrapper
 
-if __name__ == "__main__":
-    n_steps, n_episodes = 40, 10
-    env_id = "IP_custom-v1"
-    log_dir = os.path.join("..", "tmp", "log")
-    env = gym_envs.make(env_id, n_steps=n_steps)
-    num_obs = env.observation_space.shape[0]
-    num_act = env.action_space.shape[0]
-    # name = "2021-1-22-15-20-34"
-    # model_dir = os.path.join("..", "tmp", "log", name, "model")
-    # algo = PPO.load(model_dir + "/ppo50.zip")
-    costfn = CostNet(arch=[num_obs], device='cpu', num_act=num_act).double().to('cpu')
-    env = DummyVecEnv([lambda: CostWrapper(env, costfn)])
-    algo = PPO(MlpPolicy,
-               env=env,
-               verbose=1,
-               device='cpu',
-               tensorboard_log=log_dir)
+from imitation.policies import serialize
+from stable_baselines3.common import callbacks
 
-    GlfwContext(offscreen=True)
 
-    video_recorder = VFCustomCallback(log_dir+"/video/bar",
-                                      gym_envs.make(env_id, n_steps=n_steps),
-                                      n_eval_episodes=5,
-                                      render_freq=4096,
-                                      costfn=costfn)
-    for _ in range(2):
-        # video_recorder._set_costfn(costfn=costfn)
-        env = DummyVecEnv([lambda: gym_envs.make(env_id, n_steps=n_steps)])
-        algo.set_env(env)
-        algo.learn(total_timesteps=4096, callback=video_recorder, tb_log_name="test_callback")
+def test_save_policies():
+    env = gym_envs.make("IDP_custom-v2")
+    policy_dir = os.path.join("..", "tmp", "log", "ppo", "IDP", "AIRL", "tests")
+    algo = PPO(MlpPolicy, env=env, tensorboard_log=policy_dir, verbose=1)
+    save_policy_callback = serialize.SavePolicyCallback(policy_dir, None)
+    save_policy_callback = callbacks.EveryNTimesteps(
+        2500, save_policy_callback
+    )
+    algo.learn(total_timesteps=int(5000), tb_log_name="extra", callback=save_policy_callback)

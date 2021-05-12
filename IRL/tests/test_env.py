@@ -1,4 +1,4 @@
-from IRL.project_policies import def_policy
+from IRL.scripts.project_policies import def_policy
 from common.verification import verify_policy
 
 

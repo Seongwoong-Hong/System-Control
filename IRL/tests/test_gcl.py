@@ -7,8 +7,8 @@ from imitation.data import rollout
 from mujoco_py import GlfwContext
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from IRL.project_policies import def_policy
-from common.modules import CostNet
+from IRL.scripts.project_policies import def_policy
+from algo.torch.GCL.modules import CostNet
 from common.rollouts import get_trajectories_probs
 from common.wrappers import CostWrapper
 

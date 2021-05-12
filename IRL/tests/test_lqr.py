@@ -2,15 +2,12 @@ import gym_envs
 import gym
 import os
 import time
-import torch
 
 import numpy as np
 from copy import deepcopy
 from matplotlib import pyplot as plt
 
-from IRL.project_policies import def_policy
-from algo.torch.ppo import PPO
-from common.wrappers import CostWrapper
+from IRL.scripts.project_policies import def_policy
 from scipy import io
 
 
