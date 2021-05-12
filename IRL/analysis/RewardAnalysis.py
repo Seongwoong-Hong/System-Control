@@ -9,13 +9,13 @@ from algo.torch.ppo import PPO
 from common.util import make_env, write_analyzed_result
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "IP"
     algo_type = "ppo"
     device = "cpu"
     current_path = os.path.dirname(__file__)
     sub = "sub01"
-    name = "AIRL_easy"
-    ana_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, name)
+    name = "IP_custom"
+    ana_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, name+"2")
 
     pltqs = []
     test_len = 5
@@ -25,10 +25,9 @@ if __name__ == "__main__":
             pltqs += [io.loadmat(file)['pltq']]
         test_len = len(pltqs)
 
-    env = make_env(f"{env_type}_custom-v2", use_vec_env=False, n_steps=600, pltqs=pltqs)
-    expt_policy = PPO.load(f"tmp/log/{env_type}/{algo_type}/forward/model/extra_ppo0.zip")
-    # expt_policy = PPO.load(f"../RL/mujoco_envs/tmp/log/{name}/{algo_type}/ppo0.zip")
-    # env = make_env(f"{name}-v2", use_vec_env=False)
+    env = make_env(f"{name}-v2", use_vec_env=False, n_steps=600, pltqs=pltqs)
+    # expt_policy = PPO.load(f"tmp/log/{env_type}/{algo_type}/forward/model/extra_ppo0.zip")
+    expt_policy = PPO.load(f"../RL/{env_type}/tmp/log/{name}/{algo_type}/policies_2/model.pkl")
 
     def ana_fnc():
         param = 0
@@ -39,7 +38,7 @@ if __name__ == "__main__":
                 act, _ = policy.predict(obs, deterministic=True)
                 obs, r, done, _ = env.step(act)
                 param += r
-        return {'cost': -param}
+        return {'cost': -param / test_len}
 
     num_list, rew_list = [], []
     num = 0
@@ -55,7 +54,7 @@ if __name__ == "__main__":
             if "cost" in line:
                 cost = float(line[line.find(":") + 1:-1])
         assert cost is not None, "Can't find the cost value"
-        rew = test_len / cost
+        rew = -cost
         rew_list.append(rew)
         num_list.append(num)
         num += 1
@@ -68,13 +67,12 @@ if __name__ == "__main__":
                 result_dict[param_name] = [[param_value, rew]]
     policy = expt_policy
     expt_cost = ana_fnc()
-    print(test_len / expt_cost['cost'])
+    print(f"The reward of the expert is {-expt_cost['cost']}")
     env.close()
     for key, value in result_dict.items():
         fig = plt.figure()
         ax = fig.subplots()
         array = np.array(value)
-        print(np.argmax(array[:, 1]))
         ax.set_title(key)
         ax.scatter(array[:, 0], array[:, 1])
         ax.yaxis.set_major_locator(plt.MaxNLocator(7))
@@ -82,3 +80,4 @@ if __name__ == "__main__":
         ax.xaxis.set_major_formatter(FormatStrFormatter('%.2e'))
         ax.grid()
         plt.show()
+    print(f"The best agent is {np.argmax(array[:, 1])} with a reward value {np.max(array[:, 1])}")

@@ -1,7 +1,6 @@
 import os
 import pickle
 from algo.torch.ppo import PPO
-from IRL.project_policies import def_policy
 from common.util import make_env
 from common.verification import CostMap
 

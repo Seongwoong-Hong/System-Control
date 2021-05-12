@@ -4,7 +4,7 @@ import os
 from stable_baselines3.common import callbacks
 from imitation.policies import serialize
 
-from IRL.project_policies import def_policy
+from IRL.scripts.project_policies import def_policy
 from common.callbacks import VideoCallback
 from common.util import make_env, create_path
 from mujoco_py import GlfwContext
@@ -18,21 +18,22 @@ if __name__ == "__main__":
     n_steps = 600
     env = make_env(env_id, num_envs=8, n_steps=600, sub="sub01")
     device = "cpu"
-    current_path = os.path.dirname(__file__)
-    log_dir = os.path.join(current_path, "tmp", "log", name, "lqrppo")
+    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    log_dir = os.path.join(proj_path, "tmp", "log", name, "lqrppo")
     model_dir = os.path.join(log_dir, "model")
     create_path(model_dir)
     GlfwContext(offscreen=True)
     algo = def_policy(algo_type, env, device=device, log_dir=log_dir)
+    n = 1
+    while os.path.isdir(log_dir + f"/extra_{n}"):
+        n += 1
+    create_path(log_dir + f"/policies_{n}")
     video_recorder = VideoCallback(gym_envs.make(env_id, n_steps=n_steps),
                                    n_eval_episodes=5,
                                    render_freq=62500)
-    save_policy_callback = serialize.SavePolicyCallback(log_dir, None)
+    save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
     save_policy_callback = callbacks.EveryNTimesteps(125000, save_policy_callback)
     callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
     algo.learn(total_timesteps=5e6, tb_log_name="extra", callback=callback_list)
-    n = 0
-    while os.path.isfile(model_dir+f"/extra_{algo_type}{n}.zip"):
-        n += 1
-    algo.save(model_dir+f"/extra_{algo_type}{n}")
-    print(f"saved as extra_{algo_type}{n}")
+    algo.save(model_dir + f"/policies_{n}/{algo_type}0")
+    print(f"saved as policies_{n}/{algo_type}0")
