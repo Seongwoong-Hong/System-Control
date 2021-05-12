@@ -9,10 +9,10 @@ if __name__ == "__main__":
     algo_type = "ppo"
     device = "cpu"
     name = "IP_custom"
-    current_path = os.path.dirname(__file__)
+    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     env = make_env(f"{name}-v2", use_vec_env=False, n_steps=600, sub="sub01")
     expt_env = make_env(f"{name}-v2", use_vec_env=False, n_steps=600, sub="sub01")
-    ana_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, name+"2")
+    ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name + "2")
     model_dir = os.path.join(ana_dir, "6", "model")
     with open(model_dir + "/discrim.pkl", "rb") as f:
         disc = pickle.load(f).double()

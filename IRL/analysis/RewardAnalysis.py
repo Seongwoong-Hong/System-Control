@@ -9,25 +9,25 @@ from algo.torch.ppo import PPO
 from common.util import make_env, write_analyzed_result
 
 if __name__ == "__main__":
-    env_type = "IP"
+    env_type = "IDP"
     algo_type = "ppo"
     device = "cpu"
-    current_path = os.path.dirname(__file__)
+    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     sub = "sub01"
-    name = "IP_custom"
-    ana_dir = os.path.join(current_path, "tmp", "log", env_type, algo_type, name+"2")
+    name = "IDP_custom"
+    ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name + "_easy_normal")
 
     pltqs = []
     test_len = 5
     if env_type == "HPC":
         for i in [0, 5, 10, 15, 20, 25, 30]:
-            file = os.path.join(current_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
+            file = os.path.join(proj_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
             pltqs += [io.loadmat(file)['pltq']]
         test_len = len(pltqs)
 
     env = make_env(f"{name}-v2", use_vec_env=False, n_steps=600, pltqs=pltqs)
     # expt_policy = PPO.load(f"tmp/log/{env_type}/{algo_type}/forward/model/extra_ppo0.zip")
-    expt_policy = PPO.load(f"../RL/{env_type}/tmp/log/{name}/{algo_type}/policies_2/model.pkl")
+    expt_policy = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/{algo_type}/policies_1/ppo0")
 
     def ana_fnc():
         param = 0
