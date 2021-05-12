@@ -8,6 +8,7 @@ from gym.envs.mujoco import mujoco_env
 class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self, n_steps=None, bsp=None, pltqs=None):
         self._timesteps = 0
+        self._order = 0
         self.n_steps = n_steps
         self._pltqs = pltqs
         self._pltq = None
@@ -19,7 +20,6 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         self._set_pltqs()
         if bsp is not None:
             self.bsp = bsp
-        self._order = 0
 
     def step(self, action: np.ndarray):
         self.do_simulation(action + self.plt_torque, self.frame_skip)
@@ -42,6 +42,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
             self.sim.data.qpos,  # link angles
             self.sim.data.qvel,  # link angular velocities
             self.plt_torque,     # torque from platform movement
+            # np.array([self.order])
         ]).ravel()
 
     def reset_model(self):
@@ -54,7 +55,13 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         self._set_pltqs()
 
     @property
+    def num_disturbs(self):
+        return len(self._pltqs)
+
+    @property
     def order(self):
+        if self._pltqs is None:
+            return self._order
         return self._order % len(self._pltqs)
 
     @property
@@ -82,7 +89,8 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def _set_pltqs(self):
         self._timesteps = 0
         if self._pltqs is not None:
-            self._pltq = random.sample(self._pltqs, 1)[0] / self.model.actuator_gear[0, 0]
+            self._order = random.randrange(0, len(self._pltqs))
+            self._pltq = self._pltqs[self.order] / self.model.actuator_gear[0, 0]
         else:
             self._pltq = None
 
@@ -106,7 +114,7 @@ class IDPHumanExp(IDPHuman):
         else:
             self._pltq = None
 
-    def exp_isend(self):
-        if self._order == len(self._pltqs):
-            return True
-        return False
+    # def exp_isend(self):
+    #     if self._order == len(self._pltqs):
+    #         return True
+    #     return False
