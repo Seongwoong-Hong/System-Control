@@ -8,6 +8,7 @@ from algo.torch.sac import SAC, MlpPolicy
 from common.wrappers import RewardWrapper
 
 from imitation.data.rollout import make_sample_until, generate_trajectories, flatten_trajectories
+from imitation.util import logger
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 
@@ -24,6 +25,9 @@ class RewardNet(nn.Module):
         self.act_fnc = activation_fn
         self.optim_cls = optim_cls
         self._build(lr, arch)
+        assert (
+            logger.is_configured()
+        ), "Requires call to imitation.util.logger.configure"
 
     def _build(self, lr, arch):
         layers = []
@@ -90,7 +94,7 @@ class MaxEntIRL:
     def rollout_from_agent(self, **kwargs):
         n_episodes = kwargs.get('n_episodes')
         if n_episodes is None:
-            n_episodes = len(self.expert_transitions)
+            n_episodes = 10
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
         trajectories = generate_trajectories(
             self.agent, DummyVecEnv([lambda: self.env]), sample_until, deterministic_policy=False)
@@ -112,20 +116,29 @@ class MaxEntIRL:
         loss = agent_ex - expert_ex
         return loss
 
-    def learn(self, total_iter: int = 1000, gradient_steps: int = 10, **kwargs):
-        # TODO: Add loggers for the tensorboard and the command line
-        # TODO: Make callbacks work
+    def learn(self,
+              total_iter: int = 1000,
+              gradient_steps: int = 10,
+              agent_callback=None,
+              rew_callback=None,
+              **kwargs):
         loss_logger = []
         for itr in range(total_iter):
             self._build_sac_agent(**self.sac_kwargs)
-            self.agent.learn(total_timesteps=self.agent_learning_steps)
+            with logger.accumulate_means("agent"):
+                self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
             losses = []
-            for _ in range(gradient_steps):
+            for rew_steps in range(gradient_steps):
                 agent_samples = self.rollout_from_agent(**kwargs)
                 loss = self.cal_loss(agent_samples)
                 losses.append(deepcopy(loss.item()))
                 self.reward_net.optimizer.zero_grad()
                 loss.backward()
                 self.reward_net.optimizer.step()
+                logger.record("reward/loss", np.mean(losses))
+                logger.dump(rew_steps)
+            if rew_callback:
+                rew_callback(itr)
+            logger.dump(itr)
             loss_logger.append(np.mean(losses))
         return loss_logger
