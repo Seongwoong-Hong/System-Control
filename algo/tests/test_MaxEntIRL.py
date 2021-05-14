@@ -53,3 +53,37 @@ def test_process(env, expert):
                          sac_kwargs={'verbose': 1},
                          )
     learning.learn(total_iter=10, gradient_steps=1)
+
+# Above tests are outdated. Now we must define imitation.util.logger before run a learning
+
+
+def test_logger(env, expert):
+    from imitation.util import logger
+    logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
+    learning = MaxEntIRL(env,
+                         agent_learning_steps=10000,
+                         expert_transitions=expert,
+                         rew_lr=1e-5,
+                         rew_arch=[3, 8, 8],
+                         device='cuda:0',
+                         sac_kwargs={'verbose': 1},
+                         )
+    learning.learn(total_iter=10, gradient_steps=1, n_episodes=8)
+
+
+def test_callback(env, expert):
+    from imitation.util import logger
+    from stable_baselines3.common import callbacks
+    from imitation.policies import serialize
+    logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
+    learning = MaxEntIRL(env,
+                         agent_learning_steps=1000,
+                         expert_transitions=expert,
+                         rew_lr=1e-5,
+                         rew_arch=[3, 8, 8],
+                         device='cuda:0',
+                         sac_kwargs={'verbose': 1},
+                         )
+    save_policy_callback = serialize.SavePolicyCallback(f"tmp/log", None)
+    save_policy_callback = callbacks.EveryNTimesteps(int(1e3), save_policy_callback)
+    learning.learn(total_iter=10, gradient_steps=1, n_episodes=8, agent_callback=save_policy_callback)
