@@ -3,6 +3,7 @@ import os
 import pickle
 
 from common.util import make_env
+from common.callbacks import SaveRewardCallback
 from algo.torch.MaxEntIRL.algorithm import MaxEntIRL
 from imitation.data import rollout
 
@@ -20,22 +21,37 @@ def env():
     return make_env("IP_custom-v2", use_vec_env=False)
 
 
+@pytest.fixture
+def learner(env, expert):
+    from imitation.util import logger
+    logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
+    learning = MaxEntIRL(env,
+                         agent_learning_steps_per_one_loop=1000,
+                         expert_transitions=expert,
+                         rew_lr=1e-5,
+                         rew_arch=[3, 8, 8],
+                         device='cuda:0',
+                         sac_kwargs={'verbose': 1},
+                         )
+    return learning
+
+
 def test_make_obj(expert, env):
     learning = MaxEntIRL(env,
-                         agent_learning_steps=1000,
+                         agent_learning_steps_per_one_loop=1000,
                          expert_transitions=expert,
                          rew_kwargs={'lr': 1e-3, 'arch': [4, 8, 8]},
                          )
     # Test rollout from agent
     rollouts = learning.rollout_from_agent(n_episodes=8)
     # Test calculation of loss
-    loss = learning.cal_loss(rollouts)
+    loss = learning.cal_loss(rollouts, 600)
     assert isinstance(loss.item(), float)
 
 
 def test_learn_agent(env):
     learning = MaxEntIRL(env,
-                         agent_learning_steps=1000,
+                         agent_learning_steps_per_one_loop=1000,
                          expert_transitions=expert,
                          rew_kwargs={'lr': 1e-3, 'arch': [4, 8, 8]},
                          sac_kwargs={'verbose': 1}
@@ -45,7 +61,7 @@ def test_learn_agent(env):
 
 def test_process(env, expert):
     learning = MaxEntIRL(env,
-                         agent_learning_steps=1000,
+                         agent_learning_steps_per_one_loop=1000,
                          expert_transitions=expert,
                          rew_lr=1e-5,
                          rew_arch=[3, 8, 8],
@@ -61,7 +77,7 @@ def test_logger(env, expert):
     from imitation.util import logger
     logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
     learning = MaxEntIRL(env,
-                         agent_learning_steps=10000,
+                         agent_learning_steps_per_one_loop=10000,
                          expert_transitions=expert,
                          rew_lr=1e-5,
                          rew_arch=[3, 8, 8],
@@ -71,19 +87,14 @@ def test_logger(env, expert):
     learning.learn(total_iter=10, gradient_steps=1, n_episodes=8)
 
 
-def test_callback(env, expert):
-    from imitation.util import logger
+def test_callback(learner):
     from stable_baselines3.common import callbacks
     from imitation.policies import serialize
-    logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
-    learning = MaxEntIRL(env,
-                         agent_learning_steps=1000,
-                         expert_transitions=expert,
-                         rew_lr=1e-5,
-                         rew_arch=[3, 8, 8],
-                         device='cuda:0',
-                         sac_kwargs={'verbose': 1},
-                         )
     save_policy_callback = serialize.SavePolicyCallback(f"tmp/log", None)
     save_policy_callback = callbacks.EveryNTimesteps(int(1e3), save_policy_callback)
-    learning.learn(total_iter=10, gradient_steps=1, n_episodes=8, agent_callback=save_policy_callback)
+    save_reward_callback = SaveRewardCallback(cycle=1, dirpath=f"tmp/log")
+    learner.learn(total_iter=1, gradient_steps=1, n_episodes=8, max_sac_iter=1, rew_callback=save_reward_callback.save)
+
+
+def test_validity(learner):
+    learner.learn(total_iter=10, gradient_steps=1, n_episodes=8)
