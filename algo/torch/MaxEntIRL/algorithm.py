@@ -14,6 +14,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 class RewardNet(nn.Module):
     def __init__(self,
+                 inp,
                  lr: float,
                  arch: List[int],
                  device: str,
@@ -24,7 +25,7 @@ class RewardNet(nn.Module):
         self.device = device
         self.act_fnc = activation_fn
         self.optim_cls = optim_cls
-        self._build(lr, arch)
+        self._build(lr, [inp] + arch)
         assert (
             logger.is_configured()
         ), "Requires call to imitation.util.logger.configure"
@@ -49,7 +50,7 @@ class RewardNet(nn.Module):
 class MaxEntIRL:
     def __init__(self,
                  env,
-                 agent_learning_steps,
+                 agent_learning_steps_per_one_loop,
                  expert_transitions,
                  device='cpu',
                  rew_lr: float = 1e-3,
@@ -59,7 +60,7 @@ class MaxEntIRL:
                  sac_kwargs: Optional[Dict] = None,
                  ):
         self.env = env
-        self.agent_learning_steps = agent_learning_steps
+        self.agent_learning_steps = agent_learning_steps_per_one_loop
         self.device = device
         self.use_action_as_input = use_action_as_input
         if sac_kwargs is None:
@@ -71,7 +72,10 @@ class MaxEntIRL:
         else:
             self.rew_kwargs = rew_kwargs
         self.expert_transitions = expert_transitions
-        self.reward_net = RewardNet(lr=rew_lr, arch=rew_arch, device=self.device, **self.rew_kwargs).double()
+        inp = self.env.observation_space.shape[0]
+        if self.use_action_as_input:
+            inp += self.env.action_space.shape[0]
+        self.reward_net = RewardNet(inp=inp, lr=rew_lr, arch=rew_arch, device=self.device, **self.rew_kwargs).double()
 
     def _build_sac_agent(self, **kwargs):
         self.env = RewardWrapper(self.env, self.reward_net)
@@ -98,7 +102,7 @@ class MaxEntIRL:
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
         trajectories = generate_trajectories(
             self.agent, DummyVecEnv([lambda: self.env]), sample_until, deterministic_policy=False)
-        return flatten_trajectories(trajectories)
+        return flatten_trajectories(trajectories), len(flatten_trajectories(trajectories)) / n_episodes
 
     def mean_transition_reward(self, transition):
         if self.use_action_as_input:
@@ -109,28 +113,35 @@ class MaxEntIRL:
         reward = self.reward_net(th_input)
         return reward.mean()
 
-    def cal_loss(self, agent_transitions):
+    def cal_loss(self, agent_transitions, total_timesteps):
         expert_transitions = deepcopy(self.expert_transitions)
         agent_ex = self.mean_transition_reward(agent_transitions)
         expert_ex = self.mean_transition_reward(expert_transitions)
         loss = agent_ex - expert_ex
-        return loss
+        return loss * total_timesteps
 
     def learn(self,
-              total_iter: int = 1000,
-              gradient_steps: int = 10,
+              total_iter: int = 10,
+              gradient_steps: int = 50,
+              max_sac_iter: int = 10,
               agent_callback=None,
               rew_callback=None,
               **kwargs):
         loss_logger = []
         for itr in range(total_iter):
             self._build_sac_agent(**self.sac_kwargs)
-            with logger.accumulate_means("agent"):
-                self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
+            with logger.accumulate_means(f"agent_{itr}"):
+                sac_iter = 0
+                while True:
+                    self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
+                    sac_iter += 1
+                    agent_samples, T = self.rollout_from_agent(**kwargs)
+                    if self.cal_loss(agent_samples, T) / T < 0 or sac_iter > max_sac_iter:
+                        break
             losses = []
             for rew_steps in range(gradient_steps):
-                agent_samples = self.rollout_from_agent(**kwargs)
-                loss = self.cal_loss(agent_samples)
+                agent_samples, T = self.rollout_from_agent(**kwargs)
+                loss = self.cal_loss(agent_samples, T)
                 losses.append(deepcopy(loss.item()))
                 self.reward_net.optimizer.zero_grad()
                 loss.backward()
@@ -138,7 +149,7 @@ class MaxEntIRL:
                 logger.record("reward/loss", np.mean(losses))
                 logger.dump(rew_steps)
             if rew_callback:
-                rew_callback(itr)
+                rew_callback(self.reward_net, itr)
             logger.dump(itr)
             loss_logger.append(np.mean(losses))
         return loss_logger
