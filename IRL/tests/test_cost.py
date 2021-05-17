@@ -1,8 +1,10 @@
 import os
 import pickle
 
+from common.util import make_env
 from common.verification import CostMap
 from algo.torch.ppo import PPO
+from algo.torch.sac import SAC
 
 
 def test_draw_costmap():
@@ -48,3 +50,39 @@ def test_costmap(tenv):
     agent = PPO.load(reward_dir + "/gen.zip")
     # expt = def_policy("HPC", tenv)
     cost_map = CostMap(reward_fn, tenv, agent)
+
+
+def test_expt_reward():
+    env_type = "IP"
+    env = make_env(f"{env_type}_custom-v2", use_vec_env=False)
+    load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{env_type}_custom/0/model/agent.zip"
+    agent = SAC.load(load_dir)
+    done = False
+    reward = 0
+    obs = env.reset()
+    while not done:
+        act, _ = agent.predict(obs, deterministic=True)
+        obs, rew, done, _ = env.step(act)
+        reward += rew
+    print(reward)
+
+
+def test_agent_reward():
+    from common.wrappers import RewardWrapper
+    env_type = "IP"
+    name = "IP_custom"
+    env = make_env(f"{name}-v2", use_vec_env=False)
+    load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{name}/1/model"
+    # agent = SAC.load(load_dir + "/agent")
+    expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_2/model.pkl")
+    with open(load_dir + "/reward_net.pkl", "rb") as f:
+        reward_fn = pickle.load(f).double()
+    env = RewardWrapper(env, reward_fn)
+    done = False
+    reward = 0
+    obs = env.reset()
+    while not done:
+        act, _ = expt.predict(obs, deterministic=True)
+        obs, rew, done, _ = env.step(act)
+        reward += rew
+    print(reward)
