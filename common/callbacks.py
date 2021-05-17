@@ -1,7 +1,9 @@
 from copy import deepcopy
 from typing import Any, Dict, Sequence
 
+import os
 import gym
+import pickle
 import numpy as np
 import torch
 from matplotlib import cm
@@ -9,6 +11,8 @@ from matplotlib import pyplot as plt
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Video, Figure
+
+from common.util import create_path
 
 
 class VFCustomCallback(BaseCallback):
@@ -164,3 +168,17 @@ class VideoCallback(BaseCallback):
                 exclude=("stdout", "log", "json", "csv")
             )
         return True
+
+
+class SaveRewardCallback:
+    def __init__(self, cycle: int, dirpath: str):
+        self.cycle = cycle
+        create_path(dirpath)
+        self.path = dirpath
+
+    def save(self, reward_net, itr):
+        if itr % self.cycle == 0:
+            reward_path = self.path + "/reward_net.pkl"
+            with open(reward_path + ".tmp", "wb") as f:
+                pickle.dump(reward_net, f)
+            os.replace(reward_path + ".tmp", reward_path)
