@@ -6,16 +6,17 @@ from matplotlib import pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 
 from algo.torch.ppo import PPO
-from common.util import make_env, write_analyzed_result
+from algo.torch.sac import SAC
+from common.util import make_env, write_analyzed_result, create_path
 
 if __name__ == "__main__":
-    env_type = "IDP"
-    algo_type = "ppo"
+    env_type = "IP"
+    algo_type = "MaxEntIRL"
     device = "cpu"
+    saving = True
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     sub = "sub01"
-    name = "IDP_custom"
-    ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name + "_easy_normal")
+    name = "IP_custom"
 
     pltqs = []
     test_len = 5
@@ -27,7 +28,10 @@ if __name__ == "__main__":
 
     env = make_env(f"{name}-v2", use_vec_env=False, n_steps=600, pltqs=pltqs)
     # expt_policy = PPO.load(f"tmp/log/{env_type}/{algo_type}/forward/model/extra_ppo0.zip")
-    expt_policy = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/{algo_type}/policies_1/ppo0")
+    expt_policy = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_2/model.pkl")
+
+    name += ""
+    ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name)
 
     def ana_fnc():
         param = 0
@@ -44,8 +48,8 @@ if __name__ == "__main__":
     num = 0
     result_dict = {}
 
-    while os.path.isfile(ana_dir + f"/{num}/model/gen.zip"):
-        policy = PPO.load(ana_dir + f"/{num}/model/gen.zip")
+    while os.path.isfile(ana_dir + f"/{num}/model/agent.zip"):
+        policy = SAC.load(ana_dir + f"/{num}/model/agent.zip")
         file = ana_dir + f"/{num}/model/hyper_parameters.txt"
         write_analyzed_result(ana_fnc, ana_dir, iter_name=num)
         f = open(ana_dir + f"/{num}/model/result.txt", "r")
@@ -80,4 +84,7 @@ if __name__ == "__main__":
         ax.xaxis.set_major_formatter(FormatStrFormatter('%.2e'))
         ax.grid()
         plt.show()
+        if saving:
+            create_path(f"figures/{env_type}/{name}")
+            fig.savefig(f"figures/{env_type}/{name}/{key}.png")
     print(f"The best agent is {np.argmax(array[:, 1])} with a reward value {np.max(array[:, 1])}")
