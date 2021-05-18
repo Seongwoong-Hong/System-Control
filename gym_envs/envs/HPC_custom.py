@@ -22,10 +22,11 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
             self.bsp = bsp
 
     def step(self, action: np.ndarray):
+        ob = self._get_obs()
+        r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-6 * action @ np.eye(2, 2) @ action.T)
         self.do_simulation(action + self.plt_torque, self.frame_skip)
         self._timesteps += 1
         ob = self._get_obs()
-        r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-6 * action @ np.eye(2, 2) @ action.T)
         done = False
         info = {}
         if self.n_steps is None:

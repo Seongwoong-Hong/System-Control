@@ -13,9 +13,10 @@ class IPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml"), 20)
 
     def step(self, a):
-        self.do_simulation(a, self.frame_skip)
         ob = self._get_obs()
         rew = - ob[0] ** 2
+        self.do_simulation(a, self.frame_skip)
+        ob = self._get_obs()
         done = False
         info = {}
         if self.n_steps is None:

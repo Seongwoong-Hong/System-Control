@@ -8,7 +8,7 @@
 	<size nstack="3000" nuserdata="100" nuser_actuator="10"/>
 	<worldbody>
 		<body name="pole" pos="0 0 0">
-			<joint axis="0 1 0" limited="false" name="hinge" pos="0 0 0" type="hinge"/>
+			<joint axis="0 1 0" limited="true" range="-0.5 0.5" name="hinge" pos="0 0 0" type="hinge"/>
 			<geom fromto="0 0 0 0 0 1.0" name="cpole" rgba="0 0.7 0.7 1" size="0.045" type="capsule"/>
 			<inertial pos="0 0 0.5" mass="5.0" diaginertia="1.667 1.667 0.01"/>
 		</body>

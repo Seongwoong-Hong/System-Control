@@ -16,10 +16,11 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         self.init_qvel = np.array([0.0, 0.0])
 
     def step(self, action):
+        ob = self._get_obs()
+        r = -(ob[0] ** 2 + ob[1] ** 2 + 1e-5 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         self.do_simulation(action, self.frame_skip)
         self.__timesteps += 1
         ob = self._get_obs()
-        r = -0.01 * (ob[0] ** 2 + ob[1] ** 2 + 0.0001 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         done = False
         info = {}
         if self.n_steps is None:
@@ -47,8 +48,8 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def reset_model(self):
         self.set_state(
-            self.init_qpos + self.np_random.uniform(low=-.2, high=.2, size=self.model.nq),
-            self.init_qvel + self.np_random.uniform(low=-.2, high=.2, size=self.model.nv)
+            self.init_qpos + self.np_random.uniform(low=-.1, high=.1, size=self.model.nq),
+            self.init_qvel + self.np_random.uniform(low=-.1, high=.1, size=self.model.nv)
         )
         return self._get_obs()
 
@@ -71,7 +72,8 @@ class IDPCustomExp(IDPCustom):
                                     [[+0.12, +0.05], [-0.10, -0.15]],
                                     [[-0.08, +0.15], [+0.05, -0.15]],
                                     [[-0.15, +0.20], [-0.10, +0.05]],
-                                    [[+0.20, +0.01], [+0.09, -0.15]]])
+                                    [[+0.20, +0.01], [+0.09, -0.15]],
+                                    ])
 
     def reset_model(self):
         q = self.init_group[self._order % len(self.init_group)]
@@ -85,3 +87,17 @@ class IDPCustomExp(IDPCustom):
         if self._order == len(self.init_group):
             return True
         return False
+
+
+class IDPCustomEasy(IDPCustom):
+    def __init__(self, n_steps=None):
+        super().__init__(n_steps=n_steps)
+        self.observation_space = spaces.Box(low=-1, high=1, shape=(4,), dtype=np.float64)
+
+    def step(self, action):
+        ob = self._get_obs()
+        r = - abs(ob[0]) - abs(ob[1])
+        self.do_simulation(action, self.frame_skip)
+        ob = self._get_obs()
+        done = False
+        return ob, r, done, {}
