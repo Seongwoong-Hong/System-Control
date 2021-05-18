@@ -131,25 +131,27 @@ class MaxEntIRL:
         for itr in range(total_iter):
             self._build_sac_agent(**self.sac_kwargs)
             with logger.accumulate_means(f"agent_{itr}"):
-                sac_iter = 0
-                while True:
+                for agent_steps in range(max_sac_iter):
                     self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
-                    sac_iter += 1
                     agent_samples, T = self.rollout_from_agent(**kwargs)
-                    if self.cal_loss(agent_samples, T) / T < 0 or sac_iter > max_sac_iter:
+                    if self.cal_loss(agent_samples, T) / T < 0:
                         break
+                logger.record("agent_steps", agent_steps)
+                logger.dump(itr)
             losses = []
-            for rew_steps in range(gradient_steps):
-                agent_samples, T = self.rollout_from_agent(**kwargs)
-                loss = self.cal_loss(agent_samples, T)
-                losses.append(deepcopy(loss.item()))
-                self.reward_net.optimizer.zero_grad()
-                loss.backward()
-                self.reward_net.optimizer.step()
-                logger.record("reward/loss", np.mean(losses))
-                logger.dump(rew_steps)
+            with logger.accumulate_means(f"reward_{itr}"):
+                for rew_steps in range(gradient_steps):
+                    agent_samples, T = self.rollout_from_agent(**kwargs)
+                    loss = self.cal_loss(agent_samples, T)
+                    self.reward_net.optimizer.zero_grad()
+                    loss.backward()
+                    self.reward_net.optimizer.step()
+                    losses.append(loss.item())
+                    logger.record(f"loss_{rew_steps}", loss.item())
+                    logger.dump(rew_steps)
+                    if loss.item() < -100:
+                        break
             if rew_callback:
                 rew_callback(self.reward_net, itr)
-            logger.dump(itr)
             loss_logger.append(np.mean(losses))
         return loss_logger
