@@ -36,10 +36,11 @@ def test_rl_learned_policy():
 
 
 def test_irl_learned_policy():
-    env = make_env("IP_custom-v2", n_steps=600, use_vec_env=False)
-    name = "IP/ppo/IP_custom2/" + "6"
+    env_type = "IDP"
+    env = make_env(f"{env_type}_custom-v2", n_steps=600, use_vec_env=False)
+    name = f"{env_type}/MaxEntIRL/{env_type}_custom/" + "2"
     model_dir = os.path.join("..", "tmp", "log", name, "model")
-    algo = PPO.load(model_dir + "/gen.zip")
+    algo = SAC.load(model_dir + "/000000050000/model.pkl")
     a_list, o_list, _ = verify_policy(env, algo)
 
 
@@ -50,10 +51,10 @@ def test_idp_policy():
 
 
 def test_mujoco_policy():
-    name = "Ant"
+    name = "Hopper"
     env = make_env(f"{name}-v2", use_vec_env=False)
-    # model_dir = os.path.join("..", "tmp", "log", "mujoco_envs", "ppo", name, "15", "model")
-    model_dir = os.path.join("..", "..", "RL", "mujoco_envs", "tmp", "log", name, "ppo")
-    algo = PPO.load(model_dir + "/ppo0.zip")
+    model_dir = os.path.join("..", "tmp", "log", "mujoco_envs", "ppo", name, "10", "model")
+    # model_dir = os.path.join("..", "..", "RL", "mujoco_envs", "tmp", "log", name, "ppo")
+    algo = PPO.load(model_dir + "/gen")
     for _ in range(10):
         verify_policy(env, algo, deterministic=False)

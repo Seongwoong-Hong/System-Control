@@ -69,12 +69,12 @@ def test_expt_reward():
 
 def test_agent_reward():
     from common.wrappers import RewardWrapper
-    env_type = "IP"
-    name = "IP_custom"
+    env_type = "IDP"
+    name = "IDP_custom"
     env = make_env(f"{name}-v2", use_vec_env=False)
-    load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{name}/1/model"
-    # agent = SAC.load(load_dir + "/agent")
-    expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_2/model.pkl")
+    load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{name}/2/model"
+    agent = SAC.load(load_dir + "/000000050000/model.pkl")
+    expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
     env = RewardWrapper(env, reward_fn)
@@ -82,7 +82,7 @@ def test_agent_reward():
     reward = 0
     obs = env.reset()
     while not done:
-        act, _ = expt.predict(obs, deterministic=True)
+        act, _ = agent.predict(obs, deterministic=True)
         obs, rew, done, _ = env.step(act)
         reward += rew
     print(reward)
