@@ -17,7 +17,7 @@ from common.util import create_path
 
 class VFCustomCallback(BaseCallback):
     def __init__(self,
-                 eval_env: gym.Env,
+                 eval_env,
                  render_freq: int,
                  n_eval_episodes: int = 1,
                  deterministic: bool = True,
@@ -118,7 +118,7 @@ class VFCustomCallback(BaseCallback):
 
 class VideoCallback(BaseCallback):
     def __init__(self,
-                 eval_env: gym.Env,
+                 eval_env,
                  render_freq: int,
                  n_eval_episodes: int = 1,
                  deterministic: bool = True,
