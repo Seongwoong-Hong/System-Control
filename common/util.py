@@ -16,24 +16,24 @@ def make_env(env_name, use_vec_env=False, num_envs=10, **kwargs):
         return env
     env_type = env_name[:env_name.find("_custom")]
     if env_type == "HPC":
-        sub = kwargs.get("sub")
+        subpath = kwargs.pop("subpath")
         pltqs = kwargs.get("pltqs")
-        assert sub is not None, "HPC environment needs subject!"
-        if pltqs is None:
+        assert subpath is not None, "HPC environment needs subject!"
+        if not pltqs:
             pltqs = []
             i = 0
             while True:
-                file = p.join("demos", env_type, sub, sub + "i%d.mat" % (i + 1))
+                file = subpath + f"i{i+1}.mat"
                 if not p.isfile(file):
                     break
                 pltqs += [io.loadmat(file)['pltq']]
                 i += 1
             kwargs['pltqs'] = pltqs
     elif env_type == "IDP" or env_type == "IP":
-        kwargs.pop('sub', None)
+        kwargs.pop('subpath', None)
         kwargs.pop('pltqs', None)
     else:
-        kwargs.pop('sub', None)
+        kwargs.pop('subpath', None)
         kwargs.pop('pltqs', None)
         kwargs.pop('n_steps', None)
     venv = is_vectorized()
