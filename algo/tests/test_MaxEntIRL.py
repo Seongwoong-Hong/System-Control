@@ -3,7 +3,7 @@ import os
 import pickle
 
 from common.util import make_env
-from common.callbacks import SaveRewardCallback
+from common.callbacks import SaveCallback
 from algo.torch.MaxEntIRL.algorithm import MaxEntIRL
 from imitation.data import rollout
 
@@ -92,8 +92,8 @@ def test_callback(learner):
     from imitation.policies import serialize
     save_policy_callback = serialize.SavePolicyCallback(f"tmp/log", None)
     save_policy_callback = callbacks.EveryNTimesteps(int(1e3), save_policy_callback)
-    save_reward_callback = SaveRewardCallback(cycle=1, dirpath=f"tmp/log")
-    learner.learn(total_iter=1, gradient_steps=1, n_episodes=8, max_sac_iter=1, rew_callback=save_reward_callback.save)
+    save_reward_callback = SaveCallback(cycle=1, dirpath=f"tmp/log")
+    learner.learn(total_iter=1, gradient_steps=1, n_episodes=8, max_sac_iter=1, callback=save_reward_callback.net_save)
 
 
 def test_validity(learner):
