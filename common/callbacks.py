@@ -182,10 +182,8 @@ class SaveCallback:
             os.mkdir(log_dir)
             with open(log_dir + "/reward_net.pkl.tmp", "wb") as f:
                 pickle.dump(network.reward_net, f)
-            with open(log_dir + "/agent.pkl.tmp", "wb") as f:
-                pickle.dump(network.agent, f)
+            network.agent.save(log_dir + "/agent")
             os.replace(log_dir + "/reward_net.pkl.tmp", log_dir+"/reward_net.pkl")
-            os.replace(log_dir + "/agent.pkl.tmp", log_dir + "/agent.pkl")
 
     def rew_save(self, network, itr):
         if itr % self.cycle == 0:
