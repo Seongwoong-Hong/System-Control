@@ -15,9 +15,9 @@ def run_traj(env, expert_dir):
     for traj in expert_trajs:
         env.reset()
         tran = flatten_trajectories([traj])
-        env.set_state(tran.obs[0, :env.model.nq], tran.obs[0, env.model.nq:env.model.nq+env.model.nv+1])
+        env.set_state(tran.obs[0, :env.model.nq], tran.obs[0, env.model.nq:env.model.nq+env.model.nv])
         if hasattr(env, "pltq"):
-            env.pltq = traj.obs[:, 4:]
+            env.pltq = traj.obs[:-1, 4:]
         for t in range(len(tran)):
             act = tran.acts[t]
             obs, _, _, _ = env.step(act)
@@ -27,7 +27,7 @@ def run_traj(env, expert_dir):
 
 
 def test_hpc(env):
-    expert_dir = os.path.join("..", "demos", "HPC", "lqrTest.pkl")
+    expert_dir = os.path.join("..", "demos", "HPC", "expert.pkl")
     run_traj(env, expert_dir)
 
 

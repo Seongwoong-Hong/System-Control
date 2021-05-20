@@ -19,28 +19,28 @@ def test_hpcdiv_algo(tenv):
 
 
 def test_hpc_learned_policy(env):
-    name = "HPC/ppo/AIRL_test/" + "81"
+    name = "HPC/MaxEntIRL/HPC_customtest/" + ""
     model_dir = os.path.join("..", "tmp", "log", name, "model")
-    algo = PPO.load(model_dir + "/gen.zip")
+    algo = SAC.load(model_dir + "/agent.zip")
     for _ in range(10):
         a_list, o_list, _ = verify_policy(env, algo)
 
 
 def test_rl_learned_policy():
-    env_type = "IP"
+    env_type = "IDP"
     env = make_env(f"{env_type}_custom-v2", n_steps=600)
-    name = f"{env_type}_custom/sac"
+    name = f"{env_type}_custom_learned_reward/sac"
     model_dir = os.path.join("..", "..", "RL", env_type, "tmp", "log", name, "policies_1")
-    algo = SAC.load(model_dir + "/000001000000/model.pkl")
+    algo = SAC.load(model_dir + "/sac0")
     a_list, o_list, _ = verify_policy(env, algo)
 
 
 def test_irl_learned_policy():
     env_type = "IDP"
     env = make_env(f"{env_type}_custom-v2", n_steps=600, use_vec_env=False)
-    name = f"{env_type}/MaxEntIRL/{env_type}_custom/" + "2"
-    model_dir = os.path.join("..", "tmp", "log", name, "model")
-    algo = SAC.load(model_dir + "/000000050000/model.pkl")
+    name = f"{env_type}/MaxEntIRL/{env_type}_custom_test1"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "004")
+    algo = SAC.load(model_dir + "/agent")
     a_list, o_list, _ = verify_policy(env, algo)
 
 

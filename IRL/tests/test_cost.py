@@ -72,8 +72,8 @@ def test_agent_reward():
     env_type = "IDP"
     name = "IDP_custom"
     env = make_env(f"{name}-v2", use_vec_env=False)
-    load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{name}/2/model"
-    agent = SAC.load(load_dir + "/000000050000/model.pkl")
+    load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{name}_test1/model/004"
+    agent = SAC.load(load_dir + "/agent")
     expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
@@ -82,7 +82,7 @@ def test_agent_reward():
     reward = 0
     obs = env.reset()
     while not done:
-        act, _ = agent.predict(obs, deterministic=True)
+        act, _ = expt.predict(obs, deterministic=True)
         obs, rew, done, _ = env.step(act)
         reward += rew
     print(reward)
