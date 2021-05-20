@@ -122,10 +122,10 @@ class GCLCostNet(nn.Module):
             logger.dump()
         return self
 
-    def train_(self):
+    def train(self, mode=True):
         self.evalmod = False
-        return self.train()
+        return super(GCLCostNet, self).train(mode=mode)
 
-    def eval_(self):
+    def eval(self):
         self.evalmod = True
-        return self.eval()
+        return super(GCLCostNet, self).eval()
