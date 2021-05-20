@@ -1,5 +1,9 @@
-# This file is here just to define MlpPolicy/CnnPolicy
-# that work for PPO
+"""
+This file is here just to define MlpPolicy/CnnPolicy that work for PPO
+Slightly modified version of stable-baseline3 for my project
+"""
+
+
 from stable_baselines3.common.policies import (ActorCriticCnnPolicy,
                                                register_policy,
                                                BasePolicy,
@@ -7,7 +11,7 @@ from stable_baselines3.common.policies import (ActorCriticCnnPolicy,
 
 import collections
 from functools import partial
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, Callable
 
 import gym
 import numpy as np
@@ -24,7 +28,6 @@ from stable_baselines3.common.distributions import (
     make_proba_distribution,
 )
 
-from stable_baselines3.common.type_aliases import Schedule
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor, FlattenExtractor, MlpExtractor
 
 
@@ -67,7 +70,7 @@ class ActorCriticPolicy(BasePolicy):
         self,
         observation_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
-        lr_schedule: Schedule,
+        lr_schedule: Callable[[float], float],
         net_arch: Optional[List[Union[int, Dict[str, List[int]]]]] = None,
         log_std_range: Optional[List[float]] = None,
         activation_fn: Type[nn.Module] = nn.Tanh,
@@ -109,7 +112,7 @@ class ActorCriticPolicy(BasePolicy):
                 net_arch = []
 
         if log_std_range is None:
-            self.log_std_low, self.log_std_high = -3, 3
+            self.log_std_low, self.log_std_high = -5, 5
         else:
             self.log_std_low, self.log_std_high = log_std_range
 
@@ -189,7 +192,7 @@ class ActorCriticPolicy(BasePolicy):
             self.features_dim, net_arch=self.net_arch, activation_fn=self.activation_fn, device=self.device
         )
 
-    def _build(self, lr_schedule: Schedule) -> None:
+    def _build(self, lr_schedule: Callable[[float], float]) -> None:
         """
         Create the networks and the optimizer.
 

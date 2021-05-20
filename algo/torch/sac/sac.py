@@ -1,3 +1,6 @@
+"""
+Slightly modified version of stable-baseline3 for my project
+"""
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
@@ -264,6 +267,7 @@ class SAC(OffPolicyAlgorithm):
         logger.record("train/ent_coef", np.mean(ent_coefs))
         logger.record("train/actor_loss", np.mean(actor_losses))
         logger.record("train/critic_loss", np.mean(critic_losses))
+        logger.record("train/mean_rewards", replay_data.rewards.mean().detach().item())
         if len(ent_coef_losses) > 0:
             logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 

@@ -1,3 +1,6 @@
+"""
+Slightly modified version of stable-baseline3 for my project
+"""
 from typing import Any, Callable, Dict, Optional, Type, Union
 
 import numpy as np
