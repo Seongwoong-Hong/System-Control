@@ -170,15 +170,26 @@ class VideoCallback(BaseCallback):
         return True
 
 
-class SaveRewardCallback:
+class SaveCallback:
     def __init__(self, cycle: int, dirpath: str):
         self.cycle = cycle
         create_path(dirpath)
         self.path = dirpath
 
-    def save(self, reward_net, itr):
+    def net_save(self, network, itr):
+        if itr % self.cycle == 0:
+            log_dir = self.path + f"/{itr:03d}"
+            os.mkdir(log_dir)
+            with open(log_dir + "/reward_net.pkl.tmp", "wb") as f:
+                pickle.dump(network.reward_net, f)
+            with open(log_dir + "/agent.pkl.tmp", "wb") as f:
+                pickle.dump(network.agent, f)
+            os.replace(log_dir + "/reward_net.pkl.tmp", log_dir+"/reward_net.pkl")
+            os.replace(log_dir + "/agent.pkl.tmp", log_dir + "/agent.pkl")
+
+    def rew_save(self, network, itr):
         if itr % self.cycle == 0:
             reward_path = self.path + "/reward_net.pkl"
             with open(reward_path + ".tmp", "wb") as f:
-                pickle.dump(reward_net, f)
+                pickle.dump(network.reward_net, f)
             os.replace(reward_path + ".tmp", reward_path)
