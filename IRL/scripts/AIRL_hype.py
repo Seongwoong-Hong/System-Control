@@ -14,19 +14,19 @@ from algo.torch.ppo import PPO, MlpPolicy
 
 
 if __name__ == "__main__":
-    env_type = "IDP"
-    algo_type = "AIRLppo"
+    env_type = "IP"
+    algo_type = "AIRL"
     device = "cpu"
-    name = "IDP_custom"
+    name = "IP_custom"
     env = make_env(f"{name}-v2", use_vec_env=True, num_envs=8, n_steps=600, sub="sub01")
     env = VecNormalize(env, norm_obs=True, norm_reward=False)
 
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name + "_easy_normal")
+    log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name + "_normal")
     create_path(log_dir)
     shutil.copy(os.path.abspath(__file__), log_dir)
 
-    expert_dir = os.path.join(proj_path, "demos", env_type, "ppoeasy.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "expert.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     transitions = rollout.flatten_trajectories(expert_trajs)
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         else:
             print("The log directory already exists")
             raise SystemExit
-        print(f"All Tensorboards and logging are being written inside {name}/.")
+        print(f"All tensorboard outputs and logging are being written inside {name}/.")
 
         model_dir = os.path.join(name, "model")
         if not os.path.isdir(model_dir):
@@ -61,7 +61,7 @@ if __name__ == "__main__":
         f.write(f"disc_lr: {disc_lr}\n")
         f.write(f"n_epochs: {n_epochs}\n")
         f.close()
-        logger.configure(name, format_strs=["stdout", "log", "csv", "tensorboard"])
+        logger.configure(name, format_strs=["stdout", "tensorboard"])
 
         algo = PPO(MlpPolicy,
                    env=env,
@@ -97,5 +97,6 @@ if __name__ == "__main__":
         with open(disc_path + ".tmp", "wb") as f:
             pickle.dump(airl_trainer.discrim, f)
         os.replace(disc_path + ".tmp", disc_path)
-        gen_path = model_dir + "/gen"
-        airl_trainer.gen_algo.save(gen_path)
+        airl_trainer.gen_algo.save(model_dir + "/gen")
+        if isinstance(env, VecNormalize):
+            env.save(model_dir + "/vec_normalize.pkl")
