@@ -96,5 +96,22 @@ def test_callback(learner):
     learner.learn(total_iter=1, gradient_steps=1, n_episodes=8, max_sac_iter=1, callback=save_reward_callback.net_save)
 
 
+def test_wrapper(env, expert):
+    from imitation.util import logger
+    from common.wrappers import FeatureRewardWrapper
+    logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
+    learner = MaxEntIRL(env,
+                        agent_learning_steps_per_one_loop=1e4,
+                        expert_transitions=expert,
+                        rew_lr=1e-4,
+                        rew_arch=[],
+                        device='cpu',
+                        sac_kwargs={'verbose': 1,
+                                    'reward_wrapper': FeatureRewardWrapper,
+                                    }
+                        )
+    learner.learn(total_iter=1, gradient_steps=1, n_episodes=8, max_sac_iter=1)
+
+
 def test_validity(learner):
     learner.learn(total_iter=10, gradient_steps=1, n_episodes=8)

@@ -6,6 +6,8 @@ from common.verification import CostMap
 from algo.torch.ppo import PPO
 from algo.torch.sac import SAC
 
+from matplotlib import pyplot as plt
+
 
 def test_draw_costmap():
     inputs = [[[0, 1, 2, 3], [3, 4, 5, 6]]]
@@ -53,36 +55,48 @@ def test_costmap(tenv):
 
 
 def test_expt_reward():
-    env_type = "IP"
-    env = make_env(f"{env_type}_custom-v2", use_vec_env=False)
-    load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{env_type}_custom/0/model/agent.zip"
-    agent = SAC.load(load_dir)
-    done = False
-    reward = 0
-    obs = env.reset()
-    while not done:
-        act, _ = agent.predict(obs, deterministic=True)
-        obs, rew, done, _ = env.step(act)
-        reward += rew
-    print(reward)
+    env_type = "IDP"
+    rewards = []
+    for i in range(10):
+        env = make_env(f"{env_type}_custom-v2", use_vec_env=False)
+        load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{env_type}_custom_test1/model/{i:03d}/agent.zip"
+        agent = SAC.load(load_dir)
+        expt = PPO.load(f"../../RL/{env_type}/tmp/log/{env_type}_custom/ppo/policies_1/ppo0")
+        done = False
+        reward = 0
+        obs = env.reset()
+        while not done:
+            act, _ = agent.predict(obs, deterministic=True)
+            obs, rew, done, _ = env.step(act)
+            reward += rew.item()
+        rewards.append(reward)
+    print(rewards)
+    plt.plot(rewards)
+    plt.show()
 
 
 def test_agent_reward():
     from common.wrappers import RewardWrapper
     env_type = "IDP"
     name = "IDP_custom"
-    env = make_env(f"{name}-v2", use_vec_env=False)
-    load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{name}_test1/model/004"
-    agent = SAC.load(load_dir + "/agent")
-    expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
-    with open(load_dir + "/reward_net.pkl", "rb") as f:
-        reward_fn = pickle.load(f).double()
-    env = RewardWrapper(env, reward_fn)
-    done = False
-    reward = 0
-    obs = env.reset()
-    while not done:
-        act, _ = expt.predict(obs, deterministic=True)
-        obs, rew, done, _ = env.step(act)
-        reward += rew
-    print(reward)
+    rewards = []
+    for i in range(10):
+        env = make_env(f"{name}-v2", use_vec_env=False)
+        load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{name}_test1/model/{i:03d}"
+        agent = SAC.load(load_dir + "/agent")
+        expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
+        with open(load_dir + "/reward_net.pkl", "rb") as f:
+            reward_fn = pickle.load(f).double()
+        env = RewardWrapper(env, reward_fn.eval())
+        done = False
+        reward = 0
+        obs = env.reset()
+        while not done:
+            act, _ = agent.predict(obs, deterministic=True)
+            obs, rew, done, _ = env.step(act)
+            reward += rew.item()
+        rewards.append(reward)
+    print(rewards)
+    plt.plot(rewards)
+    plt.show()
+
