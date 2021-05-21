@@ -46,6 +46,10 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
             self.sim.data.qvel   # link angular velocities
         ]).ravel()
 
+    @property
+    def current_obs(self):
+        return self._get_obs()
+
     def reset_model(self):
         self.set_state(
             self.init_qpos + self.np_random.uniform(low=-.1, high=.1, size=self.model.nq),

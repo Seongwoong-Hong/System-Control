@@ -36,6 +36,10 @@ class IPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def _get_obs(self):
         return np.concatenate([self.sim.data.qpos, self.sim.data.qvel]).ravel()
 
+    @property
+    def current_obs(self):
+        return self._get_obs()
+
     def viewer_setup(self):
         v = self.viewer
         v.cam.trackbodyid = 0
