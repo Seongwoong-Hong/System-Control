@@ -13,7 +13,7 @@ class RewardNet(nn.Module):
                  arch: List[int],
                  device: str,
                  optim_cls=th.optim.Adam,
-                 activation_fn=th.nn.ReLU,
+                 activation_fn=th.nn.Tanh,
                  ):
         super(RewardNet, self).__init__()
         self.device = device
