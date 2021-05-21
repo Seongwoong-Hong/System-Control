@@ -1,50 +1,15 @@
 import torch as th
 import numpy as np
-from torch import nn
 from copy import deepcopy
 from typing import List, Dict, Optional
 
 from algo.torch.sac import SAC, MlpPolicy
+from algo.torch.MaxEntIRL import RewardNet
 from common.wrappers import RewardWrapper
 
 from imitation.data.rollout import make_sample_until, generate_trajectories, flatten_trajectories
 from imitation.util import logger
 from stable_baselines3.common.vec_env import DummyVecEnv
-
-
-class RewardNet(nn.Module):
-    def __init__(self,
-                 inp,
-                 lr: float,
-                 arch: List[int],
-                 device: str,
-                 optim_cls=th.optim.Adam,
-                 activation_fn=th.nn.ReLU,
-                 ):
-        super(RewardNet, self).__init__()
-        self.device = device
-        self.act_fnc = activation_fn
-        self.optim_cls = optim_cls
-        self._build(lr, [inp] + arch)
-        assert (
-            logger.is_configured()
-        ), "Requires call to imitation.util.logger.configure"
-
-    def _build(self, lr, arch):
-        layers = []
-        if self.act_fnc is not None:
-            for i in range(len(arch) - 1):
-                layers.append(nn.Linear(arch[i], arch[i + 1]))
-                layers.append(self.act_fnc())
-        else:
-            for i in range(len(arch) - 1):
-                layers.append(nn.Linear(arch[i], arch[i + 1]))
-        layers.append(nn.Linear(arch[-1], 1, bias=False))
-        self.layers = nn.Sequential(*layers).to(self.device)
-        self.optimizer = self.optim_cls(self.parameters(), lr)
-
-    def forward(self, x):
-        return self.layers(x.to(self.device))
 
 
 class MaxEntIRL:
@@ -78,7 +43,7 @@ class MaxEntIRL:
         self.reward_net = RewardNet(inp=inp, lr=rew_lr, arch=rew_arch, device=self.device, **self.rew_kwargs).double()
 
     def _build_sac_agent(self, **kwargs):
-        self.env = RewardWrapper(self.env, self.reward_net)
+        self.env = RewardWrapper(self.env, self.reward_net.eval())
         # TODO: Argument 들이 외부에서부터 입력되도록 변경. 파일의 형태로 넘겨주는 것 고려해 볼 것
         self.agent = SAC(MlpPolicy,
                          env=self.env,
@@ -122,10 +87,10 @@ class MaxEntIRL:
 
     def learn(self,
               total_iter: int = 10,
-              gradient_steps: int = 50,
+              gradient_steps: int = 100,
               max_sac_iter: int = 10,
               agent_callback=None,
-              rew_callback=None,
+              callback=None,
               **kwargs):
         loss_logger = []
         for itr in range(total_iter):
@@ -134,12 +99,14 @@ class MaxEntIRL:
                 for agent_steps in range(max_sac_iter):
                     self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
                     agent_samples, T = self.rollout_from_agent(**kwargs)
-                    if self.cal_loss(agent_samples, T) / T < 0:
+                    logger.record("loss_diff", self.cal_loss(agent_samples, T))
+                    logger.record("agent_steps", agent_steps)
+                    logger.dump(agent_steps)
+                    if self.cal_loss(agent_samples, T) / T > 0:
                         break
-                logger.record("agent_steps", agent_steps)
-                logger.dump(itr)
             losses = []
             with logger.accumulate_means(f"reward_{itr}"):
+                self.reward_net.train()
                 for rew_steps in range(gradient_steps):
                     agent_samples, T = self.rollout_from_agent(**kwargs)
                     loss = self.cal_loss(agent_samples, T)
@@ -147,11 +114,12 @@ class MaxEntIRL:
                     loss.backward()
                     self.reward_net.optimizer.step()
                     losses.append(loss.item())
-                    logger.record(f"loss_{rew_steps}", loss.item())
+                    logger.record("steps", rew_steps)
+                    logger.record("loss", loss.item())
                     logger.dump(rew_steps)
-                    if loss.item() < -100:
+                    if loss.item() < -50:
                         break
-            if rew_callback:
-                rew_callback(self.reward_net, itr)
+            if callback:
+                callback(self, itr + 1)
             loss_logger.append(np.mean(losses))
         return loss_logger
