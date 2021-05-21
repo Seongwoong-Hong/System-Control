@@ -36,11 +36,27 @@ class RewardWrapper(gym.RewardWrapper):
         self.rwfn = rwfn
 
     def step(self, action: np.ndarray):
-        observation, reward, done, info = self.env.step(action)
+        obs = self.env.current_obs
+        observation, _, done, info = self.env.step(action)
         return observation, self.reward(np.append(observation, action)), done, info
 
     def reward(self, obs):
         rwinp = torch.from_numpy(obs).reshape(1, -1).to(self.rwfn.device)
+        return self.rwfn.forward(rwinp)
+
+
+class FeatureRewardWrapper(gym.RewardWrapper):
+    def __init__(self, env, rwfn):
+        super(FeatureRewardWrapper, self).__init__(env)
+        self.rwfn = rwfn
+
+    def step(self, action: np.ndarray):
+        obs = self.env.current_obs
+        observation, _, done, info = self.env.step(action)
+        return observation, self.reward(np.append(obs, action)), done, info
+
+    def reward(self, inp):
+        rwinp = torch.from_numpy(np.square(inp)).reshape(1, -1).to(self.rwfn.device)
         return self.rwfn.forward(rwinp)
 
 
