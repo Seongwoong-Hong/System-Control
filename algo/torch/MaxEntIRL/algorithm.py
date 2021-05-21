@@ -43,7 +43,12 @@ class MaxEntIRL:
         self.reward_net = RewardNet(inp=inp, lr=rew_lr, arch=rew_arch, device=self.device, **self.rew_kwargs).double()
 
     def _build_sac_agent(self, **kwargs):
-        self.env = RewardWrapper(self.env, self.reward_net.eval())
+        reward_wrapper = kwargs.get('reward_wrapper')
+        if reward_wrapper:
+            self.env = reward_wrapper(self.env, self.reward_net.eval())
+            kwargs.pop('reward_wrapper')
+        else:
+            self.env = RewardWrapper(self.env, self.reward_net.eval())
         # TODO: Argument 들이 외부에서부터 입력되도록 변경. 파일의 형태로 넘겨주는 것 고려해 볼 것
         self.agent = SAC(MlpPolicy,
                          env=self.env,
@@ -71,7 +76,7 @@ class MaxEntIRL:
 
     def mean_transition_reward(self, transition):
         if self.use_action_as_input:
-            np_input = np.concatenate([transition.obs, transition.acts], axis=1)
+            np_input = np.concatenate([np.square(transition.obs), np.square(transition.acts)], axis=1)
             th_input = th.from_numpy(np_input)
         else:
             th_input = th.from_numpy(transition.obs)
@@ -99,7 +104,7 @@ class MaxEntIRL:
                 for agent_steps in range(max_sac_iter):
                     self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
                     agent_samples, T = self.rollout_from_agent(**kwargs)
-                    logger.record("loss_diff", self.cal_loss(agent_samples, T))
+                    logger.record("loss_diff", self.cal_loss(agent_samples, T).item())
                     logger.record("agent_steps", agent_steps)
                     logger.dump(agent_steps)
                     if self.cal_loss(agent_samples, T) / T > 0:
@@ -114,7 +119,7 @@ class MaxEntIRL:
                     loss.backward()
                     self.reward_net.optimizer.step()
                     losses.append(loss.item())
-                    logger.record("steps", rew_steps)
+                    logger.record("steps", rew_steps + 1)
                     logger.record("loss", loss.item())
                     logger.dump(rew_steps)
                     if loss.item() < -50:
