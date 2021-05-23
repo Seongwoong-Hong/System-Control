@@ -2,6 +2,8 @@ import gym
 import numpy as np
 import torch
 
+from typing import Callable
+
 
 class ActionRewardWrapper(gym.RewardWrapper):
     def __init__(self, env, rwfn):
@@ -31,32 +33,28 @@ class ActionWrapper(gym.ActionWrapper):
 
 
 class RewardWrapper(gym.RewardWrapper):
-    def __init__(self, env, rwfn):
+    def __init__(
+            self,
+            env,
+            rwfn,
+            feature_fn: Callable = lambda x: x,
+            use_action_as_inp=True
+    ):
         super(RewardWrapper, self).__init__(env)
         self.rwfn = rwfn
+        self.feature_fn = feature_fn
+        self.use_action_as_inp = use_action_as_inp
 
     def step(self, action: np.ndarray):
-        obs = self.env.current_obs
+        obs = np.concatenate((self.env.sim.data.qpos, self.env.sim.data.qvel))
         observation, _, done, info = self.env.step(action)
-        return observation, self.reward(np.append(observation, action)), done, info
-
-    def reward(self, obs):
-        rwinp = torch.from_numpy(obs).reshape(1, -1).to(self.rwfn.device)
-        return self.rwfn.forward(rwinp)
-
-
-class FeatureRewardWrapper(gym.RewardWrapper):
-    def __init__(self, env, rwfn):
-        super(FeatureRewardWrapper, self).__init__(env)
-        self.rwfn = rwfn
-
-    def step(self, action: np.ndarray):
-        obs = self.env.current_obs
-        observation, _, done, info = self.env.step(action)
-        return observation, self.reward(np.append(obs, action)), done, info
+        if self.use_action_as_inp:
+            return observation, self.reward(np.append(obs, action)), done, info
+        else:
+            return observation, self.reward(obs), done, info
 
     def reward(self, inp):
-        rwinp = torch.from_numpy(np.square(inp)).reshape(1, -1).to(self.rwfn.device)
+        rwinp = torch.from_numpy(self.feature_fn(inp)).reshape(1, -1).to(self.rwfn.device)
         return self.rwfn.forward(rwinp)
 
 
