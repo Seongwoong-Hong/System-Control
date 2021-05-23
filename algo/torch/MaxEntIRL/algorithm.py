@@ -1,7 +1,7 @@
 import torch as th
 import numpy as np
 from copy import deepcopy
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Callable
 
 from algo.torch.sac import SAC, MlpPolicy
 from algo.torch.MaxEntIRL import RewardNet
@@ -13,19 +13,22 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 class MaxEntIRL:
-    def __init__(self,
-                 env,
-                 agent_learning_steps_per_one_loop,
-                 expert_transitions,
-                 device='cpu',
-                 rew_lr: float = 1e-3,
-                 rew_arch: List[int] = None,
-                 use_action_as_input: bool = True,
-                 rew_kwargs: Optional[Dict] = None,
-                 sac_kwargs: Optional[Dict] = None,
-                 ):
+    def __init__(
+            self,
+            env,
+            agent_learning_steps_per_one_loop,
+            expert_transitions,
+            feature_fn: Callable = lambda x: x,
+            device='cpu',
+            rew_lr: float = 1e-3,
+            rew_arch: List[int] = None,
+            use_action_as_input: bool = True,
+            rew_kwargs: Optional[Dict] = None,
+            sac_kwargs: Optional[Dict] = None,
+    ):
         self.env = env
         self.agent_learning_steps = agent_learning_steps_per_one_loop
+        self.feature_fn = feature_fn
         self.device = device
         self.use_action_as_input = use_action_as_input
         if sac_kwargs is None:
@@ -43,26 +46,29 @@ class MaxEntIRL:
         self.reward_net = RewardNet(inp=inp, lr=rew_lr, arch=rew_arch, device=self.device, **self.rew_kwargs).double()
 
     def _build_sac_agent(self, **kwargs):
-        reward_wrapper = kwargs.get('reward_wrapper')
+        reward_wrapper = kwargs.get("reward_wrapper")
+        wrapper_kwargs = kwargs.get("wrapper_kwargs")
         if reward_wrapper:
-            self.env = reward_wrapper(self.env, self.reward_net.eval())
+            self.env = reward_wrapper(self.env, self.reward_net.eval(), **wrapper_kwargs)
             kwargs.pop('reward_wrapper')
         else:
             self.env = RewardWrapper(self.env, self.reward_net.eval())
+        kwargs.pop("wrapper_kwargs")
         # TODO: Argument 들이 외부에서부터 입력되도록 변경. 파일의 형태로 넘겨주는 것 고려해 볼 것
-        self.agent = SAC(MlpPolicy,
-                         env=self.env,
-                         batch_size=256,
-                         learning_starts=100,
-                         train_freq=1,
-                         n_episodes_rollout=-1,
-                         gradient_steps=1,
-                         gamma=0.99,
-                         ent_coef='auto',
-                         device=self.device,
-                         policy_kwargs={'net_arch': {'pi': [32, 32], 'qf': [32, 32]}},
-                         **kwargs
-                         )
+        self.agent = SAC(
+            MlpPolicy,
+            env=self.env,
+            batch_size=256,
+            learning_starts=100,
+            train_freq=1,
+            n_episodes_rollout=-1,
+            gradient_steps=1,
+            gamma=0.99,
+            ent_coef='auto',
+            device=self.device,
+            policy_kwargs={'net_arch': {'pi': [32, 32], 'qf': [32, 32]}},
+            **kwargs
+        )
         return self.agent
 
     def rollout_from_agent(self, **kwargs):
@@ -76,10 +82,10 @@ class MaxEntIRL:
 
     def mean_transition_reward(self, transition):
         if self.use_action_as_input:
-            np_input = np.concatenate([np.square(transition.obs), np.square(transition.acts)], axis=1)
+            np_input = self.feature_fn(np.concatenate([transition.obs, transition.acts], axis=1))
             th_input = th.from_numpy(np_input)
         else:
-            th_input = th.from_numpy(transition.obs)
+            th_input = th.from_numpy(self.feature_fn(transition.obs))
         reward = self.reward_net(th_input)
         return reward.mean()
 
@@ -90,13 +96,15 @@ class MaxEntIRL:
         loss = agent_ex - expert_ex
         return loss * total_timesteps
 
-    def learn(self,
-              total_iter: int = 10,
-              gradient_steps: int = 100,
-              max_sac_iter: int = 10,
-              agent_callback=None,
-              callback=None,
-              **kwargs):
+    def learn(
+            self,
+            total_iter: int = 10,
+            gradient_steps: int = 100,
+            max_sac_iter: int = 10,
+            agent_callback=None,
+            callback=None,
+            **kwargs
+    ):
         loss_logger = []
         for itr in range(total_iter):
             self._build_sac_agent(**self.sac_kwargs)
@@ -119,7 +127,7 @@ class MaxEntIRL:
                     loss.backward()
                     self.reward_net.optimizer.step()
                     losses.append(loss.item())
-                    logger.record("steps", rew_steps + 1)
+                    logger.record("steps", rew_steps + 1, exclude="tensorboard")
                     logger.record("loss", loss.item())
                     logger.dump(rew_steps)
                     if loss.item() < -50:
