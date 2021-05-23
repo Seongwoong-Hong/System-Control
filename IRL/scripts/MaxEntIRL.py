@@ -1,20 +1,21 @@
 import os
 import pickle
 import shutil
+import numpy as np
 
 from imitation.data import rollout
 from imitation.util import logger
 
 from common.util import make_env, create_path
 from common.callbacks import SaveCallback
-from common.wrappers import FeatureRewardWrapper
+from common.wrappers import RewardWrapper
 from algo.torch.MaxEntIRL import MaxEntIRL
 
 
 if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    device = "cuda:2"
+    device = "cpu"
     name = "IDP_custom"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
@@ -45,24 +46,31 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    learning = MaxEntIRL(env,
-                         agent_learning_steps_per_one_loop=3e4,
-                         expert_transitions=transitions,
-                         rew_lr=1e-3,
-                         rew_arch=[],
-                         device=device,
-                         sac_kwargs={'verbose': 1,
-                                     'reward_wrapper': FeatureRewardWrapper,
-                                     }
-                         )
+    learning = MaxEntIRL(
+        env,
+        agent_learning_steps_per_one_loop=3e4,
+        expert_transitions=transitions,
+        rew_lr=1e-3,
+        rew_arch=[],
+        device=device,
+        sac_kwargs={
+            'verbose': 1,
+            'reward_wrapper': RewardWrapper,
+            'wrapper_kwargs': {
+                'feature_fn': lambda x: np.square(x),
+                'use_action_as_inp': True,
+            },
+        },
+    )
 
     # Run Learning
-    losses = learning.learn(total_iter=50,
-                            gradient_steps=500,
-                            n_episodes=8,
-                            max_sac_iter=5,
-                            callback=save_net_callback.net_save,
-                            )
+    losses = learning.learn(
+        total_iter=50,
+        gradient_steps=500,
+        n_episodes=8,
+        max_sac_iter=5,
+        callback=save_net_callback.net_save,
+    )
 
     # Save the result of learning
     reward_path = model_dir + "/reward_net.pkl"
