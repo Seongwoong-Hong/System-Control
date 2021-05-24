@@ -33,20 +33,19 @@ class ActionWrapper(gym.ActionWrapper):
 
 
 class RewardWrapper(gym.RewardWrapper):
-    def __init__(
-            self,
-            env,
-            rwfn,
-            feature_fn: Callable = lambda x: x,
-            use_action_as_inp=True
-    ):
+    def __init__(self, env, rwfn):
         super(RewardWrapper, self).__init__(env)
         self.rwfn = rwfn
-        self.feature_fn = feature_fn
-        self.use_action_as_inp = use_action_as_inp
+        num_rwfn_inp = self.rwfn.layers[0].in_features
+        if num_rwfn_inp == self.env.observation_space.shape[0]:
+            self.use_action_as_inp = False
+        elif num_rwfn_inp == self.env.observation_space.shape[0] + self.env.action_space.shape[0]:
+            self.use_action_as_inp = True
+        else:
+            raise ValueError("An input dimension doesn't match")
 
     def step(self, action: np.ndarray):
-        obs = np.concatenate((self.env.sim.data.qpos, self.env.sim.data.qvel))
+        obs = self.env.current_obs
         observation, _, done, info = self.env.step(action)
         if self.use_action_as_inp:
             return observation, self.reward(np.append(obs, action)), done, info
@@ -54,7 +53,7 @@ class RewardWrapper(gym.RewardWrapper):
             return observation, self.reward(obs), done, info
 
     def reward(self, inp):
-        rwinp = torch.from_numpy(self.feature_fn(inp)).reshape(1, -1).to(self.rwfn.device)
+        rwinp = torch.from_numpy(inp).reshape(1, -1).to(self.rwfn.device)
         return self.rwfn.forward(rwinp)
 
 

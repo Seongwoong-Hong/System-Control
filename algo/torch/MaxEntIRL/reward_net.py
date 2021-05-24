@@ -7,23 +7,23 @@ from imitation.util import logger
 
 
 class RewardNet(nn.Module):
-    def __init__(self,
-                 inp,
-                 lr: float,
-                 arch: List[int],
-                 device: str,
-                 optim_cls=th.optim.Adam,
-                 activation_fn=th.nn.Tanh,
-                 ):
+    def __init__(
+            self,
+            inp,
+            arch: List[int],
+            lr: float = 1e-3,
+            device: str = 'cuda',
+            optim_cls=th.optim.Adam,
+            activation_fn=th.nn.Tanh,
+            feature_fn=lambda x: x,
+    ):
         super(RewardNet, self).__init__()
         self.device = device
         self.act_fnc = activation_fn
+        self.feature_fn = feature_fn
         self.optim_cls = optim_cls
         self._build(lr, [inp] + arch)
         self.evalmod = False
-        assert (
-            logger.is_configured()
-        ), "Requires call to imitation.util.logger.configure"
 
     def _build(self, lr, arch):
         layers = []
@@ -39,6 +39,7 @@ class RewardNet(nn.Module):
         self.optimizer = self.optim_cls(self.parameters(), lr)
 
     def forward(self, x):
+        x = self.feature_fn(x)
         if self.evalmod:
             with th.no_grad():
                 return self.layers(x.to(self.device))

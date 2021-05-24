@@ -1,14 +1,13 @@
 import os
 import pickle
 import shutil
-import numpy as np
+import torch as th
 
 from imitation.data import rollout
 from imitation.util import logger
 
 from common.util import make_env, create_path
 from common.callbacks import SaveCallback
-from common.wrappers import RewardWrapper
 from algo.torch.MaxEntIRL import MaxEntIRL
 
 
@@ -53,14 +52,8 @@ if __name__ == "__main__":
         rew_lr=1e-3,
         rew_arch=[],
         device=device,
-        sac_kwargs={
-            'verbose': 1,
-            'reward_wrapper': RewardWrapper,
-            'wrapper_kwargs': {
-                'feature_fn': lambda x: np.square(x),
-                'use_action_as_inp': True,
-            },
-        },
+        sac_kwargs={'verbose': 1},
+        rew_kwargs={'feature_fn': lambda x: th.square(x)},
     )
 
     # Run Learning

@@ -1,7 +1,7 @@
 import torch as th
 import numpy as np
 from copy import deepcopy
-from typing import List, Dict, Optional, Callable
+from typing import List, Dict, Optional
 
 from algo.torch.sac import SAC, MlpPolicy
 from algo.torch.MaxEntIRL import RewardNet
@@ -18,7 +18,6 @@ class MaxEntIRL:
             env,
             agent_learning_steps_per_one_loop,
             expert_transitions,
-            feature_fn: Callable = lambda x: x,
             device='cpu',
             rew_lr: float = 1e-3,
             rew_arch: List[int] = None,
@@ -26,9 +25,11 @@ class MaxEntIRL:
             rew_kwargs: Optional[Dict] = None,
             sac_kwargs: Optional[Dict] = None,
     ):
+        assert (
+            logger.is_configured()
+        ), "Requires call to imitation.util.logger.configure"
         self.env = env
         self.agent_learning_steps = agent_learning_steps_per_one_loop
-        self.feature_fn = feature_fn
         self.device = device
         self.use_action_as_input = use_action_as_input
         if sac_kwargs is None:
@@ -43,17 +44,15 @@ class MaxEntIRL:
         inp = self.env.observation_space.shape[0]
         if self.use_action_as_input:
             inp += self.env.action_space.shape[0]
-        self.reward_net = RewardNet(inp=inp, lr=rew_lr, arch=rew_arch, device=self.device, **self.rew_kwargs).double()
+        self.reward_net = RewardNet(inp=inp, arch=rew_arch, lr=rew_lr, device=self.device, **self.rew_kwargs).double()
 
     def _build_sac_agent(self, **kwargs):
         reward_wrapper = kwargs.get("reward_wrapper")
-        wrapper_kwargs = kwargs.get("wrapper_kwargs")
         if reward_wrapper:
-            self.env = reward_wrapper(self.env, self.reward_net.eval(), **wrapper_kwargs)
+            self.env = reward_wrapper(self.env, self.reward_net.eval())
             kwargs.pop('reward_wrapper')
         else:
             self.env = RewardWrapper(self.env, self.reward_net.eval())
-        kwargs.pop("wrapper_kwargs")
         # TODO: Argument 들이 외부에서부터 입력되도록 변경. 파일의 형태로 넘겨주는 것 고려해 볼 것
         self.agent = SAC(
             MlpPolicy,
@@ -82,10 +81,10 @@ class MaxEntIRL:
 
     def mean_transition_reward(self, transition):
         if self.use_action_as_input:
-            np_input = self.feature_fn(np.concatenate([transition.obs, transition.acts], axis=1))
+            np_input = np.concatenate([transition.obs, transition.acts], axis=1)
             th_input = th.from_numpy(np_input)
         else:
-            th_input = th.from_numpy(self.feature_fn(transition.obs))
+            th_input = th.from_numpy(transition.obs)
         reward = self.reward_net(th_input)
         return reward.mean()
 
