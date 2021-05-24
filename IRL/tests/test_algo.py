@@ -36,10 +36,10 @@ def test_rl_learned_policy():
 
 
 def test_irl_learned_policy():
-    env_type = "IDP"
+    env_type = "IP"
     env = make_env(f"{env_type}_custom-v2", n_steps=600, use_vec_env=False)
-    name = f"{env_type}/MaxEntIRL/{env_type}_custom_test1"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "003")
+    name = f"{env_type}/MaxEntIRL/{env_type}_custom_fast"
+    model_dir = os.path.join("..", "tmp", "log", name, "model")
     algo = SAC.load(model_dir + "/agent")
     a_list, o_list, _ = verify_policy(env, algo)
 
