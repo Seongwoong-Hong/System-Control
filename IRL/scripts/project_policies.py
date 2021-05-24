@@ -107,7 +107,6 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    batch_size=256,
                    learning_starts=4096,
                    train_freq=2048,
-                   n_episodes_rollout=-1,
                    gradient_steps=10,
                    gamma=0.975,
                    ent_coef='auto_0.05',
