@@ -2,7 +2,7 @@ import gym
 import os
 
 from common.verification import verify_policy
-from algo.torch.ppo import PPO
+from algos.torch.ppo import PPO
 
 if __name__ == "__main__":
     env_type = "Hopper"

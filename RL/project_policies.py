@@ -1,10 +1,10 @@
-from algo.torch.ppo import PPO
-from algo.torch.sac import SAC
+from algos.torch.ppo import PPO
+from algos.torch.sac import SAC
 
 
 def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
     if algo_type == "ppo":
-        from algo.torch.ppo import MlpPolicy
+        from algos.torch.ppo import MlpPolicy
         return PPO(MlpPolicy,
                    env=env,
                    n_steps=256,
@@ -26,14 +26,13 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    )
 
     elif algo_type == "sac":
-        from algo.torch.sac import MlpPolicy
+        from algos.torch.sac import MlpPolicy
         return SAC(MlpPolicy,
                    env=env,
                    buffer_size=int(1e6),
                    batch_size=256,
                    learning_starts=100,
                    train_freq=1,
-                   n_episodes_rollout=-1,
                    gradient_steps=1,
                    gamma=0.99,
                    ent_coef='auto',

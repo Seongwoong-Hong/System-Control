@@ -4,7 +4,7 @@ import os
 from stable_baselines3.common import callbacks
 from imitation.policies import serialize
 
-from algo.torch.ppo import PPO, MlpPolicy
+from algos.torch.ppo import PPO, MlpPolicy
 from common.callbacks import VideoCallback
 from common.util import create_path, make_env
 from mujoco_py import GlfwContext
