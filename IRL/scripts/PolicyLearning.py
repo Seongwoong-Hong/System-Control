@@ -12,14 +12,14 @@ from mujoco_py import GlfwContext
 
 if __name__ == "__main__":
     env_type = "IDP"
-    algo_type = "ppo"
+    algo_type = "sac"
     name = f"{env_type}/{algo_type}"
     env_id = f"{env_type}_custom-v1"
     n_steps = 600
     env = make_env(env_id, num_envs=8, n_steps=600, subpath="sub01")
     device = "cpu"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    log_dir = os.path.join(proj_path, "tmp", "log", name, "lqrppo")
+    log_dir = os.path.join(proj_path, "tmp", "log", name, "test")
     model_dir = os.path.join(log_dir, "model")
     create_path(model_dir)
     GlfwContext(offscreen=True)

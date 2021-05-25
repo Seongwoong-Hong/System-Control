@@ -10,7 +10,7 @@ from imitation.util import logger
 from stable_baselines3.common.vec_env import VecNormalize
 
 from common.util import make_env, create_path
-from algo.torch.ppo import PPO, MlpPolicy
+from algos.torch.ppo import PPO, MlpPolicy
 
 
 if __name__ == "__main__":

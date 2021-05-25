@@ -11,7 +11,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 from IRL.scripts.project_policies import def_policy
 from common.callbacks import VFCustomCallback
-from algo.torch.GCL.costnet import GCLCostNet
+from algos.torch.GCL.costnet import GCLCostNet
 from common.rollouts import get_trajectories_probs
 from common.wrappers import CostWrapper
 from scipy import io

@@ -1,6 +1,6 @@
-from algo.torch.OptCont import LQRPolicy
-from algo.torch.ppo import PPO
-from algo.torch.sac import SAC
+from algos.torch.OptCont import LQRPolicy
+from algos.torch.ppo import PPO
+from algos.torch.sac import SAC
 import numpy as np
 import torch as th
 
@@ -79,7 +79,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
     elif algo_type == "HPCDiv":
         return HPCDivPolicy(env, **kwargs)
     elif algo_type == "ppo":
-        from algo.torch.ppo import MlpPolicy
+        from algos.torch.ppo import MlpPolicy
         return PPO(MlpPolicy,
                    env=env,
                    n_steps=256,
@@ -101,7 +101,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    )
 
     elif algo_type == "sac":
-        from algo.torch.sac import MlpPolicy
+        from algos.torch.sac import MlpPolicy
         return SAC(MlpPolicy,
                    env=env,
                    batch_size=256,
