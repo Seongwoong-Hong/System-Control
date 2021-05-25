@@ -187,7 +187,12 @@ class SaveCallback:
 
     def rew_save(self, network, itr):
         if itr % self.cycle == 0:
-            reward_path = self.path + "/reward_net.pkl"
+            reward_path = self.path + f"{itr:03d}/reward_net.pkl"
             with open(reward_path + ".tmp", "wb") as f:
                 pickle.dump(network.reward_net, f)
             os.replace(reward_path + ".tmp", reward_path)
+
+    def agent_save(self, network, itr):
+        if itr % self.cycle == 0:
+            log_dir = self.path + f"/{itr:03d}/agent"
+            network.agent.save(log_dir)
