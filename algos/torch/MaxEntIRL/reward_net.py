@@ -3,8 +3,6 @@ import torch as th
 from torch import nn
 from typing import List
 
-from imitation.util import logger
-
 
 class RewardNet(nn.Module):
     def __init__(
@@ -39,7 +37,7 @@ class RewardNet(nn.Module):
         self.optimizer = self.optim_cls(self.parameters(), lr)
 
     def forward(self, x):
-        x = self.feature_fn(x)
+        # x = self.feature_fn(x)
         if self.evalmod:
             with th.no_grad():
                 return self.layers(x.to(self.device))

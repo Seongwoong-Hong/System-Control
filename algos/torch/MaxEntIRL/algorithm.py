@@ -3,8 +3,8 @@ import numpy as np
 from copy import deepcopy
 from typing import List, Dict, Optional
 
-from algo.torch.sac import SAC, MlpPolicy
-from algo.torch.MaxEntIRL import RewardNet
+from algos.torch.sac import SAC, MlpPolicy
+from algos.torch.MaxEntIRL import RewardNet
 from common.wrappers import RewardWrapper
 
 from imitation.data.rollout import make_sample_until, generate_trajectories, flatten_trajectories
@@ -60,7 +60,6 @@ class MaxEntIRL:
             batch_size=256,
             learning_starts=100,
             train_freq=1,
-            n_episodes_rollout=-1,
             gradient_steps=1,
             gamma=0.99,
             ent_coef='auto',
