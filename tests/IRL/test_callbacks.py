@@ -1,7 +1,7 @@
 import gym_envs
 import os
 
-from algo.torch.ppo import PPO, MlpPolicy
+from algos.torch.ppo import PPO, MlpPolicy
 
 from imitation.policies import serialize
 from stable_baselines3.common import callbacks

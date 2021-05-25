@@ -4,7 +4,7 @@ import pickle
 
 from common.util import make_env
 from common.callbacks import SaveCallback
-from algo.torch.MaxEntIRL.algorithm import MaxEntIRL
+from algos.torch.MaxEntIRL.algorithm import MaxEntIRL
 from imitation.data import rollout
 
 

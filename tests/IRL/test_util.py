@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from algo.torch.ppo import PPO
+from algos.torch.ppo import PPO
 from common.util import write_analyzed_result, make_env
 
 

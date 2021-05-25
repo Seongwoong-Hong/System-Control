@@ -1,7 +1,7 @@
 import os
 
-from algo.torch.ppo import PPO
-from algo.torch.sac import SAC
+from algos.torch.ppo import PPO
+from algos.torch.sac import SAC
 from IRL.scripts.project_policies import def_policy
 from common.verification import verify_policy
 from common.util import make_env
@@ -26,17 +26,8 @@ def test_hpc_learned_policy(env):
         a_list, o_list, _ = verify_policy(env, algo)
 
 
-def test_rl_learned_policy():
-    env_type = "IDP"
-    env = make_env(f"{env_type}_custom-v2", n_steps=600)
-    name = f"{env_type}_custom_learned_reward/sac"
-    model_dir = os.path.join("..", "..", "RL", env_type, "tmp", "log", name, "policies_1")
-    algo = SAC.load(model_dir + "/sac0")
-    a_list, o_list, _ = verify_policy(env, algo)
-
-
 def test_irl_learned_policy():
-    env_type = "IP"
+    env_type = "IDP"
     env = make_env(f"{env_type}_custom-v2", n_steps=600, use_vec_env=False)
     name = f"{env_type}/MaxEntIRL/{env_type}_custom_fast"
     model_dir = os.path.join("..", "tmp", "log", name, "model")

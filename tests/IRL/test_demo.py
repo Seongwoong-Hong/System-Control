@@ -27,7 +27,7 @@ def run_traj(env, expert_dir):
 
 
 def test_hpc(env):
-    expert_dir = os.path.join("..", "demos", "HPC", "expert.pkl")
+    expert_dir = os.path.join("..", "..", "IRL", "demos", "HPC", "sub01_1&2.pkl")
     run_traj(env, expert_dir)
 
 
@@ -37,8 +37,8 @@ def test_hpcdiv(env):
 
 
 def test_idp():
-    env = make_env("IDP_custom-v2", use_vec_env=False)
-    expert_dir = os.path.join("..", "demos", "IDP", "lqr.pkl")
+    env = make_env("IDP_custom-v0", use_vec_env=False)
+    expert_dir = os.path.join("..", "..", "IRL", "demos", "IDP", "lqr.pkl")
     run_traj(env, expert_dir)
 
 

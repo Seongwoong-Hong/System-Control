@@ -11,7 +11,7 @@ def pltqs():
     pltqs = []
     sub = "sub01"
     for i in range(35):
-        file = os.path.join("..", "demos", "HPC", sub, sub + "i%d.mat" % (i + 1))
+        file = os.path.join("..", "..", "IRL", "demos", "HPC", sub, sub + "i%d.mat" % (i + 1))
         pltqs += [io.loadmat(file)['pltq']]
     return pltqs
 

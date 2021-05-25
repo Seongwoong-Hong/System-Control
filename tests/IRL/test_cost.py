@@ -3,8 +3,8 @@ import pickle
 
 from common.util import make_env
 from common.verification import CostMap
-from algo.torch.ppo import PPO
-from algo.torch.sac import SAC
+from algos.torch.ppo import PPO
+from algos.torch.sac import SAC
 
 from matplotlib import pyplot as plt
 
