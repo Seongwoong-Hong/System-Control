@@ -16,9 +16,9 @@ def make_env(env_name, use_vec_env=False, num_envs=10, **kwargs):
         return env
     env_type = env_name[:env_name.find("_custom")]
     if env_type == "HPC":
-        subpath = kwargs.pop("subpath")
+        subpath = kwargs.get("subpath")
         pltqs = kwargs.get("pltqs")
-        assert subpath is not None, "HPC environment needs subject!"
+        assert subpath is not None or pltqs is not None, "HPC environment needs pltqs!"
         if not pltqs:
             pltqs = []
             i = 0
@@ -29,6 +29,7 @@ def make_env(env_name, use_vec_env=False, num_envs=10, **kwargs):
                 pltqs += [io.loadmat(file)['pltq']]
                 i += 1
             kwargs['pltqs'] = pltqs
+            kwargs.pop("subpath")
     elif env_type == "IDP" or env_type == "IP":
         kwargs.pop('subpath', None)
         kwargs.pop('pltqs', None)
