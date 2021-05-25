@@ -5,8 +5,8 @@ from scipy import io
 from matplotlib import pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 
-from algo.torch.ppo import PPO
-from algo.torch.sac import SAC
+from algos.torch.ppo import PPO
+from algos.torch.sac import SAC
 from common.util import make_env, write_analyzed_result, create_path
 
 if __name__ == "__main__":
