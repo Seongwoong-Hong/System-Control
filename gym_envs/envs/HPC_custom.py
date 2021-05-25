@@ -43,8 +43,11 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
             self.sim.data.qpos,  # link angles
             self.sim.data.qvel,  # link angular velocities
             self.plt_torque,     # torque from platform movement
-            # np.array([self.order])
         ]).ravel()
+
+    @property
+    def current_obs(self):
+        return self._get_obs()
 
     def reset_model(self):
         self._timesteps = 0

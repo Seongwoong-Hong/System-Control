@@ -17,7 +17,9 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def step(self, action):
         ob = self._get_obs()
-        r = -(ob[0] ** 2 + ob[1] ** 2 + 1e-5 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
+        r = -(ob[0] ** 2 + ob[1] ** 2
+              + 0.1 * ob[2] ** 2 + 0.1 * ob[3] ** 2
+              + 1e-5 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         self.do_simulation(action, self.frame_skip)
         self.__timesteps += 1
         ob = self._get_obs()
@@ -52,8 +54,8 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def reset_model(self):
         self.set_state(
-            self.init_qpos + self.np_random.uniform(low=-.1, high=.1, size=self.model.nq),
-            self.init_qvel + self.np_random.uniform(low=-.1, high=.1, size=self.model.nv)
+            self.init_qpos + self.np_random.uniform(low=-.3, high=.3, size=self.model.nq),
+            self.init_qvel + self.np_random.uniform(low=-.3, high=.3, size=self.model.nv)
         )
         return self._get_obs()
 
