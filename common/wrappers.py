@@ -54,7 +54,7 @@ class RewardWrapper(gym.RewardWrapper):
 
     def reward(self, inp):
         rwinp = torch.from_numpy(inp).reshape(1, -1).to(self.rwfn.device)
-        return self.rwfn.forward(rwinp)
+        return self.rwfn.forward(rwinp).item()
 
 
 class CostWrapper(gym.RewardWrapper):
