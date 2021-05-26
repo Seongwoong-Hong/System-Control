@@ -11,32 +11,35 @@ from common.util import make_env
 from common.verification import CostMap
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "HPC"
     algo_type = "MaxEntIRL"
     device = "cpu"
     saving = True
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     sub = "sub01"
-    name = "IDP_custom"
+    name = "HPC_custom"
     write_ = False
 
     pltqs = []
-    test_len = 5
+    test_len = 10
     if env_type == "HPC":
-        for i in [0, 5, 10, 15, 20, 25, 30]:
+        for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
             file = os.path.join(proj_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
             pltqs += [io.loadmat(file)['pltq']]
         test_len = len(pltqs)
 
-    agent_env = make_env(f"{name}-v2", use_vec_env=False, n_steps=600, pltqs=pltqs)
-    expt_env = make_env(f"{name}-v2", use_vec_env=False, n_steps=600, subpath="sub01")
+    agent_env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
+    expt_env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
     expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
 
-    name += "_lqr"
+    name = "no_sub01_1&2"
     ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name)
-    model_dir = os.path.join(ana_dir, "model")
+    model_dir = os.path.join(ana_dir, "model", "028")
 
     agent = SAC.load(model_dir + "/agent")
+
+    def feature_fn(x):
+        return x
 
     with open(model_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
@@ -47,7 +50,7 @@ if __name__ == "__main__":
 
     def run_algo(env, algo):
         costs = []
-        for _ in range(10):
+        for _ in range(test_len):
             reward = 0
             obs = env.reset()
             done = False
