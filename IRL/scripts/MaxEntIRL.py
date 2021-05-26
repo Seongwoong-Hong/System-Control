@@ -22,14 +22,14 @@ if __name__ == "__main__":
     env = make_env(f"{name}-v0", use_vec_env=False, num_envs=8, n_steps=600)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "abs_ppo.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     transitions = rollout.flatten_trajectories(expert_trajs)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/no_abs_ppo"
+    log_dir += "/sq_lqr_ppo"
     assert not os.path.isdir(log_dir), "The log directory already exists"
     create_path(log_dir)
     print(f"All Tensorboards and logging are being written inside {log_dir}/.")
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
-        return x
+        return th.square(x)
 
     # Setup Learner
     learning = MaxEntIRL(
