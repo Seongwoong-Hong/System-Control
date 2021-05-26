@@ -128,6 +128,7 @@ class MaxEntIRL:
                     logger.record("steps", rew_steps + 1, exclude="tensorboard")
                     logger.record("loss", loss.item())
                     logger.dump(rew_steps)
+                    # TODO: Is there any smart way that breaks reward learning?
                     if loss.item() < -50:
                         break
             if callback:
