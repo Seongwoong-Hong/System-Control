@@ -49,14 +49,14 @@ class MaxEntIRL:
     def _build_sac_agent(self, **kwargs):
         reward_wrapper = kwargs.get("reward_wrapper")
         if reward_wrapper:
-            self.env = reward_wrapper(self.env, self.reward_net.eval())
+            self.wrap_env = reward_wrapper(self.env, self.reward_net.eval())
             kwargs.pop('reward_wrapper')
         else:
-            self.env = RewardWrapper(self.env, self.reward_net.eval())
+            self.wrap_env = RewardWrapper(self.env, self.reward_net.eval())
         # TODO: Argument 들이 외부에서부터 입력되도록 변경. 파일의 형태로 넘겨주는 것 고려해 볼 것
         self.agent = SAC(
             MlpPolicy,
-            env=self.env,
+            env=self.wrap_env,
             batch_size=256,
             learning_starts=100,
             train_freq=1,
@@ -75,7 +75,7 @@ class MaxEntIRL:
             n_episodes = 10
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
         trajectories = generate_trajectories(
-            self.agent, DummyVecEnv([lambda: self.env]), sample_until, deterministic_policy=False)
+            self.agent, DummyVecEnv([lambda: self.wrap_env]), sample_until, deterministic_policy=False)
         return flatten_trajectories(trajectories), len(flatten_trajectories(trajectories)) / n_episodes
 
     def mean_transition_reward(self, transition):
