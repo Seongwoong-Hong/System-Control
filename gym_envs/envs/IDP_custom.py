@@ -14,6 +14,7 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
+        self.__timesteps = 0
 
     def step(self, action):
         ob = self._get_obs()
