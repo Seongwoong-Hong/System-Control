@@ -102,19 +102,20 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
 
     elif algo_type == "sac":
         from algos.torch.sac import MlpPolicy
-        return SAC(MlpPolicy,
-                   env=env,
-                   batch_size=256,
-                   learning_starts=4096,
-                   train_freq=2048,
-                   gradient_steps=10,
-                   gamma=0.975,
-                   ent_coef='auto_0.05',
-                   verbose=verbose,
-                   device=device,
-                   tensorboard_log=log_dir,
-                   policy_kwargs={'net_arch': {'pi': [128, 128], 'qf': [128, 128]}},
-                   **kwargs,
-                   )
+        return SAC(
+            MlpPolicy,
+            env=env,
+            batch_size=256,
+            learning_starts=100,
+            train_freq=1,
+            gradient_steps=1,
+            gamma=0.99,
+            ent_coef='auto',
+            device=device,
+            verbose=verbose,
+            tensorboard_log=log_dir,
+            policy_kwargs={'net_arch': {'pi': [32, 32], 'qf': [32, 32]}},
+            **kwargs
+        )
     else:
         raise NameError("Not implemented policy name")

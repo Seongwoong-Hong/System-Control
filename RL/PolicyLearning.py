@@ -13,15 +13,6 @@ from RL.project_policies import def_policy
 from mujoco_py import GlfwContext
 
 
-def wrapped_env(environment, reward_wrap=None, norm_wrap=False):
-    renv = environment
-    if reward_wrap:
-        renv = RewardWrapper(renv, reward_wrap)
-    if norm_wrap:
-        renv = VecNormalize(renv, norm_obs=True, norm_reward=False)
-    return renv
-
-
 if __name__ == "__main__":
     env_type = "HPC"
     algo_type = "ppo"
@@ -30,9 +21,6 @@ if __name__ == "__main__":
     env_id = f"{name}-v1"
     env = make_env(env_id, use_vec_env=True, num_envs=8, n_steps=600, subpath="../IRL/demos/HPC/sub01/sub01")
     name += ""
-    # with open(f"../IRL/tmp/log/{env_type}/MaxEntIRL/{name}/model/reward_net.pkl", "rb") as f:
-    #     reward_net = pickle.load(f).double()
-    # env = wrapped_env(env, reward_wrap=reward_net.eval(), norm_wrap=False)
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     create_path(dirname=log_dir)

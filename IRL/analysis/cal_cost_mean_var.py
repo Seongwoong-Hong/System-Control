@@ -11,14 +11,13 @@ from common.util import make_env
 from common.verification import CostMap
 
 if __name__ == "__main__":
-    env_type = "HPC"
+    env_type = "IDP"
     algo_type = "MaxEntIRL"
     device = "cpu"
-    saving = True
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     sub = "sub01"
-    name = "HPC_custom"
-    write_ = False
+    name = "IDP_custom"
+    write_txt = False
 
     pltqs = []
     test_len = 10
@@ -32,9 +31,9 @@ if __name__ == "__main__":
     expt_env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
     expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
 
-    name = "no_sub01_1&2"
+    name = "no_lqr"
     ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name)
-    model_dir = os.path.join(ana_dir, "model", "028")
+    model_dir = os.path.join(ana_dir, "model", "033")
 
     agent = SAC.load(model_dir + "/agent")
 
@@ -46,7 +45,7 @@ if __name__ == "__main__":
 
     def agent_cost_fn(*args):
         inp = th.cat([args[0], args[1]], dim=1)
-        return reward_fn(inp).item()
+        return -reward_fn(inp).item()
 
     def run_algo(env, algo):
         costs = []
@@ -71,7 +70,7 @@ if __name__ == "__main__":
     print(f"agent_cost_for_expt mean: {np.mean(agent_cost_for_expt[1]):.3e}, std: {np.std(agent_cost_for_expt[1]):.3e}")
     print(f"expt_cost_for_agent mean: {np.mean(expt_cost_for_agent):.3e}, std: {np.std(expt_cost_for_agent):.3e}")
     print(f"expt_cost_for_expt mean: {np.mean(expt_cost_for_expt):.3e}, std: {np.std(expt_cost_for_expt):.3e}")
-    if write_:
+    if write_txt:
         f = open("MaxEntIRL_result.txt", "a")
         f.write(f"env: {name}\n")
         f.write(f"agent_cost_for_agent mean: {np.mean(agent_cost_for_agent[1]):.3e}, std: {np.std(agent_cost_for_agent[1]):.3e}\n")

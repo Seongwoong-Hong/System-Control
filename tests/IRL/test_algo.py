@@ -25,9 +25,9 @@ def test_hpcdiv_algo(tenv):
 
 
 def test_hpc_learned_policy(env, irl_path):
-    name = "HPC/MaxEntIRL/HPC_customtest/" + ""
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
-    algo = SAC.load(model_dir + "/agent.zip")
+    name = "HPC/MaxEntIRL/no_sub01_1&2/" + "add_rew_learning"
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "policies_1")
+    algo = SAC.load(model_dir + "/000000250000/model.pkl")
     for _ in range(10):
         a_list, o_list, _ = verify_policy(env, algo)
 

@@ -13,23 +13,27 @@ from algos.torch.MaxEntIRL import MaxEntIRL
 
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "HPC"
     algo_type = "MaxEntIRL"
-    device = "cpu"
-    name = "IDP_custom"
+    device = "cuda:3"
+    name = "HPC_custom"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
-    env = make_env(f"{name}-v0", use_vec_env=False, num_envs=8, n_steps=600)
+    pltqs = []
+    for i in [0, 1, 2, 3, 4, 30, 31, 32, 33, 34]:
+        file = "../demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
+        pltqs += [io.loadmat(file)['pltq']]
+    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, n_steps=600, pltqs=pltqs)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "sub01_1&7.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     transitions = rollout.flatten_trajectories(expert_trajs)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/sq_lqr_ppo"
+    log_dir += "/no_sub01_1&7"
     assert not os.path.isdir(log_dir), "The log directory already exists"
     create_path(log_dir)
     print(f"All Tensorboards and logging are being written inside {log_dir}/.")
@@ -46,7 +50,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
-        return th.square(x)
+        return x
 
     # Setup Learner
     learning = MaxEntIRL(
