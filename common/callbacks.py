@@ -179,7 +179,7 @@ class SaveCallback:
     def net_save(self, network, itr):
         if itr % self.cycle == 0:
             log_dir = self.path + f"/{itr:03d}"
-            os.mkdir(log_dir)
+            os.makedirs(log_dir, exist_ok=True)
             with open(log_dir + "/reward_net.pkl.tmp", "wb") as f:
                 pickle.dump(network.reward_net, f)
             network.agent.save(log_dir + "/agent")
