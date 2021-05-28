@@ -25,13 +25,18 @@ def env():
 def learner(env, expert):
     from imitation.util import logger
     logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
+
+    def feature_fn(x):
+        return x
+
     learning = MaxEntIRL(env,
-                         agent_learning_steps_per_one_loop=1000,
+                         agent_learning_steps_per_one_loop=10000,
                          expert_transitions=expert,
-                         rew_lr=1e-5,
-                         rew_arch=[3, 8, 8],
+                         rew_lr=1e-3,
+                         rew_arch=[8, 8],
                          device='cuda:0',
                          sac_kwargs={'verbose': 1},
+                         rew_kwargs={'feature_fn': feature_fn}
                          )
     return learning
 
@@ -93,7 +98,7 @@ def test_callback(learner):
     save_policy_callback = serialize.SavePolicyCallback(f"tmp/log", None)
     save_policy_callback = callbacks.EveryNTimesteps(int(1e3), save_policy_callback)
     save_reward_callback = SaveCallback(cycle=1, dirpath=f"tmp/log")
-    learner.learn(total_iter=1, gradient_steps=1, n_episodes=8, max_sac_iter=1, callback=save_reward_callback.net_save)
+    learner.learn(total_iter=10, gradient_steps=100, n_episodes=8, max_sac_iter=10, callback=save_reward_callback.net_save)
 
 
 def test_wrapper(env, expert):
@@ -131,4 +136,4 @@ def test_feature(env, expert):
 
 
 def test_validity(learner):
-    learner.learn(total_iter=10, gradient_steps=1, n_episodes=8)
+    learner.learn(total_iter=10, gradient_steps=1, n_episodes=8, max_sac_iter=10)
