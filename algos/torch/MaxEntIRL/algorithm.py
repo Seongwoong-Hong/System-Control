@@ -129,7 +129,7 @@ class MaxEntIRL:
                     logger.record("loss", loss.item())
                     logger.dump(rew_steps)
                     # TODO: Is there any smart way that breaks reward learning?
-                    if loss.item() < -50:
+                    if loss.item() < -100:
                         break
             if callback:
                 callback(self, itr + 1)
