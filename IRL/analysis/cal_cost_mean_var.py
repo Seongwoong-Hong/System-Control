@@ -11,12 +11,12 @@ from common.util import make_env
 from common.verification import CostMap
 
 if __name__ == "__main__":
-    env_type = "HPC"
+    env_type = "IDP"
     algo_type = "MaxEntIRL"
     device = "cpu"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     sub = "sub01"
-    name = "HPC_custom"
+    name = "IDP_custom"
     write_txt = False
 
     pltqs = []
@@ -31,9 +31,9 @@ if __name__ == "__main__":
     expt_env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
     expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
 
-    name = "no_sub01_1&2"
+    name = "no_lqr"
     ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name)
-    model_dir = os.path.join(ana_dir, "model", "004")
+    model_dir = os.path.join(ana_dir, "model", "013")
 
     agent = SAC.load(model_dir + "/agent")
 

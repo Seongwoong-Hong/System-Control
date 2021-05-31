@@ -13,7 +13,7 @@ if __name__ == '__main__':
     i = 1
     sub = f"sub{i:02d}"
     for i in range(10):
-        file = "HPC/" + sub + "/" + sub + "i%d.mat" % (i+1)
+        file = "HPC/" + sub + "/" + sub + f"i{i+1}.mat"
         data = {'state': io.loadmat(file)['state'],
                 'T': io.loadmat(file)['tq'],
                 'pltq': io.loadmat(file)['pltq'],
