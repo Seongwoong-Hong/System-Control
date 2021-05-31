@@ -1,26 +1,26 @@
 <mujoco model="HPC_custom">
-  <compiler angle="radian" coordinate="local" inertiafromgeom="false"/>
+  <compiler angle="radian" coordinate="local" inertiafromgeom="false" />
   <default>
-    <joint damping="0.0"/>
-    <geom contype="0" friction="0.0 0.0 0.0"/>
+    <joint damping="0.0" />
+    <geom contype="0" friction="0.0 0.0 0.0" />
   </default>
-  <option gravity="0 0 -9.81" integrator="RK4" timestep="0.0016666666666667"/>
-  <size nstack="3000" nuserdata="100" nuser_actuator="10"/>
+  <option gravity="0 0 -9.81" integrator="RK4" timestep="0.0016666666666667" />
+  <size nstack="3000" nuser_actuator="10" nuserdata="100" />
   <worldbody>
-    <geom name="floor" pos="0 0 -3" rgba="1 1 1 1" size="40 40 40" type="plane"/>
+    <geom name="floor" pos="0 0 -3" rgba="1 1 1 1" size="40 40 40" type="plane" />
     <body name="leg" pos="0 0 0">
-      <joint axis="0 1 0" limited="true" range="-1 1" name="hinge" pos="0 0 0" type="hinge"/>
-      <geom fromto="0 0 0 0 0 0.7790" name="cpole" rgba="0.9 0.4 0.0 0.7" size="0.045" type="capsule"/>
-      <inertial pos="0 0 0.4980" mass="17.8391" diaginertia="0.8725 0.8725 0.001"/>
-      <body name="body" pos ="0 0 0.7790">
-        <joint axis="0 1 0" limited="true" range="-1 1" name="hinge2" pos="0 0 0" type="hinge"/>
-        <geom fromto="0 0 0 0 0 0.7610" name="cpole2" rgba="0.8 0.4 0.0 0.7" size="0.045" type="capsule"/>
-        <inertial pos="0 0 0.2802" mass="35.3379" diaginertia="1.0748 1.0748 0.001"/>
+      <joint axis="0 1 0" limited="true" name="hinge" pos="0 0 0" range="-1 1" type="hinge" />
+      <geom fromto="0 0 0 0 0 0.7790" name="cpole" rgba="0.9 0.4 0.0 0.7" size="0.045" type="capsule" />
+      <inertial diaginertia="0.872503 0.872503 0.001" mass="17.8391" pos="0 0 0.4980" />
+      <body name="body" pos="0 0 0.779">
+        <joint axis="0 1 0" limited="true" name="hinge2" pos="0 0 0" range="-1 1" type="hinge" />
+        <geom fromto="0 0 0 0 0 0.7610" name="cpole2" rgba="0.8 0.4 0.0 0.7" size="0.045" type="capsule" />
+        <inertial diaginertia="1.074783 1.074783 0.001" mass="35.3379" pos="0 0 0.2802" />
       </body>
     </body>
   </worldbody>
   <actuator>
-    <motor ctrllimited="true" ctrlrange='-1 1' gear="300" joint="hinge"/>
-    <motor ctrllimited="true" ctrlrange='-1 1' gear="300" joint="hinge2"/>
+    <motor ctrllimited="true" ctrlrange="-1 1" gear="300" joint="hinge" />
+    <motor ctrllimited="true" ctrlrange="-1 1" gear="300" joint="hinge2" />
   </actuator>
 </mujoco>

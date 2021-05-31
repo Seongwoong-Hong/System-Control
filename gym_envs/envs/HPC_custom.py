@@ -3,6 +3,7 @@ import random
 import numpy as np
 from gym import utils, spaces
 from gym.envs.mujoco import mujoco_env
+from xml.etree.ElementTree import ElementTree, parse
 
 
 class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
@@ -12,14 +13,15 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         self.n_steps = n_steps
         self._pltqs = pltqs
         self._pltq = None
-        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml"), 5)
+        filepath = os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml")
+        if bsp is not None:
+            self._set_body_config(filepath, bsp)
+        mujoco_env.MujocoEnv.__init__(self, filepath, 5)
         utils.EzPickle.__init__(self)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
         self._set_pltqs()
-        if bsp is not None:
-            self.bsp = bsp
 
     def step(self, action: np.ndarray):
         ob = self._get_obs()
@@ -98,6 +100,31 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         else:
             self._pltq = None
 
+    def _set_body_config(self, filepath, bsp):
+        m_u, l_u, com_u, I_u = bsp[6, :]
+        m_s, l_s, com_s, I_s = bsp[2, :]
+        m_t, l_t, com_t, I_t = bsp[3, :]
+        l_l = l_s + l_t
+        m_l = 2 * (m_s + m_t)
+        com_l = (m_s * com_s + m_t * (l_s + com_t)) / (m_s + m_t)
+        I_l = 2 * (I_s + m_s * (com_l - com_s) ** 2 + I_t + m_t * (com_l - (l_s + com_t)) ** 2)
+        tree = parse(filepath)
+        root = tree.getroot()
+        l_body = root.find("worldbody").find("body")
+        l_body.find('geom').attrib['fromto'] = f"0 0 0 0 0 {l_l:.4f}"
+        l_body.find('inertial').attrib['diaginertia'] = f"{I_l:.6f} {I_l:.6f} 0.001"
+        l_body.find('inertial').attrib['mass'] = f"{m_l:.4f}"
+        l_body.find('inertial').attrib['pos'] = f"0 0 {com_l:.4f}"
+        u_body = l_body.find("body")
+        u_body.attrib["pos"] = f"0 0 {l_l}"
+        u_body.find("geom").attrib["fromto"] = f"0 0 0 0 0 {l_u:.4f}"
+        u_body.find("inertial").attrib['diaginertia'] = f"{I_u:.6f} {I_u:.6f} 0.001"
+        u_body.find("inertial").attrib['mass'] = f"{m_u:.4f}"
+        u_body.find("inertial").attrib['pos'] = f"0 0 {com_u:.4f}"
+        m_tree = ElementTree(root)
+        m_tree.write(filepath + ".tmp")
+        os.replace(filepath + ".tmp", filepath)
+
     def viewer_setup(self):
         v = self.viewer
         v.cam.trackbodyid = 0
@@ -117,8 +144,3 @@ class IDPHumanExp(IDPHuman):
             self._pltq = self._pltqs[self.order] / self.model.actuator_gear[0, 0]
         else:
             self._pltq = None
-
-    # def exp_isend(self):
-    #     if self._order == len(self._pltqs):
-    #         return True
-    #     return False
