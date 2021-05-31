@@ -12,8 +12,6 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Video, Figure
 
-from common.util import create_path
-
 
 class VFCustomCallback(BaseCallback):
     def __init__(self,
@@ -173,7 +171,7 @@ class VideoCallback(BaseCallback):
 class SaveCallback:
     def __init__(self, cycle: int, dirpath: str):
         self.cycle = cycle
-        create_path(dirpath)
+        os.makedirs(dirpath, exist_ok=True)
         self.path = dirpath
 
     def net_save(self, network, itr):

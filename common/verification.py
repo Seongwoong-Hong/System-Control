@@ -1,3 +1,4 @@
+import os
 import time
 import cv2
 import numpy as np
@@ -9,11 +10,10 @@ from mujoco_py import GlfwContext
 from matplotlib import pyplot as plt
 from imitation.data.rollout import TrajectoryAccumulator, flatten_trajectories, make_sample_until
 from stable_baselines3.common.vec_env import DummyVecEnv
-from common.util import create_path
 
 
 def video_record(imgs: List, filename: str, dt: float):
-    create_path(filename=filename)
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     fourcc = cv2.VideoWriter_fourcc(*'MJPG')
     width, height, _ = imgs[0].shape
     writer = cv2.VideoWriter(filename, fourcc, 1 / dt, (width, height))

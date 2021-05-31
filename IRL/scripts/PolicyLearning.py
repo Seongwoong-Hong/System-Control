@@ -6,7 +6,7 @@ from imitation.policies import serialize
 
 from IRL.scripts.project_policies import def_policy
 from common.callbacks import VideoCallback
-from common.util import make_env, create_path
+from common.util import make_env
 from common.wrappers import RewardWrapper
 from mujoco_py import GlfwContext
 from scipy import io
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     n = 1
     while os.path.isdir(log_dir + f"/extra_{n}"):
         n += 1
-    create_path(log_dir + f"/policies_{n}")
+    os.makedirs(log_dir + f"/policies_{n}", exist_ok=False)
     video_recorder = VideoCallback(make_env(env_id, use_vec_env=False, n_steps=n_steps, pltqs=pltqs),
                                    n_eval_episodes=5,
                                    render_freq=100000)

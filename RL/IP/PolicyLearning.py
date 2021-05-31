@@ -6,7 +6,7 @@ from imitation.policies import serialize
 
 from algos.torch.ppo import PPO, MlpPolicy
 from common.callbacks import VideoCallback
-from common.util import create_path, make_env
+from common.util import make_env
 from mujoco_py import GlfwContext
 
 
@@ -18,7 +18,7 @@ if __name__ == "__main__":
     device = "cpu"
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, "tmp", "log", name)
-    create_path(dirname=log_dir)
+    os.makedirs(log_dir, exist_ok=True)
     GlfwContext(offscreen=True)
     env = make_env(env_id, num_envs=8)
     algo = PPO(MlpPolicy,
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     n = 1
     while os.path.isdir(log_dir + f"/extra_{n}"):
         n += 1
-    create_path(log_dir + f"/policies_{n}")
+    os.makedirs(log_dir + f"/policies_{n}", exist_ok=False)
     video_recorder = VideoCallback(gym.make(env_id),
                                    n_eval_episodes=5,
                                    render_freq=int(1e5))

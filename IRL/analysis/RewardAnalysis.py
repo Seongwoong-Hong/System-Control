@@ -7,7 +7,7 @@ from matplotlib.ticker import FormatStrFormatter
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
-from common.util import make_env, write_analyzed_result, create_path
+from common.util import make_env, write_analyzed_result
 
 if __name__ == "__main__":
     env_type = "IP"
@@ -85,6 +85,6 @@ if __name__ == "__main__":
         ax.grid()
         plt.show()
         if saving:
-            create_path(f"figures/{env_type}/{name}")
+            os.makedirs(f"figures/{env_type}/{name}", exist_ok=True)
             fig.savefig(f"figures/{env_type}/{name}/{key}.png")
     print(f"The best agent is {np.argmax(array[:, 1])} with a reward value {np.max(array[:, 1])}")

@@ -9,7 +9,7 @@ from imitation.data import rollout
 from imitation.util import logger
 from stable_baselines3.common.vec_env import VecNormalize
 
-from common.util import make_env, create_path
+from common.util import make_env
 from algos.torch.ppo import PPO, MlpPolicy
 
 
@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name + "_normal")
-    create_path(log_dir)
+    os.makedirs(log_dir, exist_ok=True)
     shutil.copy(os.path.abspath(__file__), log_dir)
 
     expert_dir = os.path.join(proj_path, "demos", env_type, "expert.pkl")

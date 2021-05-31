@@ -8,7 +8,7 @@ from imitation.data import rollout
 from imitation.util import logger
 
 from IRL.scripts.project_policies import def_policy
-from common.util import make_env, create_path
+from common.util import make_env
 
 if __name__ == "__main__":
     env_type = "mujoco_envs"
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     print(f"All Tensorboards and logging are being written inside {log_dir}/.")
 
     model_dir = os.path.join(log_dir, "model")
-    create_path(model_dir)
+    os.makedirs(model_dir, exist_ok=True)
     # Copy used file to logging folder
     # shutil.copy(os.path.abspath(proj_path + "/../gym_envs/envs/{}_custom.py".format(env_type)), model_dir)
     shutil.copy(os.path.abspath(__file__), model_dir)

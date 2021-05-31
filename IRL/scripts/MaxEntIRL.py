@@ -7,35 +7,34 @@ from imitation.data import rollout
 from imitation.util import logger
 from scipy import io
 
-from common.util import make_env, create_path
+from common.util import make_env
 from common.callbacks import SaveCallback
 from algos.torch.MaxEntIRL import MaxEntIRL
 
 
 if __name__ == "__main__":
-    env_type = "HPC"
+    env_type = "IDP"
     algo_type = "MaxEntIRL"
-    device = "cuda:2"
-    name = "HPC_custom"
+    device = "cuda:3"
+    name = "IDP_custom"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     pltqs = []
-    for i in [0, 1, 2, 3, 4, 15, 16, 17, 18, 19]:
+    for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
         file = "../demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
-    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, n_steps=600, pltqs=pltqs)
+    env = make_env(f"{name}-v0", use_vec_env=False, num_envs=8, n_steps=600, pltqs=pltqs)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "sub01_1&4.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     transitions = rollout.flatten_trajectories(expert_trajs)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/no_sub01_1&4"
-    assert not os.path.isdir(log_dir), "The log directory already exists"
-    create_path(log_dir)
+    log_dir += "/test"
+    os.makedirs(log_dir, exist_ok=False)
     print(f"All Tensorboards and logging are being written inside {log_dir}/.")
     shutil.copy(os.path.abspath(__file__), log_dir)
 
@@ -70,7 +69,7 @@ if __name__ == "__main__":
         total_iter=50,
         gradient_steps=100,
         n_episodes=10,
-        max_sac_iter=10,
+        max_sac_iter=5,
         callback=save_net_callback.net_save,
     )
 

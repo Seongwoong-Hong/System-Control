@@ -6,7 +6,7 @@ from stable_baselines3.common.vec_env import VecNormalize
 from imitation.policies import serialize
 
 from common.callbacks import VideoCallback
-from common.util import create_path, make_env
+from common.util import make_env
 from common.wrappers import RewardWrapper
 from RL.project_policies import def_policy
 
@@ -23,13 +23,13 @@ if __name__ == "__main__":
     name += ""
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
-    create_path(dirname=log_dir)
+    os.makedirs(log_dir, exist_ok=True)
     GlfwContext(offscreen=True)
     algo = def_policy(algo_type, env, device=device, log_dir=log_dir, verbose=1)
     n = 1
     while os.path.isdir(log_dir + f"/extra_{n}"):
         n += 1
-    create_path(log_dir + f"/policies_{n}")
+    os.makedirs(log_dir + f"/policies_{n}", exist_ok=False)
     # video_recorder = VideoCallback(make_env(env_id, use_vec_env=False, n_steps=600),
     #                                n_eval_episodes=5,
     #                                render_freq=int(5e5))
