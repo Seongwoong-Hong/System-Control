@@ -41,43 +41,6 @@ def learner(env, expert):
     return learning
 
 
-def test_make_obj(expert, env):
-    learning = MaxEntIRL(env,
-                         agent_learning_steps_per_one_loop=1000,
-                         expert_transitions=expert,
-                         rew_kwargs={'lr': 1e-3, 'arch': [4, 8, 8]},
-                         )
-    # Test rollout from agent
-    rollouts = learning.rollout_from_agent(n_episodes=8)
-    # Test calculation of loss
-    loss = learning.cal_loss(rollouts, 600)
-    assert isinstance(loss.item(), float)
-
-
-def test_learn_agent(env):
-    learning = MaxEntIRL(env,
-                         agent_learning_steps_per_one_loop=1000,
-                         expert_transitions=expert,
-                         rew_kwargs={'lr': 1e-3, 'arch': [4, 8, 8]},
-                         sac_kwargs={'verbose': 1}
-                         )
-    learning.agent.learn(total_timesteps=1e4)
-
-
-def test_process(env, expert):
-    learning = MaxEntIRL(env,
-                         agent_learning_steps_per_one_loop=1000,
-                         expert_transitions=expert,
-                         rew_lr=1e-5,
-                         rew_arch=[3, 8, 8],
-                         device='cuda:0',
-                         sac_kwargs={'verbose': 1},
-                         )
-    learning.learn(total_iter=10, gradient_steps=1)
-
-# Above tests are outdated. Now we must define imitation.util.logger before run a learning
-
-
 def test_logger(env, expert):
     from imitation.util import logger
     logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
@@ -85,7 +48,7 @@ def test_logger(env, expert):
                          agent_learning_steps_per_one_loop=10000,
                          expert_transitions=expert,
                          rew_lr=1e-5,
-                         rew_arch=[3, 8, 8],
+                         rew_arch=[8, 8],
                          device='cuda:0',
                          sac_kwargs={'verbose': 1},
                          )
@@ -136,4 +99,4 @@ def test_feature(env, expert):
 
 
 def test_validity(learner):
-    learner.learn(total_iter=10, gradient_steps=1, n_episodes=8, max_sac_iter=10)
+    learner.learn(total_iter=10, gradient_steps=50, n_episodes=8, max_sac_iter=10)
