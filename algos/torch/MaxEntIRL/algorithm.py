@@ -48,11 +48,12 @@ class MaxEntIRL:
 
     def _build_sac_agent(self, **kwargs):
         reward_wrapper = kwargs.get("reward_wrapper")
+        self.reward_net.eval()
         if reward_wrapper:
-            self.wrap_env = reward_wrapper(self.env, self.reward_net.eval())
+            self.wrap_env = reward_wrapper(self.env, self.reward_net)
             kwargs.pop('reward_wrapper')
         else:
-            self.wrap_env = RewardWrapper(self.env, self.reward_net.eval())
+            self.wrap_env = RewardWrapper(self.env, self.reward_net)
         # TODO: Argument 들이 외부에서부터 입력되도록 변경. 파일의 형태로 넘겨주는 것 고려해 볼 것
         self.agent = SAC(
             MlpPolicy,
@@ -76,7 +77,7 @@ class MaxEntIRL:
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
         trajectories = generate_trajectories(
             self.agent, DummyVecEnv([lambda: self.wrap_env]), sample_until, deterministic_policy=False)
-        return flatten_trajectories(trajectories), len(flatten_trajectories(trajectories)) / n_episodes
+        return flatten_trajectories(trajectories)
 
     def mean_transition_reward(self, transition):
         if self.use_action_as_input:
@@ -87,12 +88,13 @@ class MaxEntIRL:
         reward = self.reward_net(th_input)
         return reward.mean()
 
-    def cal_loss(self, agent_transitions, total_timesteps):
+    def cal_loss(self, **kwargs):
         expert_transitions = deepcopy(self.expert_transitions)
+        agent_transitions = self.rollout_from_agent(**kwargs)
         agent_ex = self.mean_transition_reward(agent_transitions)
         expert_ex = self.mean_transition_reward(expert_transitions)
         loss = agent_ex - expert_ex
-        return loss * total_timesteps
+        return loss
 
     def learn(
             self,
@@ -109,28 +111,26 @@ class MaxEntIRL:
             with logger.accumulate_means(f"agent_{itr}"):
                 for agent_steps in range(max_sac_iter):
                     self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
-                    agent_samples, T = self.rollout_from_agent(**kwargs)
-                    logger.record("loss_diff", self.cal_loss(agent_samples, T).item())
+                    logger.record("loss_diff", self.cal_loss(**kwargs).item())
                     logger.record("agent_steps", agent_steps)
                     logger.dump(agent_steps)
-                    if self.cal_loss(agent_samples, T) / T > 0:
+                    if self.cal_loss(**kwargs) > 0:
                         break
             losses = []
             with logger.accumulate_means(f"reward_{itr}"):
                 self.reward_net.train()
                 for rew_steps in range(gradient_steps):
-                    agent_samples, T = self.rollout_from_agent(**kwargs)
-                    loss = self.cal_loss(agent_samples, T)
-                    self.reward_net.optimizer.zero_grad()
-                    loss.backward()
-                    self.reward_net.optimizer.step()
+                    loss = self.cal_loss(**kwargs)
                     losses.append(loss.item())
                     logger.record("steps", rew_steps + 1, exclude="tensorboard")
                     logger.record("loss", loss.item())
                     logger.dump(rew_steps)
                     # TODO: Is there any smart way that breaks reward learning?
-                    if loss.item() < -100:
+                    if np.mean(losses[-5:]) < -0.1:
                         break
+                    self.reward_net.optimizer.zero_grad()
+                    loss.backward()
+                    self.reward_net.optimizer.step()
             if callback:
                 callback(self, itr + 1)
             loss_logger.append(np.mean(losses))
