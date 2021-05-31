@@ -21,7 +21,7 @@ class RewardNet(nn.Module):
         self.feature_fn = feature_fn
         self.optim_cls = optim_cls
         self._build(lr, [inp] + arch)
-        self.evalmod = False
+        self.trainmode = False
 
     def _build(self, lr, arch):
         layers = []
@@ -38,16 +38,15 @@ class RewardNet(nn.Module):
 
     def forward(self, x):
         x = self.feature_fn(x)
-        if self.evalmod:
+        if self.trainmode:
+            return self.layers(x.to(self.device))
+        else:
             with th.no_grad():
                 return self.layers(x.to(self.device))
-        else:
-            return self.layers(x.to(self.device))
 
     def train(self, mode=True):
-        self.evalmod = False
+        self.trainmode = mode
         return super(RewardNet, self).train(mode=mode)
 
     def eval(self):
-        self.evalmod = True
-        return super(RewardNet, self).eval()
+        return self.train(False)
