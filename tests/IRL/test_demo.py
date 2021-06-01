@@ -1,4 +1,5 @@
 import os
+import pytest
 import time
 import pickle
 import numpy as np
@@ -12,7 +13,9 @@ from common.util import make_env
 def run_traj(env, expert_dir):
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
+    costs = []
     for traj in expert_trajs:
+        rews = 0
         env.reset()
         tran = flatten_trajectories([traj])
         env.set_state(tran.obs[0, :env.model.nq], tran.obs[0, env.model.nq:env.model.nq+env.model.nv])
@@ -20,25 +23,33 @@ def run_traj(env, expert_dir):
             env.pltq = traj.obs[:-1, 4:]
         for t in range(len(tran)):
             act = tran.acts[t]
-            obs, _, _, _ = env.step(act)
+            obs, rew, _, _ = env.step(act)
+            rews += rew
             env.render()
             time.sleep(env.dt)
+        costs.append(-rews)
+    print(costs)
     env.close()
 
 
-def test_hpc(env):
-    expert_dir = os.path.join("..", "..", "IRL", "demos", "HPC", "sub01_1&2.pkl")
+@pytest.fixture
+def demo_dir():
+    return os.path.abspath(os.path.join("..", "..", "IRL", "demos"))
+
+
+def test_hpc(env, demo_dir):
+    expert_dir = os.path.join(demo_dir, "HPC", "sub01_1&2.pkl")
     run_traj(env, expert_dir)
 
 
-def test_hpcdiv(env):
-    expert_dir = os.path.join("..", "demos", "HPC", "lqrDivTest.pkl")
+def test_hpcdiv(env, demo_dir):
+    expert_dir = os.path.join(demo_dir, "HPC", "lqrDivTest.pkl")
     run_traj(env, expert_dir)
 
 
-def test_idp():
+def test_idp(demo_dir):
     env = make_env("IDP_custom-v0", use_vec_env=False)
-    expert_dir = os.path.join("..", "..", "IRL", "demos", "IDP", "lqr.pkl")
+    expert_dir = os.path.join(demo_dir, "IDP", "lqr.pkl")
     run_traj(env, expert_dir)
 
 
