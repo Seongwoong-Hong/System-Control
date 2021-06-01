@@ -10,8 +10,8 @@ if __name__ == '__main__':
     env_id = f"{env_type}_custom-v0"
     env = DummyVecEnv([lambda: gym_envs.make(env_id, n_steps=n_steps)])
     trajectories = []
-    i = 1
-    sub = f"sub{i:02d}"
+    subi = 1
+    sub = f"sub{subi:02d}"
     for i in range(10):
         file = "HPC/" + sub + "/" + sub + f"i{i+1}.mat"
         data = {'state': io.loadmat(file)['state'],

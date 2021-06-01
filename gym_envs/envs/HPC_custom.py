@@ -19,8 +19,8 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         mujoco_env.MujocoEnv.__init__(self, filepath, 5)
         utils.EzPickle.__init__(self)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
-        self.init_qpos = np.array([0.0, 0.0])
-        self.init_qvel = np.array([0.0, 0.0])
+        self.init_qpos = np.array([0.01366853, -0.05984312])
+        self.init_qvel = np.array([0.01206803, 0.03357093])
         self._set_pltqs()
 
     def step(self, action: np.ndarray):

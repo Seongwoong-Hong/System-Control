@@ -22,9 +22,9 @@ class IDPPolicy(LQRPolicy):
         _, I1, I2 = self.env.model.body_inertia[:, 1]
         g = 9.81
         self.Q = np.array([[1, 0, 0, 0],
-                           [0, 1, 0, 0],
-                           [0, 0, 0.1, 0],
-                           [0, 0, 0, 0.1]])
+                           [0, 0.1, 0, 0],
+                           [0, 0, 0, 0],
+                           [0, 0, 0, 0]])
         self.R = 1e-5*np.array([[1, 0],
                                 [0, 1]])
         self.A = np.array([[0, 0, 1, 0],

@@ -63,7 +63,7 @@ class MaxEntIRL:
             train_freq=1,
             gradient_steps=1,
             gamma=0.99,
-            ent_coef='auto',
+            ent_coef=0.1,
             device=self.device,
             policy_kwargs={'net_arch': {'pi': [32, 32], 'qf': [32, 32]}},
             **kwargs

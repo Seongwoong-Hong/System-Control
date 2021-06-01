@@ -5,6 +5,7 @@ import numpy as np
 
 from scipy import io
 
+from IRL.scripts.project_policies import def_policy
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from common.util import make_env
@@ -29,11 +30,12 @@ if __name__ == "__main__":
 
     agent_env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
     expt_env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
-    expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
+    # expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
+    expt = def_policy(env_type, expt_env)
 
     name = "no_lqr"
     ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name)
-    model_dir = os.path.join(ana_dir, "model", "013")
+    model_dir = os.path.join(ana_dir, "model", "045")
 
     agent = SAC.load(model_dir + "/agent")
 

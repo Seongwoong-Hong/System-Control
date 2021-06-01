@@ -15,7 +15,7 @@ from algos.torch.MaxEntIRL import MaxEntIRL
 if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
+    device = "cuda:2"
     name = "IDP_custom"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
@@ -26,14 +26,14 @@ if __name__ == "__main__":
     env = make_env(f"{name}-v0", use_vec_env=False, num_envs=8, n_steps=600, pltqs=pltqs)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     transitions = rollout.flatten_trajectories(expert_trajs)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/test"
+    log_dir += "/sq_lqr_ppo_ent"
     os.makedirs(log_dir, exist_ok=False)
     print(f"All Tensorboards and logging are being written inside {log_dir}/.")
     shutil.copy(os.path.abspath(__file__), log_dir)
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
-        return x
+        return th.square(x)
 
     # Setup Learner
     learning = MaxEntIRL(
@@ -58,7 +58,7 @@ if __name__ == "__main__":
         expert_transitions=transitions,
         use_action_as_input=True,
         rew_lr=1e-3,
-        rew_arch=[8, 8],
+        rew_arch=[],
         device=device,
         sac_kwargs={'verbose': 1},
         rew_kwargs={'feature_fn': feature_fn},
