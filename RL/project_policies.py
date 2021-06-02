@@ -35,7 +35,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    train_freq=1,
                    gradient_steps=1,
                    gamma=0.99,
-                   ent_coef='auto',
+                   ent_coef=0.1,
                    verbose=verbose,
                    device=device,
                    tensorboard_log=log_dir,

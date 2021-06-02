@@ -15,7 +15,7 @@ from algos.torch.MaxEntIRL import MaxEntIRL
 if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    device = "cuda:2"
+    device = "cuda:1"
     name = "IDP_custom"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
@@ -33,10 +33,10 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/sq_lqr_ppo_ent"
+    log_dir += "/no_lqr_ppo_ppoagent"
     os.makedirs(log_dir, exist_ok=False)
-    print(f"All Tensorboards and logging are being written inside {log_dir}/.")
     shutil.copy(os.path.abspath(__file__), log_dir)
+    shutil.copy(expert_dir, log_dir)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
-        return th.square(x)
+        return x
 
     # Setup Learner
     learning = MaxEntIRL(
