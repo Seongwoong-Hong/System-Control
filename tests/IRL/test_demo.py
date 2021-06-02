@@ -49,7 +49,7 @@ def test_hpcdiv(env, demo_dir):
 
 def test_idp(demo_dir):
     env = make_env("IDP_custom-v0", use_vec_env=False)
-    expert_dir = os.path.join(demo_dir, "IDP", "lqr.pkl")
+    expert_dir = os.path.join(demo_dir, "IDP", "lqr1.pkl")
     run_traj(env, expert_dir)
 
 

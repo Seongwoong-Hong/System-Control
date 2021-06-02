@@ -34,17 +34,17 @@ def test_hpc_learned_policy(env, irl_path):
 
 def test_irl_learned_policy(irl_path):
     env_type = "IDP"
-    env = make_env(f"{env_type}_custom-v2", n_steps=600, use_vec_env=False)
-    name = f"{env_type}/MaxEntIRL/sq_lqr"
+    env = make_env(f"{env_type}_custom-v0", n_steps=600, use_vec_env=False)
+    name = f"{env_type}/MaxEntIRL/no_lqr"
     model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
-    algo = SAC.load(model_dir + "/019/agent")
-    a_list, o_list, _ = verify_policy(env, algo)
+    algo = SAC.load(model_dir + "/030/agent")
+    a_list, o_list, _ = verify_policy(env, algo, deterministic=True)
 
 
 def test_idp_policy():
-    env = make_env("IDP_custom-v2", n_steps=600, use_vec_env=False)
-    algo = def_policy("IDP", env)
-    _, _, _ = verify_policy(env, algo)
+    env = make_env("IDP_custom-v0", n_steps=600, use_vec_env=False)
+    algo = def_policy("IDP", env, noise_lv=0.5)
+    _, _, _ = verify_policy(env, algo, deterministic=False)
 
 
 def test_mujoco_policy(irl_path):
