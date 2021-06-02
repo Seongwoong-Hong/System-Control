@@ -96,13 +96,11 @@ class CostMap:
             cost_fn = agent['cost_fn']
             costs = []
             for tran in transitions:
-                cost = 0
-                for t in range(len(tran)):
-                    obs = th.from_numpy(tran.obs[np.newaxis, t, :])
-                    act = th.from_numpy(tran.acts[np.newaxis, t, :])
-                    next_obs = th.from_numpy(tran.next_obs[np.newaxis, t, :])
-                    done = tran.dones[t]
-                    cost += cost_fn(obs, act, next_obs, done)
+                obs = th.from_numpy(tran.obs)
+                act = th.from_numpy(tran.acts)
+                next_obs = th.from_numpy(tran.next_obs)
+                done = tran.dones
+                cost = cost_fn(obs, act, next_obs, done).sum().item()
                 costs.append(cost)
             orders = agent['orders']
             inputs.append([orders, costs])

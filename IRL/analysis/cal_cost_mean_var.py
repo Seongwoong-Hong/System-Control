@@ -30,24 +30,24 @@ if __name__ == "__main__":
 
     agent_env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
     expt_env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
-    # expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
-    expt = def_policy(env_type, expt_env)
+    expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
+    # expt = def_policy(env_type, expt_env)
 
-    name = "no_lqr"
+    name = "sq_lqr_ppo_ent"
     ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name)
-    model_dir = os.path.join(ana_dir, "model", "045")
+    model_dir = os.path.join(ana_dir, "model", "030")
 
     agent = SAC.load(model_dir + "/agent")
 
     def feature_fn(x):
-        return x
+        return th.square(x)
 
     with open(model_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
 
     def agent_cost_fn(*args):
         inp = th.cat([args[0], args[1]], dim=1)
-        return -reward_fn(inp).item()
+        return -reward_fn(inp)
 
     def run_algo(env, algo):
         costs = []
