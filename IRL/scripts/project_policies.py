@@ -1,8 +1,9 @@
+import numpy as np
+import torch as th
+
 from algos.torch.OptCont import LQRPolicy
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
-import numpy as np
-import torch as th
 
 
 class IPPolicy(LQRPolicy):
@@ -110,7 +111,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
             train_freq=1,
             gradient_steps=1,
             gamma=0.99,
-            ent_coef='auto',
+            ent_coef=0.1,
             device=device,
             verbose=verbose,
             tensorboard_log=log_dir,
