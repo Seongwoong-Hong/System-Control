@@ -1,11 +1,12 @@
 import os
+
 import pytest
 
+from IRL.scripts.project_policies import def_policy
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
-from IRL.scripts.project_policies import def_policy
-from common.verification import verify_policy
 from common.util import make_env
+from common.verification import verify_policy
 
 
 @pytest.fixture
@@ -35,9 +36,9 @@ def test_hpc_learned_policy(env, irl_path):
 def test_irl_learned_policy(irl_path):
     env_type = "IDP"
     env = make_env(f"{env_type}_custom-v0", n_steps=600, use_vec_env=False)
-    name = f"{env_type}/MaxEntIRL/no_lqr_ppo"
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
-    algo = SAC.load(model_dir + "/050/agent")
+    name = f"{env_type}/MaxEntIRL/sq_lqr_ppo_ent"
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "add_rew_learning")
+    algo = PPO.load(model_dir + "/policies_1/000005000000/model.pkl")
     a_list, o_list, _ = verify_policy(env, algo, deterministic=True)
 
 
