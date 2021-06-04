@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     name = "sq_lqr_ppo_ent"
     ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name)
-    model_dir = os.path.join(ana_dir, "model", "030")
+    model_dir = os.path.join(ana_dir, "model", "050")
 
     agent = SAC.load(model_dir + "/agent")
 

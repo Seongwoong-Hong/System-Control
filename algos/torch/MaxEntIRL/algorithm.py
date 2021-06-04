@@ -106,8 +106,8 @@ class MaxEntIRL:
             **kwargs
     ):
         loss_logger = []
+        self._build_sac_agent(**self.sac_kwargs)
         for itr in range(total_iter):
-            self._build_sac_agent(**self.sac_kwargs)
             with logger.accumulate_means(f"agent_{itr}"):
                 for agent_steps in range(max_sac_iter):
                     self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
