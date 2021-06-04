@@ -1,5 +1,7 @@
 import os
 import pickle
+import torch as th
+import numpy as np
 
 from common.util import make_env
 from common.verification import CostMap
@@ -7,6 +9,7 @@ from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 
 from matplotlib import pyplot as plt
+from matplotlib import cm
 
 
 def test_draw_costmap():
@@ -100,24 +103,3 @@ def test_agent_reward():
     plt.plot(rewards)
     plt.show()
 
-
-def feature_fn(x):
-    return x
-
-
-def test_learned_cost():
-    from imitation.data.rollout import flatten_trajectories
-    import torch as th
-    import numpy as np
-    proj_path = os.path.abspath(os.path.join("..", "..", "IRL", "tmp", "log", "IDP", "MaxEntIRL", "no_lqr"))
-    with open("../../IRL/demos/IDP/lqr.pkl", "rb") as f:
-        expert_trajs = pickle.load(f)
-    expt_trans = flatten_trajectories(expert_trajs)
-    th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
-    i = 1
-    while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
-        with open(os.path.join(proj_path, "model", f"{i:03d}", "reward_net.pkl"), "rb") as f:
-            reward_fn = pickle.load(f).double()
-        print(-reward_fn(th_input).mean().item() * 600)
-        i += 1

@@ -35,9 +35,9 @@ def test_hpc_learned_policy(env, irl_path):
 def test_irl_learned_policy(irl_path):
     env_type = "IDP"
     env = make_env(f"{env_type}_custom-v0", n_steps=600, use_vec_env=False)
-    name = f"{env_type}/MaxEntIRL/no_lqr"
+    name = f"{env_type}/MaxEntIRL/no_lqr_ppo"
     model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
-    algo = SAC.load(model_dir + "/030/agent")
+    algo = SAC.load(model_dir + "/050/agent")
     a_list, o_list, _ = verify_policy(env, algo, deterministic=True)
 
 
