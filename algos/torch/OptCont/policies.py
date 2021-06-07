@@ -19,7 +19,6 @@ class LQRPolicy(BasePolicy):
 
         self.env = env
         self.noise_lv = noise_lv
-        self.gear = env.model.actuator_gear[0, 0]
         self._build_env()
         self.K = self._get_gains()
 

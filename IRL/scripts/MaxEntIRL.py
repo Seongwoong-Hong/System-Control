@@ -2,16 +2,17 @@ import datetime
 import os
 import pickle
 import shutil
-
 import torch as th
+
 from imitation.data import rollout
 from imitation.util import logger
 from scipy import io
 from stable_baselines3.common.vec_env import VecNormalize
 
-from algos.torch.MaxEntIRL import MaxEntIRL
-from common.callbacks import SaveCallback
 from common.util import make_env
+from common.callbacks import SaveCallback
+from algos.torch.MaxEntIRL import MaxEntIRL
+
 
 if __name__ == "__main__":
     env_type = "IDP"
@@ -25,7 +26,7 @@ if __name__ == "__main__":
     for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
         file = "../demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
-    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=1, n_steps=600, pltqs=pltqs)
+    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, n_steps=600, pltqs=pltqs)
 
     # Load data
     expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
@@ -35,7 +36,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/test"
+    log_dir += "/sq_lqr_ppo_fixed_agent"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)

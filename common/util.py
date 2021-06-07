@@ -1,8 +1,8 @@
 import os
 import os.path as p
-
 import gym
-import gym_envs
+import gym_envs  # needs for custom environments
+
 from scipy import io
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 

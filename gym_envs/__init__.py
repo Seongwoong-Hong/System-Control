@@ -53,3 +53,9 @@ register(
     id='HPC_custom-v1',
     entry_point='gym_envs.envs:IDPHuman',
 )
+
+register(
+    id='IDP_classic-v0',
+    entry_point='gym_envs.envs:InvertedDoublePendulum',
+    max_episode_steps=600,
+)

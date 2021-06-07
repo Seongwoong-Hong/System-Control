@@ -29,7 +29,6 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
         from algos.torch.sac import MlpPolicy
         return SAC(MlpPolicy,
                    env=env,
-                   buffer_size=int(1e6),
                    batch_size=256,
                    learning_starts=100,
                    train_freq=1,
