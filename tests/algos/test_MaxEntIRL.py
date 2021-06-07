@@ -1,11 +1,12 @@
-import pytest
 import os
 import pickle
 
-from common.util import make_env
-from common.callbacks import SaveCallback
-from algos.torch.MaxEntIRL.algorithm import MaxEntIRL
+import pytest
 from imitation.data import rollout
+
+from algos.torch.MaxEntIRL.algorithm import MaxEntIRL
+from common.callbacks import SaveCallback
+from common.util import make_env
 
 
 @pytest.fixture
@@ -18,7 +19,7 @@ def expert():
 
 @pytest.fixture
 def env():
-    return make_env("IP_custom-v2", use_vec_env=False)
+    return make_env("IP_custom-v2", use_vec_env=False, num_envs=1)
 
 
 @pytest.fixture
@@ -61,7 +62,7 @@ def test_callback(learner):
     save_policy_callback = serialize.SavePolicyCallback(f"tmp/log", None)
     save_policy_callback = callbacks.EveryNTimesteps(int(1e3), save_policy_callback)
     save_reward_callback = SaveCallback(cycle=1, dirpath=f"tmp/log")
-    learner.learn(total_iter=10, gradient_steps=100, n_episodes=8, max_sac_iter=10, callback=save_reward_callback.net_save)
+    learner.learn(total_iter=10, gradient_steps=1, n_episodes=8, max_sac_iter=1, callback=save_reward_callback.net_save)
 
 
 def test_wrapper(env, expert):
