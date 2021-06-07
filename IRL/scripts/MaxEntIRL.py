@@ -1,29 +1,30 @@
+import datetime
 import os
 import pickle
 import shutil
-import torch as th
 
+import torch as th
 from imitation.data import rollout
 from imitation.util import logger
 from scipy import io
 
-from common.util import make_env
-from common.callbacks import SaveCallback
 from algos.torch.MaxEntIRL import MaxEntIRL
-
+from common.callbacks import SaveCallback
+from common.util import make_env
 
 if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = "IDP_custom"
+    use_norm = True
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     pltqs = []
     for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
         file = "../demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
-    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, n_steps=600, pltqs=pltqs)
+    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=1, n_steps=600, pltqs=pltqs)
 
     # Load data
     expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
@@ -79,3 +80,8 @@ if __name__ == "__main__":
         pickle.dump(learning.reward_net, f)
     os.replace(reward_path + ".tmp", reward_path)
     learning.agent.save(model_dir + "/agent")
+    if use_norm:
+        env.save(model_dir + "/normalization.pkl")
+    now = datetime.datetime.now()
+    print(f"Endtime: {now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}")
+
