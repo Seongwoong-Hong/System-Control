@@ -3,20 +3,23 @@ import os.path as p
 import gym
 import gym_envs  # needs for custom environments
 
-from stable_baselines3.common.vec_env import DummyVecEnv
 from scipy import io
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 
-def make_env(env_name, use_vec_env=False, num_envs=10, **kwargs):
+def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, **kwargs):
     def is_vectorized():
-        if use_vec_env:
+        if use_norm:
+            env = DummyVecEnv([lambda: gym.make(env_name, **kwargs) for _ in range(num_envs)])
+            env = VecNormalize(env, norm_obs=True, norm_reward=True)
+        elif use_vec_env:
             env = DummyVecEnv([lambda: gym.make(env_name, **kwargs) for _ in range(num_envs)])
         else:
             env = gym.make(env_name, **kwargs)
         return env
     env_type = env_name[:env_name.find("_custom")]
     if env_type == "HPC":
-        subpath = kwargs.get("subpath")
+        subpath = kwargs.pop("subpath", None)
         pltqs = kwargs.get("pltqs")
         assert subpath is not None or pltqs is not None, "HPC environment needs pltqs!"
         if not pltqs:
@@ -29,7 +32,6 @@ def make_env(env_name, use_vec_env=False, num_envs=10, **kwargs):
                 pltqs += [io.loadmat(file)['pltq']]
                 i += 1
             kwargs['pltqs'] = pltqs
-            kwargs.pop("subpath")
     elif env_type == "IDP" or env_type == "IP":
         kwargs.pop('subpath', None)
         kwargs.pop('pltqs', None)

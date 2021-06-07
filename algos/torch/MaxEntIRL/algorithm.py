@@ -27,7 +27,7 @@ class MaxEntIRL:
     ):
         assert (
             logger.is_configured()
-        ), "Requires call to imitation.util.logger.configure"
+        ), "Requires calling imitation.util.logger.configure"
         self.env = env
         self.agent_learning_steps = agent_learning_steps_per_one_loop
         self.device = device
@@ -47,13 +47,13 @@ class MaxEntIRL:
         self.reward_net = RewardNet(inp=inp, arch=rew_arch, lr=rew_lr, device=self.device, **self.rew_kwargs).double()
 
     def _build_sac_agent(self, **kwargs):
-        reward_wrapper = kwargs.get("reward_wrapper")
+        reward_wrapper = kwargs.pop("reward_wrapper", RewardWrapper)
+        norm_wrapper = kwargs.pop("vec_normalizer", None)
         self.reward_net.eval()
-        if reward_wrapper:
-            self.wrap_env = reward_wrapper(self.env, self.reward_net)
-            kwargs.pop('reward_wrapper')
+        if norm_wrapper:
+            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)]))
         else:
-            self.wrap_env = RewardWrapper(self.env, self.reward_net)
+            self.wrap_env = DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)])
         # TODO: Argument 들이 외부에서부터 입력되도록 변경. 파일의 형태로 넘겨주는 것 고려해 볼 것
         self.agent = SAC(
             MlpPolicy,
@@ -71,20 +71,18 @@ class MaxEntIRL:
         return self.agent
 
     def rollout_from_agent(self, **kwargs):
-        n_episodes = kwargs.get('n_episodes')
-        if n_episodes is None:
-            n_episodes = 10
+        n_episodes = kwargs.pop('n_episodes', 10)
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
         trajectories = generate_trajectories(
-            self.agent, DummyVecEnv([lambda: self.wrap_env]), sample_until, deterministic_policy=False)
+            self.agent, self.wrap_env, sample_until, deterministic_policy=False)
         return flatten_trajectories(trajectories)
 
     def mean_transition_reward(self, transition):
         if self.use_action_as_input:
             np_input = np.concatenate([transition.obs, transition.acts], axis=1)
-            th_input = th.from_numpy(np_input)
+            th_input = th.from_numpy(np_input).double()
         else:
-            th_input = th.from_numpy(transition.obs)
+            th_input = th.from_numpy(transition.obs).double()
         reward = self.reward_net(th_input)
         return reward.mean()
 
