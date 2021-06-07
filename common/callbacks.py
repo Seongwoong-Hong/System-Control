@@ -1,9 +1,8 @@
+import os
+import pickle
 from copy import deepcopy
 from typing import Any, Dict, Sequence
 
-import os
-import gym
-import pickle
 import numpy as np
 import torch
 from matplotlib import cm
@@ -178,6 +177,8 @@ class SaveCallback:
         if itr % self.cycle == 0:
             log_dir = self.path + f"/{itr:03d}"
             os.makedirs(log_dir, exist_ok=True)
+            if network.agent.get_vec_normalize_env():
+                network.venv.save(log_dir + "/normalization.pkl")
             with open(log_dir + "/reward_net.pkl.tmp", "wb") as f:
                 pickle.dump(network.reward_net, f)
             network.agent.save(log_dir + "/agent")
@@ -185,12 +186,16 @@ class SaveCallback:
 
     def rew_save(self, network, itr):
         if itr % self.cycle == 0:
-            reward_path = self.path + f"{itr:03d}/reward_net.pkl"
-            with open(reward_path + ".tmp", "wb") as f:
+            log_dir = self.path + f"{itr:03d}"
+            with open(log_dir + "/reward_net.pkl.tmp", "wb") as f:
                 pickle.dump(network.reward_net, f)
-            os.replace(reward_path + ".tmp", reward_path)
+            os.replace(log_dir + "/reward_net.pkl.tmp", log_dir + "/reward_net.pkl")
+            if network.agent.get_vecnormalize_env():
+                network.env.save(log_dir + "/normalization.pkl")
 
     def agent_save(self, network, itr):
         if itr % self.cycle == 0:
-            log_dir = self.path + f"/{itr:03d}/agent"
-            network.agent.save(log_dir)
+            log_dir = self.path + f"/{itr:03d}"
+            network.agent.save(log_dir + "/agent")
+            if network.agent.get_vecnormalize_env():
+                network.env.save(log_dir + "/normalization.pkl")
