@@ -1,11 +1,10 @@
 import os
 import pickle
-import torch as th
-import numpy as np
 
+import numpy as np
+import torch as th
 from scipy import io
 
-from IRL.scripts.project_policies import def_policy
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from common.util import make_env
@@ -33,14 +32,14 @@ if __name__ == "__main__":
     expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
     # expt = def_policy(env_type, expt_env)
 
-    name = "sq_lqr_ppo_ent"
+    name = "no_lqr"
     ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name)
     model_dir = os.path.join(ana_dir, "model", "050")
 
     agent = SAC.load(model_dir + "/agent")
 
     def feature_fn(x):
-        return th.square(x)
+        return x
 
     with open(model_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()

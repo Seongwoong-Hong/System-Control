@@ -1,17 +1,16 @@
 import os
 import pickle
-import torch as th
-import numpy as np
-
-from common.util import make_env
-from algos.torch.sac import SAC
-from algos.torch.ppo import PPO
-
-from imitation.data.rollout import flatten_trajectories, make_sample_until, generate_trajectories
-
 from copy import deepcopy
-from matplotlib import pyplot as plt
+
+import numpy as np
+import torch as th
+from imitation.data.rollout import flatten_trajectories, make_sample_until, generate_trajectories
 from matplotlib import cm
+from matplotlib import pyplot as plt
+
+from algos.torch.ppo import PPO
+from algos.torch.sac import SAC
+from common.util import make_env
 
 
 def draw_2dfigure():
@@ -52,12 +51,12 @@ def draw_2dfigure():
 
 
 def learned_cost():
-    proj_path = os.path.abspath(os.path.join("..", "..", "IRL", "tmp", "log", "IDP", "MaxEntIRL", "sq_lqr_ppo"))
+    proj_path = os.path.abspath(os.path.join("..", "..", "IRL", "tmp", "log", "IDP", "MaxEntIRL", "sq_lqr_ppo_fixed_agent"))
     with open("../../IRL/demos/IDP/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
     venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, n_steps=600)
-    # th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
+    th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
     sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
     i = 1
     cost_list = []
