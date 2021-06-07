@@ -1,15 +1,15 @@
-import torch as th
-import numpy as np
 from copy import deepcopy
 from typing import List, Dict, Optional
 
-from algos.torch.sac import SAC, MlpPolicy
-from algos.torch.MaxEntIRL import RewardNet
-from common.wrappers import RewardWrapper
-
+import numpy as np
+import torch as th
 from imitation.data.rollout import make_sample_until, generate_trajectories, flatten_trajectories
 from imitation.util import logger
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+
+from algos.torch.MaxEntIRL import RewardNet
+from algos.torch.sac import SAC, MlpPolicy
+from common.wrappers import RewardWrapper
 
 
 class MaxEntIRL:
@@ -47,17 +47,14 @@ class MaxEntIRL:
         self.reward_net = RewardNet(inp=inp, arch=rew_arch, lr=rew_lr, device=self.device, **self.rew_kwargs).double()
 
     def _build_sac_agent(self, **kwargs):
-        reward_wrapper = kwargs.get("reward_wrapper")
+        reward_wrapper = kwargs.pop("reward_wrapper", RewardWrapper)
         self.reward_net.eval()
-        if reward_wrapper:
-            self.wrap_env = reward_wrapper(self.env, self.reward_net)
-            kwargs.pop('reward_wrapper')
-        else:
-            self.wrap_env = RewardWrapper(self.env, self.reward_net)
+        self.wrap_env = reward_wrapper(self.env, self.reward_net)
+        self.venv = VecNormalize(DummyVecEnv([lambda: self.wrap_env]))
         # TODO: Argument 들이 외부에서부터 입력되도록 변경. 파일의 형태로 넘겨주는 것 고려해 볼 것
         self.agent = SAC(
             MlpPolicy,
-            env=self.wrap_env,
+            env=self.venv,
             batch_size=256,
             learning_starts=100,
             train_freq=1,
@@ -71,9 +68,7 @@ class MaxEntIRL:
         return self.agent
 
     def rollout_from_agent(self, **kwargs):
-        n_episodes = kwargs.get('n_episodes')
-        if n_episodes is None:
-            n_episodes = 10
+        n_episodes = kwargs.pop('n_episodes', 10)
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
         trajectories = generate_trajectories(
             self.agent, DummyVecEnv([lambda: self.wrap_env]), sample_until, deterministic_policy=False)
