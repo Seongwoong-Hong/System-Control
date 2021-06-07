@@ -1,4 +1,5 @@
 import os
+
 import numpy as np
 from gym import utils, spaces
 from gym.envs.mujoco import mujoco_env
@@ -54,6 +55,7 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         return self._get_obs()
 
     def reset_model(self):
+        self.__timesteps = 0
         self.set_state(
             self.init_qpos + self.np_random.uniform(low=-.3, high=.3, size=self.model.nq),
             self.init_qvel + self.np_random.uniform(low=-.3, high=.3, size=self.model.nv)
@@ -89,11 +91,6 @@ class IDPCustomExp(IDPCustom):
             q[1].reshape(self.model.nv)
         )
         return self._get_obs()
-
-    def exp_isend(self):
-        if self._order == len(self.init_group):
-            return True
-        return False
 
 
 class IDPCustomEasy(IDPCustom):
