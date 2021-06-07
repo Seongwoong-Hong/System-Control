@@ -9,6 +9,7 @@ from algos.torch.sac import SAC
 class IPPolicy(LQRPolicy):
     def _build_env(self):
         m, g, h, I = 5.0, 9.81, 0.5, 1.667
+        self.gear = self.env.model.actuator_gear[0, 0]
         self.Q = np.array([[1, 0], [0, 0.5]])
         self.R = 0.0001*np.array([[1]])
         self.A = np.array([[0, m*g*h/I], [1, 0]])
@@ -21,6 +22,7 @@ class IDPPolicy(LQRPolicy):
         _, m1, m2 = self.env.model.body_mass
         _, h1, h2 = self.env.model.body_ipos[:, 2]
         _, I1, I2 = self.env.model.body_inertia[:, 1]
+        self.gear = self.env.model.actuator_gear[0, 0]
         g = 9.81
         self.Q = np.array([[1, 0, 0, 0],
                            [0, 1, 0, 0],
