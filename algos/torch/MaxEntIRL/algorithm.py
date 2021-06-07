@@ -5,7 +5,7 @@ import numpy as np
 import torch as th
 from imitation.data.rollout import make_sample_until, generate_trajectories, flatten_trajectories
 from imitation.util import logger
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 from algos.torch.MaxEntIRL import RewardNet
 from algos.torch.sac import SAC, MlpPolicy
@@ -27,7 +27,7 @@ class MaxEntIRL:
     ):
         assert (
             logger.is_configured()
-        ), "Requires call to imitation.util.logger.configure"
+        ), "Requires calling imitation.util.logger.configure"
         self.env = env
         self.agent_learning_steps = agent_learning_steps_per_one_loop
         self.device = device
@@ -48,13 +48,16 @@ class MaxEntIRL:
 
     def _build_sac_agent(self, **kwargs):
         reward_wrapper = kwargs.pop("reward_wrapper", RewardWrapper)
+        norm_wrapper = kwargs.pop("vec_normalizer", None)
         self.reward_net.eval()
-        self.wrap_env = reward_wrapper(self.env, self.reward_net)
-        self.venv = VecNormalize(DummyVecEnv([lambda: self.wrap_env]))
+        if norm_wrapper:
+            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)]))
+        else:
+            self.wrap_env = DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)])
         # TODO: Argument 들이 외부에서부터 입력되도록 변경. 파일의 형태로 넘겨주는 것 고려해 볼 것
         self.agent = SAC(
             MlpPolicy,
-            env=self.venv,
+            env=self.wrap_env,
             batch_size=256,
             learning_starts=100,
             train_freq=1,
@@ -71,12 +74,12 @@ class MaxEntIRL:
         n_episodes = kwargs.pop('n_episodes', 10)
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
         trajectories = generate_trajectories(
-            self.agent, DummyVecEnv([lambda: self.wrap_env]), sample_until, deterministic_policy=False)
+            self.agent, self.wrap_env, sample_until, deterministic_policy=False)
         return flatten_trajectories(trajectories)
 
     def mean_transition_reward(self, transition):
         if self.use_action_as_input:
-            np_input = np.concatenate([transition.obs, transition.acts], axis=1)
+            np_input = np.concatenate([transition.obs, transition.acts], axis=1, dtype=np.float64)
             th_input = th.from_numpy(np_input)
         else:
             th_input = th.from_numpy(transition.obs)

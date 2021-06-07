@@ -7,6 +7,7 @@ import torch as th
 from imitation.data import rollout
 from imitation.util import logger
 from scipy import io
+from stable_baselines3.common.vec_env import VecNormalize
 
 from algos.torch.MaxEntIRL import MaxEntIRL
 from common.callbacks import SaveCallback
@@ -34,7 +35,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/sq_lqr_ppo_fixed_agent"
+    log_dir += "/test"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -61,7 +62,7 @@ if __name__ == "__main__":
         rew_lr=1e-3,
         rew_arch=[],
         device=device,
-        sac_kwargs={'verbose': 1},
+        sac_kwargs={'verbose': 1, 'vec_normalizer': VecNormalize},
         rew_kwargs={'feature_fn': feature_fn},
     )
 
@@ -84,4 +85,3 @@ if __name__ == "__main__":
         env.save(model_dir + "/normalization.pkl")
     now = datetime.datetime.now()
     print(f"Endtime: {now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}")
-

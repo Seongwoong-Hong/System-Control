@@ -178,7 +178,7 @@ class SaveCallback:
             log_dir = self.path + f"/{itr:03d}"
             os.makedirs(log_dir, exist_ok=True)
             if network.agent.get_vec_normalize_env():
-                network.venv.save(log_dir + "/normalization.pkl")
+                network.wrap_env.save(log_dir + "/normalization.pkl")
             with open(log_dir + "/reward_net.pkl.tmp", "wb") as f:
                 pickle.dump(network.reward_net, f)
             network.agent.save(log_dir + "/agent")
@@ -191,11 +191,11 @@ class SaveCallback:
                 pickle.dump(network.reward_net, f)
             os.replace(log_dir + "/reward_net.pkl.tmp", log_dir + "/reward_net.pkl")
             if network.agent.get_vecnormalize_env():
-                network.env.save(log_dir + "/normalization.pkl")
+                network.wrap_env.save(log_dir + "/normalization.pkl")
 
     def agent_save(self, network, itr):
         if itr % self.cycle == 0:
             log_dir = self.path + f"/{itr:03d}"
             network.agent.save(log_dir + "/agent")
             if network.agent.get_vecnormalize_env():
-                network.env.save(log_dir + "/normalization.pkl")
+                network.wrap_env.save(log_dir + "/normalization.pkl")
