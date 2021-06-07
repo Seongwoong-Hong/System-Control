@@ -79,10 +79,10 @@ class MaxEntIRL:
 
     def mean_transition_reward(self, transition):
         if self.use_action_as_input:
-            np_input = np.concatenate([transition.obs, transition.acts], axis=1, dtype=np.float64)
-            th_input = th.from_numpy(np_input)
+            np_input = np.concatenate([transition.obs, transition.acts], axis=1)
+            th_input = th.from_numpy(np_input).double()
         else:
-            th_input = th.from_numpy(transition.obs)
+            th_input = th.from_numpy(transition.obs).double()
         reward = self.reward_net(th_input)
         return reward.mean()
 
