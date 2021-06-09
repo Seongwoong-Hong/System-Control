@@ -2,6 +2,7 @@ import torch as th
 import numpy as np
 from scipy import linalg
 from stable_baselines3.common.policies import BasePolicy
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 class LQRPolicy(BasePolicy):
@@ -18,6 +19,8 @@ class LQRPolicy(BasePolicy):
             action_space)
 
         self.env = env
+        if isinstance(env, DummyVecEnv):
+            self.env = env.envs[0]
         self.noise_lv = noise_lv
         self._build_env()
         self.K = self._get_gains()

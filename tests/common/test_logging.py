@@ -12,7 +12,7 @@ if __name__ == "__main__":
     model_dir = os.path.join(os.path.dirname(__file__), "tmp", "model")
     expert_dir = os.path.join(os.path.dirname(__file__), "demos", "expert_bar_100.pkl")
     shutil.copy(os.path.abspath("../../algos/torch/GCL/modules.py"), log_dir)
-    shutil.copy(os.path.abspath("../../gym_envs/envs/IP_custom.py"), log_dir)
+    shutil.copy(os.path.abspath("../../gym_envs/envs/mujoco/IP_custom.py"), log_dir)
     shutil.copy(os.path.abspath(__file__), log_dir)
     env = gym_envs.make("IP_custom-v1")
 

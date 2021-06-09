@@ -7,8 +7,6 @@ from common.callbacks import VideoCallback
 from common.util import make_env
 from RL.project_policies import def_policy
 
-from mujoco_py import GlfwContext
-
 
 if __name__ == "__main__":
     env_type = "IDP"
@@ -21,7 +19,6 @@ if __name__ == "__main__":
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     os.makedirs(log_dir, exist_ok=True)
-    GlfwContext(offscreen=True)
     algo = def_policy(algo_type, env, device=device, log_dir=log_dir, verbose=1)
     n = 1
     while os.path.isdir(log_dir + f"/extra_{n}"):
