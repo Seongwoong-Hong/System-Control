@@ -32,14 +32,9 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, **kwargs)
                 pltqs += [io.loadmat(file)['pltq']]
                 i += 1
             kwargs['pltqs'] = pltqs
-    elif env_type == "IDP" or env_type == "IP":
-        kwargs.pop('subpath', None)
-        kwargs.pop('pltqs', None)
-        kwargs.pop('bsp', None)
     else:
         kwargs.pop('subpath', None)
         kwargs.pop('pltqs', None)
-        kwargs.pop('n_steps', None)
         kwargs.pop('bsp', None)
     venv = is_vectorized()
     return venv

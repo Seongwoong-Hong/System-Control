@@ -6,9 +6,8 @@ from gym.envs.mujoco import mujoco_env
 
 
 class IPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self, n_steps=None):
+    def __init__(self):
         self.traj_len = 0
-        self.n_steps = n_steps
         utils.EzPickle.__init__(self)
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml"), 20)
 
@@ -19,12 +18,6 @@ class IPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         ob = self._get_obs()
         done = False
         info = {}
-        if self.n_steps is None:
-            pass
-        elif self.traj_len == self.n_steps:
-            done = True
-            info = {"terminal observation": ob}
-            self.traj_len = 0
         self.traj_len += 1
         return ob, rew, done, info
 
@@ -47,8 +40,8 @@ class IPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
 
 class IPCustomExp(IPCustom):
-    def __init__(self, n_steps=None):
-        super().__init__(n_steps=n_steps)
+    def __init__(self):
+        super().__init__()
         self.init_group = np.array([[+0.30, -0.15],
                                     [-0.30, +0.15],
                                     [+0.15, +0.15],

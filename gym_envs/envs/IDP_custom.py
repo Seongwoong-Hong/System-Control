@@ -6,16 +6,13 @@ from gym.envs.mujoco import mujoco_env
 
 
 class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self, n_steps=None):
-        self.__timesteps = 0
+    def __init__(self):
         self._order = 0
-        self.n_steps = n_steps
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 8)
         utils.EzPickle.__init__(self)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
-        self.__timesteps = 0
 
     def step(self, action):
         ob = self._get_obs()
@@ -23,26 +20,14 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
               + 0.1 * ob[2] ** 2 + 0.1 * ob[3] ** 2
               + 1e-5 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         self.do_simulation(action, self.frame_skip)
-        self.__timesteps += 1
         ob = self._get_obs()
         done = False
         info = {}
-        if self.n_steps is None:
-            pass
-        elif self.__timesteps + 1 == self.n_steps:
-            done = True
-            info = {"terminal observation": ob}
-            self.__timesteps = 0
-            self._order += 1
         return ob, r, done, info
 
     @property
     def order(self):
         return self._order
-
-    @property
-    def timesteps(self):
-        return self.__timesteps
 
     def _get_obs(self):
         return np.concatenate([
@@ -55,7 +40,6 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         return self._get_obs()
 
     def reset_model(self):
-        self.__timesteps = 0
         self.set_state(
             self.init_qpos + self.np_random.uniform(low=-.3, high=.3, size=self.model.nq),
             self.init_qvel + self.np_random.uniform(low=-.3, high=.3, size=self.model.nv)
@@ -70,8 +54,8 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
 
 class IDPCustomExp(IDPCustom):
-    def __init__(self, n_steps=None):
-        super().__init__(n_steps=n_steps)
+    def __init__(self):
+        super().__init__()
         self.init_group = np.array([[[+0.10, +0.10], [+0.05, -0.05]],
                                     [[+0.15, +0.10], [-0.05, +0.05]],
                                     [[-0.16, +0.20], [+0.10, -0.10]],
@@ -85,6 +69,7 @@ class IDPCustomExp(IDPCustom):
                                     ])
 
     def reset_model(self):
+        self._order += 1
         q = self.init_group[self._order % len(self.init_group)]
         self.set_state(
             q[0].reshape(self.model.nq),
@@ -94,8 +79,8 @@ class IDPCustomExp(IDPCustom):
 
 
 class IDPCustomEasy(IDPCustom):
-    def __init__(self, n_steps=None):
-        super().__init__(n_steps=n_steps)
+    def __init__(self):
+        super().__init__()
         self.observation_space = spaces.Box(low=-1, high=1, shape=(4,), dtype=np.float64)
 
     def step(self, action):

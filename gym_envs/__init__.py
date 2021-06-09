@@ -13,12 +13,14 @@ register(
 # v2 environment is not used yet
 register(
     id='IP_custom-v0',
-    entry_point='gym_envs.envs:IPCustomExp'
+    entry_point='gym_envs.envs:IPCustomExp',
+    max_episode_steps=600,
 )
 
 register(
     id='IP_custom-v1',
     entry_point='gym_envs.envs:IPCustom',
+    max_episode_steps=600,
 )
 
 register(
@@ -31,11 +33,13 @@ register(
 register(
     id='IDP_custom-v0',
     entry_point='gym_envs.envs:IDPCustomExp',
+    max_episode_steps=600,
 )
 
 register(
     id='IDP_custom-v1',
     entry_point='gym_envs.envs:IDPCustom',
+    max_episode_steps=600,
 )
 
 register(
@@ -47,11 +51,13 @@ register(
 register(
     id='HPC_custom-v0',
     entry_point='gym_envs.envs:IDPHumanExp',
+    max_episode_steps=600,
 )
 
 register(
     id='HPC_custom-v1',
     entry_point='gym_envs.envs:IDPHuman',
+    max_episode_steps=600,
 )
 
 register(

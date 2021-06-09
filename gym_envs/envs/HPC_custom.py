@@ -7,10 +7,9 @@ from xml.etree.ElementTree import ElementTree, parse
 
 
 class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self, n_steps=None, bsp=None, pltqs=None):
+    def __init__(self, bsp=None, pltqs=None):
         self._timesteps = 0
         self._order = 0
-        self.n_steps = n_steps
         self._pltqs = pltqs
         self._pltq = None
         filepath = os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml")
@@ -19,8 +18,8 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         mujoco_env.MujocoEnv.__init__(self, filepath, 5)
         utils.EzPickle.__init__(self)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
-        self.init_qpos = np.array([0.01366853, -0.05984312])
-        self.init_qvel = np.array([0.01206803, 0.03357093])
+        self.init_qpos = np.array([0.0, 0.0])
+        self.init_qvel = np.array([0.0, 0.0])
         self._set_pltqs()
 
     def step(self, action: np.ndarray):
@@ -31,13 +30,6 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         ob = self._get_obs()
         done = False
         info = {}
-        if self.n_steps is None:
-            pass
-        elif self._timesteps + 1 == self.n_steps:
-            done = True
-            info = {"terminal observation": ob}
-            self._timesteps = 0
-            self._order += 1
         return ob, r, done, info
 
     def _get_obs(self):
@@ -53,6 +45,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def reset_model(self):
         self._timesteps = 0
+        self._order += 1
         self.set_state(self.init_qpos, self.init_qvel)
         return self._get_obs()
 
@@ -77,6 +70,8 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     @property
     def plt_torque(self):
         if self.pltq is not None:
+            if self._timesteps == len(self.pltq):
+                return np.array([np.NaN, np.NaN])
             return self.pltq[self._timesteps, :].reshape(-1)
         else:
             return np.array([0, 0])
@@ -85,9 +80,8 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def pltq(self):
         return self._pltq
 
-    @pltq.setter
-    def pltq(self, ext_pltq):
-        if len(ext_pltq) == self.n_steps:
+    def set_pltq(self, ext_pltq):
+        if len(ext_pltq) == self.spec.max_episode_steps:
             self._pltq = ext_pltq
         else:
             raise TypeError("Input pltq length is wrong")
@@ -100,7 +94,8 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         else:
             self._pltq = None
 
-    def _set_body_config(self, filepath, bsp):
+    @staticmethod
+    def _set_body_config(filepath, bsp):
         m_u, l_u, com_u, I_u = bsp[6, :]
         m_s, l_s, com_s, I_s = bsp[2, :]
         m_t, l_t, com_t, I_t = bsp[3, :]
@@ -133,8 +128,8 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
 
 
 class IDPHumanExp(IDPHuman):
-    def __init__(self, n_steps=None, bsp=None, pltqs=None):
-        super().__init__(n_steps=n_steps, bsp=bsp)
+    def __init__(self, bsp=None, pltqs=None):
+        super().__init__(bsp=bsp)
         self._pltqs = pltqs
         self._set_pltqs()
 
