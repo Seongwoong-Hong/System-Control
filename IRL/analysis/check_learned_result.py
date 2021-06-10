@@ -15,9 +15,9 @@ from common.util import make_env
 
 def draw_2dfigure():
     env = make_env("IDP_custom-v2", use_vec_env=False)
-    # algo = SAC.load("../../IRL/tmp/log/IDP/MaxEntIRL/sq_lqr_ppo/model/050/agent")
+    # algo = SAC.load("../tmp/log/IDP/MaxEntIRL/sq_lqr_ppo/model/050/agent")
     algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
-    with open("../../IRL/tmp/log/IDP/MaxEntIRL/sq_lqr_ppo/model/050/reward_net.pkl", "rb") as f:
+    with open("../tmp/log/IDP/MaxEntIRL/sq_lqr_ppo/model/050/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
 
     ndim, nact = env.observation_space.shape[0], env.action_space.shape[0]
@@ -51,30 +51,59 @@ def draw_2dfigure():
 
 
 def learned_cost():
-    proj_path = os.path.abspath(os.path.join("..", "..", "IRL", "tmp", "log", "IDP", "MaxEntIRL", "sq_lqr_ppo_fixed_agent"))
-    with open("../../IRL/demos/IDP/lqr_ppo.pkl", "rb") as f:
+    name = "no_lqr_ppo_one_layer"
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP", "MaxEntIRL", name))
+    with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
-    venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, n_steps=600)
+    venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1)
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
     sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
     i = 1
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
         agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
-        agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
-        agent_trans = flatten_trajectories(agent_trajs)
-        th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1))
+        # agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
+        # agent_trans = flatten_trajectories(agent_trajs)
+        # th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1))
         with open(os.path.join(proj_path, "model", f"{i:03d}", "reward_net.pkl"), "rb") as f:
             reward_fn = pickle.load(f).double()
         print(-reward_fn(th_input).mean().item() * 600)
         cost_list.append(-reward_fn(th_input).mean().item() * 600)
         i += 1
     plt.plot(cost_list)
+    # plt.savefig(f"figures/IDP/MaxEntIRL/agent_cost_each_iter/expt_{name}.png")
+    plt.show()
+
+
+def expt_cost():
+    def expt_fn(inp):
+        return th.square(inp[:, :2]) + 1e-5 * (th.square(inp[:, 4:]))
+    name = "sq_lqr_ppo_ent"
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP", "MaxEntIRL", name))
+    with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
+        expert_trajs = pickle.load(f)
+    expt_trans = flatten_trajectories(expert_trajs)
+    venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1)
+    th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
+    print(f"expt_cost: {expt_fn(th_input).mean().item() * 600}")
+    sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
+    i = 1
+    cost_list = []
+    while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
+        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
+        agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
+        agent_trans = flatten_trajectories(agent_trajs)
+        th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1))
+        print(expt_fn(th_input).mean().item() * 600)
+        cost_list.append(expt_fn(th_input).mean().item() * 600)
+        i += 1
+    plt.plot(cost_list)
+    plt.savefig(f"figures/IDP/MaxEntIRL/expt_cost_each_iter/{name}.png")
     plt.show()
 
 
 if __name__ == "__main__":
     def feature_fn(x):
-        return th.square(x)
+        return x
     learned_cost()
