@@ -8,10 +8,21 @@ from algos.torch.sac import SAC
 from common.util import make_env
 from common.verification import verify_policy
 
+from scipy import io
+
 
 @pytest.fixture
 def irl_path():
     return os.path.abspath(os.path.join("..", "..", "IRL"))
+
+
+@pytest.fixture
+def pltqs(irl_path):
+    pltqs = []
+    for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+        file = os.path.join(irl_path, "demos", "HPC", "sub01", f"sub01i{i + 1}.mat")
+        pltqs += [io.loadmat(file)['pltq']]
+    return pltqs
 
 
 def test_hpc_algo(env):
@@ -25,25 +36,26 @@ def test_hpcdiv_algo(tenv):
         a_list, o_list, _ = verify_policy(tenv, algo)
 
 
-def test_hpc_learned_policy(env, irl_path):
-    name = "HPC/MaxEntIRL/no_sub01_1&2/" + "add_rew_learning"
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "policies_1")
-    algo = SAC.load(model_dir + "/000000250000/model.pkl")
+def test_hpc_learned_policy(irl_path, pltqs):
+    env = make_env("HPC_custom-v0", pltqs=pltqs)
+    name = "HPC/MaxEntIRL/sq_sub01_1&2"
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
+    algo = SAC.load(model_dir + "/agent")
     for _ in range(10):
         a_list, o_list, _ = verify_policy(env, algo)
 
 
 def test_irl_learned_policy(irl_path):
     env_type = "IDP"
-    env = make_env(f"{env_type}_custom-v0", n_steps=600, use_vec_env=False)
-    name = f"{env_type}/MaxEntIRL/sq_lqr_ppo_ent"
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "add_rew_learning")
-    algo = PPO.load(model_dir + "/policies_1/000005000000/model.pkl")
+    env = make_env(f"{env_type}_custom-v0", use_vec_env=False)
+    name = f"{env_type}/MaxEntIRL/no_lqr_ppo_one_layer"
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "017")
+    algo = SAC.load(model_dir + "/agent")
     a_list, o_list, _ = verify_policy(env, algo, deterministic=True)
 
 
 def test_idp_policy():
-    env = make_env("IDP_custom-v0", n_steps=600, use_vec_env=False)
+    env = make_env("IDP_custom-v0", use_vec_env=False)
     algo = def_policy("IDP", env, noise_lv=0.5)
     _, _, _ = verify_policy(env, algo, deterministic=False)
 
