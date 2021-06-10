@@ -59,12 +59,12 @@ register(
 register(
     id='HPC_custom-v0',
     entry_point='gym_envs.envs.mujoco:IDPHumanExp',
-    max_episode_steps=600,
+    max_episode_steps=599,
 )
 
 register(
     id='HPC_custom-v1',
     entry_point='gym_envs.envs.mujoco:IDPHuman',
-    max_episode_steps=600,
+    max_episode_steps=599,
 )
 

@@ -24,13 +24,13 @@ if __name__ == "__main__":
     while os.path.isdir(log_dir + f"/extra_{n}"):
         n += 1
     os.makedirs(log_dir + f"/policies_{n}", exist_ok=False)
-    video_recorder = VideoCallback(make_env(env_id, use_vec_env=False, n_steps=600),
-                                   n_eval_episodes=5,
-                                   render_freq=int(2.5e5))
-    save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
-    save_policy_callback = callbacks.EveryNTimesteps(int(2.5e5), save_policy_callback)
-    callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
-    algo.learn(total_timesteps=int(1e5), tb_log_name="extra", callback=callback_list)
+    # video_recorder = VideoCallback(make_env(env_id, use_vec_env=False),
+    #                                n_eval_episodes=5,
+    #                                render_freq=int(2.5e5))
+    # save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
+    # save_policy_callback = callbacks.EveryNTimesteps(int(2.5e5), save_policy_callback)
+    # callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
+    algo.learn(total_timesteps=int(1e5), tb_log_name="extra")
     algo.save(log_dir+f"/policies_{n}/{algo_type}0")
     env.save(log_dir+"/policies_{n}/normalization")
     print(f"saved as policies_{n}/{algo_type}0")

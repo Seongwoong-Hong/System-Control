@@ -63,7 +63,7 @@ class MaxEntIRL:
             train_freq=1,
             gradient_steps=1,
             gamma=0.99,
-            ent_coef=0.1,
+            ent_coef='auto',
             device=self.device,
             policy_kwargs={'net_arch': {'pi': [32, 32], 'qf': [32, 32]}},
             **kwargs
@@ -104,8 +104,8 @@ class MaxEntIRL:
             **kwargs
     ):
         loss_logger = []
-        self._build_sac_agent(**self.sac_kwargs)
         for itr in range(total_iter):
+            self._build_sac_agent(**self.sac_kwargs)
             with logger.accumulate_means(f"agent_{itr}"):
                 for agent_steps in range(max_sac_iter):
                     self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)

@@ -7,16 +7,17 @@ from scipy import io
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
+from IRL.scripts.project_policies import def_policy
 from common.util import make_env
 from common.verification import CostMap
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "HPC"
     algo_type = "MaxEntIRL"
     device = "cpu"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     sub = "sub01"
-    name = "IDP_custom"
+    name = "HPC_custom"
     write_txt = False
 
     pltqs = []
@@ -27,19 +28,19 @@ if __name__ == "__main__":
             pltqs += [io.loadmat(file)['pltq']]
         test_len = len(pltqs)
 
-    agent_env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
-    expt_env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, pltqs=pltqs)
+    agent_env = make_env(f"{name}-v0", use_vec_env=False, pltqs=pltqs)
+    expt_env = make_env(f"{name}-v0", use_vec_env=False, pltqs=pltqs)
     expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
     # expt = def_policy(env_type, expt_env)
 
-    name = "no_lqr"
+    name = "sq_sub01_1&2"
     ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name)
     model_dir = os.path.join(ana_dir, "model", "050")
 
     agent = SAC.load(model_dir + "/agent")
 
     def feature_fn(x):
-        return x
+        return th.square(x)
 
     with open(model_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()

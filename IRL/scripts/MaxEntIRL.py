@@ -17,7 +17,7 @@ from algos.torch.MaxEntIRL import MaxEntIRL
 if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    device = "cpu"
+    device = "cuda:0"
     name = "IDP_custom"
     use_norm = True
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
         file = "../demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
-    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, n_steps=600, pltqs=pltqs)
+    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, pltqs=pltqs)
 
     # Load data
     expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
@@ -36,13 +36,13 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/sq_lqr_ppo_fixed_agent"
+    log_dir += "/no_lqr_ppo_norm"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
 
     def feature_fn(x):
-        return th.square(x)
+        return x
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -61,7 +61,7 @@ if __name__ == "__main__":
         expert_transitions=transitions,
         use_action_as_input=True,
         rew_lr=1e-3,
-        rew_arch=[],
+        rew_arch=[8, 8],
         device=device,
         sac_kwargs={'verbose': 1, 'vec_normalizer': VecNormalize},
         rew_kwargs={'feature_fn': feature_fn},
