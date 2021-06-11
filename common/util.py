@@ -10,8 +10,12 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, **kwargs):
     def is_vectorized():
         if use_norm:
+            stats_path = kwargs.pop("stats_path", None)
             env = DummyVecEnv([lambda: gym.make(env_name, **kwargs) for _ in range(num_envs)])
-            env = VecNormalize(env, norm_obs=True, norm_reward=True)
+            if not stats_path:
+                env = VecNormalize(env, norm_obs=True, norm_reward=True)
+            else:
+                env = VecNormalize.load(stats_path, env)
         elif use_vec_env:
             env = DummyVecEnv([lambda: gym.make(env_name, **kwargs) for _ in range(num_envs)])
         else:
