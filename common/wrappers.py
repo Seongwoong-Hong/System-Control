@@ -36,7 +36,7 @@ class RewardWrapper(gym.RewardWrapper):
     def __init__(self, env, rwfn):
         super(RewardWrapper, self).__init__(env)
         self.rwfn = rwfn
-        num_rwfn_inp = self.rwfn.layers[0].in_features
+        num_rwfn_inp = self.rwfn.in_features
         if num_rwfn_inp == self.env.observation_space.shape[0]:
             self.use_action_as_inp = False
         elif num_rwfn_inp == self.env.observation_space.shape[0] + self.env.action_space.shape[0]:

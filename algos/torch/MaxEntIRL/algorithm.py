@@ -7,7 +7,7 @@ from imitation.data.rollout import make_sample_until, generate_trajectories, fla
 from imitation.util import logger
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from algos.torch.MaxEntIRL import RewardNet
+from algos.torch.MaxEntIRL import RewardNet, CNNRewardNet
 from algos.torch.sac import SAC, MlpPolicy
 from common.wrappers import RewardWrapper
 
@@ -44,7 +44,13 @@ class MaxEntIRL:
         inp = self.env.observation_space.shape[0]
         if self.use_action_as_input:
             inp += self.env.action_space.shape[0]
-        self.reward_net = RewardNet(inp=inp, arch=rew_arch, lr=rew_lr, device=self.device, **self.rew_kwargs).double()
+        RNet_type = rew_kwargs.pop("type", None)
+        if RNet_type is None or RNet_type is "ann":
+            self.reward_net = RewardNet(inp=inp, arch=rew_arch, lr=rew_lr, device=self.device, **self.rew_kwargs).double().to(self.device)
+        elif RNet_type is "cnn":
+            self.reward_net = CNNRewardNet(inp=inp, arch=rew_arch, lr=rew_lr, device=self.device, **self.rew_kwargs).double().to(self.device)
+        else:
+            raise NotImplementedError("Not implemented reward net type")
 
     def _build_sac_agent(self, **kwargs):
         reward_wrapper = kwargs.pop("reward_wrapper", RewardWrapper)
