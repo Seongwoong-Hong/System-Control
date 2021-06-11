@@ -17,9 +17,8 @@ from algos.torch.MaxEntIRL import MaxEntIRL
 if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    device = "cuda:0"
+    device = "cpu"
     name = "IDP_custom"
-    use_norm = True
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     pltqs = []
@@ -29,20 +28,20 @@ if __name__ == "__main__":
     env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, pltqs=pltqs)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     transitions = rollout.flatten_trajectories(expert_trajs)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/no_lqr_ppo_norm"
+    log_dir += "/sq_lqr"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
 
     def feature_fn(x):
-        return x
+        return th.square(x)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -61,9 +60,9 @@ if __name__ == "__main__":
         expert_transitions=transitions,
         use_action_as_input=True,
         rew_lr=1e-3,
-        rew_arch=[8, 8],
+        rew_arch=[],
         device=device,
-        sac_kwargs={'verbose': 1, 'vec_normalizer': VecNormalize},
+        sac_kwargs={'verbose': 1},
         rew_kwargs={'feature_fn': feature_fn},
     )
 
@@ -82,7 +81,7 @@ if __name__ == "__main__":
         pickle.dump(learning.reward_net, f)
     os.replace(reward_path + ".tmp", reward_path)
     learning.agent.save(model_dir + "/agent")
-    if use_norm:
+    if learning.agent.get_vec_normalize_env():
         env.save(model_dir + "/normalization.pkl")
     now = datetime.datetime.now()
     print(f"Endtime: {now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}")

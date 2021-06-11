@@ -11,13 +11,17 @@ from matplotlib import pyplot as plt
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from common.util import make_env
+from IRL.scripts.project_policies import def_policy
 
 
 def draw_2dfigure():
-    env = make_env("IDP_custom-v2", use_vec_env=False)
-    # algo = SAC.load("../tmp/log/IDP/MaxEntIRL/sq_lqr_ppo/model/050/agent")
+    env = make_env("IDP_custom-v0", use_vec_env=False)
+    name = "sq_lqr_ppo"
+    num = "050"
+    # algo = SAC.load(f"../tmp/log/IDP/MaxEntIRL/{name}/model/{num}/agent")
+    # algo = def_policy("IDP", env)
     algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
-    with open("../tmp/log/IDP/MaxEntIRL/sq_lqr_ppo/model/050/reward_net.pkl", "rb") as f:
+    with open(f"../tmp/log/IDP/MaxEntIRL/{name}/model/{num}/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
 
     ndim, nact = env.observation_space.shape[0], env.action_space.shape[0]
@@ -27,12 +31,13 @@ def draw_2dfigure():
     for i in range(d1.shape[0]):
         for j in range(d1.shape[1]):
             iobs = np.zeros(ndim)
-            iobs[1], iobs[3] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
+            iobs[2], iobs[3] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
             iacts, _ = algo.predict(np.array(iobs), deterministic=True)
             pact[i][j] = iacts[1]
             inp = th.from_numpy(np.append(iobs, iacts)).double().to(algo.device).reshape(1, -1)
-            cost[i][j] = -reward_fn(inp).item()
-    cost /= np.amax(cost)
+            cost[i][j] = th.sum(th.square(inp[0, :2]) + 0.1*th.square(inp[0, 2:4])+1e-5*th.square(200*inp[0, 4:])).item()
+            # cost[i][j] = -reward_fn(inp).item()
+    cost = (cost - np.min(cost))/(np.max(cost) - np.min(cost))
     title_list = ["norm_cost", "abs_action"]
     yval_list = [cost, np.abs(pact)]
     xlabel, ylabel = "d1", "d2"
@@ -47,13 +52,14 @@ def draw_2dfigure():
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         clb.ax.set_title(title_list[i])
+    # plt.savefig(f"figures/IDP/MaxEntIRL/2dplot_for_th1th2/e_agent_{name}.png")
     plt.show()
 
 
 def learned_cost():
-    name = "no_lqr_ppo_one_layer"
+    name = "no_lqr_ppo_many"
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP", "MaxEntIRL", name))
-    with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
+    with open("../demos/IDP/lqr_ppo_large.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
     venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1)
@@ -63,9 +69,11 @@ def learned_cost():
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
         agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
+        # stats_path = os.path.abspath(f"../tmp/log/IDP/MaxEntIRL/{name}/model/{i:03d}/normalization.pkl")
+        # venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path)
         # agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
         # agent_trans = flatten_trajectories(agent_trajs)
-        # th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1))
+        # th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
         with open(os.path.join(proj_path, "model", f"{i:03d}", "reward_net.pkl"), "rb") as f:
             reward_fn = pickle.load(f).double()
         print(-reward_fn(th_input).mean().item() * 600)
@@ -106,4 +114,4 @@ def expt_cost():
 if __name__ == "__main__":
     def feature_fn(x):
         return x
-    learned_cost()
+    draw_2dfigure()
