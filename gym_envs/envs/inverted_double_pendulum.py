@@ -105,6 +105,9 @@ class InvertedDoublePendulum(gym.Env):
 
         return self.state, reward, done, {'action': action}
 
+    def current_obs(self):
+        return self.state
+
     def reset(self):
         self.set_state(self.np_random.uniform(low=-self.high, high=self.high))
         return self.state
