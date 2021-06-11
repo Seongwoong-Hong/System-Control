@@ -37,7 +37,7 @@ def learner(env, expert):
                          rew_arch=[8, 8],
                          device='cuda:0',
                          sac_kwargs={'verbose': 1},
-                         rew_kwargs={'feature_fn': feature_fn}
+                         rew_kwargs={'feature_fn': feature_fn, 'type': 'cnn'}
                          )
     return learning
 
@@ -100,4 +100,4 @@ def test_feature(env, expert):
 
 
 def test_validity(learner):
-    learner.learn(total_iter=10, gradient_steps=50, n_episodes=8, max_sac_iter=10)
+    learner.learn(total_iter=10, gradient_steps=10, n_episodes=8, max_sac_iter=1)

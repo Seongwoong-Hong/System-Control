@@ -69,7 +69,7 @@ def test_expt_reward():
         reward = 0
         obs = env.reset()
         while not done:
-            act, _ = agent.predict(obs, deterministic=True)
+            act, _ = expt.predict(obs, deterministic=True)
             obs, rew, done, _ = env.step(act)
             reward += rew.item()
         rewards.append(reward)

@@ -4,6 +4,7 @@ import time
 import pickle
 import numpy as np
 
+from scipy import io
 from matplotlib import pyplot as plt
 from imitation.data.rollout import flatten_trajectories
 
@@ -37,19 +38,30 @@ def demo_dir():
     return os.path.abspath(os.path.join("..", "..", "IRL", "demos"))
 
 
-def test_hpc(env, demo_dir):
-    expert_dir = os.path.join(demo_dir, "HPC", "sub01_1&2.pkl")
+@pytest.fixture
+def pltqs(demo_dir):
+    pltqs = []
+    for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+        file = os.path.join(demo_dir, "HPC", "sub01", f"sub01i{i + 1}.mat")
+        pltqs += [io.loadmat(file)['pltq']]
+    return pltqs
+
+
+def test_hpc(demo_dir, pltqs):
+    env = make_env("HPC_custom-v0", pltqs=pltqs)
+    expert_dir = os.path.join(demo_dir, "HPC", "sub01.pkl")
     run_traj(env, expert_dir)
 
 
-def test_hpcdiv(env, demo_dir):
+def test_hpcdiv(demo_dir, pltqs):
+    env = make_env("HPC_custom-v0", pltqs=pltqs)
     expert_dir = os.path.join(demo_dir, "HPC", "lqrDivTest.pkl")
     run_traj(env, expert_dir)
 
 
 def test_idp(demo_dir):
     env = make_env("IDP_custom-v0", use_vec_env=False)
-    expert_dir = os.path.join(demo_dir, "IDP", "lqr1.pkl")
+    expert_dir = os.path.join(demo_dir, "IDP", "lqr_known.pkl")
     run_traj(env, expert_dir)
 
 
