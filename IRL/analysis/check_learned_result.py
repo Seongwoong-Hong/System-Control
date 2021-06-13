@@ -17,15 +17,15 @@ from IRL.scripts.project_policies import def_policy
 def draw_2dfigure():
     env = make_env("IDP_custom-v0", use_vec_env=False)
     name = "sq_lqr_ppo"
-    num = "050"
-    # algo = SAC.load(f"../tmp/log/IDP/MaxEntIRL/{name}/model/{num}/agent")
+    num = "011"
+    algo = SAC.load(f"../tmp/log/IDP/MaxEntIRL/{name}/model/{num}/agent")
     # algo = def_policy("IDP", env)
-    algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
+    # algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
     with open(f"../tmp/log/IDP/MaxEntIRL/{name}/model/{num}/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
 
     ndim, nact = env.observation_space.shape[0], env.action_space.shape[0]
-    d1, d2 = np.meshgrid(np.linspace(-0.25, 0.25, 100), np.linspace(-0.25, 0.25, 100))
+    d1, d2 = np.meshgrid(np.linspace(-0.5, 0.5, 100), np.linspace(-0.25, 0.25, 100))
     pact = np.zeros((100, 100), dtype=np.float64)
     cost = np.zeros(d1.shape)
     for i in range(d1.shape[0]):
@@ -57,9 +57,9 @@ def draw_2dfigure():
 
 
 def learned_cost():
-    name = "no_lqr_ppo_many"
+    name = "cnn_lqr_ppo"
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP", "MaxEntIRL", name))
-    with open("../demos/IDP/lqr_ppo_large.pkl", "rb") as f:
+    with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
     venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1)
@@ -71,9 +71,9 @@ def learned_cost():
         agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
         # stats_path = os.path.abspath(f"../tmp/log/IDP/MaxEntIRL/{name}/model/{i:03d}/normalization.pkl")
         # venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path)
-        # agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
-        # agent_trans = flatten_trajectories(agent_trajs)
-        # th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
+        agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
+        agent_trans = flatten_trajectories(agent_trajs)
+        th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
         with open(os.path.join(proj_path, "model", f"{i:03d}", "reward_net.pkl"), "rb") as f:
             reward_fn = pickle.load(f).double()
         print(-reward_fn(th_input).mean().item() * 600)
@@ -87,7 +87,7 @@ def learned_cost():
 def expt_cost():
     def expt_fn(inp):
         return th.square(inp[:, :2]) + 1e-5 * (th.square(inp[:, 4:]))
-    name = "sq_lqr_ppo_ent"
+    name = "sq_lqr_ppo"
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP", "MaxEntIRL", name))
     with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
@@ -103,15 +103,16 @@ def expt_cost():
         agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
         agent_trans = flatten_trajectories(agent_trajs)
         th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1))
-        print(expt_fn(th_input).mean().item() * 600)
+        print("Cost:", expt_fn(th_input).mean().item() * 600)
         cost_list.append(expt_fn(th_input).mean().item() * 600)
         i += 1
     plt.plot(cost_list)
-    plt.savefig(f"figures/IDP/MaxEntIRL/expt_cost_each_iter/{name}.png")
+    # plt.savefig(f"figures/IDP/MaxEntIRL/expt_cost_each_iter/{name}.png")
     plt.show()
+    print(f"minimum cost index: {np.argmin(cost_list) + 1}")
 
 
 if __name__ == "__main__":
     def feature_fn(x):
-        return x
+        return th.square(x)
     draw_2dfigure()

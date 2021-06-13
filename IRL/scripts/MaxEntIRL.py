@@ -28,20 +28,21 @@ if __name__ == "__main__":
     env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, pltqs=pltqs)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
+    expt_traj_num = len(expert_trajs)
     transitions = rollout.flatten_trajectories(expert_trajs)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/sq_lqr"
+    log_dir += "/no_lqr_ppo_ppoagent"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
 
     def feature_fn(x):
-        return th.square(x)
+        return x
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -60,17 +61,17 @@ if __name__ == "__main__":
         expert_transitions=transitions,
         use_action_as_input=True,
         rew_lr=1e-3,
-        rew_arch=[],
+        rew_arch=[8, 8],
         device=device,
         sac_kwargs={'verbose': 1},
-        rew_kwargs={'feature_fn': feature_fn},
+        rew_kwargs={'feature_fn': feature_fn, 'type': 'ann'},
     )
 
     # Run Learning
     losses = learning.learn(
         total_iter=50,
         gradient_steps=100,
-        n_episodes=10,
+        n_episodes=expt_traj_num,
         max_sac_iter=5,
         callback=save_net_callback.net_save,
     )
@@ -82,6 +83,6 @@ if __name__ == "__main__":
     os.replace(reward_path + ".tmp", reward_path)
     learning.agent.save(model_dir + "/agent")
     if learning.agent.get_vec_normalize_env():
-        env.save(model_dir + "/normalization.pkl")
+        learning.wrap_env.save(model_dir + "/normalization.pkl")
     now = datetime.datetime.now()
     print(f"Endtime: {now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}")
