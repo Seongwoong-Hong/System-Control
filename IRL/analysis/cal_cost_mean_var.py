@@ -12,12 +12,12 @@ from common.util import make_env
 from common.verification import CostMap
 
 if __name__ == "__main__":
-    env_type = "HPC"
+    env_type = "IDP"
     algo_type = "MaxEntIRL"
     device = "cpu"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     sub = "sub01"
-    name = "HPC_custom"
+    name = "IDP_custom"
     write_txt = False
 
     pltqs = []
@@ -28,15 +28,18 @@ if __name__ == "__main__":
             pltqs += [io.loadmat(file)['pltq']]
         test_len = len(pltqs)
 
-    agent_env = make_env(f"{name}-v0", use_vec_env=False, pltqs=pltqs)
+    type_name = "sq_lqr_ppo"
+    ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, type_name)
+    model_dir = os.path.join(ana_dir, "model", "011")
+
+    if os.path.isfile(model_dir + "normalization.pkl"):
+        stats_path = model_dir + "/normalization.pkl"
+        agent_env = make_env("IDP_custom-v0", num_envs=1, use_norm=True, stats_path=stats_path, pltqs=pltqs)
+    else:
+        agent_env = make_env(f"{name}-v0", use_vec_env=False, pltqs=pltqs)
     expt_env = make_env(f"{name}-v0", use_vec_env=False, pltqs=pltqs)
     expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
     # expt = def_policy(env_type, expt_env)
-
-    name = "sq_sub01_1&2"
-    ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name)
-    model_dir = os.path.join(ana_dir, "model", "050")
-
     agent = SAC.load(model_dir + "/agent")
 
     def feature_fn(x):
@@ -74,7 +77,7 @@ if __name__ == "__main__":
     print(f"expt_cost_for_expt mean: {np.mean(expt_cost_for_expt):.3e}, std: {np.std(expt_cost_for_expt):.3e}")
     if write_txt:
         f = open("MaxEntIRL_result.txt", "a")
-        f.write(f"env: {name}\n")
+        f.write(f"env: {type_name}\n")
         f.write(f"agent_cost_for_agent mean: {np.mean(agent_cost_for_agent[1]):.3e}, std: {np.std(agent_cost_for_agent[1]):.3e}\n")
         f.write(f"agent_cost_for_expt mean: {np.mean(agent_cost_for_expt[1]):.3e}, std: {np.std(agent_cost_for_expt[1]):.3e}\n")
         f.write(f"expt_cost_for_agent mean: {np.mean(expt_cost_for_agent):.3e}, std: {np.std(expt_cost_for_agent):.3e}\n")
