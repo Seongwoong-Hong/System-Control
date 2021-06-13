@@ -61,12 +61,13 @@ class CostMap:
     @classmethod
     def process_agent(cls, agent_dict: Dict):
         trajectories = []
-        env = agent_dict['env']
+        venv = agent_dict['env']
         n_episodes = 10
-        if hasattr(env, 'num_disturbs'):
-            n_episodes = env.num_disturbs
+        if hasattr(venv, 'num_disturbs'):
+            n_episodes = venv.num_disturbs
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
-        venv = DummyVecEnv([lambda: env])
+        if not isinstance(venv, DummyVecEnv):
+            venv = DummyVecEnv([lambda: venv])
         algo = agent_dict['algo']
         trajectories_accum = TrajectoryAccumulator()
         obs = venv.reset()
