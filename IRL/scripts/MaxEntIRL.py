@@ -12,6 +12,7 @@ from stable_baselines3.common.vec_env import VecNormalize
 from common.util import make_env
 from common.callbacks import SaveCallback
 from algos.torch.MaxEntIRL import MaxEntIRL
+from IRL.scripts.project_policies import def_policy
 
 
 if __name__ == "__main__":
@@ -36,10 +37,11 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/no_lqr_ppo_ppoagent"
+    log_dir += "/reset_test"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
+    shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
         return x
@@ -55,9 +57,11 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    learning = MaxEntIRL(
+    agent = def_policy("sac", env, device=device, verbose=1)
+    learner = MaxEntIRL(
         env,
-        agent_learning_steps_per_one_loop=3e4,
+        agent=agent,
+        agent_learning_steps_per_one_loop=int(3e4),
         expert_transitions=transitions,
         use_action_as_input=True,
         rew_lr=1e-3,
@@ -68,7 +72,7 @@ if __name__ == "__main__":
     )
 
     # Run Learning
-    losses = learning.learn(
+    learner.learn(
         total_iter=50,
         gradient_steps=100,
         n_episodes=expt_traj_num,
@@ -79,10 +83,10 @@ if __name__ == "__main__":
     # Save the result of learning
     reward_path = model_dir + "/reward_net.pkl"
     with open(reward_path + ".tmp", "wb") as f:
-        pickle.dump(learning.reward_net, f)
+        pickle.dump(learner.reward_net, f)
     os.replace(reward_path + ".tmp", reward_path)
-    learning.agent.save(model_dir + "/agent")
-    if learning.agent.get_vec_normalize_env():
-        learning.wrap_env.save(model_dir + "/normalization.pkl")
+    learner.agent.save(model_dir + "/agent")
+    if learner.agent.get_vec_normalize_env():
+        learner.wrap_env.save(model_dir + "/normalization.pkl")
     now = datetime.datetime.now()
     print(f"Endtime: {now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}")

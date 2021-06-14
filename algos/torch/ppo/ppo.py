@@ -14,10 +14,9 @@ from stable_baselines3.common.utils import explained_variance
 
 class PPOCustom(PPO):
     def __init__(self, *args, **kwargs):
-        if 'ent_schedule' in kwargs:
-            self.ent_schedule = kwargs.pop('ent_schedule')
-        else:
-            self.ent_schedule = 1.0
+        self.init_args = args
+        self.init_kwargs = kwargs
+        self.ent_schedule = kwargs.pop('ent_schedule', 1.0)
         super(PPOCustom, self).__init__(*args, **kwargs)
 
     def train(self) -> None:
@@ -133,6 +132,14 @@ class PPOCustom(PPO):
             logger.record("train/clip_range_vf", clip_range_vf)
         logger.record("train/returns", np.mean(returns))
 
-    def learn(self, **kwargs) -> "OnPolicyAlgorithm":
+    def learn(self, *args, **kwargs) -> "OnPolicyAlgorithm":
         self.ent_coef *= self.ent_schedule
-        return super(PPOCustom, self).learn(**kwargs)
+        return super(PPOCustom, self).learn(*args, **kwargs)
+
+    def set_env_and_reset(self, env):
+        self.init_kwargs['env'] = env
+        if 'ent_schedule' in self.init_kwargs:
+            self.ent_schedule = self.init_kwargs.pop('ent_schedule')
+        else:
+            self.ent_schedule = 1.0
+        super(PPOCustom, self).__init__(*self.init_args, **self.init_kwargs)
