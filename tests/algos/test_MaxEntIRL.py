@@ -25,12 +25,16 @@ def env():
 @pytest.fixture
 def learner(env, expert):
     from imitation.util import logger
+    from IRL.scripts.project_policies import def_policy
     logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
         return x
 
+    agent = def_policy("sac", env, device='cpu', verbose=1)
+
     learning = MaxEntIRL(env,
+                         agent=agent,
                          agent_learning_steps_per_one_loop=10000,
                          expert_transitions=expert,
                          rew_lr=1e-3,
