@@ -69,8 +69,9 @@ def learned_cost():
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
         agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
-        # stats_path = os.path.abspath(f"../tmp/log/IDP/MaxEntIRL/{name}/model/{i:03d}/normalization.pkl")
-        # venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path)
+        if os.path.isfile(os.path.abspath(proj_path + f"/{i:03d}/normalization.pkl")):
+            stats_path = os.path.abspath(proj_path + f"/model/{i:03d}/normalization.pkl")
+            venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path)
         agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
         agent_trans = flatten_trajectories(agent_trajs)
         th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
@@ -87,9 +88,9 @@ def learned_cost():
 def expt_cost():
     def expt_fn(inp):
         return th.square(inp[:, :2]) + 1e-5 * (th.square(inp[:, 4:]))
-    name = "sq_lqr_ppo"
+    name = "cnn_lqr_ppo_large"
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP", "MaxEntIRL", name))
-    with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
+    with open("../demos/IDP/lqr_ppo_large.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
     venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1)
@@ -100,6 +101,9 @@ def expt_cost():
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
         agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
+        if os.path.isfile(proj_path + f"/{i:03d}/normalization.pkl"):
+            stats_path = proj_path + f"/model/{i:03d}/normalization.pkl"
+            venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path)
         agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
         agent_trans = flatten_trajectories(agent_trajs)
         th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1))
@@ -115,4 +119,4 @@ def expt_cost():
 if __name__ == "__main__":
     def feature_fn(x):
         return th.square(x)
-    draw_2dfigure()
+    expt_cost()
