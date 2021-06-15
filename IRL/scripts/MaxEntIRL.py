@@ -67,7 +67,7 @@ if __name__ == "__main__":
         rew_lr=1e-3,
         rew_arch=[8, 8],
         device=device,
-        sac_kwargs={'verbose': 1},
+        env_kwargs={},
         rew_kwargs={'feature_fn': feature_fn, 'type': 'ann'},
     )
 
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         total_iter=50,
         gradient_steps=100,
         n_episodes=expt_traj_num,
-        max_sac_iter=5,
+        max_agent_iter=5,
         callback=save_net_callback.net_save,
     )
 

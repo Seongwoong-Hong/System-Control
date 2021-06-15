@@ -11,6 +11,7 @@ from stable_baselines3.common.type_aliases import GymEnv
 
 from algos.torch.MaxEntIRL import RewardNet, CNNRewardNet
 from common.wrappers import RewardWrapper
+from common.rollouts import get_trajectories_probs
 
 
 class MaxEntIRL:
@@ -25,7 +26,7 @@ class MaxEntIRL:
             rew_arch: List[int] = None,
             use_action_as_input: bool = True,
             rew_kwargs: Optional[Dict] = None,
-            sac_kwargs: Optional[Dict] = None,
+            env_kwargs: Optional[Dict] = None,
     ):
         assert (
             logger.is_configured()
@@ -35,10 +36,10 @@ class MaxEntIRL:
         self.agent_learning_steps = agent_learning_steps_per_one_loop
         self.device = device
         self.use_action_as_input = use_action_as_input
-        if sac_kwargs is None:
-            self.sac_kwargs = {}
+        if env_kwargs is None:
+            self.env_kwargs = {}
         else:
-            self.sac_kwargs = sac_kwargs
+            self.env_kwargs = env_kwargs
         if rew_kwargs is None:
             self.rew_kwargs = {}
         else:
@@ -67,7 +68,7 @@ class MaxEntIRL:
         else:
             raise NotImplementedError("Not implemented reward net type")
 
-    def _build_sac_agent(self, **kwargs):
+    def _reset_agent(self, **kwargs):
         reward_wrapper = kwargs.pop("reward_wrapper", RewardWrapper)
         norm_wrapper = kwargs.pop("vec_normalizer", None)
         self.reward_net.eval()
@@ -82,7 +83,7 @@ class MaxEntIRL:
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
         trajectories = generate_trajectories(
             self.agent, self.wrap_env, sample_until, deterministic_policy=False)
-        return flatten_trajectories(trajectories)
+        return trajectories
 
     def mean_transition_reward(self, transition):
         if self.use_action_as_input:
@@ -95,7 +96,7 @@ class MaxEntIRL:
 
     def cal_loss(self, **kwargs):
         expert_transitions = deepcopy(self.expert_transitions)
-        agent_transitions = self.rollout_from_agent(**kwargs)
+        agent_transitions = flatten_trajectories(self.rollout_from_agent(**kwargs))
         agent_ex = self.mean_transition_reward(agent_transitions)
         expert_ex = self.mean_transition_reward(expert_transitions)
         loss = agent_ex - expert_ex
@@ -105,15 +106,15 @@ class MaxEntIRL:
             self,
             total_iter: int = 10,
             gradient_steps: int = 100,
-            max_sac_iter: int = 10,
+            max_agent_iter: int = 10,
             agent_callback=None,
             callback=None,
             **kwargs
     ):
         for itr in range(total_iter):
-            self._build_sac_agent(**self.sac_kwargs)
+            self._reset_agent(**self.env_kwargs)
             with logger.accumulate_means(f"agent_{itr}"):
-                for agent_steps in range(max_sac_iter):
+                for agent_steps in range(max_agent_iter):
                     self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
                     logger.record("loss_diff", self.cal_loss(**kwargs).item())
                     logger.record("agent_steps", agent_steps)
@@ -132,6 +133,59 @@ class MaxEntIRL:
                     # TODO: Is there any smart way that breaks reward learning?
                     if np.mean(losses[-5:]) < -0.1:
                         break
+                    self.reward_net.optimizer.zero_grad()
+                    loss.backward()
+                    self.reward_net.optimizer.step()
+            if callback:
+                callback(self, itr + 1)
+
+
+class GuidedCostLearning(MaxEntIRL):
+    def transition_IS(self, transition):
+        if self.use_action_as_input:
+            np_input = np.concatenate([transition.obs, transition.acts], axis=1)
+            th_input = th.from_numpy(np_input).double()
+        else:
+            th_input = th.from_numpy(transition.obs).double()
+        costs = -th.sum(self.reward_net(th_input))
+        log_probs = th.sum(get_trajectories_probs(transition, self.agent.policy))
+        return -costs + log_probs
+
+    def cal_loss(self, **kwargs):
+        expert_trans = deepcopy(self.expert_transitions)
+        IOCLoss1 = -self.mean_transition_reward(expert_trans)
+        agent_trajs = self.rollout_from_agent(**kwargs)
+        losses = th.zeros(len(agent_trajs))
+        for i, traj in enumerate(agent_trajs):
+            losses[i] = self.transition_IS(flatten_trajectories([traj]))
+        IOCLoss2 = th.logsumexp(losses, 0)
+        return IOCLoss1 + IOCLoss2
+
+    def learn(
+            self,
+            total_iter: int = 10,
+            gradient_steps: int = 100,
+            max_agent_iter: int = 10,
+            agent_callback=None,
+            callback=None,
+            **kwargs
+    ):
+        for itr in range(total_iter):
+            self._reset_agent(**self.env_kwargs)
+            with logger.accumulate_means(f"agent_{itr}"):
+                for agent_steps in range(max_agent_iter):
+                    self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
+                    logger.record("agent_steps", agent_steps)
+                    logger.dump(agent_steps)
+            losses = []
+            with logger.accumulate_means(f"reward_{itr}"):
+                self.reward_net.train()
+                for rew_steps in range(gradient_steps):
+                    loss = self.cal_loss(**kwargs)
+                    losses.append(loss.item())
+                    logger.record("steps", rew_steps + 1, exclude="tensorboard")
+                    logger.record("loss", loss.item())
+                    logger.dump(rew_steps)
                     self.reward_net.optimizer.zero_grad()
                     loss.backward()
                     self.reward_net.optimizer.step()

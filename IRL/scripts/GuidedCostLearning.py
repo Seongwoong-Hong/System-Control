@@ -1,129 +1,92 @@
 import datetime
-import gym_envs
 import os
 import pickle
 import shutil
-import sys
-import torch
-from imitation.data import rollout
-from mujoco_py import GlfwContext
-from stable_baselines3.common.vec_env import DummyVecEnv
+import torch as th
 
-from IRL.scripts.project_policies import def_policy
-from common.callbacks import VFCustomCallback
-from algos.torch.GCL.costnet import GCLCostNet
-from common.rollouts import get_trajectories_probs
-from common.wrappers import CostWrapper
+from imitation.data import rollout
+from imitation.util import logger
 from scipy import io
+from stable_baselines3.common.vec_env import VecNormalize
+
+from common.util import make_env
+from common.callbacks import SaveCallback
+from algos.torch.MaxEntIRL import GuidedCostLearning
+from IRL.scripts.project_policies import def_policy
+
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        raise SyntaxError("Please enter the type of environment you use")
-    elif len(sys.argv) == 2:
-        device = 'cpu'
-        algo_type = 'ppo'
-    elif len(sys.argv) == 3:
-        device = sys.argv[2]
-        algo_type = 'ppo'
-    elif len(sys.argv) == 4:
-        device = sys.argv[2]
-        algo_type = sys.argv[3]
-    else:
-        raise SyntaxError("Too many system inputs")
-
-    env_type = sys.argv[1]
-    now = datetime.datetime.now()
+    env_type = "IDP"
+    algo_type = "GCL"
+    device = "cpu"
+    name = "IDP_custom"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, "GCL")
-    if not os.path.isdir(log_dir):
-        os.mkdir(log_dir)
-    name = "/%s-%s-%s-%s-%s-%s" % (now.year, now.month, now.day, now.hour, now.minute, now.second)
-    log_dir += name
-    if not os.path.isdir(log_dir):
-        os.mkdir(log_dir)
+    subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
+    pltqs = []
+    for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+        file = "../demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
+        pltqs += [io.loadmat(file)['pltq']]
+    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, pltqs=pltqs)
+
+    # Load data
+    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
+    with open(expert_dir, "rb") as f:
+        expert_trajs = pickle.load(f)
+    expt_traj_num = len(expert_trajs)
+    transitions = rollout.flatten_trajectories(expert_trajs)
+
+    # Setup log directories
+    log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
+    log_dir += "/no_lqr_ppo"
+    os.makedirs(log_dir, exist_ok=False)
+    shutil.copy(os.path.abspath(__file__), log_dir)
+    shutil.copy(expert_dir, log_dir)
+    shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
+
+    def feature_fn(x):
+        return x
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
-    # Copy used file to logging folder
-    shutil.copy(os.path.abspath(proj_path + "/../common/modules.py"), model_dir)
-    shutil.copy(os.path.abspath(proj_path + "/../gym_envs/envs/{}_custom.py".format(env_type)), model_dir)
-    shutil.copy(os.path.abspath(__file__), model_dir)
-    shutil.copy(os.path.abspath(proj_path + "/project_policies.py"), model_dir)
 
-    sub = "sub01"
-    expert_dir = os.path.join(proj_path, "demos", env_type, sub + ".pkl")
-    pltqs = []
-    for i in range(35):
-        file = os.path.join(proj_path, "demos", env_type, sub, sub + "i%d.mat" % (i + 1))
-        pltqs += [io.loadmat(file)['pltq']]
+    # Setup callbacks
+    save_net_callback = SaveCallback(cycle=1, dirpath=model_dir)
 
-    n_steps, n_episodes = 600, 5
-    steps_for_learn, n_envs = 3072000, 10
-    env_id = "{}_custom-v0".format(env_type)
-    env = gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs)
-    num_obs = env.observation_space.shape[0]
-    num_act = env.action_space.shape[0]
+    # Setup Logger
+    logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
-    costfn = GCLCostNet(arch=[num_obs, 4*num_obs, 8*num_obs],
-                        act_fcn=torch.nn.ReLU,
-                        device=device,
-                        num_expert=15,
-                        num_samp=n_episodes,
-                        lr=3e-4,
-                        decay_coeff=0.0,
-                        num_act=num_act
-                        ).double().to(device)
+    # Setup Learner
+    agent = def_policy("sac", env, device=device, verbose=1)
+    learner = GuidedCostLearning(
+        env,
+        agent=agent,
+        agent_learning_steps_per_one_loop=int(3e4),
+        expert_transitions=transitions,
+        use_action_as_input=True,
+        rew_lr=1e-3,
+        rew_arch=[8, 8],
+        device=device,
+        env_kwargs={},
+        rew_kwargs={'feature_fn': feature_fn, 'type': 'ann'},
+    )
 
-    env = DummyVecEnv([lambda: CostWrapper(env, costfn) for i in range(n_envs)])
-    GlfwContext(offscreen=True)
+    # Run Learning
+    learner.learn(
+        total_iter=50,
+        gradient_steps=100,
+        n_episodes=expt_traj_num,
+        max_agent_iter=3,
+        callback=save_net_callback.net_save,
+    )
 
-    sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=n_episodes)
-    with open(expert_dir, "rb") as f:
-        expert_trajs = pickle.load(f)
-        learner_trajs = []
-
-    algo = def_policy(algo_type, env, device=device, log_dir=log_dir)
-
-    video_recorder = VFCustomCallback(gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs),
-                                      n_eval_episodes=5,
-                                      render_freq=int(steps_for_learn/n_envs),
-                                      costfn=costfn)
-
-    print("Start Guided Cost Learning...  Using {} environment.\nThe Name for logging is {}".format(env_id, name))
-    for i in range(30):
-        # remove old tensorboard log
-        if i > 3 and (i - 3) % 5 != 0:
-            shutil.rmtree(os.path.join(log_dir, "log") + "_%d" % (i - 3))
-
-        # Add sample trajectories from current policy
-        learner_trajs = []
-        env = DummyVecEnv([lambda: CostWrapper(gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs), costfn)])
-        with torch.no_grad():
-            for _ in range(10):
-                learner_trajs += rollout.generate_trajectories(algo.policy, env, sample_until)
-            expert_trans = get_trajectories_probs(expert_trajs, algo.policy)
-            learner_trans = get_trajectories_probs(learner_trajs, algo.policy)
-        del env
-        # update cost function
-        start = datetime.datetime.now()
-        for k in range(60):
-            costfn.learn(learner_trans, expert_trans, epoch=100)
-        delta = datetime.datetime.now() - start
-        print("Cost Optimization Takes {}. Now start {}th policy optimization...".format(str(delta), i+1))
-        print("The Name for logging in {}".format(name))
-        # update policy using PPO
-        env = DummyVecEnv([lambda: CostWrapper(
-            gym_envs.make(env_id, n_steps=n_steps, pltqs=pltqs), costfn.eval_()) for i in range(n_envs)])
-        algo.set_env(env)
-        with torch.no_grad():
-            for n, param in algo.policy.named_parameters():
-                if 'log_std' in n:
-                    param.copy_(torch.zeros(*param.shape))
-        algo.learn(total_timesteps=steps_for_learn, callback=video_recorder, tb_log_name="log")
-        video_recorder.set_costfn(costfn=costfn)
-
-        # save updated policy
-        if (i + 1) % 2 == 0:
-            torch.save(costfn, model_dir + "/costfn{}.pt".format(i + 1))
-            algo.save(model_dir + "/" + algo_type + "{}".format(i + 1))
+    # Save the result of learning
+    reward_path = model_dir + "/reward_net.pkl"
+    with open(reward_path + ".tmp", "wb") as f:
+        pickle.dump(learner.reward_net, f)
+    os.replace(reward_path + ".tmp", reward_path)
+    learner.agent.save(model_dir + "/agent")
+    if learner.agent.get_vec_normalize_env():
+        learner.wrap_env.save(model_dir + "/normalization.pkl")
+    now = datetime.datetime.now()
+    print(f"Endtime: {now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}")
