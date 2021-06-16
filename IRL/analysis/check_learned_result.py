@@ -1,12 +1,13 @@
 import os
 import pickle
-from copy import deepcopy
-
 import numpy as np
 import torch as th
-from imitation.data.rollout import flatten_trajectories, make_sample_until, generate_trajectories
+
+from copy import deepcopy
+from scipy import io
 from matplotlib import cm
 from matplotlib import pyplot as plt
+from imitation.data.rollout import flatten_trajectories, make_sample_until, generate_trajectories
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
@@ -88,22 +89,30 @@ def learned_cost():
 def expt_cost():
     def expt_fn(inp):
         return th.square(inp[:, :2]) + 1e-5 * (th.square(inp[:, 4:]))
-    name = "cnn_lqr_ppo_large"
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP", "MaxEntIRL", name))
-    with open("../demos/IDP/lqr_ppo_large.pkl", "rb") as f:
+    env_type = "HPC"
+    name = "sq_sub01_1&2"
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_type, "MaxEntIRL", name))
+    with open(f"../demos/{env_type}/sub01_1&2.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
-    venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1)
+    test_len = 10
+    pltqs = []
+    if env_type == "HPC":
+        for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+            file = os.path.join("..", "demos", env_type, "sub01", f"sub01i{i+1}.mat")
+            pltqs += [io.loadmat(file)['pltq']]
+        test_len = len(pltqs)
+    venv = make_env(f"{env_type}_custom-v0", use_vec_env=True, num_envs=1, pltqs=pltqs)
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
     print(f"expt_cost: {expt_fn(th_input).mean().item() * 600}")
-    sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
+    sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
     i = 1
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
         agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
         if os.path.isfile(proj_path + f"/{i:03d}/normalization.pkl"):
             stats_path = proj_path + f"/model/{i:03d}/normalization.pkl"
-            venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path)
+            venv = make_env(f"{env_type}_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path, pltqs=pltqs)
         agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
         agent_trans = flatten_trajectories(agent_trajs)
         th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1))

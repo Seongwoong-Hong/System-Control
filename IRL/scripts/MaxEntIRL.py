@@ -19,14 +19,14 @@ if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "MaxEntIRL"
     device = "cpu"
-    name = "IDP_custom"
+    name = "IDP_pybullet"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     pltqs = []
     for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
         file = "../demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
-    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, pltqs=pltqs)
+    env = make_env(f"{name}-v0", use_vec_env=False, num_envs=8, pltqs=pltqs)
 
     # Load data
     expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/reset_test"
+    log_dir += "/docker_test"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)

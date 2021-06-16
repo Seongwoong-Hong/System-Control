@@ -11,7 +11,7 @@ from RL.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "ppo"
-    name = "IDP_classic"
+    name = "IDP_pybullet"
     device = "cuda:1"
     env_id = f"{name}-v0"
     env = make_env(env_id, use_vec_env=False, num_envs=1, use_norm=True)
@@ -32,5 +32,6 @@ if __name__ == "__main__":
     # callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
     algo.learn(total_timesteps=int(1e5), tb_log_name="extra")
     algo.save(log_dir+f"/policies_{n}/{algo_type}0")
-    env.save(log_dir+f"/policies_{n}/normalization.pkl")
+    if algo.get_vec_normalize_env():
+        algo.env.save(log_dir+f"/policies_{n}/normalization.pkl")
     print(f"saved as policies_{n}/{algo_type}0")
