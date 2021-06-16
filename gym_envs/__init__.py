@@ -68,3 +68,10 @@ register(
     max_episode_steps=599,
 )
 
+# environments based on pybullet
+
+register(
+    id='IDP_pybullet-v0',
+    entry_point='gym_envs.envs.pybullet:InvertedDoublePendulumBulletEnv',
+    max_episode_steps=600,
+)
