@@ -19,7 +19,7 @@ if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "GCL"
     device = "cpu"
-    name = "IDP_custom"
+    name = "IDP_pybullet"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     pltqs = []
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/no_lqr_ppo"
+    log_dir += "/cnn_lqr_ppo"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -60,6 +60,7 @@ if __name__ == "__main__":
     agent = def_policy("sac", env, device=device, verbose=1)
     learner = GuidedCostLearning(
         env,
+        feature_fn=feature_fn,
         agent=agent,
         agent_learning_steps_per_one_loop=int(3e4),
         expert_transitions=transitions,
@@ -68,15 +69,15 @@ if __name__ == "__main__":
         rew_arch=[8, 8],
         device=device,
         env_kwargs={},
-        rew_kwargs={'feature_fn': feature_fn, 'type': 'ann'},
+        rew_kwargs={'type': 'cnn'},
     )
 
     # Run Learning
     learner.learn(
         total_iter=50,
-        gradient_steps=100,
+        gradient_steps=50,
         n_episodes=expt_traj_num,
-        max_agent_iter=3,
+        max_agent_iter=5,
         callback=save_net_callback.net_save,
     )
 

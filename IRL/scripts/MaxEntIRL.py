@@ -18,7 +18,7 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    device = "cpu"
+    device = "cuda:1"
     name = "IDP_pybullet"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
         file = "../demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
-    env = make_env(f"{name}-v0", use_vec_env=False, num_envs=8, pltqs=pltqs)
+    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, pltqs=pltqs)
 
     # Load data
     expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
@@ -37,14 +37,14 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/docker_test"
+    log_dir += "/sq_lqr_ppo_deep"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return x
+        return x.square()
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -60,15 +60,16 @@ if __name__ == "__main__":
     agent = def_policy("sac", env, device=device, verbose=1)
     learner = MaxEntIRL(
         env,
+        feature_fn=feature_fn,
         agent=agent,
         agent_learning_steps_per_one_loop=int(3e4),
         expert_transitions=transitions,
         use_action_as_input=True,
         rew_lr=1e-3,
-        rew_arch=[8, 8],
+        rew_arch=[8, 8, 8, 8],
         device=device,
         env_kwargs={},
-        rew_kwargs={'feature_fn': feature_fn, 'type': 'ann'},
+        rew_kwargs={'type': 'ann'},
     )
 
     # Run Learning

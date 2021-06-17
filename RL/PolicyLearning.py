@@ -15,7 +15,7 @@ if __name__ == "__main__":
     device = "cuda:1"
     env_id = f"{name}-v0"
     env = make_env(env_id, use_vec_env=False, num_envs=1, use_norm=True)
-    name += "_test"
+    name += "_windows"
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     os.makedirs(log_dir, exist_ok=True)
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     # save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
     # save_policy_callback = callbacks.EveryNTimesteps(int(2.5e5), save_policy_callback)
     # callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
-    algo.learn(total_timesteps=int(1e5), tb_log_name="extra")
+    algo.learn(total_timesteps=int(1e6), tb_log_name="extra")
     algo.save(log_dir+f"/policies_{n}/{algo_type}0")
     if algo.get_vec_normalize_env():
         algo.env.save(log_dir+f"/policies_{n}/normalization.pkl")
