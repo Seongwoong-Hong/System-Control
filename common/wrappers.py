@@ -36,13 +36,7 @@ class RewardWrapper(gym.RewardWrapper):
     def __init__(self, env, rwfn):
         super(RewardWrapper, self).__init__(env)
         self.rwfn = rwfn
-        num_rwfn_inp = self.rwfn.in_features
-        if num_rwfn_inp == self.env.observation_space.shape[0]:
-            self.use_action_as_inp = False
-        elif num_rwfn_inp == self.env.observation_space.shape[0] + self.env.action_space.shape[0]:
-            self.use_action_as_inp = True
-        else:
-            raise ValueError("An input dimension doesn't match")
+        self.use_action_as_inp = self.rwfn.use_action_as_inp
 
     def step(self, action: np.ndarray):
         obs = self.env.current_obs

@@ -9,13 +9,15 @@ class RewardNet(nn.Module):
             self,
             inp,
             arch: List[int],
+            feature_fn,
+            use_action_as_inp,
             lr: float = 1e-3,
             device: str = 'cuda',
             optim_cls=th.optim.Adam,
             activation_fn=th.nn.Tanh,
-            feature_fn=lambda x: x,
     ):
         super(RewardNet, self).__init__()
+        self.use_action_as_inp = use_action_as_inp
         self.device = device
         self.act_fnc = activation_fn
         self.feature_fn = feature_fn

@@ -18,6 +18,7 @@ class MaxEntIRL:
     def __init__(
             self,
             env: GymEnv,
+            feature_fn,
             agent,
             agent_learning_steps_per_one_loop: int,
             expert_transitions: Transitions,
@@ -45,22 +46,27 @@ class MaxEntIRL:
         else:
             self.rew_kwargs = rew_kwargs
         self.expert_transitions = expert_transitions
-        inp = self.env.observation_space.shape[0]
+        inp = self.env.observation_space.sample()
         if self.use_action_as_input:
-            inp += self.env.action_space.shape[0]
+            inp = np.concatenate([inp, self.env.action_space.sample()])
+        inp = feature_fn(th.from_numpy(inp).reshape(1, -1))
         RNet_type = rew_kwargs.pop("type", None)
         if RNet_type is None or RNet_type is "ann":
             self.reward_net = RewardNet(
-                inp=inp,
+                inp=inp.shape[1],
                 arch=rew_arch,
+                feature_fn=feature_fn,
+                use_action_as_inp=use_action_as_input,
                 lr=rew_lr,
                 device=self.device,
                 **self.rew_kwargs
             ).double().to(self.device)
         elif RNet_type is "cnn":
             self.reward_net = CNNRewardNet(
-                inp=inp,
+                inp=inp.shape[1],
                 arch=rew_arch,
+                feature_fn=feature_fn,
+                use_action_as_inp=use_action_as_input,
                 lr=rew_lr,
                 device=self.device,
                 **self.rew_kwargs
