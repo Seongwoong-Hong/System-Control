@@ -6,7 +6,6 @@ import torch as th
 from typing import Dict, List, Optional
 
 from copy import deepcopy
-from mujoco_py import GlfwContext
 from matplotlib import pyplot as plt
 from imitation.data.rollout import TrajectoryAccumulator, flatten_trajectories, make_sample_until
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -23,6 +22,7 @@ def video_record(imgs: List, filename: str, dt: float):
 
 
 def verify_policy(environment, policy, render="human", deterministic=True, repeat_num=5):
+    from mujoco_py import GlfwContext
     if render == 'rgb_array':
         GlfwContext(offscreen=True)
     imgs = []
@@ -30,6 +30,7 @@ def verify_policy(environment, policy, render="human", deterministic=True, repea
     obs_list = []
     for _ in range(repeat_num):
         actions = np.zeros((1,) + environment.action_space.shape)
+        environment.render()
         ob = environment.reset()
         obs = deepcopy(ob.reshape(1, -1))
         done = False

@@ -93,7 +93,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    gamma=0.99,
                    gae_lambda=0.95,
                    learning_rate=3e-4,
-                   ent_coef=0.05,
+                   ent_coef=0.01,
                    n_epochs=10,
                    ent_schedule=1.0,
                    clip_range=0.2,
