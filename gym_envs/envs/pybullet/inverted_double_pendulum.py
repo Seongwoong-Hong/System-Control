@@ -13,12 +13,12 @@ class InvertedDoublePendulum(MJCFBasedRobot):
 
     def robot_specific_reset(self, bullet_client):
         self._p = bullet_client
-        self.pole2 = self.parts["pole2"]
         self.j1 = self.jdict["hinge"]
         self.j2 = self.jdict["hinge2"]
-        u = self.np_random.uniform(low=-.1, high=.1, size=[2])
-        self.j1.reset_current_position(float(u[0]), 0)
-        self.j2.reset_current_position(float(u[1]), 0)
+        u = self.np_random.uniform(low=-.3, high=.3, size=[2])
+        du = self.np_random.uniform(low=-.3, high=.3, size=[2])
+        self.j1.reset_current_position(float(u[0]), float(du[0]))
+        self.j2.reset_current_position(float(u[1]), float(du[1]))
         self.j1.set_motor_torque(0)
         self.j2.set_motor_torque(0)
 
@@ -36,6 +36,34 @@ class InvertedDoublePendulum(MJCFBasedRobot):
             theta_dot,
             gamma_dot,
         ])
+
+
+class InvertedDoublePendulumExp(InvertedDoublePendulum):
+    def __init__(self):
+        self._order = 0
+        super().__init__()
+        self.init_group = np.array([[[+0.10, +0.10], [+0.05, -0.05]],
+                                    [[+0.15, +0.10], [-0.05, +0.05]],
+                                    [[-0.16, +0.20], [+0.10, -0.10]],
+                                    [[-0.10, +0.06], [+0.05, -0.10]],
+                                    [[+0.05, +0.15], [-0.20, -0.20]],
+                                    [[-0.05, +0.05], [+0.15, +0.15]],
+                                    [[+0.12, +0.05], [-0.10, -0.15]],
+                                    [[-0.08, +0.15], [+0.05, -0.15]],
+                                    [[-0.15, +0.20], [-0.10, +0.05]],
+                                    [[+0.20, +0.01], [+0.09, -0.15]],
+                                    ])
+
+    def robot_specific_reset(self, bullet_client):
+        self._p = bullet_client
+        self.j1 = self.jdict["hinge"]
+        self.j2 = self.jdict["hinge2"]
+        u, du = self.init_group[self._order % len(self.init_group)]
+        self.j1.reset_current_position(float(u[0]), float(du[0]))
+        self.j2.reset_current_position(float(u[1]), float(du[1]))
+        self.j1.set_motor_torque(0)
+        self.j2.set_motor_torque(0)
+        self._order += 1
 
 
 class InvertedDoublePendulumBulletEnv(MJCFBaseBulletEnv):
@@ -76,3 +104,14 @@ class InvertedDoublePendulumBulletEnv(MJCFBaseBulletEnv):
     @property
     def current_obs(self):
         return self.robot.calc_state()
+
+    @property
+    def dt(self):
+        return self.scene.dt
+
+
+class InvertedDoublePendulumExpBulletEnv(InvertedDoublePendulumBulletEnv):
+    def __init__(self):
+        self.robot = InvertedDoublePendulumExp()
+        MJCFBaseBulletEnv.__init__(self, self.robot)
+        self.stateId = -1

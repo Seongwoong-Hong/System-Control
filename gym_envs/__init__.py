@@ -71,6 +71,12 @@ register(
 # environments based on pybullet
 
 register(
+    id='IDP_pybullet-v0',
+    entry_point='gym_envs.envs.pybullet:InvertedDoublePendulumExpBulletEnv',
+    max_episode_steps=600,
+)
+
+register(
     id='IDP_pybullet-v1',
     entry_point='gym_envs.envs.pybullet:InvertedDoublePendulumBulletEnv',
     max_episode_steps=600,

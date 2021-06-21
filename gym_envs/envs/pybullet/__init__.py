@@ -1,1 +1,1 @@
-from gym_envs.envs.pybullet.inverted_double_pendulum import InvertedDoublePendulumBulletEnv
+from gym_envs.envs.pybullet.inverted_double_pendulum import InvertedDoublePendulumBulletEnv, InvertedDoublePendulumExpBulletEnv
