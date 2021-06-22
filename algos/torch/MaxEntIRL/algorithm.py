@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 
 import numpy as np
 import torch as th
@@ -20,10 +20,8 @@ class MaxEntIRL:
             env: GymEnv,
             feature_fn,
             agent,
-            agent_learning_steps_per_one_loop: int,
             expert_transitions: Transitions,
             device='cpu',
-            rew_lr: float = 1e-3,
             rew_arch: List[int] = None,
             use_action_as_input: bool = True,
             rew_kwargs: Optional[Dict] = None,
@@ -34,7 +32,6 @@ class MaxEntIRL:
         ), "Requires calling imitation.util.logger.configure"
         self.env = env
         self.agent = agent
-        self.agent_learning_steps = agent_learning_steps_per_one_loop
         self.device = device
         self.use_action_as_input = use_action_as_input
         if env_kwargs is None:
@@ -56,8 +53,7 @@ class MaxEntIRL:
                 inp=inp.shape[1],
                 arch=rew_arch,
                 feature_fn=feature_fn,
-                use_action_as_inp=use_action_as_input,
-                lr=rew_lr,
+                use_action_as_inp=self.use_action_as_input,
                 device=self.device,
                 **self.rew_kwargs
             ).double().to(self.device)
@@ -66,8 +62,7 @@ class MaxEntIRL:
                 inp=inp.shape[1],
                 arch=rew_arch,
                 feature_fn=feature_fn,
-                use_action_as_inp=use_action_as_input,
-                lr=rew_lr,
+                use_action_as_inp=self.use_action_as_input,
                 device=self.device,
                 **self.rew_kwargs
             ).double().to(self.device)
@@ -91,7 +86,7 @@ class MaxEntIRL:
             self.agent, self.wrap_env, sample_until, deterministic_policy=False)
         return trajectories
 
-    def mean_transition_reward(self, transition):
+    def mean_transition_reward(self, transition) -> th.Tensor:
         if self.use_action_as_input:
             np_input = np.concatenate([transition.obs, transition.acts], axis=1)
             th_input = th.from_numpy(np_input).double()
@@ -100,7 +95,7 @@ class MaxEntIRL:
         reward = self.reward_net(th_input)
         return reward.mean()
 
-    def cal_loss(self, **kwargs):
+    def cal_loss(self, **kwargs) -> th.Tensor:
         expert_transitions = deepcopy(self.expert_transitions)
         agent_transitions = flatten_trajectories(self.rollout_from_agent(**kwargs))
         agent_ex = self.mean_transition_reward(agent_transitions)
@@ -110,22 +105,26 @@ class MaxEntIRL:
 
     def learn(
             self,
-            total_iter: int = 10,
-            gradient_steps: int = 100,
-            max_agent_iter: int = 10,
+            total_iter: int,
+            agent_learning_steps: Union[int, float],
+            gradient_steps: int,
+            max_agent_iter: int,
             agent_callback=None,
             callback=None,
+            early_stop=True,
             **kwargs
     ):
         for itr in range(total_iter):
             self._reset_agent(**self.env_kwargs)
             with logger.accumulate_means(f"agent_{itr}"):
                 for agent_steps in range(max_agent_iter):
-                    self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
+                    self.agent.learn(
+                        total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
+                    logger.dump(step=self.agent.num_timesteps)
                     logger.record("loss_diff", self.cal_loss(**kwargs).item())
                     logger.record("agent_steps", agent_steps)
                     logger.dump(agent_steps)
-                    if self.cal_loss(**kwargs) > 0:
+                    if self.cal_loss(**kwargs) > 0 and early_stop:
                         break
             losses = []
             with logger.accumulate_means(f"reward_{itr}"):
@@ -137,7 +136,7 @@ class MaxEntIRL:
                     logger.record("loss", loss.item())
                     logger.dump(rew_steps)
                     # TODO: Is there any smart way that breaks reward learning?
-                    if np.mean(losses[-5:]) < -0.1:
+                    if np.mean(losses[-5:]) < -0.1 and early_stop:
                         break
                     self.reward_net.optimizer.zero_grad()
                     loss.backward()
@@ -147,7 +146,7 @@ class MaxEntIRL:
 
 
 class GuidedCostLearning(MaxEntIRL):
-    def transition_IS(self, transition):
+    def transition_IS(self, transition) -> th.Tensor:
         if self.use_action_as_input:
             np_input = np.concatenate([transition.obs, transition.acts], axis=1)
             th_input = th.from_numpy(np_input).double()
@@ -157,7 +156,7 @@ class GuidedCostLearning(MaxEntIRL):
         log_probs = th.sum(get_trajectories_probs(transition, self.agent.policy))
         return -costs + log_probs
 
-    def cal_loss(self, **kwargs):
+    def cal_loss(self, **kwargs) -> th.Tensor:
         expert_trans = deepcopy(self.expert_transitions)
         IOCLoss1 = -self.mean_transition_reward(expert_trans)
         agent_trajs = self.rollout_from_agent(**kwargs)
@@ -169,31 +168,22 @@ class GuidedCostLearning(MaxEntIRL):
 
     def learn(
             self,
-            total_iter: int = 10,
-            gradient_steps: int = 100,
-            max_agent_iter: int = 10,
+            total_iter: int,
+            agent_learning_steps: Union[int, float],
+            gradient_steps: int,
+            max_agent_iter: int,
             agent_callback=None,
             callback=None,
+            early_stop=False,
             **kwargs
     ):
-        for itr in range(total_iter):
-            self._reset_agent(**self.env_kwargs)
-            with logger.accumulate_means(f"agent_{itr}"):
-                for agent_steps in range(max_agent_iter):
-                    self.agent.learn(total_timesteps=self.agent_learning_steps, callback=agent_callback)
-                    logger.record("agent_steps", agent_steps)
-                    logger.dump(agent_steps)
-            losses = []
-            with logger.accumulate_means(f"reward_{itr}"):
-                self.reward_net.train()
-                for rew_steps in range(gradient_steps):
-                    loss = self.cal_loss(**kwargs)
-                    losses.append(loss.item())
-                    logger.record("steps", rew_steps + 1, exclude="tensorboard")
-                    logger.record("loss", loss.item())
-                    logger.dump(rew_steps)
-                    self.reward_net.optimizer.zero_grad()
-                    loss.backward()
-                    self.reward_net.optimizer.step()
-            if callback:
-                callback(self, itr + 1)
+        super(GuidedCostLearning, self).learn(
+            total_iter=total_iter,
+            agent_learning_steps=agent_learning_steps,
+            gradient_steps=gradient_steps,
+            max_agent_iter=max_agent_iter,
+            agent_callback=agent_callback,
+            callback=callback,
+            early_stop=early_stop,
+            **kwargs,
+        )

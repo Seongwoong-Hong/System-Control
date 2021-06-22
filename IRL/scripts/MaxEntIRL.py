@@ -18,8 +18,8 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
-    name = "IDP_custom"
+    device = "cuda:2"
+    name = "IDP_pybullet"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     pltqs = []
@@ -36,15 +36,15 @@ if __name__ == "__main__":
     transitions = rollout.flatten_trajectories(expert_trajs)
 
     # Setup log directories
-    log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type)
-    log_dir += "/extcnn_lqr_ppo_deep_ppoagent_0.1"
+    log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
+    log_dir += "/sq_lqr_ppo_0.01rew"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return th.cat([x, x.square()], dim=1)
+        return x.square()
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -57,24 +57,23 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("ppo", env, device=device, verbose=1)
+    agent = def_policy("sac", env, device=device, verbose=1)
     learner = MaxEntIRL(
         env,
         feature_fn=feature_fn,
         agent=agent,
-        agent_learning_steps_per_one_loop=int(3e5),
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_lr=1e-3,
-        rew_arch=[8, 8, 8, 8],
+        rew_arch=[16, 16],
         device=device,
         env_kwargs={},
-        rew_kwargs={'type': 'cnn'},
+        rew_kwargs={'type': 'ann', 'scale': 1e-2},
     )
 
     # Run Learning
     learner.learn(
-        total_iter=50,
+        total_iter=25,
+        agent_learning_steps=3e4,
         gradient_steps=100,
         n_episodes=expt_traj_num,
         max_agent_iter=5,

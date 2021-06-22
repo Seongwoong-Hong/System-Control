@@ -11,6 +11,7 @@ class RewardNet(nn.Module):
             arch: List[int],
             feature_fn,
             use_action_as_inp,
+            scale: float = 1.0,
             lr: float = 1e-3,
             device: str = 'cuda',
             optim_cls=th.optim.Adam,
@@ -18,6 +19,7 @@ class RewardNet(nn.Module):
     ):
         super(RewardNet, self).__init__()
         self.use_action_as_inp = use_action_as_inp
+        self.scale = scale
         self.device = device
         self.act_fnc = activation_fn
         self.feature_fn = feature_fn
@@ -39,13 +41,13 @@ class RewardNet(nn.Module):
         self.layers = nn.Sequential(*layers)
         self.optimizer = self.optim_cls(self.parameters(), lr)
 
-    def forward(self, x):
+    def forward(self, x: th.Tensor) -> th.Tensor:
         x = self.feature_fn(x).to(self.device)
         if self.trainmode:
-            return self.layers(x)
+            return self.scale * self.layers(x)
         else:
             with th.no_grad():
-                return self.layers(x)
+                return self.scale * self.layers(x)
 
     def train(self, mode=True):
         self.trainmode = mode
@@ -76,9 +78,9 @@ class CNNRewardNet(RewardNet):
         if self.trainmode:
             x = self.conv_layers(x)
             x = x.view(-1, self.fcnn.in_features)
-            return self.fcnn(x)
+            return self.scale * self.fcnn(x)
         else:
             with th.no_grad():
                 x = self.conv_layers(x)
                 x = x.view(-1, self.fcnn.in_features)
-                return self.fcnn(x)
+                return self.scale * self.fcnn(x)
