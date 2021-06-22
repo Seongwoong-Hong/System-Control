@@ -58,7 +58,7 @@ def draw_2dfigure():
 
 
 def learned_cost():
-    name = "extcnn_lqr_ppo"
+    name = "cnn_lqr_ppo_ent"
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP", "MaxEntIRL", name))
     with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
@@ -73,9 +73,9 @@ def learned_cost():
         if os.path.isfile(os.path.abspath(proj_path + f"/{i:03d}/normalization.pkl")):
             stats_path = os.path.abspath(proj_path + f"/model/{i:03d}/normalization.pkl")
             venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path)
-        agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
-        agent_trans = flatten_trajectories(agent_trajs)
-        th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
+        # agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
+        # agent_trans = flatten_trajectories(agent_trajs)
+        # th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
         with open(os.path.join(proj_path, "model", f"{i:03d}", "reward_net.pkl"), "rb") as f:
             reward_fn = pickle.load(f).double()
         print("Cost:", -reward_fn(th_input).mean().item() * 600)
@@ -128,5 +128,5 @@ def expt_cost():
 
 if __name__ == "__main__":
     def feature_fn(x):
-        return th.cat([x, x.square()], dim=1)
-    expt_cost()
+        return x
+    learned_cost()

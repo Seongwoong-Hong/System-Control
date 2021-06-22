@@ -2,8 +2,6 @@ import gym
 import numpy as np
 import torch
 
-from typing import Callable
-
 
 class ActionRewardWrapper(gym.RewardWrapper):
     def __init__(self, env, rwfn):
@@ -46,7 +44,7 @@ class RewardWrapper(gym.RewardWrapper):
         else:
             return observation, self.reward(obs), done, info
 
-    def reward(self, inp):
+    def reward(self, inp: np.ndarray) -> float:
         rwinp = torch.from_numpy(inp).reshape(1, -1).to(self.rwfn.device)
         return self.rwfn.forward(rwinp).item()
 
