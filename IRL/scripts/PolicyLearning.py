@@ -13,42 +13,81 @@ from mujoco_py import GlfwContext
 from scipy import io
 
 
-if __name__ == "__main__":
+def learning_specific_one():
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    name = f"sq_lqr_ppo_ent"
-    env_id = f"{env_type}_custom-v0"
-    n_steps = 600
+    name = "sq_lqr_ppo"
+    env_id = f"{env_type}_custom"
 
     pltqs = []
     for i in range(10):
         file = "../demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
 
-    env = make_env(env_id, use_vec_env=False, num_envs=8, n_steps=600, pltqs=pltqs)
+    env = make_env(f"{env_id}-v1", use_vec_env=False, pltqs=pltqs)
 
-    def feature_fn(x):
-        return th.square(x)
-
-    with open(f"../tmp/log/{env_type}/{algo_type}/{name}/model/030/reward_net.pkl", "rb") as f:
+    n = "003"
+    with open(f"../tmp/log/{env_id}/{algo_type}/{name}/model/{n}/reward_net.pkl", "rb") as f:
         reward_net = pickle.load(f).double()
     env = RewardWrapper(env, reward_net.eval())
 
-    device = "cuda:3"
+    device = "cuda:1"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name, "add_rew_learning")
+    log_dir = os.path.join(proj_path, "tmp", "log", env_id, algo_type, name, "add_rew_learning")
     GlfwContext(offscreen=True)
     algo = def_policy("ppo", env, device=device, log_dir=log_dir, verbose=1)
-    n = 1
-    while os.path.isdir(log_dir + f"/extra_{n}"):
-        n += 1
     os.makedirs(log_dir + f"/policies_{n}", exist_ok=False)
-    video_recorder = VideoCallback(make_env(env_id, use_vec_env=False, n_steps=n_steps, pltqs=pltqs),
+    video_recorder = VideoCallback(make_env(f"{env_id}-v0", use_vec_env=False, pltqs=pltqs),
                                    n_eval_episodes=5,
-                                   render_freq=1000000)
+                                   render_freq=int(1e5))
     save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
-    save_policy_callback = callbacks.EveryNTimesteps(1000000, save_policy_callback)
+    save_policy_callback = callbacks.EveryNTimesteps(int(1e5), save_policy_callback)
     callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
-    algo.learn(total_timesteps=500000, tb_log_name="extra", callback=callback_list)
+    algo.learn(total_timesteps=int(1e6), tb_log_name="extra", callback=callback_list)
     algo.save(log_dir + f"/policies_{n}/{algo_type}0")
     print(f"saved as policies_{n}/{algo_type}0")
+
+
+def learning_whole_iter():
+    env_type = "IDP"
+    algo_type = "MaxEntIRL"
+    name = "sq_lqr_ppo"
+    env_id = f"{env_type}_custom"
+    device = "cuda:1"
+
+    pltqs = []
+    for i in range(10):
+        file = os.path.abspath("../demos/HPC/sub01/sub01" + f"i{i + 1}.mat")
+        pltqs += [io.loadmat(file)['pltq']]
+
+    n = 1
+    filename = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model/{n:03d}/reward_net.pkl")
+    while os.path.isfile(filename):
+        env = make_env(f"{env_id}-v1", use_vec_env=False, pltqs=pltqs)
+
+        with open(filename, "rb") as f:
+            reward_net = pickle.load(f).double()
+        env = RewardWrapper(env, reward_net.eval())
+
+        proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        log_dir = os.path.join(proj_path, "tmp", "log", env_id, algo_type, name, "add_rew_learning")
+        GlfwContext(offscreen=True)
+        algo = def_policy("sac", env, device=device, log_dir=log_dir, verbose=1)
+        os.makedirs(log_dir + f"/policies_{n}", exist_ok=False)
+        video_recorder = VideoCallback(make_env(f"{env_id}-v0", use_vec_env=False, pltqs=pltqs),
+                                       n_eval_episodes=5,
+                                       render_freq=int(1e5))
+        save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
+        save_policy_callback = callbacks.EveryNTimesteps(int(1e5), save_policy_callback)
+        callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
+        algo.learn(total_timesteps=int(0.25e6), tb_log_name="extra", callback=callback_list)
+        algo.save(log_dir + f"/policies_{n}/{algo_type}0")
+        print(f"saved as policies_{n}/{algo_type}0")
+        n += 1
+        filename = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model/{n:03d}/reward_net.pkl")
+
+
+if __name__ == "__main__":
+    def feature_fn(x):
+        return x.square()
+    learning_whole_iter()
