@@ -86,7 +86,7 @@ class MaxEntIRL:
             self.agent, self.wrap_env, sample_until, deterministic_policy=False)
         return trajectories
 
-    def mean_transition_reward(self, transition) -> th.Tensor:
+    def mean_transition_reward(self, transition: Transitions) -> th.Tensor:
         if self.use_action_as_input:
             np_input = np.concatenate([transition.obs, transition.acts], axis=1)
             th_input = th.from_numpy(np_input).double()
@@ -121,10 +121,11 @@ class MaxEntIRL:
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
                     logger.dump(step=self.agent.num_timesteps)
-                    logger.record("loss_diff", self.cal_loss(**kwargs).item())
+                    loss_diff = self.cal_loss(**kwargs).item()
+                    logger.record("loss_diff", loss_diff)
                     logger.record("agent_steps", agent_steps)
                     logger.dump(agent_steps)
-                    if self.cal_loss(**kwargs) > 0 and early_stop:
+                    if loss_diff > 0 and early_stop:
                         break
             losses = []
             with logger.accumulate_means(f"reward_{itr}"):
@@ -146,7 +147,7 @@ class MaxEntIRL:
 
 
 class GuidedCostLearning(MaxEntIRL):
-    def transition_IS(self, transition) -> th.Tensor:
+    def transition_is(self, transition: Transitions) -> th.Tensor:
         if self.use_action_as_input:
             np_input = np.concatenate([transition.obs, transition.acts], axis=1)
             th_input = th.from_numpy(np_input).double()
@@ -162,7 +163,7 @@ class GuidedCostLearning(MaxEntIRL):
         agent_trajs = self.rollout_from_agent(**kwargs)
         losses = th.zeros(len(agent_trajs))
         for i, traj in enumerate(agent_trajs):
-            losses[i] = self.transition_IS(flatten_trajectories([traj]))
+            losses[i] = self.transition_is(flatten_trajectories([traj]))
         IOCLoss2 = th.logsumexp(losses, 0)
         return IOCLoss1 + IOCLoss2
 

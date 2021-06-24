@@ -61,13 +61,10 @@ class CNNRewardNet(RewardNet):
     def _build(self, lr, arch):
         arch[0] = 1
         layers = []
-        if self.act_fnc is not None:
-            for i in range(len(arch) - 1):
-                layers.append(nn.Conv1d(in_channels=arch[i], out_channels=arch[i+1], kernel_size=3, padding=1))
+        for i in range(len(arch) - 1):
+            layers.append(nn.Conv1d(in_channels=arch[i], out_channels=arch[i + 1], kernel_size=3, padding=1))
+            if self.act_fnc is not None:
                 layers.append(self.act_fnc())
-        else:
-            for i in range(len(arch) - 1):
-                layers.append(nn.Conv1d(in_channels=arch[i], out_channels=arch[i+1], kernel_size=3, padding=1))
         self.conv_layers = nn.Sequential(*layers)
         self.fcnn = nn.Linear(arch[-1] * self.in_features, 1, bias=False)
         self.optimizer = self.optim_cls(self.parameters(), lr)
