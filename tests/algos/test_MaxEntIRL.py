@@ -32,7 +32,7 @@ def learner(env, expert):
     def feature_fn(x):
         return th.cat([x, x.square()], dim=1)
 
-    agent = def_policy("ppo", env, device='cpu', verbose=1)
+    agent = def_policy("sac", env, device='cpu', verbose=1)
 
     return MaxEntIRL(
         env,
@@ -66,9 +66,9 @@ def test_validity(learner):
     learner.learn(
         total_iter=10,
         agent_learning_steps=10000,
-        gradient_steps=10,
-        n_episodes=8,
-        max_agent_iter=3,
+        gradient_steps=50,
+        n_episodes=5,
+        max_agent_iter=5,
     )
 
 
