@@ -116,10 +116,8 @@ class PPOCustom(PPO):
         explained_var = explained_variance(self.rollout_buffer.returns.flatten(), self.rollout_buffer.values.flatten())
 
         # Logs
-        logger.record("train/entropy_loss", np.mean(entropy_losses))
         logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         logger.record("train/value_loss", np.mean(value_losses))
-        logger.record("train/approx_kl", np.mean(approx_kl_divs))
         logger.record("train/clip_fraction", np.mean(clip_fractions))
         logger.record("train/loss", loss.item())
         logger.record("train/explained_variance", explained_var)
@@ -127,9 +125,6 @@ class PPOCustom(PPO):
             logger.record("train/std", th.exp(self.policy.log_std).mean().item())
 
         logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
-        logger.record("train/clip_range", clip_range)
-        if self.clip_range_vf is not None:
-            logger.record("train/clip_range_vf", clip_range_vf)
         logger.record("train/returns", np.mean(returns))
 
     def learn(self, *args, **kwargs) -> "OnPolicyAlgorithm":
