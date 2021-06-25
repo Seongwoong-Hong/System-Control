@@ -16,7 +16,7 @@ from scipy import io
 def learning_specific_one():
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    name = "sq_lqr_ppo"
+    name = "extcnn_lqr_ppo_deep"
     env_id = f"{env_type}_custom"
 
     pltqs = []
@@ -26,8 +26,8 @@ def learning_specific_one():
 
     env = make_env(f"{env_id}-v1", use_vec_env=False, pltqs=pltqs)
 
-    n = "003"
-    with open(f"../tmp/log/{env_id}/{algo_type}/{name}/model/{n}/reward_net.pkl", "rb") as f:
+    n = 10
+    with open(f"../tmp/log/{env_id}/{algo_type}/{name}/model/{n:03d}/reward_net.pkl", "rb") as f:
         reward_net = pickle.load(f).double()
     env = RewardWrapper(env, reward_net.eval())
 
@@ -36,14 +36,14 @@ def learning_specific_one():
     log_dir = os.path.join(proj_path, "tmp", "log", env_id, algo_type, name, "add_rew_learning")
     GlfwContext(offscreen=True)
     algo = def_policy("ppo", env, device=device, log_dir=log_dir, verbose=1)
-    os.makedirs(log_dir + f"/policies_{n}", exist_ok=False)
+    os.makedirs(log_dir + f"/ppo_policies_{n}", exist_ok=False)
     video_recorder = VideoCallback(make_env(f"{env_id}-v0", use_vec_env=False, pltqs=pltqs),
                                    n_eval_episodes=5,
-                                   render_freq=int(1e5))
+                                   render_freq=int(1e6))
     save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
-    save_policy_callback = callbacks.EveryNTimesteps(int(1e5), save_policy_callback)
+    save_policy_callback = callbacks.EveryNTimesteps(int(1e6), save_policy_callback)
     callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
-    algo.learn(total_timesteps=int(1e6), tb_log_name="extra", callback=callback_list)
+    algo.learn(total_timesteps=int(1e7), tb_log_name="extra", callback=callback_list)
     algo.save(log_dir + f"/policies_{n}/{algo_type}0")
     print(f"saved as policies_{n}/{algo_type}0")
 
@@ -89,5 +89,5 @@ def learning_whole_iter():
 
 if __name__ == "__main__":
     def feature_fn(x):
-        return x.square()
-    learning_whole_iter()
+        return th.cat([x, x.square()], dim=1)
+    learning_specific_one()

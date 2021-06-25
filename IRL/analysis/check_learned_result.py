@@ -17,12 +17,12 @@ from IRL.scripts.project_policies import def_policy
 
 def draw_2dfigure():
     env = make_env("IDP_custom-v0", use_vec_env=False)
-    name = "sq_lqr_ppo"
-    num = "011"
-    algo = SAC.load(f"../tmp/log/IDP/MaxEntIRL/{name}/model/{num}/agent")
+    name = "extcnn_lqr_ppo_ppoagent_deep_noreset"
+    num = "019"
+    algo = PPO.load(f"../tmp/log/IDP_pybullet/MaxEntIRL/{name}/model/{num}/agent")
     # algo = def_policy("IDP", env)
     # algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
-    with open(f"../tmp/log/IDP/MaxEntIRL/{name}/model/{num}/reward_net.pkl", "rb") as f:
+    with open(f"../tmp/log/IDP_pybullet/MaxEntIRL/{name}/model/{num}/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
 
     ndim, nact = env.observation_space.shape[0], env.action_space.shape[0]
@@ -32,7 +32,7 @@ def draw_2dfigure():
     for i in range(d1.shape[0]):
         for j in range(d1.shape[1]):
             iobs = np.zeros(ndim)
-            iobs[2], iobs[3] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
+            iobs[0], iobs[2] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
             iacts, _ = algo.predict(np.array(iobs), deterministic=True)
             pact[i][j] = iacts[1]
             inp = th.from_numpy(np.append(iobs, iacts)).double().to(algo.device).reshape(1, -1)
@@ -58,8 +58,8 @@ def draw_2dfigure():
 
 
 def learned_cost():
-    name = "cnn_lqr_ppo_ent"
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP", "MaxEntIRL", name))
+    name = "no_lqr_ppo_ppoagent_noreset"
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP_custom", "MaxEntIRL", name))
     with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
@@ -69,13 +69,13 @@ def learned_cost():
     i = 1
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
+        agent = PPO.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
         if os.path.isfile(os.path.abspath(proj_path + f"/{i:03d}/normalization.pkl")):
             stats_path = os.path.abspath(proj_path + f"/model/{i:03d}/normalization.pkl")
             venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path)
-        # agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
-        # agent_trans = flatten_trajectories(agent_trajs)
-        # th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
+        agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
+        agent_trans = flatten_trajectories(agent_trajs)
+        th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
         with open(os.path.join(proj_path, "model", f"{i:03d}", "reward_net.pkl"), "rb") as f:
             reward_fn = pickle.load(f).double()
         print("Cost:", -reward_fn(th_input).mean().item() * 600)
@@ -90,8 +90,9 @@ def expt_cost():
     def expt_fn(inp):
         return inp[:, :2].square() + 1e-5 * inp[:, 4:].square()
     env_type = "IDP"
-    name = "extcnn_lqr_ppo"
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_type, "MaxEntIRL", name))
+    env_id = "IDP_custom"
+    name = "no_lqr_ppo_ppoagent_noreset"
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     with open(f"../demos/{env_type}/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
@@ -109,7 +110,7 @@ def expt_cost():
     i = 1
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
+        agent = PPO.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
         if os.path.isfile(proj_path + f"/{i:03d}/normalization.pkl"):
             stats_path = proj_path + f"/model/{i:03d}/normalization.pkl"
             venv = make_env(f"{env_type}_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path, pltqs=pltqs)

@@ -83,13 +83,14 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
         return HPCDivPolicy(env, **kwargs)
     elif algo_type == "ppo":
         from algos.torch.ppo import MlpPolicy
-        n_steps = 2048
+        n_steps, batch_size = 2048, 256
         if hasattr(env, "num_envs"):
             n_steps = int(n_steps / int(env.num_envs))
+            batch_size = int(batch_size / int(env.num_envs))
         return PPO(MlpPolicy,
                    env=env,
                    n_steps=n_steps,
-                   batch_size=64,
+                   batch_size=batch_size,
                    gamma=0.99,
                    gae_lambda=0.95,
                    learning_rate=3e-4,
@@ -111,6 +112,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
         return SAC(
             MlpPolicy,
             env=env,
+            learning_rate=3e-4,
             batch_size=256,
             learning_starts=100,
             train_freq=1,
