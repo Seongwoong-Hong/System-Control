@@ -77,7 +77,9 @@ class MaxEntIRL:
             self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)]))
         else:
             self.wrap_env = DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)])
-        self.agent.set_env_and_reset(self.wrap_env)
+        self.agent.set_env(self.wrap_env)
+        self.agent.num_timesteps = 0
+        # self.agent.set_env_and_reset(self.wrap_env)
 
     def rollout_from_agent(self, **kwargs):
         n_episodes = kwargs.pop('n_episodes', 10)
@@ -118,15 +120,15 @@ class MaxEntIRL:
             self._reset_agent(**self.env_kwargs)
             with logger.accumulate_means(f"agent_{itr}"):
                 for agent_steps in range(max_agent_iter):
-                    self.agent.learn(
-                        total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
-                    logger.dump(step=self.agent.num_timesteps)
                     loss_diff = self.cal_loss(**kwargs).item()
                     logger.record("loss_diff", loss_diff)
-                    logger.record("agent_steps", agent_steps)
+                    logger.record("agent_steps", agent_steps, exclude="tensorboard")
                     logger.dump(agent_steps)
                     if loss_diff > 0 and early_stop:
                         break
+                    self.agent.learn(
+                        total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
+                    logger.dump(step=self.agent.num_timesteps)
             losses = []
             with logger.accumulate_means(f"reward_{itr}"):
                 self.reward_net.train()
@@ -137,7 +139,7 @@ class MaxEntIRL:
                     logger.record("loss", loss.item())
                     logger.dump(rew_steps)
                     # TODO: Is there any smart way that breaks reward learning?
-                    if np.mean(losses[-5:]) < -0.1 and early_stop:
+                    if np.mean(losses[-5:]) < -0.05 and early_stop:
                         break
                     self.reward_net.optimizer.zero_grad()
                     loss.backward()
