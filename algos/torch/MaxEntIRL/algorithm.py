@@ -135,7 +135,7 @@ class MaxEntIRL:
                 for rew_steps in range(gradient_steps):
                     loss = self.cal_loss(**kwargs)
                     losses.append(loss.item())
-                    logger.record("steps", rew_steps + 1, exclude="tensorboard")
+                    logger.record("steps", rew_steps, exclude="tensorboard")
                     logger.record("loss", loss.item())
                     logger.dump(rew_steps)
                     # TODO: Is there any smart way that breaks reward learning?
@@ -145,7 +145,7 @@ class MaxEntIRL:
                     loss.backward()
                     self.reward_net.optimizer.step()
             if callback:
-                callback(self, itr + 1)
+                callback(self, itr)
 
 
 class GuidedCostLearning(MaxEntIRL):

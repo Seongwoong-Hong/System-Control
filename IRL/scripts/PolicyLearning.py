@@ -35,17 +35,18 @@ def learning_specific_one():
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     log_dir = os.path.join(proj_path, "tmp", "log", env_id, algo_type, name, "add_rew_learning")
     GlfwContext(offscreen=True)
-    algo = def_policy("ppo", env, device=device, log_dir=log_dir, verbose=1)
-    os.makedirs(log_dir + f"/ppo_policies_{n}", exist_ok=False)
+    algo_used = "sac"
+    algo = def_policy(algo_used, env, device=device, log_dir=log_dir, verbose=1)
+    os.makedirs(log_dir + f"/{algo_used}_policies_{n:03d}", exist_ok=True)
     video_recorder = VideoCallback(make_env(f"{env_id}-v0", use_vec_env=False, pltqs=pltqs),
                                    n_eval_episodes=5,
-                                   render_freq=int(1e6))
-    save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
-    save_policy_callback = callbacks.EveryNTimesteps(int(1e6), save_policy_callback)
+                                   render_freq=int(0.5e6))
+    save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/{algo_used}_policies_{n:03d}", None)
+    save_policy_callback = callbacks.EveryNTimesteps(int(0.5e6), save_policy_callback)
     callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
-    algo.learn(total_timesteps=int(1e7), tb_log_name="extra", callback=callback_list)
-    algo.save(log_dir + f"/policies_{n}/{algo_type}0")
-    print(f"saved as policies_{n}/{algo_type}0")
+    algo.learn(total_timesteps=int(0.5e7), tb_log_name="extra", callback=callback_list)
+    algo.save(log_dir + f"/{algo_used}_policies_{n:03d}/{algo_used}0")
+    print(f"saved as {algo_used}_policies_{n}/{algo_used}0")
 
 
 def learning_whole_iter():

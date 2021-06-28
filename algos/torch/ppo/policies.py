@@ -22,7 +22,7 @@ class ActorCriticPolicyCustom(ActorCriticPolicy):
     def __init__(self, *args, **kwargs):
         log_std_range = kwargs.pop('log_std_range', None)
         if log_std_range is None:
-            self.log_std_low, self.log_std_high = -5, 5
+            self.log_std_low, self.log_std_high = None, None
         else:
             self.log_std_low, self.log_std_high = log_std_range
         super(ActorCriticPolicyCustom, self).__init__(*args, **kwargs)

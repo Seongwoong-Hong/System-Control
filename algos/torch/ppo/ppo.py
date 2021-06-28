@@ -119,8 +119,7 @@ class PPOCustom(PPO):
         logger.record("train/policy_gradient_loss", np.mean(pg_losses))
         logger.record("train/value_loss", np.mean(value_losses))
         logger.record("train/clip_fraction", np.mean(clip_fractions))
-        logger.record("train/loss", loss.item())
-        logger.record("train/explained_variance", explained_var)
+        logger.record("train/entropy_loss", np.mean(entropy_losses))
         if hasattr(self.policy, "log_std"):
             logger.record("train/std", th.exp(self.policy.log_std).mean().item())
 
