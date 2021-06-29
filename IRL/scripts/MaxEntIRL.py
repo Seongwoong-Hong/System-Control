@@ -16,10 +16,10 @@ from IRL.scripts.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "HPC"
     algo_type = "MaxEntIRL"
-    device = "cuda:2"
-    name = "IDP_custom"
+    device = "cuda:3"
+    name = "HPC_custom"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     pltqs = []
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, pltqs=pltqs)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "sub01_1&2.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
@@ -37,14 +37,14 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += "/no_lqr_ppo_ppoagent_noreset2"
+    log_dir += "/extcnn_sub01_1&2_deep_10_noreset"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return x
+        return th.cat([x, x.square()], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -57,23 +57,23 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("ppo", env, device=device, verbose=1)
+    agent = def_policy("sac", env, device=device, verbose=1)
     learner = MaxEntIRL(
         env,
         feature_fn=feature_fn,
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[8, 8],
+        rew_arch=[16, 16, 16, 16],
         device=device,
         env_kwargs={},
-        rew_kwargs={'type': 'ann', 'scale': 1.0},
+        rew_kwargs={'type': 'cnn', 'scale': 10},
     )
 
     # Run Learning
     learner.learn(
         total_iter=25,
-        agent_learning_steps=6e5,
+        agent_learning_steps=1e5,
         gradient_steps=50,
         n_episodes=expt_traj_num,
         max_agent_iter=10,

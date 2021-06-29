@@ -29,6 +29,7 @@ def learning_specific_one():
     n = 10
     with open(f"../tmp/log/{env_id}/{algo_type}/{name}/model/{n:03d}/reward_net.pkl", "rb") as f:
         reward_net = pickle.load(f).double()
+    reward_net.scale = 0.1
     env = RewardWrapper(env, reward_net.eval())
 
     device = "cuda:1"

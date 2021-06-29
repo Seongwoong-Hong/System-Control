@@ -90,8 +90,8 @@ def expt_cost():
     def expt_fn(inp):
         return inp[:, :2].square() + 1e-5 * inp[:, 4:].square()
     env_type = "IDP"
-    env_id = "IDP_custom"
-    name = "no_lqr_ppo_ppoagent_noreset"
+    env_id = "IDP_pybullet"
+    name = "cnn_lqr_ppo_noreset"
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     with open(f"../demos/{env_type}/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
@@ -107,13 +107,13 @@ def expt_cost():
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
     print(f"expt_cost: {expt_fn(th_input).mean().item() * 600}")
     sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
-    i = 1
+    i = 0
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        agent = PPO.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
+        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
         if os.path.isfile(proj_path + f"/{i:03d}/normalization.pkl"):
             stats_path = proj_path + f"/model/{i:03d}/normalization.pkl"
-            venv = make_env(f"{env_type}_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path, pltqs=pltqs)
+            venv = make_env(f"{env_type}_pybullet-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path, pltqs=pltqs)
         venv.reset()
         agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
         agent_trans = flatten_trajectories(agent_trajs)
@@ -130,4 +130,4 @@ def expt_cost():
 if __name__ == "__main__":
     def feature_fn(x):
         return x
-    learned_cost()
+    expt_cost()

@@ -46,11 +46,11 @@ def test_hpc_learned_policy(irl_path, pltqs):
 
 
 def test_irl_learned_policy(irl_path):
-    env_type = "IDP"
-    env = make_env(f"{env_type}_pybullet-v1", use_vec_env=False)
-    name = f"{env_type}/MaxEntIRL/cnn_lqr_ppo_deep"
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
-    algo = SAC.load(model_dir + "/agent")
+    env_type = "IDP_custom"
+    env = make_env(f"{env_type}-v1", use_vec_env=False)
+    name = f"{env_type}/MaxEntIRL/extcnn_lqr_ppo_ppoagent_noreset"
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "013")
+    algo = PPO.load(model_dir + "/agent")
     a_list, o_list, _ = verify_policy(env, algo, deterministic=True)
 
 
