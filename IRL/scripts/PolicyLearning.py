@@ -9,15 +9,15 @@ from IRL.scripts.project_policies import def_policy
 from common.callbacks import VideoCallback
 from common.util import make_env
 from common.wrappers import RewardWrapper
-from mujoco_py import GlfwContext
+# from mujoco_py import GlfwContext
 from scipy import io
 
 
 def learning_specific_one():
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    name = "extcnn_lqr_ppo_deep"
-    env_id = f"{env_type}_custom"
+    name = "ext_lqr_ppo_deep_0.01_noreset"
+    env_id = f"{env_type}_pybullet"
 
     pltqs = []
     for i in range(10):
@@ -26,26 +26,26 @@ def learning_specific_one():
 
     env = make_env(f"{env_id}-v1", use_vec_env=False, pltqs=pltqs)
 
-    n = 10
+    n = 2
     with open(f"../tmp/log/{env_id}/{algo_type}/{name}/model/{n:03d}/reward_net.pkl", "rb") as f:
         reward_net = pickle.load(f).double()
-    reward_net.scale = 0.1
+    reward_net.scale = 0.01
     env = RewardWrapper(env, reward_net.eval())
 
-    device = "cuda:1"
+    device = "cpu"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     log_dir = os.path.join(proj_path, "tmp", "log", env_id, algo_type, name, "add_rew_learning")
-    GlfwContext(offscreen=True)
-    algo_used = "sac"
+    # GlfwContext(offscreen=True)
+    algo_used = "ppo"
     algo = def_policy(algo_used, env, device=device, log_dir=log_dir, verbose=1)
     os.makedirs(log_dir + f"/{algo_used}_policies_{n:03d}", exist_ok=True)
-    video_recorder = VideoCallback(make_env(f"{env_id}-v0", use_vec_env=False, pltqs=pltqs),
-                                   n_eval_episodes=5,
-                                   render_freq=int(0.5e6))
-    save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/{algo_used}_policies_{n:03d}", None)
-    save_policy_callback = callbacks.EveryNTimesteps(int(0.5e6), save_policy_callback)
-    callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
-    algo.learn(total_timesteps=int(0.5e7), tb_log_name="extra", callback=callback_list)
+    # video_recorder = VideoCallback(make_env(f"{env_id}-v0", use_vec_env=False, pltqs=pltqs),
+    #                                n_eval_episodes=5,
+    #                                render_freq=int(0.5e6))
+    # save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/{algo_used}_policies_{n:03d}", None)
+    # save_policy_callback = callbacks.EveryNTimesteps(int(0.5e6), save_policy_callback)
+    # callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
+    algo.learn(total_timesteps=int(1e7), tb_log_name="extra")
     algo.save(log_dir + f"/{algo_used}_policies_{n:03d}/{algo_used}0")
     print(f"saved as {algo_used}_policies_{n}/{algo_used}0")
 

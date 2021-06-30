@@ -12,7 +12,7 @@ if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "ppo"
     name = "IDP_pybullet"
-    device = "cuda:1"
+    device = "cpu"
     env_id = f"{name}-v0"
     env = make_env(env_id, use_vec_env=False, num_envs=1, use_norm=True)
     name += "_windows"

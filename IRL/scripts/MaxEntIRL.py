@@ -16,10 +16,10 @@ from IRL.scripts.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "HPC"
+    env_type = "IDP"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
-    name = "HPC_custom"
+    device = "cuda:1"
+    name = "IDP_custom"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     pltqs = []
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     env = make_env(f"{name}-v1", use_vec_env=False, num_envs=8, pltqs=pltqs)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "sub01_1&2.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += "/extcnn_sub01_1&2_deep_10_noreset"
+    log_dir += "/ext_lqr_ppo_linear_0.1_noreset"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -64,19 +64,19 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[16, 16, 16, 16],
+        rew_arch=[],
         device=device,
         env_kwargs={},
-        rew_kwargs={'type': 'cnn', 'scale': 10},
+        rew_kwargs={'type': 'ann', 'scale': 0.1},
     )
 
     # Run Learning
     learner.learn(
-        total_iter=25,
-        agent_learning_steps=1e5,
-        gradient_steps=50,
+        total_iter=50,
+        agent_learning_steps=2.5e4,
+        gradient_steps=20,
         n_episodes=expt_traj_num,
-        max_agent_iter=10,
+        max_agent_iter=40,
         callback=save_net_callback.net_save,
     )
 
