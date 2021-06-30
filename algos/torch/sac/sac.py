@@ -114,3 +114,18 @@ class SACCustom(SAC):
     def set_env_and_reset(self, env):
         self.init_kwargs['env'] = env
         super(SACCustom, self).__init__(*self.init_args, **self.init_kwargs)
+
+    def set_env_and_reset_ent(self, env):
+        self.num_timesteps = 0
+        self.ent_coef = self.init_kwargs.pop('ent_coef', 'auto')
+        self.set_env(env)
+        if isinstance(self.ent_coef, str) and self.ent_coef.startswith("auto"):
+            init_value = 1.0
+            if "_" in self.ent_coef:
+                init_value = float(self.ent_coef.split("_")[1])
+                assert init_value > 0.0, "The initial value of ent_coef must be greater than 0"
+
+            self.log_ent_coef = th.log(th.ones(1, device=self.device) * init_value).requires_grad_(True)
+            self.ent_coef_optimizer = th.optim.Adam([self.log_ent_coef], lr=self.lr_schedule(1))
+        else:
+            self.ent_coef_tensor = th.tensor(float(self.ent_coef)).to(self.device)

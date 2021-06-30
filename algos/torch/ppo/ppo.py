@@ -137,3 +137,8 @@ class PPOCustom(PPO):
         else:
             self.ent_schedule = 1.0
         super(PPOCustom, self).__init__(*self.init_args, **self.init_kwargs)
+
+    def set_env_and_reset_ent(self, env):
+        self.num_timesteps = 0
+        self.ent_coef = self.init_kwargs.pop('ent_coef', 0.0)
+        self.set_env(env)
