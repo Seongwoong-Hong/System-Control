@@ -77,7 +77,7 @@ class MaxEntIRL:
             self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)]))
         else:
             self.wrap_env = DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)])
-        self.agent.set_env_and_reset_ent(self.wrap_env)
+        self.agent.reset_except_policy_param(self.wrap_env)
 
     def rollout_from_agent(self, **kwargs):
         n_episodes = kwargs.pop('n_episodes', 10)

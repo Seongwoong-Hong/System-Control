@@ -138,7 +138,12 @@ class PPOCustom(PPO):
             self.ent_schedule = 1.0
         super(PPOCustom, self).__init__(*self.init_args, **self.init_kwargs)
 
-    def set_env_and_reset_ent(self, env):
-        self.num_timesteps = 0
-        self.ent_coef = self.init_kwargs.pop('ent_coef', 0.0)
-        self.set_env(env)
+    def reset_except_policy_param(self, env):
+        self.init_kwargs['env'] = env
+        if 'ent_schedule' in self.init_kwargs:
+            self.ent_schedule = self.init_kwargs.pop('ent_schedule')
+        else:
+            self.ent_schedule = 1.0
+        param_vec = self.policy.parameters_to_vector()
+        super(PPOCustom, self).__init__(*self.init_args, **self.init_kwargs)
+        self.policy.load_from_vector(param_vec)

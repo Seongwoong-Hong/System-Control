@@ -6,6 +6,7 @@ import torch as th
 from torch.nn import functional as F
 
 from stable_baselines3.common import logger
+from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.utils import polyak_update
 from stable_baselines3.sac import SAC
 
@@ -111,14 +112,27 @@ class SACCustom(SAC):
         if len(ent_coef_losses) > 0:
             logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
-    def set_env_and_reset(self, env):
+    def reset(self, env):
         self.init_kwargs['env'] = env
         super(SACCustom, self).__init__(*self.init_args, **self.init_kwargs)
+
+    def reset_except_policy_param(self, env):
+        self.init_kwargs['env'] = env
+        param_vec = self.policy.parameters_to_vector()
+        super(SACCustom, self).__init__(*self.init_args, **self.init_kwargs)
+        self.policy.load_from_vector(param_vec)
 
     def set_env_and_reset_ent(self, env):
         self.num_timesteps = 0
         self.ent_coef = self.init_kwargs.pop('ent_coef', 'auto')
         self.set_env(env)
+        self.replay_buffer = ReplayBuffer(
+            self.buffer_size,
+            self.observation_space,
+            self.action_space,
+            self.device,
+            optimize_memory_usage=self.optimize_memory_usage,
+        )
         if isinstance(self.ent_coef, str) and self.ent_coef.startswith("auto"):
             init_value = 1.0
             if "_" in self.ent_coef:
