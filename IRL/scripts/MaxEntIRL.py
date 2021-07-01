@@ -18,8 +18,8 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "MaxEntIRL"
-    device = "cuda:1"
-    name = "IDP_custom"
+    device = "cpu"
+    name = "IDP_pybullet"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     pltqs = []
@@ -37,14 +37,14 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += "/ext_lqr_ppo_linear_0.1_noreset"
+    log_dir += "/cnn_lqr_ppo_deep_0.01_noreset"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return th.cat([x, x.square()], dim=1)
+        return x
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -64,17 +64,17 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[],
+        rew_arch=[8, 8, 8, 8],
         device=device,
         env_kwargs={},
-        rew_kwargs={'type': 'ann', 'scale': 0.1},
+        rew_kwargs={'type': 'cnn', 'scale': 0.01},
     )
 
     # Run Learning
     learner.learn(
         total_iter=50,
         agent_learning_steps=2.5e4,
-        gradient_steps=20,
+        gradient_steps=25,
         n_episodes=expt_traj_num,
         max_agent_iter=40,
         callback=save_net_callback.net_save,

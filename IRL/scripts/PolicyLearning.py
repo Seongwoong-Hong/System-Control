@@ -36,7 +36,7 @@ def learning_specific_one():
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     log_dir = os.path.join(proj_path, "tmp", "log", env_id, algo_type, name, "add_rew_learning")
     # GlfwContext(offscreen=True)
-    algo_used = "ppo"
+    algo_used = "sac"
     algo = def_policy(algo_used, env, device=device, log_dir=log_dir, verbose=1)
     os.makedirs(log_dir + f"/{algo_used}_policies_{n:03d}", exist_ok=True)
     # video_recorder = VideoCallback(make_env(f"{env_id}-v0", use_vec_env=False, pltqs=pltqs),
