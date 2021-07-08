@@ -30,6 +30,8 @@ class VFCustomCallback(BaseCallback):
         :param draw_dim: First two arguments are for observation dimension that are input for drawing a figure
                          and third argument is for action dimension that is a output for figure.
         """
+        from mujoco_py import GlfwContext
+        GlfwContext(offscreen=True)
         super().__init__()
         self._eval_env = eval_env
         self._render_freq = render_freq
@@ -128,6 +130,8 @@ class VideoCallback(BaseCallback):
         :param n_eval_episodes: Number of episodes to render
         :param deterministic: Whether to use deterministic or stochastic policy
         """
+        from mujoco_py import GlfwContext
+        GlfwContext(offscreen=True)
         super().__init__()
         self._eval_env = eval_env
         self._render_freq = render_freq

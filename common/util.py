@@ -8,20 +8,24 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 
 def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, **kwargs):
-    def is_vectorized():
+    def is_vectorized(env):
         if use_norm:
             stats_path = kwargs.pop("stats_path", None)
-            env = DummyVecEnv([lambda: gym.make(env_name, **kwargs) for _ in range(num_envs)])
+            env = DummyVecEnv([lambda: env for _ in range(num_envs)])
             if not stats_path:
                 env = VecNormalize(env, norm_obs=True, norm_reward=True)
             else:
                 env = VecNormalize.load(stats_path, env)
         elif use_vec_env:
-            env = DummyVecEnv([lambda: gym.make(env_name, **kwargs) for _ in range(num_envs)])
-        else:
-            env = gym.make(env_name, **kwargs)
+            env = DummyVecEnv([lambda: env for _ in range(num_envs)])
         return env
-    env_type = env_name[:env_name.find("_custom")]
+
+    if isinstance(env_name, gym.Env):
+        env = env_name
+        env_type = "Env"
+    else:
+        env_type = env_name[:env_name.find("_custom")]
+        env = gym.make(env_name)
     if env_type == "HPC":
         subpath = kwargs.pop("subpath", None)
         pltqs = kwargs.get("pltqs")
@@ -40,8 +44,7 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, **kwargs)
         kwargs.pop('subpath', None)
         kwargs.pop('pltqs', None)
         kwargs.pop('bsp', None)
-    venv = is_vectorized()
-    return venv
+    return is_vectorized(env)
 
 
 def write_analyzed_result(ana_fn,
