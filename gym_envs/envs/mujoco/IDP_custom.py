@@ -17,7 +17,7 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def step(self, action):
         ob = self._get_obs()
         r = -(ob[0] ** 2 + ob[1] ** 2
-              + 0.1 * ob[2] ** 2 + 0.1 * ob[3] ** 2
+              + 1 * ob[2] ** 2 + 1 * ob[3] ** 2
               + 1e-5 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         self.do_simulation(action, self.frame_skip)
         ob = self._get_obs()

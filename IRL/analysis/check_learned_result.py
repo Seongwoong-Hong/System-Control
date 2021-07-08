@@ -62,6 +62,7 @@ def learned_cost():
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP_custom", "MaxEntIRL", name))
     with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
+    test_len = len(expert_trajs)
     expt_trans = flatten_trajectories(expert_trajs)
     venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1)
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
@@ -78,8 +79,8 @@ def learned_cost():
         th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
         with open(os.path.join(proj_path, "model", f"{i:03d}", "reward_net.pkl"), "rb") as f:
             reward_fn = pickle.load(f).double()
-        print("Cost:", -reward_fn(th_input).mean().item() * 600)
-        cost_list.append(-reward_fn(th_input).mean().item() * 600)
+        print("Cost:", -reward_fn(th_input).sum().item() / test_len)
+        cost_list.append(-reward_fn(th_input).sum().item() / test_len)
         i += 1
     plt.plot(cost_list)
     # plt.savefig(f"figures/IDP/MaxEntIRL/agent_cost_each_iter/expt_{name}.png")
@@ -88,15 +89,16 @@ def learned_cost():
 
 def expt_cost():
     def expt_fn(inp):
-        return inp[:, :2].square() + 1e-5 * inp[:, 4:].square()
+        return inp[:, :4].square().sum() + 1e-5 * inp[:, 4:].square().sum()
     env_type = "IDP"
-    env_id = "IDP_custom"
-    name = "ext_lqr_ppo_deep_noreset"
+    env_id = "IDP_pybullet"
+    name = "sq_lqr_ppo_ppoagent"
+    print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     with open(f"../demos/{env_type}/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
-    test_len = 10
+    test_len = len(expert_trajs)
     pltqs = []
     if env_type == "HPC":
         for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
@@ -105,12 +107,12 @@ def expt_cost():
         test_len = len(pltqs)
     venv = make_env(f"{env_type}_custom-v0", use_vec_env=True, num_envs=1, pltqs=pltqs)
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
-    print(f"expt_cost: {expt_fn(th_input).mean().item() * 600}")
+    print(f"expt_cost: {expt_fn(th_input).item() / test_len}")
     sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
-    i = 0
+    i = 1
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
+        agent = PPO.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
         if os.path.isfile(proj_path + f"/{i:03d}/normalization.pkl"):
             stats_path = proj_path + f"/model/{i:03d}/normalization.pkl"
             venv = make_env(f"{env_type}_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path, pltqs=pltqs)
@@ -118,16 +120,16 @@ def expt_cost():
         agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
         agent_trans = flatten_trajectories(agent_trajs)
         th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1))
-        print("Cost:", expt_fn(th_input).mean().item() * 600)
-        cost_list.append(expt_fn(th_input).mean().item() * 600)
+        print(f"{i:03d} Cost:", expt_fn(th_input).item() / test_len)
+        cost_list.append(expt_fn(th_input).item() / test_len)
         i += 1
-    plt.plot(cost_list)
+    # plt.plot(cost_list)
     # plt.savefig(f"figures/IDP/MaxEntIRL/expt_cost_each_iter/{name}.png")
-    plt.show()
+    # plt.show()
     print(f"minimum cost index: {np.argmin(cost_list) + 1}")
 
 
 if __name__ == "__main__":
     def feature_fn(x):
-        return th.cat([x, x.square()], dim=1)
+        return x.square()
     expt_cost()

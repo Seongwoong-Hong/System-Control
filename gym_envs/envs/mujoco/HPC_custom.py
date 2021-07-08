@@ -17,14 +17,15 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
             self._set_body_config(filepath, bsp)
         mujoco_env.MujocoEnv.__init__(self, filepath, 5)
         utils.EzPickle.__init__(self)
-        self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
+        self.action_space = spaces.Box(low=-2, high=2, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
         self._set_pltqs()
 
     def step(self, action: np.ndarray):
+        action = np.clip(action, a_max=1, a_min=-1)
         ob = self._get_obs()
-        r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-6 * action @ np.eye(2, 2) @ action.T)
+        r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-3 * action @ np.eye(2, 2) @ action.T)
         self.do_simulation(action + self.plt_torque, self.frame_skip)
         self._timesteps += 1
         ob = self._get_obs()
@@ -71,7 +72,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def plt_torque(self):
         if self.pltq is not None:
             if self._timesteps == len(self.pltq):
-                return np.array([np.NaN, np.NaN])
+                return np.array([0, 0])
             return self.pltq[self._timesteps, :].reshape(-1)
         else:
             return np.array([0, 0])

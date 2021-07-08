@@ -130,7 +130,7 @@ class PPOCustom(PPO):
         self.ent_coef *= self.ent_schedule
         return super(PPOCustom, self).learn(*args, **kwargs)
 
-    def set_env_and_reset(self, env):
+    def reset(self, env):
         self.init_kwargs['env'] = env
         if 'ent_schedule' in self.init_kwargs:
             self.ent_schedule = self.init_kwargs.pop('ent_schedule')
