@@ -1,5 +1,6 @@
 import os
 import pickle
+import pytest
 import torch as th
 import numpy as np
 
@@ -7,9 +8,16 @@ from common.util import make_env
 from common.verification import CostMap
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
+from IRL.scripts.project_policies import def_policy
 
+from imitation.algorithms import bc
 from matplotlib import pyplot as plt
 from matplotlib import cm
+
+
+@pytest.fixture()
+def irl_path():
+    return os.path.abspath(os.path.join("..", "..", "IRL"))
 
 
 def test_draw_costmap():
@@ -19,13 +27,13 @@ def test_draw_costmap():
 
 def test_cal_cost():
     from imitation.data.rollout import flatten_trajectories
-    expert_dir = os.path.join("..", "demos", "HPC", "lqrTest.pkl")
+    expert_dir = os.path.join(irl_path, "demos", "HPC", "lqrTest.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     transitions = []
     for traj in expert_trajs:
         transitions += [flatten_trajectories([traj])]
-    cost_dir = os.path.join("..", "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model", "discrim.pkl")
+    cost_dir = os.path.join(irl_path, "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model", "discrim.pkl")
     with open(cost_dir, "rb") as f:
         disc = pickle.load(f)
     reward_fn = disc.reward_net.base_reward_net.double()
@@ -36,7 +44,7 @@ def test_cal_cost():
 
 
 def test_process_agent(tenv):
-    cost_dir = os.path.join("..", "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model")
+    cost_dir = os.path.join(irl_path, "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model")
     with open(cost_dir + "/discrim.pkl", "rb") as f:
         disc = pickle.load(f)
     cost_fn = disc.reward_net.base_reward_net.double()
@@ -48,7 +56,7 @@ def test_process_agent(tenv):
 
 
 def test_costmap(tenv):
-    reward_dir = os.path.join("..", "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model")
+    reward_dir = os.path.join(irl_path, "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model")
     with open(reward_dir + "/discrim.pkl", "rb") as f:
         disc = pickle.load(f).double()
     reward_fn = disc.reward_net.base_reward_net
@@ -57,23 +65,24 @@ def test_costmap(tenv):
     cost_map = CostMap(reward_fn, tenv, agent)
 
 
-def test_expt_reward():
+def test_expt_reward(irl_path):
     env_type = "IDP"
+    name = "IDP_custom"
     rewards = []
+    env = make_env(f"{env_type}_custom-v1", use_vec_env=False)
+    load_dir = irl_path + f"/tmp/log/{name}/BC/sq_lqr_ppo_ppoagent_noreset/model/000/agent"
+    expt = def_policy("IDP", env)
+    agent = PPO.load(load_dir)
     for i in range(10):
-        env = make_env(f"{env_type}_custom-v2", use_vec_env=False)
-        load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{env_type}_custom_test1/model/{i:03d}/agent.zip"
-        agent = SAC.load(load_dir)
-        expt = PPO.load(f"../../RL/{env_type}/tmp/log/{env_type}_custom/ppo/policies_1/ppo0")
         done = False
         reward = 0
         obs = env.reset()
         while not done:
-            act, _ = expt.predict(obs, deterministic=True)
+            act, _ = agent.predict(obs, deterministic=True)
             obs, rew, done, _ = env.step(act)
             reward += rew.item()
         rewards.append(reward)
-    print(rewards)
+    print(np.mean(rewards))
     plt.plot(rewards)
     plt.show()
 
@@ -84,7 +93,7 @@ def test_agent_reward():
     name = "IDP_custom"
     rewards = []
     for i in range(10):
-        env = make_env(f"{name}-v2", use_vec_env=False)
+        env = make_env(f"{name}-v1", use_vec_env=False)
         load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{name}_test1/model/{i:03d}"
         agent = SAC.load(load_dir + "/agent")
         expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")

@@ -1,6 +1,6 @@
 import os
-
 import pytest
+from scipy import io
 
 from IRL.scripts.project_policies import def_policy
 from algos.torch.ppo import PPO
@@ -8,7 +8,7 @@ from algos.torch.sac import SAC
 from common.util import make_env
 from common.verification import verify_policy
 
-from scipy import io
+from imitation.algorithms import bc
 
 
 @pytest.fixture
@@ -38,9 +38,9 @@ def test_hpcdiv_algo(tenv):
 
 def test_hpc_learned_policy(irl_path, pltqs):
     env = make_env("HPC_custom-v0", pltqs=pltqs)
-    name = "HPC/MaxEntIRL/sq_sub01_1&2"
+    name = "HPC_custom/BC/test"
     model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
-    algo = SAC.load(model_dir + "/agent")
+    algo = bc.reconstruct_policy(model_dir + "/policy")
     for _ in range(10):
         a_list, o_list, _ = verify_policy(env, algo)
 
@@ -48,9 +48,9 @@ def test_hpc_learned_policy(irl_path, pltqs):
 def test_irl_learned_policy(irl_path):
     env_type = "IDP_custom"
     env = make_env(f"{env_type}-v1", use_vec_env=False)
-    name = f"{env_type}/MaxEntIRL/extcnn_lqr_ppo_ppoagent_noreset"
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "013")
-    algo = PPO.load(model_dir + "/agent")
+    name = f"{env_type}/BC/test"
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
+    algo = bc.reconstruct_policy(model_dir + "/policy")
     a_list, o_list, _ = verify_policy(env, algo, deterministic=True)
 
 

@@ -74,10 +74,10 @@ class MaxEntIRL:
         norm_wrapper = kwargs.pop("vec_normalizer", None)
         self.reward_net.eval()
         if norm_wrapper:
-            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)]))
+            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)]), **kwargs)
         else:
             self.wrap_env = DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)])
-        self.agent.reset_except_policy_param(self.wrap_env)
+        self.agent.reset(self.wrap_env)
 
     def rollout_from_agent(self, **kwargs):
         n_episodes = kwargs.pop('n_episodes', 10)
@@ -137,7 +137,7 @@ class MaxEntIRL:
                     logger.record("loss", loss.item())
                     logger.dump(rew_steps)
                     # TODO: Is there any smart way that breaks reward learning?
-                    if np.mean(losses[-5:]) < -0.05 and early_stop:
+                    if loss.item() < -0.05 and early_stop:
                         break
                     self.reward_net.optimizer.zero_grad()
                     loss.backward()

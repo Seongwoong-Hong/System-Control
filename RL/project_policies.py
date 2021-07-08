@@ -41,7 +41,8 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    verbose=verbose,
                    device=device,
                    tensorboard_log=log_dir,
-                   policy_kwargs={'net_arch': {'pi': [32, 32], 'qf': [32, 32]}},
+                   policy_kwargs={'net_arch': {'pi': [32, 32], 'qf': [32, 32]},
+                                  'optimizer_kwargs': {'betas': (0.9, 0.99)}},
                    **kwargs,
                    )
     else:

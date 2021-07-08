@@ -1,6 +1,7 @@
 import os
 
 from algos.torch.ppo import PPO
+from algos.torch.sac import SAC
 from common.util import make_env
 from common.verification import verify_policy
 
@@ -15,10 +16,10 @@ def test_mujoco_envs_learned_policy():
 
 
 def test_rl_learned_policy():
-    env_type = "IDP"
-    env = make_env(f"{env_type}_custom-v0")
-    name = f"{env_type}_custom_abs_ppo/ppo"
+    env_type = "HPC"
+    env = make_env(f"{env_type}_custom-v0", subpath="../../IRL/demos/HPC/sub01/sub01")
+    name = f"{env_type}_custom_test/sac"
     model_dir = os.path.join("..", "..", "RL", env_type, "tmp", "log", name, "policies_2")
-    algo = PPO.load(model_dir + "/ppo0")
+    algo = SAC.load(model_dir + "/sac0")
     a_list, o_list, _ = verify_policy(env, algo)
 
