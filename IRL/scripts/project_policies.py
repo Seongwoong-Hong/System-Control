@@ -101,7 +101,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    verbose=verbose,
                    device=device,
                    tensorboard_log=log_dir,
-                   policy_kwargs={'log_std_range': [None, 2.5],
+                   policy_kwargs={'log_std_range': [None, 1.8],
                                   'net_arch': [{'pi': [32, 32], 'vf': [32, 32]}],
                                   },
                    **kwargs,

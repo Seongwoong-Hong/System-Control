@@ -16,13 +16,16 @@ from IRL.scripts.project_policies import def_policy
 
 
 def draw_2dfigure():
+    def expt_cost(inp):
+        th.sum(inp[0, :2].square() + 0.1 * inp[0, 2:4].square() + 1e-5 * 200 * inp[0, 4:].square).item()
     env = make_env("IDP_custom-v0", use_vec_env=False)
-    name = "extcnn_lqr_ppo_ppoagent_deep_noreset"
-    num = "019"
-    algo = PPO.load(f"../tmp/log/IDP_pybullet/MaxEntIRL/{name}/model/{num}/agent")
+    name = "sq_lqr_ppo_ppoagent_noreset"
+    num = "010"
+    load_dir = f"../tmp/log/IDP_custom/BC/{name}/model/{num}"
+    algo = PPO.load(load_dir + "/agent")
     # algo = def_policy("IDP", env)
     # algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
-    with open(f"../tmp/log/IDP_pybullet/MaxEntIRL/{name}/model/{num}/reward_net.pkl", "rb") as f:
+    with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
 
     ndim, nact = env.observation_space.shape[0], env.action_space.shape[0]
@@ -32,12 +35,12 @@ def draw_2dfigure():
     for i in range(d1.shape[0]):
         for j in range(d1.shape[1]):
             iobs = np.zeros(ndim)
-            iobs[0], iobs[2] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
+            iobs[0], iobs[1] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
             iacts, _ = algo.predict(np.array(iobs), deterministic=True)
             pact[i][j] = iacts[1]
             inp = th.from_numpy(np.append(iobs, iacts)).double().to(algo.device).reshape(1, -1)
-            cost[i][j] = th.sum(th.square(inp[0, :2]) + 0.1*th.square(inp[0, 2:4])+1e-5*th.square(200*inp[0, 4:])).item()
-            # cost[i][j] = -reward_fn(inp).item()
+            # cost[i][j] = th.sum(th.square(inp[0, :2]) + 0.1 * th.square(inp[0, 2:4]) + 1e-5 * th.square(200 * inp[0, 4:])).item()
+            cost[i][j] = -reward_fn(inp).item()
     cost = (cost - np.min(cost))/(np.max(cost) - np.min(cost))
     title_list = ["norm_cost", "abs_action"]
     yval_list = [cost, np.abs(pact)]
@@ -59,7 +62,7 @@ def draw_2dfigure():
 
 def learned_cost():
     name = "no_lqr_ppo_ppoagent_noreset"
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP_custom", "MaxEntIRL", name))
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP_custom", "BC", name))
     with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     test_len = len(expert_trajs)
@@ -67,7 +70,7 @@ def learned_cost():
     venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1)
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
     sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
-    i = 1
+    i = 0
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
         agent = PPO.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
@@ -79,7 +82,7 @@ def learned_cost():
         th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
         with open(os.path.join(proj_path, "model", f"{i:03d}", "reward_net.pkl"), "rb") as f:
             reward_fn = pickle.load(f).double()
-        print("Cost:", -reward_fn(th_input).sum().item() / test_len)
+        print(f"{i:03d} Cost:", -reward_fn(th_input).sum().item() / test_len)
         cost_list.append(-reward_fn(th_input).sum().item() / test_len)
         i += 1
     plt.plot(cost_list)
@@ -92,7 +95,7 @@ def expt_cost():
         return inp[:, :4].square().sum() + 1e-5 * inp[:, 4:].square().sum()
     env_type = "IDP"
     env_id = "IDP_pybullet"
-    name = "sq_lqr_ppo_ppoagent"
+    name = "sq_lqr_ppo_ppoagent_norm_noreset"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     with open(f"../demos/{env_type}/lqr_ppo.pkl", "rb") as f:
@@ -105,11 +108,11 @@ def expt_cost():
             file = os.path.join("..", "demos", env_type, "sub01", f"sub01i{i+1}.mat")
             pltqs += [io.loadmat(file)['pltq']]
         test_len = len(pltqs)
-    venv = make_env(f"{env_type}_custom-v0", use_vec_env=True, num_envs=1, pltqs=pltqs)
+    venv = make_env(f"{env_type}_pybullet-v0", use_vec_env=True, num_envs=1, pltqs=pltqs)
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
     print(f"expt_cost: {expt_fn(th_input).item() / test_len}")
     sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
-    i = 1
+    i = 0
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
         agent = PPO.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
@@ -126,7 +129,7 @@ def expt_cost():
     # plt.plot(cost_list)
     # plt.savefig(f"figures/IDP/MaxEntIRL/expt_cost_each_iter/{name}.png")
     # plt.show()
-    print(f"minimum cost index: {np.argmin(cost_list) + 1}")
+    print(f"minimum cost index: {np.argmin(cost_list)}")
 
 
 if __name__ == "__main__":

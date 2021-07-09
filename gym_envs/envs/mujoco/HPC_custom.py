@@ -25,7 +25,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def step(self, action: np.ndarray):
         action = np.clip(action, a_max=1, a_min=-1)
         ob = self._get_obs()
-        r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-3 * action @ np.eye(2, 2) @ action.T)
+        r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-5 * action @ np.eye(2, 2) @ action.T)
         self.do_simulation(action + self.plt_torque, self.frame_skip)
         self._timesteps += 1
         ob = self._get_obs()
