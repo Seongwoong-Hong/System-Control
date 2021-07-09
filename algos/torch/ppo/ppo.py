@@ -147,3 +147,15 @@ class PPOCustom(PPO):
         param_vec = self.policy.parameters_to_vector()
         super(PPOCustom, self).__init__(*self.init_args, **self.init_kwargs)
         self.policy.load_from_vector(param_vec)
+
+    def reset_std(self, env):
+        self.init_kwargs['env'] = env
+        if 'ent_schedule' in self.init_kwargs:
+            self.ent_schedule = self.init_kwargs.pop('ent_schedule')
+        else:
+            self.ent_schedule = 1.0
+        state_dict = self.policy.state_dict()
+        log_std_init = self.init_kwargs.get('policy_kwargs', {}).get('log_std_init', 0.0)
+        super(PPOCustom, self).__init__(*self.init_args, **self.init_kwargs)
+        state_dict['log_std'] = (log_std_init + state_dict['log_std'])/2
+        self.policy.load_state_dict(state_dict)
