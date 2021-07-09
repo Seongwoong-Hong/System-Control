@@ -2,13 +2,14 @@ import os
 import shutil
 import pickle
 import datetime
+import torch as th
 from scipy import io
 
 from imitation.algorithms import bc
 from imitation.data import rollout
 from imitation.util import logger
+from stable_baselines3.common.vec_env import VecNormalize
 
-from algos.torch.ppo import MlpPolicy
 from algos.torch.MaxEntIRL import MaxEntIRL
 from common.callbacks import SaveCallback
 from common.util import make_env
@@ -19,6 +20,7 @@ if __name__ == "__main__":
     algo_type = "BC"
     device = "cpu"
     name = "IDP_pybullet"
+    policy_type = "sac"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     pltqs = []
@@ -36,7 +38,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += "/no_lqr_ppo_noreset_sqlast"
+    log_dir += "/no_lqr_ppo"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -49,14 +51,24 @@ if __name__ == "__main__":
     # Setup Logger
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
+    policy_kwargs = None
+    if policy_type == "ppo":
+        from algos.torch.ppo import MlpPolicy
+        policy_kwargs = {'log_std_range': [None, 1.8],
+                         'net_arch': [{'pi': [32, 32], 'vf': [32, 32]}]
+                         }
+    elif policy_type == "sac":
+        from algos.torch.sac import MlpPolicy
+        policy_kwargs = {'net_arch': {'pi': [32, 32], 'qf': [32, 32]},
+                         'optimizer_kwargs': {'betas': (0.9, 0.99)}
+                         }
+
     # bc.BC.DEFAULT_BATCH_SIZE = 128
     learner = bc.BC(
         observation_space=env.observation_space,
         action_space=env.action_space,
         policy_class=MlpPolicy,
-        policy_kwargs={'log_std_range': [None, 1.8],
-                       'net_arch': [{'pi': [32, 32], 'vf': [32, 32]}],
-                       },
+        policy_kwargs=policy_kwargs,
         expert_data=transitions,
         device=device,
         ent_weight=1e-4,
@@ -67,7 +79,7 @@ if __name__ == "__main__":
 
     learner.save_policy(model_dir + "/policy")
 
-    agent = def_policy("ppo", env, device=device, verbose=1)
+    agent = def_policy(policy_type, env, device=device, verbose=1)
     agent.policy = learner.policy
 
     def feature_fn(x):
@@ -90,8 +102,8 @@ if __name__ == "__main__":
     # Run Learning
     learner.learn(
         total_iter=50,
-        agent_learning_steps=4e4,
-        gradient_steps=25,
+        agent_learning_steps=1e4,
+        gradient_steps=50,
         n_episodes=expt_traj_num,
         max_agent_iter=40,
         callback=save_net_callback.net_save,
