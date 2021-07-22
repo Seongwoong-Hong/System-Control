@@ -143,3 +143,11 @@ class SACCustom(SAC):
             self.ent_coef_optimizer = th.optim.Adam([self.log_ent_coef], lr=self.lr_schedule(1))
         else:
             self.ent_coef_tensor = th.tensor(float(self.ent_coef)).to(self.device)
+
+    def reset_std(self, env):
+        self.init_kwargs['env'] = env
+        state_dict = self.policy.state_dict()
+        super(SACCustom, self).__init__(*self.init_args, **self.init_kwargs)
+        state_dict['actor.log_std.weight'] = th.randn(state_dict['actor.log_std.weight'].size())
+        state_dict['actor.log_std.bias'] = th.randn(state_dict['actor.log_std.bias'].size())
+        self.policy.load_state_dict(state_dict)

@@ -32,7 +32,7 @@ def learner(env, expert):
     def feature_fn(x):
         return th.cat([x, x.square()], dim=1)
 
-    agent = def_policy("ppo", env, device='cpu', verbose=1)
+    agent = def_policy("sac", env, device='cpu', verbose=1)
 
     return MaxEntIRL(
         env,

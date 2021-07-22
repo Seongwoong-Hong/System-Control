@@ -38,9 +38,10 @@ def test_hpcdiv_algo(tenv):
 
 def test_hpc_learned_policy(irl_path, pltqs):
     env = make_env("HPC_custom-v0", pltqs=pltqs)
-    name = "HPC_custom/BC/test"
+    name = "HPC_custom/BC/extcnn_sub01_1&2_noreset"
     model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
-    algo = bc.reconstruct_policy(model_dir + "/policy")
+    # algo = bc.reconstruct_policy(model_dir + "/policy")
+    algo = SAC.load(model_dir + "/010/agent.zip")
     for _ in range(10):
         a_list, o_list, _ = verify_policy(env, algo)
 
@@ -49,7 +50,7 @@ def test_irl_learned_policy(irl_path):
     env_type = "IDP_custom"
     env = make_env(f"{env_type}-v1", use_vec_env=False)
     name = f"{env_type}/BC/sq_lqr_ppo_ppoagent_noreset"
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "010")
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "023")
     algo = PPO.load(model_dir + "/agent")
     a_list, o_list, _ = verify_policy(env, algo, deterministic=True)
 

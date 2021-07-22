@@ -30,7 +30,7 @@ def verify_policy(environment, policy, render="human", deterministic=True, repea
     obs_list = []
     for _ in range(repeat_num):
         actions = np.zeros((1,) + environment.action_space.shape)
-        environment.render()
+        environment.render(mode=render)
         ob = environment.reset()
         obs = deepcopy(ob.reshape(1, -1))
         done = False

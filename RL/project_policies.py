@@ -5,13 +5,14 @@ from algos.torch.sac import SAC
 def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
     if algo_type == "ppo":
         from algos.torch.ppo import MlpPolicy
-        n_steps = 2048
+        n_steps = 250
+        batch_size = 256
         if hasattr(env, "num_envs"):
             n_steps = int(n_steps / int(env.num_envs))
         return PPO(MlpPolicy,
                    env=env,
                    n_steps=n_steps,
-                   batch_size=64,
+                   batch_size=batch_size,
                    gamma=0.99,
                    gae_lambda=0.95,
                    learning_rate=3e-4,
@@ -22,7 +23,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    verbose=verbose,
                    device=device,
                    tensorboard_log=log_dir,
-                   policy_kwargs={'log_std_range': [-5, 5],
+                   policy_kwargs={'log_std_range': [None, 1.8],
                                   'net_arch': [{'pi': [32, 32], 'vf': [32, 32]}],
                                   },
                    **kwargs,
