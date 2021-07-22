@@ -81,3 +81,9 @@ register(
     entry_point='gym_envs.envs.pybullet:InvertedDoublePendulumBulletEnv',
     max_episode_steps=600,
 )
+
+register(
+    id='HPC_pybullet-v1',
+    entry_point='gym_envs.envs.pybullet:HumanBalanceBulletEnv',
+    max_episode_steps=599,
+)
