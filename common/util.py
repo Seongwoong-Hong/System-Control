@@ -11,7 +11,7 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, **kwargs)
     if isinstance(env_name, gym.Env):
         env = env_name
     else:
-        env_type = env_name[:env_name.find("_custom")]
+        env_type = env_name[:env_name.find("_")]
         if env_type == "HPC":
             subpath = kwargs.pop("subpath", None)
             pltqs = kwargs.get("pltqs")

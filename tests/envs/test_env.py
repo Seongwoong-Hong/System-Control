@@ -1,3 +1,5 @@
+import pytest
+
 from IRL.scripts.project_policies import def_policy
 from common.verification import verify_policy
 from common.util import make_env
@@ -21,10 +23,11 @@ def test_env_traj_len():
 
 def test_pybullet_envs():
     import gym, time
-    env = gym.make("IDP_pybullet-v1")
-    env.render(mode='human')
+    from common.util import make_env
+    env = make_env("HPC_pybullet-v1", subpath="../../IRL/demos/HPC/sub01/sub01")
+    env.render(mode='no')
     ob = env.reset()
-    env.set_state(ob[:2], ob[2:])
+    env.set_state(ob[:2], ob[2:4])
     env.camera_adjust()
     done = False
     while not done:

@@ -23,7 +23,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         self._set_pltqs()
 
     def step(self, action: np.ndarray):
-        action = np.clip(action, a_max=1, a_min=-1)
+        action = np.clip(action, a_max=1.0, a_min=-1.0)
         ob = self._get_obs()
         r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-5 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         self.do_simulation(action + self.plt_torque, self.frame_skip)
@@ -40,10 +40,6 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
             self.plt_torque,     # torque from platform movement
         ]).ravel()
 
-    @property
-    def current_obs(self):
-        return self._get_obs()
-
     def reset_model(self):
         self._timesteps = 0
         self._order += 1
@@ -53,6 +49,10 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def set_state(self, qpos, qvel):
         super().set_state(qpos, qvel)
         self._set_pltqs()
+
+    @property
+    def current_obs(self):
+        return self._get_obs()
 
     @property
     def num_disturbs(self):
@@ -91,7 +91,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         self._timesteps = 0
         if self._pltqs is not None:
             self._order = random.randrange(0, len(self._pltqs))
-            self._pltq = self._pltqs[self.order]
+            self._pltq = self._pltqs[self.order] / self.model.actuator_gear[0, 0]
         else:
             self._pltq = None
 

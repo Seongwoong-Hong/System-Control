@@ -20,7 +20,7 @@
     </body>
   </worldbody>
   <actuator>
-    <motor ctrllimited="true" ctrlrange="-1 1" gear="100" joint="hinge" />
-    <motor ctrllimited="true" ctrlrange="-1 1" gear="100" joint="hinge2" />
+    <motor ctrllimited="true" ctrlrange="-1 1" gear="150" joint="hinge" />
+    <motor ctrllimited="true" ctrlrange="-1 1" gear="150" joint="hinge2" />
   </actuator>
 </mujoco>

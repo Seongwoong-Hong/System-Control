@@ -9,6 +9,8 @@ from imitation.algorithms import bc
 from matplotlib import pyplot as plt
 
 from common.util import make_env
+from algos.torch.MaxEntIRL import MaxEntIRL
+from IRL.scripts.project_policies import def_policy
 
 
 @pytest.fixture
@@ -38,12 +40,18 @@ def env(pltqs):
     return make_env("HPC_custom-v1", use_vec_env=False, num_envs=1, pltqs=pltqs)
 
 
-def test_learn(env, expert):
-    from algos.torch.ppo import MlpPolicy
-    policy_kwargs = {
-        'log_std_range': [None, 1.8],
-        'net_arch': [{'pi': [32, 32], 'vf': [32, 32]}],
-    }
+def test_learn(env, expert, policy_type="sac"):
+    policy_kwargs = None
+    if policy_type == "ppo":
+        from algos.torch.ppo import MlpPolicy
+        policy_kwargs = {'log_std_range': [None, 1.8],
+                         'net_arch': [{'pi': [32, 32], 'vf': [32, 32]}]
+                         }
+    elif policy_type == "sac":
+        from algos.torch.sac import MlpPolicy
+        policy_kwargs = {'net_arch': {'pi': [32, 32], 'qf': [32, 32]},
+                         'optimizer_kwargs': {'betas': (0.9, 0.99)}
+                         }
 
     # Setup Logger
     logger.configure("tmp/log/BC", format_strs=["stdout", "tensorboard"])
@@ -54,13 +62,54 @@ def test_learn(env, expert):
         policy_kwargs=policy_kwargs,
         expert_data=expert,
         device='cpu',
-        ent_weight=1e-5,
-        l2_weight=1e-2,
+        ent_weight=1e-4,
+        l2_weight=1e-3,
     )
 
     learner.train(n_epochs=300)
 
     learner.save_policy("policy")
+    return learner
+
+
+def test_irl(env, expert):
+    policy_type = "ppo"
+    learner = test_learn(env, expert, policy_type=policy_type)
+    agent = def_policy(policy_type, env, device="cpu", verbose=1)
+    agent.policy = learner.policy
+
+    def feature_fn(x):
+        return x
+
+    learner = MaxEntIRL(
+        env,
+        feature_fn=feature_fn,
+        agent=agent,
+        expert_transitions=expert,
+        use_action_as_input=True,
+        rew_arch=[8, 8, 8, 8],
+        device="cpu",
+        env_kwargs={'vec_normalizer': None},
+        rew_kwargs={'type': 'ann', 'scale': 1},
+    )
+
+    # Run Learning
+    learner.learn(
+        total_iter=50,
+        agent_learning_steps=2e5,
+        gradient_steps=150,
+        n_episodes=10,
+        max_agent_iter=1,
+        callback=None,
+        early_stop=False
+    )
+
+    # Save the result of learning
+    reward_path = "reward_net.pkl"
+    with open(reward_path + ".tmp", "wb") as f:
+        pickle.dump(learner.reward_net, f)
+    os.replace(reward_path + ".tmp", reward_path)
+    learner.agent.save("agent")
 
 
 def test_policy(env, expert):
