@@ -5,10 +5,10 @@ from algos.torch.sac import SAC
 def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
     if algo_type == "ppo":
         from algos.torch.ppo import MlpPolicy
-        n_steps = 250
+        n_steps = 600
         batch_size = 256
-        if hasattr(env, "num_envs"):
-            n_steps = int(n_steps / int(env.num_envs))
+        # if hasattr(env, "num_envs"):
+        #     n_steps = int(n_steps / int(env.num_envs))
         return PPO(MlpPolicy,
                    env=env,
                    n_steps=n_steps,

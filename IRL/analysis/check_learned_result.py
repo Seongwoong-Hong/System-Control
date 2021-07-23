@@ -134,7 +134,7 @@ def expt_cost():
         return inp[:, :2].square().sum() + 0.1 * inp[:, 2:4].square().sum() + 1e-5 * (100 * inp[:, 6:]).square().sum()
     env_type = "HPC"
     env_id = "HPC_custom"
-    name = "sq_sub01_1&2_ppoagent_noreset"
+    name = "no_sub01_1&2_deep_resetstd_rewfirst"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "BC", name))
     with open(f"../demos/{env_type}/sub01_1&2.pkl", "rb") as f:
@@ -154,7 +154,7 @@ def expt_cost():
     i = 0
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        agent = PPO.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
+        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
         if os.path.isfile(proj_path + f"/{i:03d}/normalization.pkl"):
             stats_path = proj_path + f"/model/{i:03d}/normalization.pkl"
             venv = make_env(f"{env_type}_custom-v1", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path, pltqs=pltqs)
@@ -174,6 +174,6 @@ def expt_cost():
 if __name__ == "__main__":
     def feature_fn(x):
         # return x
-        return x.square()
-        # return th.cat([x, x.square()], dim=1)
+        # return x.square()
+        return th.cat([x, x.square()], dim=1)
     expt_cost()

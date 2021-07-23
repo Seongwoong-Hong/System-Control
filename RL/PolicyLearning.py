@@ -21,12 +21,12 @@ if __name__ == "__main__":
         file = "../IRL/demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
     env = make_env(env_id, use_vec_env=False, num_envs=16, use_norm=False, pltqs=pltqs)
-    # venv = DummyVecEnv([lambda: env for _ in range(10)])
+    venv = DummyVecEnv([lambda: env for _ in range(10)])
     name += ""
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     os.makedirs(log_dir, exist_ok=True)
-    algo = def_policy(algo_type, env, device=device, log_dir=log_dir, verbose=1)
+    algo = def_policy(algo_type, venv, device=device, log_dir=log_dir, verbose=1)
     n = 1
     while os.path.isdir(log_dir + f"/extra_{n}"):
         n += 1

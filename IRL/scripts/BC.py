@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += "/no_sub01_1&2_deep_noreset_rewfirst"
+    log_dir += "/extcnn_sub01_1&2_deep_noreset_rewfirst"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
-        return x
+        return th.cat([x, x.square()], dim=1)
 
     policy_kwargs = None
     if policy_type == "ppo":
@@ -93,19 +93,19 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[8, 8, 8, 8],
+        rew_arch=[4, 4, 4, 4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'ann', 'scale': 1},
+        rew_kwargs={'type': 'cnn', 'scale': 1},
     )
 
     # Run Learning
     learner.learn(
         total_iter=50,
         agent_learning_steps=2e4,
-        gradient_steps=150,
+        gradient_steps=50,
         n_episodes=expt_traj_num,
-        max_agent_iter=5,
+        max_agent_iter=10,
         callback=save_net_callback.net_save,
         early_stop=False
     )

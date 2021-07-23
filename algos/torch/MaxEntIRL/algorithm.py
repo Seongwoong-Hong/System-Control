@@ -116,6 +116,21 @@ class MaxEntIRL:
     ):
         for itr in range(total_iter):
             self._reset_agent(**self.env_kwargs)
+            losses = []
+            with logger.accumulate_means(f"reward_{itr}"):
+                self.reward_net.train()
+                for rew_steps in range(gradient_steps):
+                    loss = self.cal_loss(**kwargs)
+                    losses.append(loss.item())
+                    logger.record("steps", rew_steps, exclude="tensorboard")
+                    logger.record("loss", loss.item())
+                    logger.dump(rew_steps)
+                    # TODO: Is there any smart way that breaks reward learning?
+                    # if loss.item() < and early_stop:
+                    #     break
+                    self.reward_net.optimizer.zero_grad()
+                    loss.backward()
+                    self.reward_net.optimizer.step()
             with logger.accumulate_means(f"agent_{itr}"):
                 for agent_steps in range(max_agent_iter):
                     loss_diff = self.cal_loss(**kwargs).item()
@@ -127,21 +142,6 @@ class MaxEntIRL:
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
                     logger.dump(step=self.agent.num_timesteps)
-            losses = []
-            with logger.accumulate_means(f"reward_{itr}"):
-                self.reward_net.train()
-                for rew_steps in range(gradient_steps):
-                    loss = self.cal_loss(**kwargs)
-                    losses.append(loss.item())
-                    logger.record("steps", rew_steps, exclude="tensorboard")
-                    logger.record("loss", loss.item())
-                    logger.dump(rew_steps)
-                    # TODO: Is there any smart way that breaks reward learning?
-                    if loss.item() < -0.005 and early_stop:
-                        break
-                    self.reward_net.optimizer.zero_grad()
-                    loss.backward()
-                    self.reward_net.optimizer.step()
             if callback:
                 callback(self, itr)
 

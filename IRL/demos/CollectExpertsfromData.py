@@ -12,7 +12,7 @@ if __name__ == '__main__':
     trajectories = []
     subi = 1
     sub = f"sub{subi:02d}"
-    for i in range(10):
+    for i in range(1):
         file = "HPC/" + sub + "/" + sub + f"i{i+1}.mat"
         data = {'state': io.loadmat(file)['state'],
                 'T': io.loadmat(file)['tq'] / act_coeff,
@@ -20,6 +20,6 @@ if __name__ == '__main__':
                 'bsp': io.loadmat(file)['bsp'],
                 }
         trajectories += generate_trajectories_from_data(data, env)
-    save_name = f"{env_type}/{sub}_1&2.pkl"
+    save_name = f"{env_type}/{sub}_1.pkl"
     types.save(save_name, trajectories)
     print("Expert Trajectories are saved")
