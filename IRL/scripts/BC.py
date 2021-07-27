@@ -18,8 +18,8 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "HPC"
     algo_type = "BC"
-    device = "cpu"
-    name = "HPC_pybullet"
+    device = "cuda:1"
+    name = "HPC_custom"
     policy_type = "sac"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     env = make_env(f"{name}-v1", use_vec_env=False, num_envs=1, pltqs=pltqs)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "sub01_1&2.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "sub01.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += "/extcnn_sub01_1&2_deep_noreset_rewfirst"
+    log_dir += "/cnn_sub01_deep_noreset_rewfirst"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
-        return th.cat([x, x.square()], dim=1)
+        return x
 
     policy_kwargs = None
     if policy_type == "ppo":

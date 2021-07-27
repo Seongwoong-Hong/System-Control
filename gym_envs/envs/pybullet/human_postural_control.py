@@ -10,7 +10,7 @@ from pybullet_envs.scene_abstract import SingleRobotEmptyScene
 class HumanIDP(MJCFBasedRobot):
     def __init__(self, pltqs=None):
         xml_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "mujoco", "assets", "HPC_custom.xml"))
-        self.gear = 150
+        self.gear = 300
         MJCFBasedRobot.__init__(self, xml_path, 'HPC', action_dim=2, obs_dim=6)
         self._timesteps = 0
         self._pltq = None
@@ -29,8 +29,8 @@ class HumanIDP(MJCFBasedRobot):
 
     def apply_action(self, a):
         assert (np.isfinite(a).all())
-        self.j1.set_motor_torque(self.gear * float(np.clip(a[0] + self.plt_torque[0], -1, +1)))
-        self.j2.set_motor_torque(self.gear * float(np.clip(a[1] + self.plt_torque[1], -1, +1)))
+        self.j1.set_motor_torque(self.gear * float(np.clip(a[0], -0.5, +0.5) + self.plt_torque[0]))
+        self.j2.set_motor_torque(self.gear * float(np.clip(a[1], -0.5, +0.5) + self.plt_torque[1]))
 
     def calc_state(self):
         theta, theta_dot = self.j1.current_position()

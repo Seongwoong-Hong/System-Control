@@ -52,13 +52,21 @@ def draw_trajectories():
 
 def draw_costfigure():
     def expt_cost(inp):
-        return th.sum(inp[0, :2].square() + 0.1 * inp[0, 2:4].square() + 1e-5 * (200 * inp[0, 4:]).square()).item()
-    env = make_env("IDP_custom-v0", use_vec_env=False)
-    name = "sq_lqr_ppo_ppoagent_noreset"
-    num = 23
-    load_dir = f"../tmp/log/IDP_custom/BC/{name}/model"
-    # algo = PPO.load(load_dir + f"/{num:03d}/agent")
-    algo = def_policy("IDP", env)
+        return th.sum(inp[0, :2].square() + 0.1 * inp[0, 2:4].square() + 1e-5 * (200 * inp[0, 6:]).square()).item()
+    env_type = "HPC"
+    env_id = f"{env_type}_custom"
+    pltqs = []
+    if env_type == "HPC":
+        for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+            file = os.path.join("..", "demos", env_type, "sub01", f"sub01i{i + 1}.mat")
+            pltqs += [io.loadmat(file)['pltq']]
+        test_len = len(pltqs)
+    env = make_env(f"{env_id}-v0", use_vec_env=False, pltqs=pltqs)
+    name = "extcnn_sub01_1&2_deep_noreset_rewfirst"
+    num = 32
+    load_dir = f"../tmp/log/{env_id}/BC/{name}/model"
+    algo = SAC.load(load_dir + f"/{num:03d}/agent")
+    # algo = def_policy("IDP", env)
     # algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
     with open(load_dir + f"/{num:03d}/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
@@ -100,25 +108,34 @@ def draw_costfigure():
 
 
 def learned_cost():
-    name = "no_lqr_ppo_resetstd"
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", "IDP_custom", "BC", name))
-    with open("../demos/IDP/lqr_ppo.pkl", "rb") as f:
+    env_type = "HPC"
+    env_id = f"{env_type}_custom"
+    name = "no_sub01_1&2_deep_noreset"
+    print(name)
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
+    with open(f"../demos/{env_type}/sub01_1&2.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
-    test_len = len(expert_trajs)
     expt_trans = flatten_trajectories(expert_trajs)
-    venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1)
+    test_len = len(expert_trajs)
+    pltqs = []
+    if env_type == "HPC":
+        for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+            file = os.path.join("..", "demos", env_type, "sub01", f"sub01i{i + 1}.mat")
+            pltqs += [io.loadmat(file)['pltq']]
+        test_len = len(pltqs)
+    venv = make_env(f"{env_id}-v1", use_vec_env=True, num_envs=1, pltqs=pltqs)
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
-    sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
+    sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
     i = 0
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
-        if os.path.isfile(os.path.abspath(proj_path + f"/{i:03d}/normalization.pkl")):
-            stats_path = os.path.abspath(proj_path + f"/model/{i:03d}/normalization.pkl")
-            venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path)
-        agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
-        agent_trans = flatten_trajectories(agent_trajs)
-        th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
+        # agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
+        # if os.path.isfile(os.path.abspath(proj_path + f"/{i:03d}/normalization.pkl")):
+        #     stats_path = os.path.abspath(proj_path + f"/model/{i:03d}/normalization.pkl")
+        #     venv = make_env("IDP_custom-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path)
+        # agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=False)
+        # agent_trans = flatten_trajectories(agent_trajs)
+        # th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1)).double()
         with open(os.path.join(proj_path, "model", f"{i:03d}", "reward_net.pkl"), "rb") as f:
             reward_fn = pickle.load(f).double()
         print(f"{i:03d} Cost:", -reward_fn(th_input).sum().item() / test_len)
@@ -133,10 +150,10 @@ def expt_cost():
     def expt_fn(inp):
         return inp[:, :2].square().sum() + 0.1 * inp[:, 2:4].square().sum() + 1e-5 * (100 * inp[:, 6:]).square().sum()
     env_type = "HPC"
-    env_id = "HPC_custom"
-    name = "no_sub01_1&2_deep_resetstd_rewfirst"
+    env_id = f"{env_type}_pybullet"
+    name = "extcnn_sub01_1&2_deep_noreset"
     print(name)
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "BC", name))
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     with open(f"../demos/{env_type}/sub01_1&2.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
@@ -147,7 +164,7 @@ def expt_cost():
             file = os.path.join("..", "demos", env_type, "sub01", f"sub01i{i+1}.mat")
             pltqs += [io.loadmat(file)['pltq']]
         test_len = len(pltqs)
-    venv = make_env(f"{env_type}_custom-v0", use_vec_env=True, num_envs=1, pltqs=pltqs)
+    venv = make_env(f"{env_id}-v1", use_vec_env=True, num_envs=1, pltqs=pltqs)
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
     print(f"expt_cost: {expt_fn(th_input).item() / test_len}")
     sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
@@ -157,7 +174,7 @@ def expt_cost():
         agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
         if os.path.isfile(proj_path + f"/{i:03d}/normalization.pkl"):
             stats_path = proj_path + f"/model/{i:03d}/normalization.pkl"
-            venv = make_env(f"{env_type}_custom-v1", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path, pltqs=pltqs)
+            venv = make_env(f"{env_id}-v1", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path, pltqs=pltqs)
         venv.reset()
         agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=True)
         agent_trans = flatten_trajectories(agent_trajs)
