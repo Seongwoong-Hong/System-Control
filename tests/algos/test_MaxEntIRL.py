@@ -11,16 +11,22 @@ from common.util import make_env
 
 
 @pytest.fixture
-def expert():
-    expert_dir = os.path.join("..", "..", "IRL", "demos", "IP", "expert.pkl")
+def demo_dir():
+    return os.path.abspath(os.path.join("..", "..", "IRL", "demos"))
+
+
+@pytest.fixture
+def expert(demo_dir):
+    expert_dir = os.path.join(demo_dir, "HPC", "sub01.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return rollout.flatten_trajectories(expert_trajs)
 
 
 @pytest.fixture
-def env():
-    return make_env("IP_custom-v1", use_vec_env=False, num_envs=1)
+def env(demo_dir):
+    subpath = os.path.join(demo_dir, "HPC", "sub01")
+    return make_env("HPC_custom-v1", use_vec_env=False, num_envs=1, subpath=subpath + "/sub01")
 
 
 @pytest.fixture
@@ -30,7 +36,7 @@ def learner(env, expert):
     logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
-        return th.cat([x, x.square()], dim=1)
+        return x
 
     agent = def_policy("sac", env, device='cpu', verbose=1)
 
@@ -41,8 +47,8 @@ def learner(env, expert):
         expert_transitions=expert,
         rew_arch=[8, 8],
         device='cpu',
-        env_kwargs={},
-        rew_kwargs={'type': 'ann'}
+        env_kwargs={'vec_normalizer': None},
+        rew_kwargs={'type': 'ann', 'scale': 1},
     )
 
 

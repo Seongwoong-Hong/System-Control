@@ -6,7 +6,6 @@ import torch as th
 
 from imitation.data import rollout
 from imitation.util import logger
-from scipy import io
 from stable_baselines3.common.vec_env import VecNormalize
 
 from common.util import make_env
@@ -16,20 +15,18 @@ from IRL.scripts.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "HPC"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
+    device = "cuda:1"
     name = f"{env_type}_custom"
+    expt = "sub10"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
+    subpath = os.path.join(proj_path, "demos", env_type, expt)
     pltqs = []
-    for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
-        file = f"{proj_path}/demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
-        pltqs += [io.loadmat(file)['pltq']]
-    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=1, pltqs=pltqs)
+    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=1, subpath=subpath + f"/{expt}")
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "lqr_ppo.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
@@ -37,7 +34,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += "/extcnn_lqr_ppo_deep_noreset_rewfirst"
+    log_dir += f"/extcnn_{expt}_deep_noreset_rewfirst"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -74,7 +71,7 @@ if __name__ == "__main__":
     learner.learn(
         total_iter=50,
         agent_learning_steps=2e4,
-        gradient_steps=50,
+        gradient_steps=30,
         n_episodes=expt_traj_num,
         max_agent_iter=10,
         callback=save_net_callback.net_save,

@@ -19,7 +19,7 @@ def irl_path():
 @pytest.fixture
 def pltqs(irl_path):
     pltqs = []
-    for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+    for i in [0, 5, 10, 15, 20, 25, 30]:
         file = os.path.join(irl_path, "demos", "HPC", "sub01", f"sub01i{i + 1}.mat")
         pltqs += [io.loadmat(file)['pltq']]
     return pltqs
@@ -37,22 +37,38 @@ def test_hpcdiv_algo(tenv):
 
 
 def test_hpc_learned_policy(irl_path, pltqs):
-    env = make_env("HPC_custom-v1", pltqs=pltqs)
-    name = "HPC_custom/BC/extcnn_sub01_1&2_deep_noreset_rewfirst"
+    import matplotlib.pyplot as plt
+    env_name = "HPC_custom"
+    env = make_env(f"{env_name}-v0", pltqs=pltqs)
+    name = f"{env_name}/MaxEntIRL/ext_sub01_deep_noreset_rewfirst"
     model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
     # algo = bc.reconstruct_policy(model_dir + "/policy")
-    algo = SAC.load(model_dir + "/032/agent.zip")
-    for _ in range(10):
-        a_list, o_list, _ = verify_policy(env, algo)
+    algo = SAC.load(model_dir + "/005/agent.zip")
+    for _ in range(7):
+        a_list = []
+        obs = env.reset()
+        env.render("None")
+        done = False
+        while not done:
+            action, _ = algo.predict(obs, deterministic=True)
+            obs, r, done, info = env.step(action)
+            a_list.append(info['a'])
+        import numpy as np
+        plt.plot(np.array(a_list))
+        plt.show()
+    # for _ in range(7):
+    #     a_list, o_list, _ = verify_policy(env, algo, render="human", repeat_num=1)
+    #     plt.plot(a_list[0])
+    #     plt.show()
 
 
 def test_irl_learned_policy(irl_path):
     env_type = "IDP_custom"
-    env = make_env(f"{env_type}-v1", use_vec_env=False)
-    name = f"{env_type}/BC/sq_lqr_ppo_ppoagent_noreset"
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "023")
-    algo = PPO.load(model_dir + "/agent")
-    a_list, o_list, _ = verify_policy(env, algo, deterministic=True)
+    env = make_env(f"{env_type}-v0", use_vec_env=False)
+    name = f"{env_type}/MaxEntIRL/cnn_lqr_ppo_deep_noreset_rewfirst"
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "018")
+    algo = SAC.load(model_dir + "/agent")
+    a_list, o_list, _ = verify_policy(env, algo)
 
 
 def test_idp_policy():

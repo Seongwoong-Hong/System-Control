@@ -19,7 +19,7 @@ def run_traj(env, expert_dir):
         rews = 0
         env.reset()
         tran = flatten_trajectories([traj])
-        env.set_state(tran.obs[0, :env.model.nq], tran.obs[0, env.model.nq:env.model.nq+env.model.nv])
+        env.set_state(tran.obs[0, :2], tran.obs[0, 2:4])
         if hasattr(env, "pltq"):
             env.pltq = traj.obs[:-1, 4:]
         for t in range(len(tran)):
@@ -48,7 +48,7 @@ def pltqs(demo_dir):
 
 
 def test_hpc(demo_dir, pltqs):
-    env = make_env("HPC_custom-v0", pltqs=pltqs)
+    env = make_env("HPC_pybullet-v0", pltqs=pltqs)
     expert_dir = os.path.join(demo_dir, "HPC", "sub01.pkl")
     run_traj(env, expert_dir)
 
