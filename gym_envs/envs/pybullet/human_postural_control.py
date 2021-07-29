@@ -62,7 +62,7 @@ class HumanIDP(MJCFBasedRobot):
         l_body.find('inertial').attrib['mass'] = f"{m_l:.4f}"
         l_body.find('inertial').attrib['pos'] = f"0 0 {com_l:.4f}"
         u_body = l_body.find("body")
-        u_body.attrib["pos"] = f"0 0 {l_l}"
+        u_body.attrib["pos"] = f"0 0 {l_l:.4f}"
         u_body.find("geom").attrib["fromto"] = f"0 0 0 0 0 {l_u:.4f}"
         u_body.find("inertial").attrib['diaginertia'] = f"{I_u:.6f} {I_u:.6f} 0.001"
         u_body.find("inertial").attrib['mass'] = f"{m_u:.4f}"

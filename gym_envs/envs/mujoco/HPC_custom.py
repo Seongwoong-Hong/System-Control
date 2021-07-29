@@ -1,7 +1,7 @@
 import os
 import random
 import numpy as np
-from gym import utils, spaces
+from gym import utils
 from gym.envs.mujoco import mujoco_env
 from xml.etree.ElementTree import ElementTree, parse
 
@@ -9,7 +9,7 @@ from xml.etree.ElementTree import ElementTree, parse
 class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self, bsp=None, pltqs=None):
         self._timesteps = 0
-        self._order = 0
+        self._order = -1
         self._pltqs = pltqs
         self._pltq = None
         filepath = os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml")
@@ -17,13 +17,10 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
             self._set_body_config(filepath, bsp)
         mujoco_env.MujocoEnv.__init__(self, filepath, 5)
         utils.EzPickle.__init__(self)
-        self.action_space = spaces.Box(low=-2, high=2, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
-        self._set_pltqs()
 
     def step(self, action: np.ndarray):
-        action = np.clip(action, a_max=1.0, a_min=-1.0)
         ob = self._get_obs()
         r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-5 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         self.do_simulation(action + self.plt_torque, self.frame_skip)
@@ -112,7 +109,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         l_body.find('inertial').attrib['mass'] = f"{m_l:.4f}"
         l_body.find('inertial').attrib['pos'] = f"0 0 {com_l:.4f}"
         u_body = l_body.find("body")
-        u_body.attrib["pos"] = f"0 0 {l_l}"
+        u_body.attrib["pos"] = f"0 0 {l_l:.4f}"
         u_body.find("geom").attrib["fromto"] = f"0 0 0 0 0 {l_u:.4f}"
         u_body.find("inertial").attrib['diaginertia'] = f"{I_u:.6f} {I_u:.6f} 0.001"
         u_body.find("inertial").attrib['mass'] = f"{m_u:.4f}"
@@ -129,11 +126,6 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
 
 
 class IDPHumanExp(IDPHuman):
-    def __init__(self, bsp=None, pltqs=None):
-        super().__init__(bsp=bsp)
-        self._pltqs = pltqs
-        self._set_pltqs()
-
     def _set_pltqs(self):
         self._timesteps = 0
         if self._pltqs is not None:
