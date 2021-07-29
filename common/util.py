@@ -24,6 +24,7 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, **kwargs)
                     if not p.isfile(file):
                         break
                     pltqs += [io.loadmat(file)['pltq']]
+                    kwargs['bsp'] = io.loadmat(file)['bsp']
                     i += 1
                 kwargs['pltqs'] = pltqs
         else:
@@ -35,7 +36,7 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, **kwargs)
     if use_norm:
         stats_path = kwargs.pop("stats_path", None)
         env = DummyVecEnv([lambda: env for _ in range(num_envs)])
-        if not stats_path:
+        if stats_path is None:
             env = VecNormalize(env, norm_obs=True, norm_reward=True)
         else:
             env = VecNormalize.load(stats_path, env)
