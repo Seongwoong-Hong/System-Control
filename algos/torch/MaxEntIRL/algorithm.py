@@ -10,7 +10,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.type_aliases import GymEnv
 
 from algos.torch.MaxEntIRL import RewardNet, CNNRewardNet
-from common.wrappers import RewardWrapper
+from common.wrappers import ActionRewardWrapper
 from common.rollouts import get_trajectories_probs
 
 
@@ -70,7 +70,7 @@ class MaxEntIRL:
             raise NotImplementedError("Not implemented reward net type")
 
     def _reset_agent(self, **kwargs):
-        reward_wrapper = kwargs.pop("reward_wrapper", RewardWrapper)
+        reward_wrapper = kwargs.pop("reward_wrapper", ActionRewardWrapper)
         norm_wrapper = kwargs.pop("vec_normalizer", None)
         self.reward_net.eval()
         if norm_wrapper:

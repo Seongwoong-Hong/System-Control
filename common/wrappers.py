@@ -3,25 +3,6 @@ import numpy as np
 import torch
 
 
-class ActionRewardWrapper(gym.RewardWrapper):
-    def __init__(self, env, rwfn):
-        super(ActionRewardWrapper, self).__init__(env)
-        self.rwfn = rwfn
-
-    # noinspection PyMethodMayBeStatic
-    def action(self, action):
-        new_action = 2 * action
-        return new_action
-
-    def step(self, action):
-        observation, reward, done, info = self.env.step(self.action(action))
-        return observation, self.reward(np.append(observation, self.action(action))), done, info
-
-    def reward(self, obs):
-        rwinp = torch.from_numpy(obs).reshape(1, -1).to(self.rwfn.device)
-        return self.rwfn.forward(rwinp)
-
-
 class ActionWrapper(gym.ActionWrapper):
     def action(self, action):
         return action
@@ -47,6 +28,18 @@ class RewardWrapper(gym.RewardWrapper):
     def reward(self, inp: np.ndarray) -> float:
         rwinp = torch.from_numpy(inp).reshape(1, -1).to(self.rwfn.device)
         return self.rwfn.forward(rwinp).item()
+
+
+class ActionRewardWrapper(RewardWrapper):
+    def __init__(self, env, rwfn):
+        super(ActionRewardWrapper, self).__init__(env, rwfn)
+        self.clip_coeff = 0.4
+
+    def action(self, action):
+        return self.clip_coeff * action
+
+    def step(self, action):
+        return super(ActionRewardWrapper, self).step(self.action(action))
 
 
 class CostWrapper(gym.RewardWrapper):
