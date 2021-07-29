@@ -1,2 +1,2 @@
 from gym_envs.envs.pybullet.inverted_double_pendulum import InvertedDoublePendulumBulletEnv, InvertedDoublePendulumExpBulletEnv
-from gym_envs.envs.pybullet.human_postural_control import HumanBalanceBulletEnv
+from gym_envs.envs.pybullet.human_postural_control import HumanBalanceBulletEnv, HumanBalanceExpBulletEnv

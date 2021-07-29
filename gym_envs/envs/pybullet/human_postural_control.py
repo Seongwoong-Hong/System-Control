@@ -5,17 +5,18 @@ import numpy as np
 from pybullet_envs.env_bases import MJCFBaseBulletEnv
 from pybullet_envs.robot_bases import MJCFBasedRobot
 from pybullet_envs.scene_abstract import SingleRobotEmptyScene
+from xml.etree.ElementTree import ElementTree, parse
 
 
 class HumanIDP(MJCFBasedRobot):
-    def __init__(self, pltqs=None):
+    def __init__(self, bsp=None):
         xml_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "mujoco", "assets", "HPC_custom.xml"))
         self.gear = 300
+        if bsp is not None:
+            self._set_body_config(xml_path, bsp)
         MJCFBasedRobot.__init__(self, xml_path, 'HPC', action_dim=2, obs_dim=6)
         self._timesteps = 0
-        self._pltq = None
         self._plt_torque = None
-        self._pltqs = pltqs
 
     def robot_specific_reset(self, bullet_client):
         self._p = bullet_client
@@ -29,8 +30,8 @@ class HumanIDP(MJCFBasedRobot):
 
     def apply_action(self, a):
         assert (np.isfinite(a).all())
-        self.j1.set_motor_torque(self.gear * float(np.clip(a[0], -0.5, +0.5) + self.plt_torque[0]))
-        self.j2.set_motor_torque(self.gear * float(np.clip(a[1], -0.5, +0.5) + self.plt_torque[1]))
+        self.j1.set_motor_torque(self.gear * float(np.clip(a[0], -0.4, +0.4) + self.plt_torque[0]))
+        self.j2.set_motor_torque(self.gear * float(np.clip(a[1], -0.4, +0.4) + self.plt_torque[1]))
 
     def calc_state(self):
         theta, theta_dot = self.j1.current_position()
@@ -44,6 +45,32 @@ class HumanIDP(MJCFBasedRobot):
             self.plt_torque[1],
         ])
 
+    @staticmethod
+    def _set_body_config(filepath, bsp):
+        m_u, l_u, com_u, I_u = bsp[6, :]
+        m_s, l_s, com_s, I_s = bsp[2, :]
+        m_t, l_t, com_t, I_t = bsp[3, :]
+        l_l = l_s + l_t
+        m_l = 2 * (m_s + m_t)
+        com_l = (m_s * com_s + m_t * (l_s + com_t)) / (m_s + m_t)
+        I_l = 2 * (I_s + m_s * (com_l - com_s) ** 2 + I_t + m_t * (com_l - (l_s + com_t)) ** 2)
+        tree = parse(filepath)
+        root = tree.getroot()
+        l_body = root.find("worldbody").find("body")
+        l_body.find('geom').attrib['fromto'] = f"0 0 0 0 0 {l_l:.4f}"
+        l_body.find('inertial').attrib['diaginertia'] = f"{I_l:.6f} {I_l:.6f} 0.001"
+        l_body.find('inertial').attrib['mass'] = f"{m_l:.4f}"
+        l_body.find('inertial').attrib['pos'] = f"0 0 {com_l:.4f}"
+        u_body = l_body.find("body")
+        u_body.attrib["pos"] = f"0 0 {l_l}"
+        u_body.find("geom").attrib["fromto"] = f"0 0 0 0 0 {l_u:.4f}"
+        u_body.find("inertial").attrib['diaginertia'] = f"{I_u:.6f} {I_u:.6f} 0.001"
+        u_body.find("inertial").attrib['mass'] = f"{m_u:.4f}"
+        u_body.find("inertial").attrib['pos'] = f"0 0 {com_u:.4f}"
+        m_tree = ElementTree(root)
+        m_tree.write(filepath + ".tmp")
+        os.replace(filepath + ".tmp", filepath)
+
     @property
     def plt_torque(self):
         return self._plt_torque
@@ -56,10 +83,10 @@ class HumanIDP(MJCFBasedRobot):
 class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
     def __init__(self, bsp=None, pltqs=None):
         self._timesteps = 0
-        self._order = 0
+        self._order = -1
         self._pltqs = pltqs
         self._pltq = None
-        self.robot = HumanIDP()
+        self.robot = HumanIDP(bsp=bsp)
         MJCFBaseBulletEnv.__init__(self, self.robot)
         self.stateId = -1
 
@@ -144,3 +171,13 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
             self.robot.plt_torque = self.pltq[self._timesteps, :].reshape(-1)
         else:
             self.robot.plt_torque = np.array([0, 0])
+
+
+class HumanBalanceExpBulletEnv(HumanBalanceBulletEnv):
+    def _set_pltqs(self):
+        self._timesteps = 0
+        if self._pltqs is not None:
+            self._pltq = self._pltqs[self.order] / self.robot.gear
+        else:
+            self._pltq = None
+        self._set_plt_torque()
