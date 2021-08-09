@@ -5,7 +5,7 @@ import torch
 
 class ActionWrapper(gym.ActionWrapper):
     def action(self, action):
-        return action
+        return 0.4 * action
 
     def reverse_action(self, action):
         return 1/action
