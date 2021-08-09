@@ -27,7 +27,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         self._timesteps += 1
         ob = self._get_obs()
         done = False
-        info = {}
+        info = {"a": action}
         return ob, r, done, info
 
     def _get_obs(self):
@@ -79,10 +79,8 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         return self._pltq
 
     def set_pltq(self, ext_pltq):
-        if len(ext_pltq) == self.spec.max_episode_steps:
-            self._pltq = ext_pltq
-        else:
-            raise TypeError("Input pltq length is wrong")
+        assert len(ext_pltq) == self.spec.max_episode_steps, "Input pltq length is wrong"
+        self._pltq = ext_pltq
 
     def _set_pltqs(self):
         self._timesteps = 0

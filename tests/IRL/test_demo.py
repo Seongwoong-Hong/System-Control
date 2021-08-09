@@ -66,7 +66,7 @@ def test_idp(demo_dir):
 
 
 def test_ip():
-    env = make_env("IP_custom-v1", use_vec_env=False, n_steps=600)
+    env = make_env("IP_custom-v1", use_vec_env=False)
     expert_dir = os.path.join("..", "demos", "IP", "expert.pkl")
     run_traj(env, expert_dir)
 
@@ -75,3 +75,17 @@ def test_mujoco_envs():
     env = make_env("Ant-v2", use_vec_env=False)
     expert_dir = os.path.join("..", "demos", "mujoco_envs", "ant.pkl")
     run_traj(env, expert_dir)
+
+
+def test_demo_state(demo_dir):
+    env = make_env("IDP_custom-v0")
+    with open(os.path.join(demo_dir, "HPC", "sub01.pkl"), "rb") as f:
+        expert_trajs = pickle.load(f)
+    for traj in expert_trajs:
+        trans = flatten_trajectories([traj])
+        env.reset()
+        for obs in trans.obs:
+            env.set_state(obs[:2], obs[2:4])
+            env.render()
+            time.sleep(env.dt)
+    env.close()

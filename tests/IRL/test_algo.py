@@ -7,6 +7,7 @@ from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from common.util import make_env
 from common.verification import verify_policy
+from common.wrappers import ActionWrapper
 
 from imitation.algorithms import bc
 
@@ -17,12 +18,22 @@ def irl_path():
 
 
 @pytest.fixture
-def pltqs(irl_path):
+def subj():
+    return "sub01"
+
+
+@pytest.fixture
+def pltqs(irl_path, subj):
     pltqs = []
     for i in [0, 5, 10, 15, 20, 25, 30]:
-        file = os.path.join(irl_path, "demos", "HPC", "sub01", f"sub01i{i + 1}.mat")
+        file = os.path.join(irl_path, "demos", "HPC", subj, f"{subj}i{i + 1}.mat")
         pltqs += [io.loadmat(file)['pltq']]
     return pltqs
+
+
+@pytest.fixture
+def bsp(irl_path, subj):
+    return io.loadmat(f"{irl_path}/demos/HPC/{subj}/{subj}i1.mat")['bsp']
 
 
 def test_hpc_algo(env):
@@ -36,37 +47,40 @@ def test_hpcdiv_algo(tenv):
         a_list, o_list, _ = verify_policy(tenv, algo)
 
 
-def test_hpc_learned_policy(irl_path, pltqs):
-    import matplotlib.pyplot as plt
-    env_name = "HPC_custom"
-    env = make_env(f"{env_name}-v0", pltqs=pltqs)
-    name = f"{env_name}/MaxEntIRL/ext_sub01_deep_noreset_rewfirst"
+def test_hpc_learned_policy(irl_path, pltqs, bsp, subj):
+    env_name = "HPC_pybullet"
+    env = make_env(f"{env_name}-v0", wrapper=ActionWrapper, pltqs=pltqs, bsp=bsp)
+    name = f"{env_name}/BC/no_{subj}_deep_noreset_rewfirst"
     model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
     # algo = bc.reconstruct_policy(model_dir + "/policy")
-    algo = SAC.load(model_dir + "/005/agent.zip")
-    for _ in range(7):
-        a_list = []
-        obs = env.reset()
-        env.render("None")
-        done = False
-        while not done:
-            action, _ = algo.predict(obs, deterministic=True)
-            obs, r, done, info = env.step(action)
-            a_list.append(info['a'])
-        import numpy as np
-        plt.plot(np.array(a_list))
-        plt.show()
-    # for _ in range(7):
-    #     a_list, o_list, _ = verify_policy(env, algo, render="human", repeat_num=1)
-    #     plt.plot(a_list[0])
-    #     plt.show()
+    algo = SAC.load(model_dir + "/024/agent.zip")
+    a_list, o_list, _ = verify_policy(env, algo, render="human", repeat_num=len(pltqs))
+
+
+def test_hpc_action_verification(irl_path, pltqs, bsp, subj):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    env_name = "HPC_pybullet"
+    env = make_env(f"{env_name}-v1", wrapper=ActionWrapper, pltqs=pltqs, bsp=bsp)
+    name = f"{env_name}/BC/ext_{subj}_deep_noreset_rewfirst"
+    model_dir = f"{irl_path}/tmp/log/{name}/model"
+    algo = SAC.load(model_dir + "/036/agent.zip")
+    actuations = []
+    obs = env.reset()
+    done = False
+    while not done:
+        act, _ = algo.predict(obs, deterministic=True)
+        obs, r, done, info = env.step(act)
+        actuations.append(info['a'])
+    plt.plot(np.array(actuations))
+    plt.show()
 
 
 def test_irl_learned_policy(irl_path):
     env_type = "IDP_custom"
     env = make_env(f"{env_type}-v0", use_vec_env=False)
-    name = f"{env_type}/MaxEntIRL/cnn_lqr_ppo_deep_noreset_rewfirst"
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "018")
+    name = f"{env_type}/BC/cnn_lqr_ppo_deep_noreset_rewfirst"
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "016")
     algo = SAC.load(model_dir + "/agent")
     a_list, o_list, _ = verify_policy(env, algo)
 

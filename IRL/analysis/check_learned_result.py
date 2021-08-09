@@ -13,27 +13,30 @@ from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from common.util import make_env
 from common.verification import verify_policy
+from common.wrappers import ActionWrapper
 from IRL.scripts.project_policies import def_policy
 
 
 def draw_trajectories():
-    env_type = "IDP_custom"
-    env = make_env(f"{env_type}-v0", use_vec_env=False)
-    name = f"{env_type}/BC/extcnn_lqr_ppo_deep_noreset_rewfirst"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "018")
+    env_type = "HPC_custom"
+    subj = "sub01"
+    env = make_env(f"{env_type}-v1", wrapper=ActionWrapper, use_vec_env=False, subpath=f"../demos/HPC/{subj}/{subj}")
+    name = f"{env_type}/BC/extcnn_{subj}_deep_noreset_rewfirst"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "006")
     algo = SAC.load(model_dir + "/agent")
     # expt = def_policy("IDP", env)
-    expt = PPO.load("../../RL/IDP/tmp/log/IDP_custom/ppo/policies_10/ppo0")
+    # expt = PPO.load("../../RL/IDP/tmp/log/IDP_custom/ppo/policies_10/ppo0")
     # i = int(7.5e6)
     # expt = PPO.load(os.path.join("..", "..", "RL", "IDP", "tmp", "log", env_type, "ppo", "policies_10", f"{i:012d}", "model.pkl"))
-    _, agent_obs, _ = verify_policy(env, algo, deterministic=True, render="rgb_array", repeat_num=1)
-    env = make_env(f"{env_type}-v0", use_vec_env=False)
-    _, expt_obs, _ = verify_policy(env, expt, deterministic=True, render="rgb_array", repeat_num=1)
-    t = np.linspace(0, env.dt*600, 601)
+    agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=True, render="rgb_array", repeat_num=1)
+    # env = make_env(f"{env_type}-v0", use_vec_env=False)
+    # _, expt_obs, _ = verify_policy(env, expt, deterministic=True, render="rgb_array", repeat_num=1)
+    expt_obs = [io.loadmat(f"../demos/HPC/{subj}/{subj}i{env.order+1}.mat")['state']]
+    t = np.linspace(0, env.dt*599, 600)
     for j in range(1):
         errors = 100 * (agent_obs[j] - expt_obs[j]) / expt_obs[j]
         yval_list = [agent_obs[j], expt_obs[j]]
-        fig = plt.figure(figsize=[7.2, 6.4], dpi=300.0)
+        plt.figure(figsize=[7.2, 6.4], dpi=300.0)
         plt.plot(t, yval_list[0][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
         plt.plot(t, yval_list[1][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 0.4), lw=3)
         plt.plot(t, yval_list[0][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 1), lw=3)
@@ -55,15 +58,12 @@ def draw_costfigure():
         return inp[0, :2].square().sum() + 0.1 * inp[0, 2:4].square().sum() + 1e-5 * (200 * inp[0, 6:]).square().sum()
     env_type = "IDP"
     env_id = f"{env_type}_custom"
-    pltqs = []
-    if env_type == "HPC":
-        for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
-            file = os.path.join("..", "demos", env_type, "sub01", f"sub01i{i + 1}.mat")
-            pltqs += [io.loadmat(file)['pltq']]
-    env = make_env(f"{env_id}-v0", use_vec_env=False, pltqs=pltqs)
-    name = "extcnn_lqr_ppo_deep_noreset_rewfirst"
-    num = 18
-    load_dir = f"../tmp/log/{env_id}/BC/{name}/model"
+    subj = "sub10"
+    subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
+    env = make_env(f"{env_id}-v0", use_vec_env=False, subpath=subpath + f"/{subj}")
+    name = "cnn_lqr_ppo_deep_noreset_rewfirst"
+    num = 21
+    load_dir = f"../tmp/log/{env_id}/MaxEntIRL/{name}/model"
     algo = SAC.load(load_dir + f"/{num:03d}/agent")
     # algo = def_policy("IDP", env)
     # algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
@@ -147,33 +147,31 @@ def learned_cost():
 
 def expt_cost():
     def expt_fn(inp):
-        return inp[:, :2].square().sum() + 0.1 * inp[:, 2:4].square().sum() + 1e-5 * (200 * inp[:, 6:]).square().sum()
+        return inp[:, :2].square().sum() + 0.1 * inp[:, 2:4].square().sum() + 1e-5 * (200 * inp[:, -2:]).square().sum()
     env_type = "HPC"
     env_id = f"{env_type}_pybullet"
-    name = "cnn_sub01_deep_noreset_rewfirst"
+    subj = "sub01"
+    name = f"extcnn_{subj}_deep_noreset_rewfirst"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "BC", name))
-    with open(f"../demos/{env_type}/sub01.pkl", "rb") as f:
+    with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     expt_trans = flatten_trajectories(expert_trajs)
     test_len = len(expert_trajs)
-    pltqs = []
-    if env_type == "HPC":
-        for i in range(35):
-            file = os.path.join("..", "demos", env_type, "sub01", f"sub01i{i+1}.mat")
-            pltqs += [io.loadmat(file)['pltq']]
-        test_len = len(pltqs)
-    venv = make_env(f"{env_id}-v0", use_vec_env=True, num_envs=1, pltqs=pltqs)
+    subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
+    wrapper = ActionWrapper if env_type == "HPC" else None
+    venv = make_env(f"{env_id}-v0", use_vec_env=True, num_envs=1, wrapper=wrapper, subpath=subpath + f"/{subj}")
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
     print(f"expt_cost: {expt_fn(th_input).item() / test_len}")
     sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
-    i = 10
+    i = 0
     cost_list = []
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
         agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
         if os.path.isfile(proj_path + f"/{i:03d}/normalization.pkl"):
             stats_path = proj_path + f"/model/{i:03d}/normalization.pkl"
-            venv = make_env(f"{env_id}-v0", use_vec_env=True, num_envs=1, use_norm=True, stats_path=stats_path, pltqs=pltqs)
+            venv = make_env(f"{env_id}-v0", num_envs=1, use_norm=True, wrapper=wrapper,
+                            stats_path=stats_path, subpath=subpath + f"/{subj}")
         venv.reset()
         agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=True)
         agent_trans = flatten_trajectories(agent_trajs)
