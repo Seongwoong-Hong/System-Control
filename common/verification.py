@@ -42,7 +42,8 @@ def verify_policy(environment, policy, render="human", deterministic=True, repea
             img = environment.render(mode=render)
             actions = np.append(actions, act.reshape(1, -1), 0)
             obs = np.append(obs, ob.reshape(1, -1), 0)
-            time.sleep(environment.dt)
+            if render == 'human':
+                time.sleep(environment.dt)
             imgs.append(img)
         acts_list.append(actions)
         obs_list.append(obs)
