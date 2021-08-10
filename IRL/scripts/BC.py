@@ -16,12 +16,12 @@ from common.util import make_env
 from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "HPC"
     algo_type = "BC"
     device = "cpu"
     name = f"{env_type}_pybullet"
     policy_type = "sac"
-    expt = "lqr_ppo"
+    expt = "sub01"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, expt)
     env = make_env(f"{name}-v1", use_vec_env=False, num_envs=1, subpath=subpath + f"/{expt}")
@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_{expt}_linear_noreset_rewfirst_0.2"
+    log_dir += f"/extcnn_{expt}_noreset_rewfirst_0.2"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
-        return x.square()
+        return th.cat([x, x.square()], dim=1)
 
     policy_kwargs = None
     if policy_type == "ppo":
@@ -89,10 +89,10 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[],
+        rew_arch=[4, 4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'ann', 'scale': 1},
+        rew_kwargs={'type': 'cnn', 'scale': 1},
     )
 
     # Run Learning

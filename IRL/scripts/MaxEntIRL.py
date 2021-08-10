@@ -17,7 +17,7 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "HPC"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
+    device = "cuda:1"
     name = f"{env_type}_custom"
     expt = "sub01"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_deep_noreset_rewfirst_0.2"
+    log_dir += f"/extcnn_{expt}_deep_noreset_rewfirst_grad10"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     # Run Learning
     learner.learn(
         total_iter=50,
-        agent_learning_steps=2e4,
+        agent_learning_steps=1e4,
         gradient_steps=30,
         n_episodes=expt_traj_num,
         max_agent_iter=10,

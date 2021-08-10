@@ -48,12 +48,12 @@ def test_hpcdiv_algo(tenv):
 
 
 def test_hpc_learned_policy(irl_path, pltqs, bsp, subj):
-    env_name = "HPC_pybullet"
+    env_name = "HPC_custom"
     env = make_env(f"{env_name}-v0", wrapper=ActionWrapper, pltqs=pltqs, bsp=bsp)
-    name = f"{env_name}/BC/no_{subj}_deep_noreset_rewfirst"
+    name = f"{env_name}/BC/extcnn_{subj}_deep_noreset_rewfirst"
     model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
     # algo = bc.reconstruct_policy(model_dir + "/policy")
-    algo = SAC.load(model_dir + "/024/agent.zip")
+    algo = SAC.load(model_dir + "/025/agent.zip")
     a_list, o_list, _ = verify_policy(env, algo, render="human", repeat_num=len(pltqs))
 
 

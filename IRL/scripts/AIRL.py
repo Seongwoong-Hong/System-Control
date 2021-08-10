@@ -8,37 +8,37 @@ from imitation.data import rollout
 from imitation.util import logger
 
 from IRL.scripts.project_policies import def_policy
+from common.wrappers import ActionWrapper
 from common.util import make_env
 
 if __name__ == "__main__":
-    env_type = "mujoco_envs"
+    env_type = "HPC"
+    name = f"{env_type}_custom"
     algo_type = "ppo"
+    expt = "sub01"
     device = "cpu"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    # env = make_env(f"{env_type}_custom-v0", sub="sub01", num_envs=10)
-    env = make_env("HalfCheetah-v2", num_envs=8)
+    subpath = os.path.join(proj_path, "demos", env_type, expt)
+    env = make_env(f"{name}-v1", use_vec_env=True, wrapper=ActionWrapper, num_envs=1, subpath=subpath + f"/{expt}")
 
-    # expert_dir = os.path.join(current_path, "demos", env_type, sub + ".pkl")
-    expert_dir = os.path.join(proj_path, "demos", env_type, "halfcheetah.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
+    expt_trajs_num =len(expert_trajs)
     transitions = rollout.flatten_trajectories(expert_trajs)
 
     algo = def_policy(algo_type, env, device=device, log_dir=None, verbose=1)
 
     now = datetime.datetime.now()
-    log_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, "HalfCheetah")
-    name = "/default"
-    # name = "/%s-%s-%s-%s-%s-%s" % (now.year, now.month, now.day, now.hour, now.minute, now.second)
-    log_dir += name
+    log_dir = os.path.join(proj_path, "tmp", "log", name, "AIRL")
+    log_dir += f"/trial_1"
     print(f"All Tensorboards and logging are being written inside {log_dir}/.")
 
     model_dir = os.path.join(log_dir, "model")
-    os.makedirs(model_dir, exist_ok=True)
+    os.makedirs(model_dir, exist_ok=False)
     # Copy used file to logging folder
-    # shutil.copy(os.path.abspath(proj_path + "/../gym_envs/envs/{}_custom.py".format(env_type)), model_dir)
-    shutil.copy(os.path.abspath(__file__), model_dir)
-    # shutil.copy(os.path.abspath(proj_path + "/project_policies.py"), model_dir)
+    shutil.copy(os.path.abspath(__file__), log_dir)
+    shutil.copy(os.path.abspath(proj_path + "/scripts/project_policies.py"), log_dir)
 
     logger.configure(log_dir, format_strs=["stdout", "log", "csv", "tensorboard"])
 
