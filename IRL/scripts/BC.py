@@ -18,8 +18,8 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "HPC"
     algo_type = "BC"
-    device = "cpu"
-    name = f"{env_type}_pybullet"
+    device = "cuda:3"
+    name = f"{env_type}_custom"
     policy_type = "sac"
     expt = "sub01"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_noreset_rewfirst_0.2"
+    log_dir += f"/extcnn_{expt}_criticreset_rewfirst_0.2_grad1000"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -75,7 +75,7 @@ if __name__ == "__main__":
         l2_weight=1e-3,
     )
 
-    learner.train(n_epochs=300)
+    learner.train(n_epochs=150)
 
     learner.save_policy(model_dir + "/policy")
 
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[4, 4, 4, 4],
+        rew_arch=[4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
         rew_kwargs={'type': 'cnn', 'scale': 1},
@@ -103,7 +103,6 @@ if __name__ == "__main__":
         n_episodes=expt_traj_num,
         max_agent_iter=10,
         callback=save_net_callback.net_save,
-        early_stop=False
     )
 
     # Save the result of learning

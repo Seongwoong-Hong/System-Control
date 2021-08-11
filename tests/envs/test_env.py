@@ -35,3 +35,20 @@ def test_pybullet_envs():
         ob, rew, done, info = env.step(act)
         time.sleep(0.01)
     assert isinstance(env, gym.Env)
+
+
+def test_hpc_obs_reset():
+    from scipy import io
+    init_states = []
+    for i in range(35):
+        file = f"../../IRL/demos/HPC/sub01/sub01i{i+1}.mat"
+        init_states += [io.loadmat(file)['state'][0, :4]]
+    env = make_env("HPC_pybullet-v0", subpath="../../IRL/demos/HPC/sub01/sub01")
+    for i in range(35):
+        env.render(mode="None")
+        init = env.reset()
+        assert (init[:4] == init_states[i]).all()
+        done = False
+        while not done:
+            act = env.action_space.sample()
+            ob, rew, done, info = env.step(act)

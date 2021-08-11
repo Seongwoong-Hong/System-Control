@@ -17,8 +17,8 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "HPC"
     algo_type = "MaxEntIRL"
-    device = "cuda:1"
-    name = f"{env_type}_custom"
+    device = "cuda:3"
+    name = f"{env_type}_pybullet"
     expt = "sub01"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, expt)
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_deep_noreset_rewfirst_grad10"
+    log_dir += f"/extcnn_{expt}_criticreset_0.2_grad1000"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -61,7 +61,7 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[4, 4, 4, 4, 4, 4],
+        rew_arch=[4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
         rew_kwargs={'type': 'cnn', 'scale': 1},
@@ -73,7 +73,7 @@ if __name__ == "__main__":
         agent_learning_steps=1e4,
         gradient_steps=30,
         n_episodes=expt_traj_num,
-        max_agent_iter=10,
+        max_agent_iter=30,
         callback=save_net_callback.net_save,
     )
 
