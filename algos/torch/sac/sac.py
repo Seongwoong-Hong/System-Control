@@ -118,9 +118,9 @@ class SACCustom(SAC):
 
     def reset_except_policy_param(self, env):
         self.init_kwargs['env'] = env
-        param_vec = self.policy.parameters_to_vector()
+        param_vec = self.policy.actor.parameters_to_vector()
         super(SACCustom, self).__init__(*self.init_args, **self.init_kwargs)
-        self.policy.load_from_vector(param_vec)
+        self.policy.actor.load_from_vector(param_vec)
 
     def set_env_and_reset_ent(self, env):
         self.num_timesteps = 0
