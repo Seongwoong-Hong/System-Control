@@ -17,16 +17,18 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, wrapper=N
             pltqs = kwargs.get("pltqs")
             assert subpath is not None or pltqs is not None, "HPC environment needs pltqs!"
             if not pltqs:
-                pltqs = []
+                pltqs, init_states = [], []
                 i = 0
                 while True:
                     file = subpath + f"i{i+1}.mat"
                     if not p.isfile(file):
                         break
                     pltqs += [io.loadmat(file)['pltq']]
+                    init_states += [io.loadmat(file)['state'][0, :4]]
                     kwargs['bsp'] = io.loadmat(file)['bsp']
                     i += 1
                 kwargs['pltqs'] = pltqs
+                kwargs['init_states'] = init_states
         else:
             kwargs.pop('subpath', None)
             kwargs.pop('pltqs', None)

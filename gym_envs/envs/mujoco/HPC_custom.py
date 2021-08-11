@@ -7,11 +7,12 @@ from xml.etree.ElementTree import ElementTree, parse
 
 
 class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self, bsp=None, pltqs=None):
+    def __init__(self, bsp=None, pltqs=None, init_states=None):
         self._timesteps = 0
         self._order = -1
         self._pltqs = pltqs
         self._pltq = None
+        self._init_states = init_states
         filepath = os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml")
         if bsp is not None:
             self._set_body_config(filepath, bsp)
@@ -40,6 +41,9 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def reset_model(self):
         self._timesteps = 0
         self._order += 1
+        if self._init_states is not None:
+            self.init_qpos = np.array(self._init_states[self.order][:2])
+            self.init_qvel = np.array(self._init_states[self.order][2:])
         self.set_state(self.init_qpos, self.init_qvel)
         return self._get_obs()
 

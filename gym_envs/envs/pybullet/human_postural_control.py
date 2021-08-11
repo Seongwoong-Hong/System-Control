@@ -12,6 +12,8 @@ class HumanIDP(MJCFBasedRobot):
     def __init__(self, bsp=None):
         xml_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "mujoco", "assets", "HPC_custom.xml"))
         self.gear = 300
+        self.init_qpos = [0.0, 0.0]
+        self.init_qvel = [0.0, 0.0]
         if bsp is not None:
             self._set_body_config(xml_path, bsp)
         MJCFBasedRobot.__init__(self, xml_path, 'HPC', action_dim=2, obs_dim=6)
@@ -22,8 +24,8 @@ class HumanIDP(MJCFBasedRobot):
         self._p = bullet_client
         self.j1 = self.jdict["hinge"]
         self.j2 = self.jdict["hinge2"]
-        self.j1.reset_current_position(0.0, 0.0)
-        self.j2.reset_current_position(0.0, 0.0)
+        self.j1.reset_current_position(self.init_qpos[0], self.init_qvel[0])
+        self.j2.reset_current_position(self.init_qpos[1], self.init_qvel[1])
         self.j1.set_motor_torque(self.plt_torque[0])
         self.j2.set_motor_torque(self.plt_torque[1])
         return self.calc_state()
@@ -81,11 +83,12 @@ class HumanIDP(MJCFBasedRobot):
 
 
 class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
-    def __init__(self, bsp=None, pltqs=None):
+    def __init__(self, bsp=None, pltqs=None, init_states=None):
         self._timesteps = 0
         self._order = -1
         self._pltqs = pltqs
         self._pltq = None
+        self._init_states = init_states
         self.robot = HumanIDP(bsp=bsp)
         MJCFBaseBulletEnv.__init__(self, self.robot)
         self.stateId = -1
@@ -99,6 +102,9 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
         self._timesteps = 0
         self._order += 1
         self._set_pltqs()
+        if self._init_states is not None:
+            self.robot.init_qpos = self._init_states[self.order][:2]
+            self.robot.init_qvel = self._init_states[self.order][2:]
         r = MJCFBaseBulletEnv.reset(self)
         if self.stateId < 0:
             self.stateId = self._p.saveState()
