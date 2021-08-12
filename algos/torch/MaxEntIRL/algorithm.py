@@ -119,12 +119,16 @@ class MaxEntIRL:
             losses = []
             with logger.accumulate_means(f"reward_{itr}"):
                 self.reward_net.train()
-                for rew_steps in range(gradient_steps):
+                loss_value = 1.0
+                rew_steps = 0
+                while loss_value > 0 or rew_steps < gradient_steps:
                     loss = self.cal_loss(**kwargs)
+                    loss_value = loss.item()
                     losses.append(loss.item())
                     logger.record("steps", rew_steps, exclude="tensorboard")
-                    logger.record("loss", loss.item())
+                    logger.record("loss", loss_value)
                     logger.dump(rew_steps)
+                    rew_steps += 1
                     # TODO: Is there any smart way that breaks reward learning?
                     # if loss.item() < and early_stop:
                     #     break
