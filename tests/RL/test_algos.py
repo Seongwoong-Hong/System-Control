@@ -16,10 +16,10 @@ def test_mujoco_envs_learned_policy():
 
 
 def test_rl_learned_policy():
-    env_type = "IDP"
-    env = make_env(f"{env_type}_custom-v0", subpath="../../IRL/demos/HPC/sub01/sub01")
-    name = f"{env_type}_custom/ppo"
-    model_dir = os.path.join("..", "..", "RL", env_type, "tmp", "log", name, "policies_3")
-    algo = PPO.load(model_dir + f"/{int(2.5e6):012d}/model.pkl")
+    env_type = "HPC"
+    name = f"{env_type}_pybullet"
+    env = make_env(f"{name}-v0", subpath="../../IRL/demos/HPC/sub01/sub01")
+    name += "/sac"
+    model_dir = os.path.join("..", "..", "RL", env_type, "tmp", "log", name, "policies_2")
+    algo = SAC .load(model_dir + f"/sac0")
     a_list, o_list, _ = verify_policy(env, algo)
-

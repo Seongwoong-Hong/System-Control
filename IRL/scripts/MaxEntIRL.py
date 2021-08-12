@@ -17,8 +17,8 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "HPC"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
-    name = f"{env_type}_pybullet"
+    device = "cuda:1"
+    name = f"{env_type}_custom"
     expt = "sub01"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, expt)
@@ -34,14 +34,14 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_criticreset_0.2_grad1000"
+    log_dir += f"/cnn_{expt}_deep_criticreset_0.2_grad1000_decay"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return th.cat([x, x.square()], dim=1)
+        return x
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -61,19 +61,19 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[4, 4, 4],
+        rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'cnn', 'scale': 1},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.05},
     )
 
     # Run Learning
     learner.learn(
         total_iter=50,
         agent_learning_steps=1e4,
-        gradient_steps=30,
+        gradient_steps=15,
         n_episodes=expt_traj_num,
-        max_agent_iter=30,
+        max_agent_iter=15,
         callback=save_net_callback.net_save,
     )
 

@@ -18,24 +18,21 @@ from IRL.scripts.project_policies import def_policy
 
 
 def draw_trajectories():
-    env_type = "HPC_pybullet"
+    env_type = "HPC_custom"
     subj = "sub01"
     wrapper = ActionWrapper if "HPC" in env_type else None
     env = make_env(f"{env_type}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/{subj}/{subj}")
-    name = f"{env_type}/MaxEntIRL/extcnn_{subj}_noreset_rewfirst_0.2"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "013")
+    name = f"{env_type}/MaxEntIRL/extcnn_{subj}_noreset_rewfirst_grad1000"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "009")
     algo = SAC.load(model_dir + "/agent")
+    agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=False, render="None", repeat_num=35)
     # expt = def_policy("IDP", env)
     # expt = PPO.load("../../RL/IDP/tmp/log/IDP_custom/ppo/policies_10/ppo0")
-    # i = int(7.5e6)
-    # expt = PPO.load(os.path.join("..", "..", "RL", "IDP", "tmp", "log", "IDP_custom", "ppo", "policies_10", f"{i:012d}", "model.pkl"))
-    agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=False, render="None", repeat_num=35)
     # env = make_env(f"{env_type}-v0", use_vec_env=False)
     # _, expt_obs, _ = verify_policy(env, expt, deterministic=True, render="None", repeat_num=1)
     expt_obs = [io.loadmat(f"../demos/HPC/{subj}/{subj}i{i+1}.mat")['state'] for i in range(35)]
     t = np.linspace(0, env.dt*599, 600)
     for j in [1, 6, 11, 16, 21, 26, 31]:
-        errors = 100 * (agent_obs[j] - expt_obs[j]) / expt_obs[j]
         yval_list = [agent_obs[j], expt_obs[j]]
         plt.figure(figsize=[9, 6.4], dpi=600.0)
         plt.plot(t, yval_list[0][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
@@ -93,7 +90,7 @@ def draw_costfigure():
     min_list = [0.0, 0.0]
     fig = plt.figure(figsize=[6, 5.8], dpi=300.0)
     for i in [1]:
-        ax = fig.add_subplot(1, 1, (i), projection='3d')
+        ax = fig.add_subplot(1, 1, i, projection='3d')
         # d1, d2 = np.meshgrid(d1, d2)
         surf = ax.plot_surface(d1, d2, yval_list[i], rstride=1, cstride=1, cmap=cm.rainbow,
                                vmax=max_list[i], vmin=min_list[i])
@@ -109,9 +106,9 @@ def draw_costfigure():
 
 def learned_cost():
     env_type = "HPC"
-    env_id = f"{env_type}_pybullet"
+    env_id = f"{env_type}_custom"
     subj = "sub01"
-    name = f"extcnn_{subj}_noreset_rewfirst_0.2"
+    name = f"extcnn_{subj}_criticreset_0.2_grad1000"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
@@ -187,7 +184,7 @@ def compare_obs():
     env_type = "HPC"
     env_id = f"{env_type}_pybullet"
     subj = "sub01"
-    name = f"extcnn_{subj}_noreset_rewfirst_0.2"
+    name = f"extcnn_{subj}_criticreset_0.2_grad1000"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
@@ -215,4 +212,4 @@ if __name__ == "__main__":
         # return x
         # return x.square()
         return th.cat([x, x.square()], dim=1)
-    draw_trajectories()
+    learned_cost()

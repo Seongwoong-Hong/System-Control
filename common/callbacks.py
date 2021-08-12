@@ -134,6 +134,7 @@ class VideoCallback(BaseCallback):
         GlfwContext(offscreen=True)
         super().__init__()
         self._eval_env = eval_env
+        self._eval_env.reset()
         self._render_freq = render_freq
         self._n_eval_episodes = n_eval_episodes
         self._deterministic = deterministic

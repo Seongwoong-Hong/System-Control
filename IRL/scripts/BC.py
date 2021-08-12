@@ -3,7 +3,6 @@ import shutil
 import pickle
 import datetime
 import torch as th
-from scipy import io
 
 from imitation.algorithms import bc
 from imitation.data import rollout
@@ -18,8 +17,8 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "HPC"
     algo_type = "BC"
-    device = "cuda:3"
-    name = f"{env_type}_custom"
+    device = "cpu"
+    name = f"{env_type}_pybullet"
     policy_type = "sac"
     expt = "sub01"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -35,7 +34,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_criticreset_rewfirst_0.2_grad1000"
+    log_dir += f"/extcnn_{expt}_criticreset_rewfirst_0.2_grad1000_decay"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -92,16 +91,16 @@ if __name__ == "__main__":
         rew_arch=[4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'cnn', 'scale': 1},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
     )
 
     # Run Learning
     learner.learn(
         total_iter=50,
-        agent_learning_steps=2e4,
-        gradient_steps=30,
+        agent_learning_steps=1e4,
+        gradient_steps=15,
         n_episodes=expt_traj_num,
-        max_agent_iter=10,
+        max_agent_iter=15,
         callback=save_net_callback.net_save,
     )
 
