@@ -35,13 +35,13 @@ def generate_trajectories_from_data(
     # accumulator for incomplete trajectories
     trajectories_accum = rollout.TrajectoryAccumulator()
     trajectories_accum.add_step(dict(obs=data['state'][0]), 0)
-    for i in range(len(data['state'])):
+    for i in range(len(data['state']) - 1):
         act = data['T'][i].reshape(1, -1)
-        if (i + 1) == len(data['state']):
+        if i + 1 == len(data['state']) - 1:
             # Termination condition has been reached. Mark as inactive any environments
             # where a trajectory was completed this timestep.
             done = np.array([True])
-            obs = data['state'][i].reshape(1, -1)
+            obs = data['state'][i+1].reshape(1, -1)
             info = [{"terminal_observation": data['state'][i], "pltq": data["pltq"][i]}]
         else:
             done = np.array([False])
