@@ -95,13 +95,15 @@ class MaxEntIRL:
         reward = self.reward_net(th_input)
         return reward.mean()
 
-    def cal_loss(self, **kwargs) -> th.Tensor:
+    def cal_loss(self, **kwargs) -> (th.Tensor, th.Tensor):
         expert_transitions = deepcopy(self.expert_transitions)
         agent_transitions = flatten_trajectories(self.rollout_from_agent(**kwargs))
         agent_ex = self.mean_transition_reward(agent_transitions)
         expert_ex = self.mean_transition_reward(expert_transitions)
-        loss = agent_ex - expert_ex
-        return loss
+        weight_norm = 0.0
+        for param in self.reward_net.parameters():
+            weight_norm += param.norm().detach().item()
+        return agent_ex - expert_ex, weight_norm
 
     def learn(
             self,
@@ -116,32 +118,29 @@ class MaxEntIRL:
     ):
         for itr in range(total_iter):
             self._reset_agent(**self.env_kwargs)
-            losses = []
-            with logger.accumulate_means(f"reward_{itr}"):
+            with logger.accumulate_means(f"{itr}/reward"):
                 self.reward_net.train()
-                loss_value = 1.0
+                losses = [1.0]  # meaningless inital value
                 rew_steps = 0
-                while loss_value > 0 or rew_steps < gradient_steps:
-                    loss = self.cal_loss(**kwargs)
-                    loss_value = loss.item()
-                    losses.append(loss.item())
-                    logger.record("steps", rew_steps, exclude="tensorboard")
-                    logger.record("loss", loss_value)
-                    logger.dump(rew_steps)
+                while np.mean(losses[-5:]) > 0 or rew_steps < gradient_steps:
+                    loss, weight_norm = self.cal_loss(**kwargs)
                     rew_steps += 1
-                    # TODO: Is there any smart way that breaks reward learning?
-                    # if loss.item() < and early_stop:
-                    #     break
                     self.reward_net.optimizer.zero_grad()
                     loss.backward()
+                    losses.append(loss.item())
+                    logger.record("weight norm", weight_norm)
+                    logger.record("loss", loss.item())
+                    logger.record("steps", rew_steps, exclude="tensorboard")
+                    logger.dump(rew_steps)
                     self.reward_net.optimizer.step()
-            with logger.accumulate_means(f"agent_{itr}"):
+            with logger.accumulate_means(f"{itr}/agent"):
+                self.reward_net.eval()
                 for agent_steps in range(max_agent_iter):
-                    loss_diff = self.cal_loss(**kwargs).item()
-                    logger.record("loss_diff", loss_diff)
+                    loss_diff, _ = self.cal_loss(**kwargs)
+                    logger.record("loss_diff", loss_diff.item())
                     logger.record("agent_steps", agent_steps, exclude="tensorboard")
                     logger.dump(agent_steps)
-                    if loss_diff > 0.0 and early_stop:
+                    if loss_diff.item() > 0.0 and early_stop:
                         break
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
