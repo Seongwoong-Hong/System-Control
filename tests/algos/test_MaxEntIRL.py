@@ -8,6 +8,7 @@ from imitation.data import rollout
 from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning
 from common.callbacks import SaveCallback
 from common.util import make_env
+from common.wrappers import ObsConcatWrapper
 
 
 @pytest.fixture
@@ -17,7 +18,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, "HPC", "sub01.pkl")
+    expert_dir = os.path.join(demo_dir, "HPC", "sub01_test.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return rollout.flatten_trajectories(expert_trajs)
@@ -26,7 +27,7 @@ def expert(demo_dir):
 @pytest.fixture
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01")
-    return make_env("HPC_custom-v1", use_vec_env=False, num_envs=1, subpath=subpath + "/sub01")
+    return make_env("HPC_custom-v1", subpath=subpath + "/sub01", wrapper=ObsConcatWrapper, wrapper_kwrags={'num_timesteps': 4})
 
 
 @pytest.fixture
@@ -45,10 +46,10 @@ def learner(env, expert):
         agent=agent,
         feature_fn=feature_fn,
         expert_transitions=expert,
-        rew_arch=[4, 4, 4, 4],
+        rew_arch=[],
         device='cpu',
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
     )
 
 
@@ -72,7 +73,7 @@ def test_validity(learner):
     learner.learn(
         total_iter=10,
         agent_learning_steps=5,
-        gradient_steps=150,
+        gradient_steps=10,
         n_episodes=5,
         max_agent_iter=5,
     )

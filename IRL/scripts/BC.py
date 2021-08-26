@@ -12,6 +12,7 @@ from stable_baselines3.common.vec_env import VecNormalize
 from algos.torch.MaxEntIRL import MaxEntIRL
 from common.callbacks import SaveCallback
 from common.util import make_env
+from common.wrappers import ObsConcatWrapper
 from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
@@ -21,12 +22,14 @@ if __name__ == "__main__":
     name = f"{env_type}_custom"
     policy_type = "sac"
     expt = "sub01"
+    num_timesteps = 4
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, expt)
-    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=1, subpath=subpath + f"/{expt}")
+    env = make_env(f"{name}-v1", subpath=subpath + f"/{expt}",
+                   wrapper=ObsConcatWrapper, wrapper_kwrags={'num_timesteps': num_timesteps})
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}_{num_timesteps}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
@@ -34,7 +37,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_noreset_weightnorm3"
+    log_dir += f"/extcnn_{expt}_deep_{num_timesteps}steps_noreset_weightnorm"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -92,7 +95,7 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[4, 4, 4, 4],
+        rew_arch=[8, 8, 8, 8, 8, 8],
         device=device,
         env_kwargs={'vec_normalizer': None},
         rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
@@ -102,7 +105,7 @@ if __name__ == "__main__":
     learner.learn(
         total_iter=50,
         agent_learning_steps=1e4,
-        gradient_steps=50,
+        gradient_steps=30,
         n_episodes=expt_traj_num,
         max_agent_iter=20,
         callback=save_net_callback.net_save,

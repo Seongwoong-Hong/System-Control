@@ -22,7 +22,6 @@ class MaxEntIRL:
             agent,
             expert_transitions: Transitions,
             device='cpu',
-            timesteps: int = 1,
             rew_arch: List[int] = None,
             use_action_as_input: bool = True,
             rew_kwargs: Optional[Dict] = None,
@@ -48,11 +47,10 @@ class MaxEntIRL:
         if self.use_action_as_input:
             inp = np.concatenate([inp, self.env.action_space.sample()])
         inp = feature_fn(th.from_numpy(inp).reshape(1, -1))
-        self.timesteps = timesteps
         RNet_type = rew_kwargs.pop("type", None)
         if RNet_type is None or RNet_type is "ann":
             self.reward_net = RewardNet(
-                inp=inp.shape[1] * self.timesteps,
+                inp=inp.shape[1] * self.env.num_timesteps,
                 arch=rew_arch,
                 feature_fn=feature_fn,
                 use_action_as_inp=self.use_action_as_input,
@@ -61,7 +59,7 @@ class MaxEntIRL:
             ).double().to(self.device)
         elif RNet_type is "cnn":
             self.reward_net = CNNRewardNet(
-                inp=inp.shape[1] * self.timesteps,
+                inp=inp.shape[1] * self.env.num_timesteps,
                 arch=rew_arch,
                 feature_fn=feature_fn,
                 use_action_as_inp=self.use_action_as_input,
@@ -76,9 +74,9 @@ class MaxEntIRL:
         norm_wrapper = kwargs.pop("vec_normalizer", None)
         self.reward_net.eval()
         if norm_wrapper:
-            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net, self.timesteps)]), **kwargs)
+            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)]), **kwargs)
         else:
-            self.wrap_env = DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net, self.timesteps)])
+            self.wrap_env = DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)])
         self.agent.reset_except_policy_param(self.wrap_env)
 
     def rollout_from_agent(self, **kwargs):
@@ -89,11 +87,15 @@ class MaxEntIRL:
         return trajectories
 
     def mean_transition_reward(self, transition: Transitions) -> th.Tensor:
+        rw_inp = transition.infos[0]['obs'].reshape(1, -1)
         if self.use_action_as_input:
-            np_input = np.concatenate([transition.obs, transition.acts], axis=1)
-            th_input = th.from_numpy(np_input).double()
-        else:
-            th_input = th.from_numpy(transition.obs).double()
+            rw_inp = np.append(rw_inp, transition.infos[0]['acts'].reshape(1, -1), axis=1)
+        for i in range(len(transition)-1):
+            rw_inp_t = transition.infos[i]['obs'].reshape(1, -1)
+            if self.use_action_as_input:
+                rw_inp_t = np.append(rw_inp_t, transition.infos[i]['acts'].reshape(1, -1), axis=1)
+            rw_inp = np.append(rw_inp, rw_inp_t, axis=0)
+        th_input = th.from_numpy(rw_inp).double()
         reward = self.reward_net(th_input)
         return reward.mean()
 

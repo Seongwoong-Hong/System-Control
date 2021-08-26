@@ -1,6 +1,11 @@
+import os
+import pickle
 import numpy as np
+
 from IRL.scripts.project_policies import def_policy
 from common.util import make_env
+
+from imitation.data import rollout
 from matplotlib import pyplot as plt
 from scipy import io
 
@@ -30,3 +35,12 @@ def test_hpc_data():
     plt.plot(np.array(obs_list)[:, :2])
     plt.show()
     print(data['state'][0, :4])
+
+
+def test_pkl_data():
+    expert_dir = os.path.join("../../IRL", "demos", "HPC", "sub01_4.pkl")
+    with open(expert_dir, "rb") as f:
+        expert_trajs = pickle.load(f)
+    transitions = rollout.flatten_trajectories(expert_trajs)
+    plt.plot(transitions.obs)
+    plt.show()

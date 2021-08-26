@@ -12,36 +12,26 @@ class ActionWrapper(gym.ActionWrapper):
 
 
 class RewardWrapper(gym.RewardWrapper):
-    def __init__(self, env, rwfn, timesteps: int = 1):
+    def __init__(self, env, rwfn):
         super(RewardWrapper, self).__init__(env)
         self.rwfn = rwfn
         self.use_action_as_inp = self.rwfn.use_action_as_inp
-        self.timesteps = timesteps
-        if self.use_action_as_inp:
-            self.inp_list = np.zeros([self.timesteps, env.current_obs.shape[0] + env.action_space.shape[0]])
-        else:
-            self.inp_list = np.zeros([self.timesteps, env.current_obs.shape[0]])
 
     def step(self, action: np.ndarray):
-        observation, _, done, info = self.env.step(action)
+        ob, rew, done, info = self.env.step(action)
+        inp = info['obs']
         if self.use_action_as_inp:
-            inp = self.concat(np.append(info['rw_inp'], action))
-        else:
-            inp = self.concat(info['rw_inp'])
-        return observation, self.reward(inp), done, info
+            inp = np.append(inp, info['acts'], axis=1)
+        return ob, self.reward(inp), done, info
 
-    def reward(self, inp: np.ndarray) -> float:
+    def reward(self, inp) -> float:
         rwinp = torch.from_numpy(inp).reshape(1, -1).to(self.rwfn.device)
         return self.rwfn.forward(rwinp).item()
 
-    def concat(self, inp: np.ndarray) -> np.ndarray:
-        self.inp_list = np.append(self.inp_list[-self.timesteps + 1:], [inp], axis=0)
-        return self.inp_list.reshape(-1)
-
 
 class ActionRewardWrapper(RewardWrapper):
-    def __init__(self, env, rwfn, timesteps: int = 1):
-        super(ActionRewardWrapper, self).__init__(env, rwfn, timesteps)
+    def __init__(self, env, rwfn):
+        super(ActionRewardWrapper, self).__init__(env, rwfn)
         self.clip_coeff = 0.4
 
     def action(self, action):
@@ -84,3 +74,26 @@ class ActionCostWrapper(gym.RewardWrapper):
     def reward(self, obs):
         cost_inp = torch.from_numpy(obs).reshape(1, -1).to(self.costfn.device)
         return -self.costfn.forward(cost_inp)
+
+
+class ObsConcatWrapper(gym.Wrapper):
+    def __init__(self, env, num_timesteps):
+        super(ObsConcatWrapper, self).__init__(env)
+        self.num_timesteps = num_timesteps
+        self.obs_list = np.zeros([self.num_timesteps, self.observation_space.shape[0]])
+        self.acts_list = np.zeros([self.num_timesteps, self.action_space.shape[0]])
+
+    def step(self, action: np.ndarray):
+        ob, rew, done, info = self.env.step(action)
+        self.acts_list = np.append([action], self.acts_list[:-1], axis=0)
+        info['obs'] = self.obs_list
+        info['acts'] = self.acts_list
+        self.obs_list = np.append([ob], self.obs_list[:-1], axis=0)
+        return ob, rew, done, info
+
+    def reset(self):
+        ob = super(ObsConcatWrapper, self).reset()
+        self.obs_list = np.zeros([self.num_timesteps, self.observation_space.shape[0]])
+        self.acts_list = np.zeros([self.num_timesteps, self.action_space.shape[0]])
+        self.obs_list[0, :] = ob
+        return ob

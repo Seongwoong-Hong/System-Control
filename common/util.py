@@ -16,8 +16,7 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, wrapper=N
         if env_type == "HPC":
             subpath = kwargs.pop("subpath", None)
             pltqs = kwargs.get("pltqs")
-            assert subpath is not None or pltqs is not None, "HPC environment needs pltqs!"
-            if not pltqs:
+            if pltqs is None and subpath is not None:
                 pltqs, init_states = [], []
                 i = 0
                 while True:
