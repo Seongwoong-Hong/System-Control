@@ -7,10 +7,10 @@ from typing import List
 class RewardNet(nn.Module):
     def __init__(
             self,
-            inp,
+            inp: int,
             arch: List[int],
             feature_fn,
-            use_action_as_inp,
+            use_action_as_inp: bool,
             scale: float = 1.0,
             lr: float = 1e-3,
             alpha: float = 0.0,
@@ -26,10 +26,10 @@ class RewardNet(nn.Module):
         self.feature_fn = feature_fn
         self.optim_cls = optim_cls
         self.in_features = inp
-        self._build(lr, alpha, [inp] + arch)
+        self._build(lr, alpha, [self.in_features] + arch)
         self.trainmode = False
 
-    def _build(self, lr, alpha, arch):
+    def _build(self, lr: float, alpha: float, arch: List[int]):
         layers = []
         if self.act_fnc is not None:
             for i in range(len(arch) - 1):
@@ -70,7 +70,7 @@ class CNNRewardNet(RewardNet):
         self.fcnn = nn.Linear(arch[-1] * self.in_features, 1, bias=False)
         self.optimizer = self.optim_cls(self.parameters(), lr, weight_decay=alpha)
 
-    def forward(self, x):
+    def forward(self, x: th.Tensor) -> th.Tensor:
         x = self.feature_fn(x)
         x = x.unsqueeze(1).to(self.device)
         if self.trainmode:
