@@ -24,7 +24,9 @@ def test_AE(irl_path):
     vae = VAE(
         inp_dim=6,
         feature_dim=2,
-        arch=[64],
+        arch=[32],
     ).double()
 
-    vae.learn(train_loader=train_data, total_epoch=500, weight=2.0)
+    vae.learn(train_loader=train_data, total_epoch=int(1e4), weight=1.0)
+
+    th.save(vae, irl_path + "/demos/feature_fn.pt")

@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 
 from IRL.scripts.project_policies import def_policy
 from common.verification import verify_policy
@@ -52,3 +53,17 @@ def test_hpc_obs_reset():
         while not done:
             act = env.action_space.sample()
             ob, rew, done, info = env.step(act)
+
+
+def test_init():
+    import time
+    env = make_env("IDP_custom-v1", subpath="../../IRL/demos/HPC/sub01/sub01")
+    env.render()
+    env.reset()
+    env.set_state(np.array([0.3, 0.3]), np.array([1.0, 1.0]))
+    done = False
+    for _ in range(1000):
+        _, _, _, _ = env.step(np.array([1., 1.]))
+        env.render()
+        print(env.current_obs)
+        time.sleep(env.dt)

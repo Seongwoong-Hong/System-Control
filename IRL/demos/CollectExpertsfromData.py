@@ -10,8 +10,8 @@ if __name__ == '__main__':
     env = DummyVecEnv([lambda: gym_envs.make(env_id)])
     act_coeff = env.get_attr("model")[0].actuator_gear[0, 0]
     trajectories = []
-    subi = 10
-    sub = f"sub{subi:02d}"
+    subi = 1
+    sub = f"sub{subi:02d}_crop"
     for i in range(35):
         file = f"HPC/{sub}/{sub}i{i+1}.mat"
         state = io.loadmat(file)['state']

@@ -36,7 +36,7 @@ def learner(env, expert):
     logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
-        return x
+        return th.cat([x, x.square()], dim=1)
 
     agent = def_policy("sac", env, device='cpu', verbose=1)
 
@@ -45,10 +45,10 @@ def learner(env, expert):
         agent=agent,
         feature_fn=feature_fn,
         expert_transitions=expert,
-        rew_arch=[8, 8],
+        rew_arch=[4, 4, 4, 4],
         device='cpu',
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'ann', 'scale': 1},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
     )
 
 
@@ -71,8 +71,8 @@ def test_callback(learner):
 def test_validity(learner):
     learner.learn(
         total_iter=10,
-        agent_learning_steps=10000,
-        gradient_steps=50,
+        agent_learning_steps=5,
+        gradient_steps=150,
         n_episodes=5,
         max_agent_iter=5,
     )

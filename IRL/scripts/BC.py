@@ -17,8 +17,8 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "HPC"
     algo_type = "BC"
-    device = "cpu"
-    name = f"{env_type}_pybullet"
+    device = "cuda:3"
+    name = f"{env_type}_custom"
     policy_type = "sac"
     expt = "sub01"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_criticreset_rewfirst_0.2_grad1000_decay"
+    log_dir += f"/extcnn_{expt}_noreset_weightnorm3"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -48,6 +48,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
+        # return x
         return th.cat([x, x.square()], dim=1)
 
     policy_kwargs = None
@@ -62,7 +63,7 @@ if __name__ == "__main__":
                          'optimizer_kwargs': {'betas': (0.9, 0.99)}
                          }
 
-    # bc.BC.DEFAULT_BATCH_SIZE = 128
+    bc.BC.DEFAULT_BATCH_SIZE = 256
     learner = bc.BC(
         observation_space=env.observation_space,
         action_space=env.action_space,
@@ -70,16 +71,19 @@ if __name__ == "__main__":
         policy_kwargs=policy_kwargs,
         expert_data=transitions,
         device=device,
-        ent_weight=1e-4,
-        l2_weight=1e-3,
+        ent_weight=1e-2,
+        l2_weight=1e-2,
     )
 
-    learner.train(n_epochs=150)
+    with logger.accumulate_means("BC"):
+        learner.train(n_epochs=100)
 
     learner.save_policy(model_dir + "/policy")
 
     agent = def_policy(policy_type, env, device=device, verbose=1)
     agent.policy = learner.policy
+
+    del learner
 
     save_net_callback = SaveCallback(cycle=1, dirpath=model_dir)
     learner = MaxEntIRL(
@@ -88,7 +92,7 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[4, 4, 4],
+        rew_arch=[4, 4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
         rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
@@ -98,10 +102,11 @@ if __name__ == "__main__":
     learner.learn(
         total_iter=50,
         agent_learning_steps=1e4,
-        gradient_steps=15,
+        gradient_steps=50,
         n_episodes=expt_traj_num,
-        max_agent_iter=15,
+        max_agent_iter=20,
         callback=save_net_callback.net_save,
+        early_stop=True,
     )
 
     # Save the result of learning
