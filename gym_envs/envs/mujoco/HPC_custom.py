@@ -22,13 +22,14 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         self.init_qvel = np.array([0.0, 0.0])
 
     def step(self, action: np.ndarray):
-        ob = self._get_obs()
-        r = - (ob[0] ** 2 + ob[1] ** 2 + 1e-5 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
+        prev_ob = self._get_obs()
+        r = - (prev_ob[0] ** 2 + prev_ob[1] ** 2 +
+               1e-5 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
         self.do_simulation(action + self.plt_torque, self.frame_skip)
         self._timesteps += 1
         ob = self._get_obs()
         done = False
-        info = {"a": action}
+        info = {"rw_inp": prev_ob}
         return ob, r, done, info
 
     def _get_obs(self):

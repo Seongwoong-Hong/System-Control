@@ -126,7 +126,7 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
         self._timesteps += 1
         done = False
         self.HUD(state, a, done)
-        return state, reward, done, {'a': a}
+        return state, reward, done, {'rw_inp': prev_state, 'a': a}
 
     def camera_adjust(self):
         self._p.resetDebugVisualizerCamera(2.4, -2.8, -27, [0, 0, 0.5])

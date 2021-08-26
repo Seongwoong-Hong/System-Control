@@ -8,6 +8,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 
 def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, wrapper=None, **kwargs):
+    wrapper_kwargs = kwargs.pop('wrapper_kwrags', {})
     if isinstance(env_name, gym.Env):
         env = env_name
     else:
@@ -34,8 +35,9 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, wrapper=N
             kwargs.pop('pltqs', None)
             kwargs.pop('bsp', None)
         env = gym.make(env_name, **kwargs)
-        if wrapper is not None:
-            env = wrapper(env)
+
+    if wrapper is not None:
+        env = wrapper(env, **wrapper_kwargs)
 
     if use_norm:
         stats_path = kwargs.pop("stats_path", None)

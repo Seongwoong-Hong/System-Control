@@ -12,27 +12,36 @@ class ActionWrapper(gym.ActionWrapper):
 
 
 class RewardWrapper(gym.RewardWrapper):
-    def __init__(self, env, rwfn):
+    def __init__(self, env, rwfn, timesteps: int = 1):
         super(RewardWrapper, self).__init__(env)
         self.rwfn = rwfn
         self.use_action_as_inp = self.rwfn.use_action_as_inp
+        self.timesteps = timesteps
+        if self.use_action_as_inp:
+            self.inp_list = np.zeros([self.timesteps, env.current_obs.shape[0] + env.action_space.shape[0]])
+        else:
+            self.inp_list = np.zeros([self.timesteps, env.current_obs.shape[0]])
 
     def step(self, action: np.ndarray):
-        obs = self.env.current_obs
         observation, _, done, info = self.env.step(action)
         if self.use_action_as_inp:
-            return observation, self.reward(np.append(obs, action)), done, info
+            inp = self.concat(np.append(info['rw_inp'], action))
         else:
-            return observation, self.reward(obs), done, info
+            inp = self.concat(info['rw_inp'])
+        return observation, self.reward(inp), done, info
 
     def reward(self, inp: np.ndarray) -> float:
         rwinp = torch.from_numpy(inp).reshape(1, -1).to(self.rwfn.device)
         return self.rwfn.forward(rwinp).item()
 
+    def concat(self, inp: np.ndarray) -> np.ndarray:
+        self.inp_list = np.append(self.inp_list[-self.timesteps + 1:], [inp], axis=0)
+        return self.inp_list.reshape(-1)
+
 
 class ActionRewardWrapper(RewardWrapper):
-    def __init__(self, env, rwfn):
-        super(ActionRewardWrapper, self).__init__(env, rwfn)
+    def __init__(self, env, rwfn, timesteps: int = 1):
+        super(ActionRewardWrapper, self).__init__(env, rwfn, timesteps)
         self.clip_coeff = 0.4
 
     def action(self, action):

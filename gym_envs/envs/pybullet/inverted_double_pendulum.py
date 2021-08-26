@@ -96,7 +96,7 @@ class InvertedDoublePendulumBulletEnv(MJCFBaseBulletEnv):
         state = self.robot.calc_state()
         done = False
         self.HUD(state, a, done)
-        return state, reward, done, {}
+        return state, reward, done, {'rw_inp': prev_state}
 
     def camera_adjust(self):
         self._p.resetDebugVisualizerCamera(2.4, -2.8, -27, [0, 0, 0.5])

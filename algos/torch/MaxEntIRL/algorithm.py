@@ -22,6 +22,7 @@ class MaxEntIRL:
             agent,
             expert_transitions: Transitions,
             device='cpu',
+            timesteps: int = 1,
             rew_arch: List[int] = None,
             use_action_as_input: bool = True,
             rew_kwargs: Optional[Dict] = None,
@@ -47,10 +48,11 @@ class MaxEntIRL:
         if self.use_action_as_input:
             inp = np.concatenate([inp, self.env.action_space.sample()])
         inp = feature_fn(th.from_numpy(inp).reshape(1, -1))
+        self.timesteps = timesteps
         RNet_type = rew_kwargs.pop("type", None)
         if RNet_type is None or RNet_type is "ann":
             self.reward_net = RewardNet(
-                inp=inp.shape[1],
+                inp=inp.shape[1] * self.timesteps,
                 arch=rew_arch,
                 feature_fn=feature_fn,
                 use_action_as_inp=self.use_action_as_input,
@@ -59,7 +61,7 @@ class MaxEntIRL:
             ).double().to(self.device)
         elif RNet_type is "cnn":
             self.reward_net = CNNRewardNet(
-                inp=inp.shape[1],
+                inp=inp.shape[1] * self.timesteps,
                 arch=rew_arch,
                 feature_fn=feature_fn,
                 use_action_as_inp=self.use_action_as_input,
@@ -74,9 +76,9 @@ class MaxEntIRL:
         norm_wrapper = kwargs.pop("vec_normalizer", None)
         self.reward_net.eval()
         if norm_wrapper:
-            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)]), **kwargs)
+            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net, self.timesteps)]), **kwargs)
         else:
-            self.wrap_env = DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)])
+            self.wrap_env = DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net, self.timesteps)])
         self.agent.reset_except_policy_param(self.wrap_env)
 
     def rollout_from_agent(self, **kwargs):
@@ -117,7 +119,18 @@ class MaxEntIRL:
             **kwargs
     ):
         for itr in range(total_iter):
-            self._reset_agent(**self.env_kwargs)
+            with logger.accumulate_means(f"{itr}/agent"):
+                self._reset_agent(**self.env_kwargs)
+                for agent_steps in range(max_agent_iter):
+                    loss_diff, _ = self.cal_loss(**kwargs)
+                    logger.record("loss_diff", loss_diff.item())
+                    logger.record("agent_steps", agent_steps, exclude="tensorboard")
+                    logger.dump(agent_steps)
+                    if loss_diff.item() > 0.0 and early_stop:
+                        break
+                    self.agent.learn(
+                        total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
+                    logger.dump(step=self.agent.num_timesteps)
             with logger.accumulate_means(f"{itr}/reward"):
                 self.reward_net.train()
                 losses = [1.0]  # meaningless inital value
@@ -133,18 +146,6 @@ class MaxEntIRL:
                     logger.record("steps", rew_steps, exclude="tensorboard")
                     logger.dump(rew_steps)
                     self.reward_net.optimizer.step()
-            with logger.accumulate_means(f"{itr}/agent"):
-                self.reward_net.eval()
-                for agent_steps in range(max_agent_iter):
-                    loss_diff, _ = self.cal_loss(**kwargs)
-                    logger.record("loss_diff", loss_diff.item())
-                    logger.record("agent_steps", agent_steps, exclude="tensorboard")
-                    logger.dump(agent_steps)
-                    if loss_diff.item() > 0.0 and early_stop:
-                        break
-                    self.agent.learn(
-                        total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
-                    logger.dump(step=self.agent.num_timesteps)
             if callback:
                 callback(self, itr)
 

@@ -14,7 +14,7 @@ class RewardNet(nn.Module):
             scale: float = 1.0,
             lr: float = 1e-3,
             alpha: float = 0.0,
-            device: str = 'cuda',
+            device: str = 'cpu',
             optim_cls=th.optim.Adam,
             activation_fn=th.nn.Tanh,
     ):
