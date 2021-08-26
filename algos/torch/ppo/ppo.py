@@ -42,8 +42,6 @@ class PPOCustom(PPO):
             approx_kl_divs = []
             # Do a complete pass on the rollout buffer
             for rollout_data in self.rollout_buffer.get(self.batch_size):
-                r = rollout_data.returns.mean()
-                returns.append(r.item())
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
@@ -101,6 +99,8 @@ class PPOCustom(PPO):
                 # Optimization step
                 self.policy.optimizer.zero_grad()
                 loss.backward()
+                # Save average return
+                returns.append(rollout_data.returns.mean().detach().item())
                 # Clip grad norm
                 th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                 self.policy.optimizer.step()

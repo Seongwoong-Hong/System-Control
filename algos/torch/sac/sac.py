@@ -28,10 +28,13 @@ class SACCustom(SAC):
 
         ent_coef_losses, ent_coefs = [], []
         actor_losses, critic_losses = [], []
+        mean_rewards = []
 
         for gradient_step in range(gradient_steps):
             # Sample replay buffer
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
+
+            mean_rewards.append(replay_data.rewards.mean().detach().item())
 
             # We need to sample because `log_std` may have changed between two gradient steps
             if self.use_sde:
@@ -109,7 +112,7 @@ class SACCustom(SAC):
         logger.record("train/ent_coef", np.mean(ent_coefs))
         logger.record("train/actor_loss", np.mean(actor_losses))
         logger.record("train/critic_loss", np.mean(critic_losses))
-        logger.record("train/mean_rewards", replay_data.rewards.mean().detach().item())
+        logger.record("train/mean_rewards", np.mean(mean_rewards))
         if len(ent_coef_losses) > 0:
             logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
@@ -119,9 +122,9 @@ class SACCustom(SAC):
 
     def reset_except_policy_param(self, env):
         self.init_kwargs['env'] = env
-        param_vec = self.policy.actor.parameters_to_vector()
+        param_vec = self.policy.parameters_to_vector()
         super(SACCustom, self).__init__(*self.init_args, **self.init_kwargs)
-        self.policy.actor.load_from_vector(param_vec)
+        self.policy.load_from_vector(param_vec)
 
     def set_env_and_reset_ent(self, env):
         self.num_timesteps = 0
