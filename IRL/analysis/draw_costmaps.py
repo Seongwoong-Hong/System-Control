@@ -16,19 +16,21 @@ from common.wrappers import ActionWrapper
 
 
 def draw_trajectories():
-    env_type = "HPC_custom"
-    subj = "sub01"
+    env_type = "HPC_pybullet"
+    subj = "ppo"
     wrapper = ActionWrapper if "HPC" in env_type else None
-    env = make_env(f"{env_type}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/{subj}/{subj}")
-    name = f"{env_type}/BC/extcnn_{subj}_noreset_grad1000_weightnorm"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "037")
+    env = make_env(f"{env_type}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
+    name = f"{env_type}/BC/ext_{subj}_linear_noreset"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "015")
     algo = SAC.load(model_dir + "/agent")
     agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=False, render="None", repeat_num=35)
     # expt = def_policy("IDP", env)
     # expt = PPO.load("../../RL/IDP/tmp/log/IDP_custom/ppo/policies_10/ppo0")
     # env = make_env(f"{env_type}-v0", use_vec_env=False)
     # _, expt_obs, _ = verify_policy(env, expt, deterministic=True, render="None", repeat_num=1)
-    expt_obs = [io.loadmat(f"../demos/HPC/{subj}/{subj}i{i+1}.mat")['state'] for i in range(35)]
+    with open(f"../demos/HPC/{subj}.pkl", "rb") as f:
+        expert_trajs = pickle.load(f)
+    expt_obs = [expert_trajs[i].obs for i in range(35)]
     t = np.linspace(0, env.dt*599, 600)
     for j in [1, 6, 11, 16, 21, 26, 31]:
         yval_list = [agent_obs[j], expt_obs[j]]

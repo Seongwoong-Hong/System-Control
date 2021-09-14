@@ -55,7 +55,7 @@ class VAE(nn.Module):
         return self.decoder(z), mu, log_var
 
     def loss_fn(self, recon_x, x, mu, log_var, weight):
-        BCE = nn.functional.binary_cross_entropy(recon_x, x.view(-1, self.inp_dim), reduction='mean')
+        BCE = nn.functional.binary_cross_entropy(recon_x, x.view(-1, self.inp_dim), reduction='sum')
         KLD = weight * 0.5 * th.sum(1 + log_var - mu ** 2 - log_var.exp())
         return BCE, KLD
 

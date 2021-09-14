@@ -23,10 +23,10 @@ def test_AE(irl_path):
     train_data = th.utils.data.DataLoader(dataset=np.concatenate([expert_trans.obs], axis=1), batch_size=128, shuffle=True)
     vae = VAE(
         inp_dim=6,
-        feature_dim=2,
+        feature_dim=16,
         arch=[32],
     ).double()
 
-    vae.learn(train_loader=train_data, total_epoch=int(1e4), weight=1.0)
+    vae.learn(train_loader=train_data, total_epoch=int(1e4), weight=0.2)
 
     th.save(vae, irl_path + "/demos/feature_fn.pt")

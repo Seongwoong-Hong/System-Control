@@ -5,10 +5,10 @@ from algos.torch.sac import SAC
 def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
     if algo_type == "ppo":
         from algos.torch.ppo import MlpPolicy
-        n_steps = 600
+        n_steps = 2048
         batch_size = 256
-        # if hasattr(env, "num_envs"):
-        #     n_steps = int(n_steps / int(env.num_envs))
+        if hasattr(env, "num_envs"):
+            n_steps = int(n_steps / int(env.num_envs))
         return PPO(MlpPolicy,
                    env=env,
                    n_steps=n_steps,
@@ -16,7 +16,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    gamma=0.99,
                    gae_lambda=0.95,
                    learning_rate=3e-4,
-                   ent_coef=0.0,
+                   ent_coef=0.01,
                    n_epochs=10,
                    ent_schedule=1.0,
                    clip_range=0.2,
@@ -34,16 +34,16 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
         return SAC(MlpPolicy,
                    env=env,
                    batch_size=256,
-                   learning_starts=100,
-                   train_freq=(1, 'episode'),
+                   learning_starts=256,
+                   train_freq=(500, 'step'),
                    gradient_steps=1000,
                    gamma=0.99,
                    ent_coef='auto',
+                   target_update_interval=1,
                    verbose=verbose,
                    device=device,
                    tensorboard_log=log_dir,
-                   policy_kwargs={'net_arch': {'pi': [32, 32], 'qf': [32, 32]},
-                                  'optimizer_kwargs': {'betas': (0.9, 0.999)}},
+                   policy_kwargs={'net_arch': {'pi': [32, 32], 'qf': [32, 32]}},
                    **kwargs,
                    )
     else:

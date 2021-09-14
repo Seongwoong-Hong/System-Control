@@ -2,9 +2,13 @@ import os
 import os.path as p
 import gym
 import gym_envs  # needs for custom environments
+from copy import deepcopy
 
 from scipy import io
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.monitor import Monitor
+
+from common.wrappers import ActionWrapper
 
 
 def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, wrapper=None, **kwargs):
@@ -36,17 +40,19 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, wrapper=N
         env = gym.make(env_name, **kwargs)
 
     if wrapper is not None:
-        env = wrapper(env, **wrapper_kwargs)
+        if wrapper == "ActionWrapper":
+            env = ActionWrapper(env)
+        else:
+            env = wrapper(env, **wrapper_kwargs)
 
     if use_norm:
-        stats_path = kwargs.pop("stats_path", None)
-        env = DummyVecEnv([lambda: env for _ in range(num_envs)])
-        if stats_path is None:
-            env = VecNormalize(env, norm_obs=True, norm_reward=True)
+        env = DummyVecEnv([lambda: Monitor(env) for _ in range(num_envs)])
+        if isinstance(use_norm, str):
+            env = VecNormalize.load(use_norm, env)
         else:
-            env = VecNormalize.load(stats_path, env)
+            env = VecNormalize(env, norm_obs=True, norm_reward=True)
     elif use_vec_env:
-        env = DummyVecEnv([lambda: env for _ in range(num_envs)])
+        env = DummyVecEnv([lambda: deepcopy(env) for _ in range(num_envs)])
 
     return env
 

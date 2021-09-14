@@ -202,5 +202,5 @@ class SaveCallback:
         if itr % self.cycle == 0:
             log_dir = self.path + f"/{itr:03d}"
             network.agent.save(log_dir + "/agent")
-            if network.agent.get_vecnormalize_env():
+            if network.agent.get_vec_normalize_env():
                 network.wrap_env.save(log_dir + "/normalization.pkl")

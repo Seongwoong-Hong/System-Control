@@ -78,14 +78,16 @@ def test_mujoco_envs():
 
 
 def test_demo_state(demo_dir):
-    env = make_env("IDP_custom-v0")
+    env = make_env("HPC_custom-v0")
     with open(os.path.join(demo_dir, "HPC", "sub01.pkl"), "rb") as f:
         expert_trajs = pickle.load(f)
     for traj in expert_trajs:
         trans = flatten_trajectories([traj])
+        plt.plot(trans.acts[:, :2])
+        plt.show()
         env.reset()
         for obs in trans.obs:
             env.set_state(obs[:2], obs[2:4])
-            env.render()
-            time.sleep(env.dt)
+            # env.render()
+            # time.sleep(env.dt)
     env.close()

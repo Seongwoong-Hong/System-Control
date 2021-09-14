@@ -29,6 +29,7 @@ class SACCustom(SAC):
         ent_coef_losses, ent_coefs = [], []
         actor_losses, critic_losses = [], []
         mean_rewards = []
+        log_probs = []
 
         for gradient_step in range(gradient_steps):
             # Sample replay buffer
@@ -102,6 +103,8 @@ class SACCustom(SAC):
             actor_loss.backward()
             self.actor.optimizer.step()
 
+            log_probs.append(log_prob.mean().detach().item())
+
             # Update target networks
             if gradient_step % self.target_update_interval == 0:
                 polyak_update(self.critic.parameters(), self.critic_target.parameters(), self.tau)
@@ -113,6 +116,7 @@ class SACCustom(SAC):
         logger.record("train/actor_loss", np.mean(actor_losses))
         logger.record("train/critic_loss", np.mean(critic_losses))
         logger.record("train/mean_rewards", np.mean(mean_rewards))
+        logger.record("train/mean_log_prob", np.mean(log_probs))
         if len(ent_coef_losses) > 0:
             logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
@@ -125,28 +129,6 @@ class SACCustom(SAC):
         param_vec = self.policy.parameters_to_vector()
         super(SACCustom, self).__init__(*self.init_args, **self.init_kwargs)
         self.policy.load_from_vector(param_vec)
-
-    def set_env_and_reset_ent(self, env):
-        self.num_timesteps = 0
-        self.ent_coef = self.init_kwargs.pop('ent_coef', 'auto')
-        self.set_env(env)
-        self.replay_buffer = ReplayBuffer(
-            self.buffer_size,
-            self.observation_space,
-            self.action_space,
-            self.device,
-            optimize_memory_usage=self.optimize_memory_usage,
-        )
-        if isinstance(self.ent_coef, str) and self.ent_coef.startswith("auto"):
-            init_value = 1.0
-            if "_" in self.ent_coef:
-                init_value = float(self.ent_coef.split("_")[1])
-                assert init_value > 0.0, "The initial value of ent_coef must be greater than 0"
-
-            self.log_ent_coef = th.log(th.ones(1, device=self.device) * init_value).requires_grad_(True)
-            self.ent_coef_optimizer = th.optim.Adam([self.log_ent_coef], lr=self.lr_schedule(1))
-        else:
-            self.ent_coef_tensor = th.tensor(float(self.ent_coef)).to(self.device)
 
     def reset_std(self, env):
         self.init_kwargs['env'] = env

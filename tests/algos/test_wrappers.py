@@ -8,9 +8,10 @@ from common.util import make_env
 
 def test_reward_wrapper():
     rwfn = RewardNet(inp=4, arch=[], feature_fn=lambda x: x.square(), use_action_as_inp=True).double()
-    env = RewardWrapper(gym_envs.make("IDP_custom-v2"), rwfn)
-    env.reset()
-    obs, rew, done, info = env.step(np.array([1, 1]))
+    env = make_env("HPC_custom-v1", use_vec_env=True, num_envs=5)
+    wenv = RewardWrapper(env, rwfn)
+    wenv.reset()
+    obs, rew, done, info = wenv.step(wenv.action_space.sample())
 
 
 def test_obs_concat():

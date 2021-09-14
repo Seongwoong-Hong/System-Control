@@ -22,14 +22,13 @@ if __name__ == "__main__":
     name = f"{env_type}_custom"
     policy_type = "sac"
     expt = "sub01"
-    num_timesteps = 4
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    subpath = os.path.join(proj_path, "demos", env_type, expt)
-    env = make_env(f"{name}-v1", subpath=subpath + f"/{expt}",
-                   wrapper=ObsConcatWrapper, wrapper_kwrags={'num_timesteps': num_timesteps})
+    subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
+    env = make_env(f"{name}-v1", subpath=subpath)
+    eval_env = make_env(f"{name}-v0", subpath=subpath)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}_{num_timesteps}.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
@@ -37,7 +36,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_deep_{num_timesteps}steps_noreset_weightnorm"
+    log_dir += f"/cnn_{expt}_noreset"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -51,8 +50,9 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
-        # return x
-        return th.cat([x, x.square()], dim=1)
+        return x
+        # return x.square()
+        # return th.cat([x, x.square()], dim=1)
 
     policy_kwargs = None
     if policy_type == "ppo":
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     elif policy_type == "sac":
         from algos.torch.sac import MlpPolicy
         policy_kwargs = {'net_arch': {'pi': [32, 32], 'qf': [32, 32]},
-                         'optimizer_kwargs': {'betas': (0.9, 0.99)}
+                         'optimizer_kwargs': {'betas': (0.9, 0.999)}
                          }
 
     bc.BC.DEFAULT_BATCH_SIZE = 256
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         policy_kwargs=policy_kwargs,
         expert_data=transitions,
         device=device,
-        ent_weight=1e-2,
+        ent_weight=5e-2,
         l2_weight=1e-2,
     )
 
@@ -91,23 +91,26 @@ if __name__ == "__main__":
     save_net_callback = SaveCallback(cycle=1, dirpath=model_dir)
     learner = MaxEntIRL(
         env,
+        eval_env=eval_env,
         feature_fn=feature_fn,
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[8, 8, 8, 8, 8, 8],
+        rew_arch=[8, 8, 8, 4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.0},
     )
 
     # Run Learning
     learner.learn(
         total_iter=50,
         agent_learning_steps=1e4,
-        gradient_steps=30,
         n_episodes=expt_traj_num,
-        max_agent_iter=20,
+        max_agent_iter=15,
+        min_agent_iter=3,
+        max_gradient_steps=50,
+        min_gradient_steps=10,
         callback=save_net_callback.net_save,
         early_stop=True,
     )

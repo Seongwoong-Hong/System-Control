@@ -157,5 +157,5 @@ class PPOCustom(PPO):
         state_dict = self.policy.state_dict()
         log_std_init = self.init_kwargs.get('policy_kwargs', {}).get('log_std_init', 0.0)
         super(PPOCustom, self).__init__(*self.init_args, **self.init_kwargs)
-        state_dict['log_std'] = (log_std_init + state_dict['log_std'])/2
+        state_dict['log_std'] = 0.7 * log_std_init + 0.3 * state_dict['log_std']
         self.policy.load_state_dict(state_dict)

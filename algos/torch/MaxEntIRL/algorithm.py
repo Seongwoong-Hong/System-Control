@@ -3,15 +3,16 @@ from typing import List, Dict, Optional, Union
 
 import numpy as np
 import torch as th
-from imitation.data.rollout import make_sample_until, generate_trajectories, flatten_trajectories
+from imitation.data.rollout import make_sample_until, flatten_trajectories
 from imitation.data.types import Transitions
 from imitation.util import logger
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, VecEnvWrapper
 from stable_baselines3.common.type_aliases import GymEnv
+from stable_baselines3.common.monitor import Monitor
 
 from algos.torch.MaxEntIRL import RewardNet, CNNRewardNet
 from common.wrappers import ActionRewardWrapper
-from common.rollouts import get_trajectories_probs
+from common.rollouts import get_trajectories_probs, generate_trajectories_without_shuffle
 
 
 class MaxEntIRL:
@@ -22,6 +23,7 @@ class MaxEntIRL:
             agent,
             expert_transitions: Transitions,
             device='cpu',
+            eval_env = None,
             rew_arch: List[int] = None,
             use_action_as_input: bool = True,
             rew_kwargs: Optional[Dict] = None,
@@ -30,27 +32,36 @@ class MaxEntIRL:
         assert (
             logger.is_configured()
         ), "Requires calling imitation.util.logger.configure"
+
         self.env = env
         self.agent = agent
         self.device = device
         self.use_action_as_input = use_action_as_input
-        if env_kwargs is None:
-            self.env_kwargs = {}
-        else:
-            self.env_kwargs = env_kwargs
-        if rew_kwargs is None:
-            self.rew_kwargs = {}
-        else:
-            self.rew_kwargs = rew_kwargs
+        self.env_kwargs = env_kwargs
+        self.rew_kwargs = rew_kwargs
+        self.eval_env = eval_env
         self.expert_transitions = expert_transitions
+
+        if self.env_kwargs is None:
+            self.env_kwargs = {}
+        if self.eval_env is None:
+            self.eval_env = env
+        if self.rew_kwargs is None:
+            self.rew_kwargs = {}
+
+        num_timesteps = 1
+        if hasattr(self.env, "num_timesteps"):
+            num_timesteps = self.env.num_timesteps
+
         inp = self.env.observation_space.sample()
         if self.use_action_as_input:
             inp = np.concatenate([inp, self.env.action_space.sample()])
         inp = feature_fn(th.from_numpy(inp).reshape(1, -1))
+
         RNet_type = rew_kwargs.pop("type", None)
         if RNet_type is None or RNet_type is "ann":
             self.reward_net = RewardNet(
-                inp=inp.shape[1] * self.env.num_timesteps,
+                inp=inp.shape[1] * num_timesteps,
                 arch=rew_arch,
                 feature_fn=feature_fn,
                 use_action_as_inp=self.use_action_as_input,
@@ -59,7 +70,7 @@ class MaxEntIRL:
             ).double().to(self.device)
         elif RNet_type is "cnn":
             self.reward_net = CNNRewardNet(
-                inp=inp.shape[1] * self.env.num_timesteps,
+                inp=inp.shape[1] * num_timesteps,
                 arch=rew_arch,
                 feature_fn=feature_fn,
                 use_action_as_inp=self.use_action_as_input,
@@ -73,73 +84,71 @@ class MaxEntIRL:
         reward_wrapper = kwargs.pop("reward_wrapper", ActionRewardWrapper)
         norm_wrapper = kwargs.pop("vec_normalizer", None)
         self.reward_net.eval()
+        self.wrap_env = reward_wrapper(deepcopy(self.env), self.reward_net.eval())
+        self.wrap_eval_env = reward_wrapper(self.eval_env, self.reward_net.eval())
         if norm_wrapper:
-            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)]), **kwargs)
+            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: Monitor(self.wrap_env)]), **kwargs)
         else:
-            self.wrap_env = DummyVecEnv([lambda: reward_wrapper(self.env, self.reward_net)])
+            self.wrap_env = DummyVecEnv([lambda: Monitor(self.wrap_env)])
+            self.wrap_eval_env = DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(5)])
         self.agent.reset_except_policy_param(self.wrap_env)
 
-    def rollout_from_agent(self, **kwargs):
-        n_episodes = kwargs.pop('n_episodes', 10)
+    def rollout_from_agent(self, n_episodes=10):
+        if isinstance(self.wrap_env, VecEnvWrapper):
+            self.wrap_eval_env_tmp = deepcopy(self.wrap_env)
+            self.wrap_eval_env_tmp.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(5)]))
+            self.wrap_eval_env = self.wrap_eval_env_tmp
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
-        trajectories = generate_trajectories(
-            self.agent, self.wrap_env, sample_until, deterministic_policy=False)
+        trajectories = generate_trajectories_without_shuffle(
+            self.agent, self.wrap_eval_env, sample_until, deterministic_policy=False)
+        self.agent.set_env(self.wrap_env)
         return trajectories
 
     def mean_transition_reward(self, transition: Transitions) -> th.Tensor:
-        rw_inp = transition.infos[0]['obs'].reshape(1, -1)
         if self.use_action_as_input:
-            rw_inp = np.append(rw_inp, transition.infos[0]['acts'].reshape(1, -1), axis=1)
-        for i in range(len(transition)-1):
-            rw_inp_t = transition.infos[i]['obs'].reshape(1, -1)
-            if self.use_action_as_input:
-                rw_inp_t = np.append(rw_inp_t, transition.infos[i]['acts'].reshape(1, -1), axis=1)
-            rw_inp = np.append(rw_inp, rw_inp_t, axis=0)
-        th_input = th.from_numpy(rw_inp).double()
+            acts = transition.acts
+            if hasattr(self.eval_env, "action") and callable(self.eval_env.action):
+                acts = self.eval_env.action(acts)
+            np_input = np.concatenate([transition.obs, acts], axis=1)
+            th_input = th.from_numpy(np_input).double()
+        else:
+            th_input = th.from_numpy(transition.obs).double()
         reward = self.reward_net(th_input)
-        return reward.mean()
+        return reward.sum()
 
     def cal_loss(self, **kwargs) -> (th.Tensor, th.Tensor):
+        n_episodes = kwargs.pop('n_episodes', 10)
+        n_agent_episodes = n_episodes * self.wrap_eval_env.num_envs
         expert_transitions = deepcopy(self.expert_transitions)
-        agent_transitions = flatten_trajectories(self.rollout_from_agent(**kwargs))
-        agent_ex = self.mean_transition_reward(agent_transitions)
-        expert_ex = self.mean_transition_reward(expert_transitions)
+        agent_transitions = flatten_trajectories(self.rollout_from_agent(n_agent_episodes))
+        agent_reward = self.mean_transition_reward(agent_transitions)
+        expt_reward = self.mean_transition_reward(expert_transitions)
         weight_norm = 0.0
         for param in self.reward_net.parameters():
             weight_norm += param.norm().detach().item()
-        return agent_ex - expert_ex, weight_norm
+        loss = agent_reward / n_agent_episodes - expt_reward / n_episodes
+        return loss, weight_norm
 
     def learn(
             self,
             total_iter: int,
             agent_learning_steps: Union[int, float],
-            gradient_steps: int,
-            max_agent_iter: int,
+            max_gradient_steps: int = 40,
+            min_gradient_steps: int = 15,
+            max_agent_iter: int = 15,
+            min_agent_iter: int = 3,
             agent_callback=None,
             callback=None,
             early_stop=True,
             **kwargs
     ):
+        self._reset_agent(**self.env_kwargs)
         for itr in range(total_iter):
-            with logger.accumulate_means(f"{itr}/agent"):
-                self._reset_agent(**self.env_kwargs)
-                for agent_steps in range(max_agent_iter):
-                    loss_diff, _ = self.cal_loss(**kwargs)
-                    logger.record("loss_diff", loss_diff.item())
-                    logger.record("agent_steps", agent_steps, exclude="tensorboard")
-                    logger.dump(agent_steps)
-                    if loss_diff.item() > 0.0 and early_stop:
-                        break
-                    self.agent.learn(
-                        total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
-                    logger.dump(step=self.agent.num_timesteps)
             with logger.accumulate_means(f"{itr}/reward"):
                 self.reward_net.train()
-                losses = [1.0]  # meaningless inital value
-                rew_steps = 0
-                while np.mean(losses[-5:]) > 0 or rew_steps < gradient_steps:
+                losses = []
+                for rew_steps in range(max_gradient_steps):
                     loss, weight_norm = self.cal_loss(**kwargs)
-                    rew_steps += 1
                     self.reward_net.optimizer.zero_grad()
                     loss.backward()
                     losses.append(loss.item())
@@ -147,7 +156,24 @@ class MaxEntIRL:
                     logger.record("loss", loss.item())
                     logger.record("steps", rew_steps, exclude="tensorboard")
                     logger.dump(rew_steps)
+                    if np.mean(losses[-min_gradient_steps:]) <= 0 and rew_steps >= min_gradient_steps:
+                        self.reward_net.optimizer.zero_grad()
+                        break
                     self.reward_net.optimizer.step()
+            with logger.accumulate_means(f"{itr}/agent"):
+                self._reset_agent(**self.env_kwargs)
+                loss_diffs = []
+                for agent_steps in range(max_agent_iter):
+                    self.agent.learn(
+                        total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
+                    logger.dump(step=self.agent.num_timesteps)
+                    loss_diff, _ = self.cal_loss(**kwargs)
+                    logger.record("loss_diff", loss_diff.item())
+                    logger.record("agent_steps", agent_steps, exclude="tensorboard")
+                    logger.dump(agent_steps)
+                    loss_diffs.append(loss_diff.item())
+                    if np.mean(loss_diffs[-min_agent_iter:]) > 0.0 and agent_steps >= min_agent_iter and early_stop:
+                        break
             if callback:
                 callback(self, itr)
 
@@ -177,8 +203,10 @@ class GuidedCostLearning(MaxEntIRL):
             self,
             total_iter: int,
             agent_learning_steps: Union[int, float],
-            gradient_steps: int,
-            max_agent_iter: int,
+            max_gradient_steps: int = 40,
+            min_gradient_steps: int = 15,
+            max_agent_iter: int = 15,
+            min_agent_iter: int = 3,
             agent_callback=None,
             callback=None,
             early_stop=False,
@@ -187,8 +215,10 @@ class GuidedCostLearning(MaxEntIRL):
         super(GuidedCostLearning, self).learn(
             total_iter=total_iter,
             agent_learning_steps=agent_learning_steps,
-            gradient_steps=gradient_steps,
+            max_gradient_steps=max_gradient_steps,
+            min_gradient_steps=min_gradient_steps,
             max_agent_iter=max_agent_iter,
+            min_agent_iter=min_agent_iter,
             agent_callback=agent_callback,
             callback=callback,
             early_stop=early_stop,

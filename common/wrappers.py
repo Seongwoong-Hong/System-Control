@@ -8,7 +8,7 @@ class ActionWrapper(gym.ActionWrapper):
         return 0.4 * action
 
     def reverse_action(self, action):
-        return 1/action
+        return 1/(action * 0.4)
 
 
 class RewardWrapper(gym.RewardWrapper):

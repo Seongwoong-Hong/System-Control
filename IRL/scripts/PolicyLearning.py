@@ -9,45 +9,44 @@ from imitation.policies import serialize
 from IRL.scripts.project_policies import def_policy
 from common.callbacks import VideoCallback
 from common.util import make_env
-from common.wrappers import RewardWrapper
+from common.wrappers import ActionRewardWrapper
 from scipy import io
 
 
 def learning_specific_one():
     env_type = "HPC"
-    algo_type = "MaxEntIRL"
-    name = "extcnn_sub01_1&2_1_norm_noreset"
+    algo_type = "BC"
+    name = "ext_sub01_linear_noreset"
     env_id = f"{env_type}_custom"
 
-    pltqs = []
-    for i in range(10):
-        file = "../demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
-        pltqs += [io.loadmat(file)['pltq']]
+    n = 7
+    load_dir = os.path.abspath(os.path.join("..", "tmp", "log", env_id, algo_type, name, "model", f"{n:03d}"))
 
-    env = make_env(f"{env_id}-v1", use_vec_env=False, pltqs=pltqs)
+    stats_path = None
+    if os.path.isfile(load_dir + "/normalization.pkl"):
+        stats_path = load_dir + "/normalization.pkl"
 
-    n = 0
-    with open(f"../tmp/log/{env_id}/{algo_type}/{name}/model/{n:03d}/reward_net.pkl", "rb") as f:
+    with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_net = pickle.load(f).double()
-    reward_net.scale = 1
-    env = RewardWrapper(env, reward_net.eval())
-    env = make_env(env, use_norm=True, num_envs=1)
+
+    env = make_env(f"{env_id}-v1", subpath="../demos/HPC/sub01/sub01", num_envs=1,
+                   wrapper=ActionRewardWrapper, wrapper_kwrags={'rwfn': reward_net.eval()}, use_norm=stats_path)
 
     device = "cuda:3"
-    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    log_dir = os.path.join(proj_path, "tmp", "log", env_id, algo_type, name, "add_rew_learning")
+    log_dir = os.path.join(load_dir, "add_rew_learning")
+
     algo_used = "sac"
     algo = def_policy(algo_used, env, device=device, log_dir=log_dir, verbose=1)
+    from algos.torch.sac import SAC
+    prev_algo = SAC.load(os.path.abspath(os.path.join(load_dir, "..", f"{n - 1:03d}", "agent")))
+    algo.policy.load_from_vector(prev_algo.policy.parameters_to_vector())
     os.makedirs(log_dir + f"/{algo_used}_policies_{n:03d}", exist_ok=True)
-    video_recorder = VideoCallback(make_env(f"{env_id}-v0", use_vec_env=False, pltqs=pltqs),
-                                   n_eval_episodes=5,
-                                   render_freq=int(1e5))
     save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/{algo_used}_policies_{n:03d}", None)
-    save_policy_callback = callbacks.EveryNTimesteps(int(1e5), save_policy_callback)
-    callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
-    algo.learn(total_timesteps=int(4e5), tb_log_name="extra", callback=callback_list)
-    algo.save(log_dir + f"/{algo_used}_policies_{n:03d}/{algo_used}0")
-    print(f"saved as {algo_used}_policies_{n}/{algo_used}0")
+    save_policy_callback = callbacks.EveryNTimesteps(int(3e5), save_policy_callback)
+    for i in range(15):
+        algo.learn(total_timesteps=int(1e4), tb_log_name="extra", callback=save_policy_callback, reset_num_timesteps=False)
+        algo.save(log_dir + f"/{algo_used}_policies_{n:03d}/{algo_used}{i}")
+    print(f"saved as {algo_used}_policies_{n}/{algo_used}")
 
 
 def learning_whole_iter():
@@ -62,14 +61,14 @@ def learning_whole_iter():
         file = os.path.abspath("../demos/HPC/sub01/sub01" + f"i{i + 1}.mat")
         pltqs += [io.loadmat(file)['pltq']]
 
-    n = 1
+    n = 0
     filename = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model/{n:03d}/reward_net.pkl")
     while os.path.isfile(filename):
-        env = make_env(f"{env_id}-v1", use_vec_env=False, pltqs=pltqs)
 
         with open(filename, "rb") as f:
             reward_net = pickle.load(f).double()
-        env = RewardWrapper(env, reward_net.eval())
+        env = make_env(f"{env_id}-v1", use_vec_env=False, pltqs=pltqs,
+                       wrapper=ActionRewardWrapper, wrapper_kwrags={'rwfn': reward_net.eval()})
 
         proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         log_dir = os.path.join(proj_path, "tmp", "log", env_id, algo_type, name, "add_rew_learning")

@@ -1,4 +1,6 @@
 import os
+import mujoco_py
+from copy import deepcopy
 import random
 import numpy as np
 from gym import utils
@@ -16,27 +18,41 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         filepath = os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml")
         if bsp is not None:
             self._set_body_config(filepath, bsp)
-        mujoco_env.MujocoEnv.__init__(self, filepath, 5)
+        mujoco_env.MujocoEnv.__init__(self, filepath, frame_skip=5)
         utils.EzPickle.__init__(self)
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
 
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        result.__dict__.update(self.__dict__)
+        for k, v in self.__dict__.items():
+            if k not in ['model', 'sim', 'data']:
+                setattr(result, k, deepcopy(v, memo))
+        result.sim = mujoco_py.MjSim(result.model)
+        result.data = result.sim.data
+        return result
+
     def step(self, action: np.ndarray):
         prev_ob = self._get_obs()
         r = - (prev_ob[0] ** 2 + prev_ob[1] ** 2 +
-               1e-5 * self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T)
+               0.1 * prev_ob[2] ** 2 + 0.1 * prev_ob[3] ** 2 +
+               1e-6 * ((self.model.actuator_gear[0, 0] * action[0]) ** 2 +
+                       (self.model.actuator_gear[0, 0] * action[1]) ** 2))
         self.do_simulation(action + self.plt_torque, self.frame_skip)
         self._timesteps += 1
         ob = self._get_obs()
         done = False
-        info = {"rw_inp": prev_ob}
+        info = {"obs": prev_ob.reshape(1, -1), "acts": action.reshape(1, -1)}
         return ob, r, done, info
 
     def _get_obs(self):
         return np.concatenate([
             self.sim.data.qpos,  # link angles
             self.sim.data.qvel,  # link angular velocities
-            self.plt_torque,     # torque from platform movement
+            self.plt_torque,  # torque from platform movement
         ]).ravel()
 
     def reset_model(self):

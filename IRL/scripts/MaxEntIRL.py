@@ -19,11 +19,11 @@ if __name__ == "__main__":
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}_pybullet"
-    expt = "sub01"
+    expt = "ppo"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    subpath = os.path.join(proj_path, "demos", env_type, expt)
-    pltqs = []
-    env = make_env(f"{name}-v1", use_vec_env=False, num_envs=1, subpath=subpath + f"/{expt}")
+    subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
+    env = make_env(f"{name}-v1", subpath=subpath)
+    eval_env = make_env(f"{name}-v0", subpath=subpath)
 
     # Load data
     expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}.pkl")
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_criticreset_0.2_grad1000_decay"
+    log_dir += f"/extcnn_{expt}_noreset"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -64,16 +64,18 @@ if __name__ == "__main__":
         rew_arch=[4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.01},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.0},
     )
 
     # Run Learning
     learner.learn(
         total_iter=50,
         agent_learning_steps=1e4,
-        gradient_steps=15,
         n_episodes=expt_traj_num,
         max_agent_iter=15,
+        min_agent_iter=3,
+        max_gradient_steps=50,
+        min_gradient_steps=10,
         callback=save_net_callback.net_save,
     )
 

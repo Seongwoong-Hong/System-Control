@@ -34,6 +34,7 @@ def test_pybullet_envs():
     while not done:
         act = env.action_space.sample()
         ob, rew, done, info = env.step(act)
+        print(ob[-1])
         time.sleep(0.01)
     assert isinstance(env, gym.Env)
 

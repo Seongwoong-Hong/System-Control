@@ -11,13 +11,13 @@ from xml.etree.ElementTree import ElementTree, parse
 class HumanIDP(MJCFBasedRobot):
     def __init__(self, bsp=None):
         xml_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "mujoco", "assets", "HPC_custom.xml"))
+        self.timesteps = 0
         self.gear = 300
         self.init_qpos = [0.0, 0.0]
         self.init_qvel = [0.0, 0.0]
         if bsp is not None:
             self._set_body_config(xml_path, bsp)
         MJCFBasedRobot.__init__(self, xml_path, 'HPC', action_dim=2, obs_dim=6)
-        self._timesteps = 0
         self._plt_torque = None
 
     def robot_specific_reset(self, bullet_client):
@@ -45,6 +45,7 @@ class HumanIDP(MJCFBasedRobot):
             gamma_dot,
             self.plt_torque[0],
             self.plt_torque[1],
+            # self.timesteps / 600,
         ])
 
     @staticmethod
@@ -84,7 +85,6 @@ class HumanIDP(MJCFBasedRobot):
 
 class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
     def __init__(self, bsp=None, pltqs=None, init_states=None):
-        self._timesteps = 0
         self._order = -1
         self._pltqs = pltqs
         self._pltq = None
@@ -94,12 +94,12 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
         self.stateId = -1
 
     def create_single_player_scene(self, bullet_client):
-        return SingleRobotEmptyScene(bullet_client, gravity=9.81, timestep=0.01, frame_skip=1)
+        return SingleRobotEmptyScene(bullet_client, gravity=9.81, timestep=0.0016666666666667, frame_skip=5)
 
     def reset(self):
         if self.stateId >= 0:
             self._p.restoreState(self.stateId)
-        self._timesteps = 0
+        self.robot.timesteps = 0
         self._order += 1
         self._set_pltqs()
         if self._init_states is not None:
@@ -118,15 +118,16 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
     def step(self, a):
         prev_state = self.robot.calc_state()
         reward = -(prev_state[0] ** 2 + prev_state[1] ** 2
-                   + 0.1 * prev_state[2] ** 2 + 0.1 * prev_state[3] ** 2)
+                   + 0.1 * prev_state[2] ** 2 + 0.1 * prev_state[3] ** 2
+                   + 1e-6 * (((self.robot.gear * a[0]) ** 2) + (self.robot.gear * a[1]) ** 2))
         self._set_plt_torque()
         self.robot.apply_action(a)
         self.scene.global_step()
         state = self.robot.calc_state()
-        self._timesteps += 1
+        self.robot.timesteps += 1
         done = False
         self.HUD(state, a, done)
-        return state, reward, done, {'rw_inp': prev_state, 'a': a}
+        return state, reward, done, {'obs': prev_state.reshape(1, -1), 'acts': a.reshape(1, -1)}
 
     def camera_adjust(self):
         self._p.resetDebugVisualizerCamera(2.4, -2.8, -27, [0, 0, 0.5])
@@ -145,7 +146,7 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
 
     @property
     def timesteps(self):
-        return self._timesteps
+        return self.robot.timesteps
 
     @property
     def order(self):
@@ -164,7 +165,7 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
             raise TypeError("Input pltq length is wrong")
 
     def _set_pltqs(self):
-        self._timesteps = 0
+        self.robot.timesteps = 0
         if self._pltqs is not None:
             self._order = random.randrange(0, len(self._pltqs))
             self._pltq = self._pltqs[self.order] / self.robot.gear
@@ -173,15 +174,15 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
         self._set_plt_torque()
 
     def _set_plt_torque(self):
-        if self.pltq is not None and self._timesteps != len(self.pltq):
-            self.robot.plt_torque = self.pltq[self._timesteps, :].reshape(-1)
+        if self.pltq is not None and self.robot.timesteps != len(self.pltq):
+            self.robot.plt_torque = self.pltq[self.robot.timesteps, :].reshape(-1)
         else:
             self.robot.plt_torque = np.array([0, 0])
 
 
 class HumanBalanceExpBulletEnv(HumanBalanceBulletEnv):
     def _set_pltqs(self):
-        self._timesteps = 0
+        self.robot.timesteps = 0
         if self._pltqs is not None:
             self._pltq = self._pltqs[self.order] / self.robot.gear
         else:
