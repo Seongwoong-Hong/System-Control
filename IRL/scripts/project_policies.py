@@ -102,7 +102,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    device=device,
                    tensorboard_log=log_dir,
                    policy_kwargs={'log_std_range': [None, 1.8],
-                                  'net_arch': [{'pi': [32, 32], 'vf': [32, 32]}],
+                                  'net_arch': [{'pi': [8, 8], 'vf': [32, 32]}],
                                   },
                    **kwargs,
                    )
@@ -119,7 +119,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
             gradient_steps=1000,
             target_update_interval=1,
             gamma=0.99,
-            ent_coef='auto',
+            ent_coef=0.1,
             device=device,
             verbose=verbose,
             tensorboard_log=log_dir,

@@ -19,7 +19,7 @@ if __name__ == "__main__":
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}_pybullet"
-    expt = "ppo"
+    expt = "sub01"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     env = make_env(f"{name}-v1", subpath=subpath)
@@ -34,14 +34,15 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_noreset"
+    log_dir += f"/cnn_{expt}_reset"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return th.cat([x, x.square()], dim=1)
+        return x
+        # return th.cat([x, x.square()], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -61,7 +62,7 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[4, 4, 4],
+        rew_arch=[8, 8, 8, 4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
         rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.0},
@@ -72,10 +73,10 @@ if __name__ == "__main__":
         total_iter=50,
         agent_learning_steps=1e4,
         n_episodes=expt_traj_num,
-        max_agent_iter=15,
-        min_agent_iter=3,
-        max_gradient_steps=50,
-        min_gradient_steps=10,
+        max_agent_iter=20,
+        min_agent_iter=5,
+        max_gradient_steps=60,
+        min_gradient_steps=15,
         callback=save_net_callback.net_save,
     )
 

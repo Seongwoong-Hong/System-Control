@@ -100,11 +100,11 @@ def expt_cost():
 
 def compare_obs():
     env_type = "HPC"
-    env_id = f"{env_type}_custom"
-    subj = "ppo"
-    name = f"cnn_{subj}_noreset"
+    env_id = f"{env_type}_pybullet"
+    subj = "sub01"
+    name = f"no_{subj}_reset"
     print(name)
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "BC", name))
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     assert os.path.isdir(proj_path)
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
     with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
@@ -162,7 +162,7 @@ def feature():
 
 if __name__ == "__main__":
     def feature_fn(x):
-        return x
+        # return x
         # return x.square()
-        # return th.cat([x, x.square()], dim=1)
+        return th.cat([x, x.square()], dim=1)
     compare_obs()

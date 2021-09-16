@@ -60,18 +60,18 @@ def test_hpc_learned_policy(irl_path, pltqs, bsp, subj):
 def test_hpc_action_verification(irl_path, pltqs, bsp, subj):
     import matplotlib.pyplot as plt
     import numpy as np
-    env_name = "HPC_pybullet"
+    env_name = "HPC_custom"
     env = make_env(f"{env_name}-v1", wrapper=ActionWrapper, pltqs=pltqs, bsp=bsp)
-    name = f"{env_name}/BC/ext_{subj}_deep_noreset_rewfirst"
+    name = f"{env_name}/BC/ext_{subj}_noreset"
     model_dir = f"{irl_path}/tmp/log/{name}/model"
-    algo = SAC.load(model_dir + "/036/agent.zip")
+    algo = SAC.load(model_dir + "/019/agent.zip")
     actuations = []
     obs = env.reset()
     done = False
     while not done:
         act, _ = algo.predict(obs, deterministic=True)
         obs, r, done, info = env.step(act)
-        actuations.append(info['a'])
+        actuations.append(info['acts'].reshape(-1))
     plt.plot(np.array(actuations))
     plt.show()
 

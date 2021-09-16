@@ -40,12 +40,14 @@ def verify_policy(environment, policy, render="human", deterministic=True, repea
             act, _ = policy.predict(ob, deterministic=deterministic)
             ob, rew, done, info = environment.step(act)
             img = environment.render(mode=render)
+            if hasattr(environment, "action") and callable(environment.action):
+                act = environment.action(act)
             actions = np.append(actions, act.reshape(1, -1), 0)
             obs = np.append(obs, ob.reshape(1, -1), 0)
             if render == 'human':
                 time.sleep(environment.dt)
             imgs.append(img)
-        acts_list.append(actions)
+        acts_list.append(actions[1:, :])
         obs_list.append(obs)
     return acts_list, obs_list, imgs
 

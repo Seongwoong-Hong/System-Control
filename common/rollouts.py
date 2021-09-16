@@ -1,7 +1,7 @@
 import torch
 from typing import Sequence
-
 import numpy as np
+from common.wrappers import *
 
 from imitation.data import rollout, types
 from stable_baselines3.common.vec_env import VecEnv
@@ -132,7 +132,6 @@ def generate_trajectories_without_shuffle(
     while np.any(active):
         acts, _ = get_action(obs, deterministic=deterministic_policy)
         obs, rews, dones, infos = venv.step(acts)
-
         # If an environment is inactive, i.e. the episode completed for that
         # environment after `sample_until(trajectories)` was true, then we do
         # *not* want to add any subsequent trajectories from it. We avoid this
