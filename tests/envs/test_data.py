@@ -38,9 +38,9 @@ def test_hpc_data():
 
 
 def test_pkl_data():
-    expert_dir = os.path.join("../../IRL", "demos", "HPC", "sub01_4.pkl")
+    expert_dir = os.path.join("../../IRL", "demos", "HPC", "ppo.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
-    transitions = rollout.flatten_trajectories(expert_trajs)
-    plt.plot(transitions.obs)
+    transitions = rollout.flatten_trajectories([expert_trajs[i] for i in range(15, 20)])
+    plt.plot(transitions.obs[:, :2])
     plt.show()

@@ -68,6 +68,18 @@ register(
     max_episode_steps=599,
 )
 
+register(
+    id="HPC_crop-v0",
+entry_point='gym_envs.envs.mujoco:IDPHumanExp',
+    max_episode_steps=300,
+)
+
+register(
+    id='HPC_crop-v1',
+    entry_point='gym_envs.envs.mujoco:IDPHuman',
+    max_episode_steps=300,
+)
+
 # environments based on pybullet
 
 register(
@@ -92,4 +104,16 @@ register(
     id='HPC_pybullet-v1',
     entry_point='gym_envs.envs.pybullet:HumanBalanceBulletEnv',
     max_episode_steps=599,
+)
+
+register(
+    id='HPC_pbcrop-v0',
+    entry_point='gym_envs.envs.pybullet:HumanBalanceExpBulletEnv',
+    max_episode_steps=300,
+)
+
+register(
+    id='HPC_pbcrop-v1',
+    entry_point='gym_envs.envs.pybullet:HumanBalanceBulletEnv',
+    max_episode_steps=300,
 )

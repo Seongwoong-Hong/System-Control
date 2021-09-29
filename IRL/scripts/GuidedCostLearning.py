@@ -17,9 +17,9 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "HPC"
     algo_type = "GCL"
-    device = "cpu"
-    sub = "sub01"
-    name = f"{env_type}_pybullet"
+    device = "cuda:3"
+    sub = "sub01_crop"
+    name = f"{env_type}_crop"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, sub, sub)
     env = make_env(f"{name}-v1", use_vec_env=False, subpath=subpath)
@@ -33,14 +33,15 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{sub}_criticreset_0.2_grad1000_decay"
+    log_dir += f"/no_{sub}_ppoagent_reset"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return th.cat([x, x.square()], dim=1)
+        return x
+        # return th.cat([x, x.square()], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -53,28 +54,29 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("sac", env, device=device, verbose=1)
+    agent = def_policy("ppo", env, device=device, verbose=1)
     learner = GuidedCostLearning(
         env,
         feature_fn=feature_fn,
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[4, 4, 4],
+        rew_arch=[32, 32],
         device=device,
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'cnn', 'scale': 1},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.05},
     )
 
     # Run Learning
     learner.learn(
         total_iter=50,
-        agent_learning_steps=1e4,
-        gradient_steps=15,
+        agent_learning_steps=1e5,
         n_episodes=expt_traj_num,
         max_agent_iter=15,
+        min_agent_iter=5,
+        max_gradient_steps=100,
+        min_gradient_steps=15,
         callback=save_net_callback.net_save,
-        early_stop=False,
     )
 
     # Save the result of learning

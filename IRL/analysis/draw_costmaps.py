@@ -6,6 +6,7 @@ import numpy as np
 
 from copy import deepcopy
 from matplotlib import pyplot as plt
+from matplotlib import cm
 from scipy import io
 
 from algos.torch.ppo import PPO
@@ -15,12 +16,12 @@ from common.verification import CostMap, verify_policy
 from common.wrappers import ActionWrapper
 
 
-def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[2 + 5*i for i in range(7)]):
-    t = np.linspace(0, 1/120 * len(inp1[0])-1, len(inp1[0]))
+def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in range(7)]):
+    t = np.linspace(0, 1/120 * (len(inp1[0])-1), len(inp1[0]))
     ymax, ymin = 0.4, -0.4
     # ymax, ymin = np.max(np.array(inp2)[:, :, :2]), np.min(np.array(inp2)[:, :, :2])
     for j in labels:
-        yval_list = [inp1[j]*0.4, inp2[j]]
+        yval_list = [0.4*inp1[j], inp2[j]]
         plt.figure(figsize=[9, 6.4], dpi=600.0)
         plt.plot(t, yval_list[0][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
         plt.plot(t, yval_list[1][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 0.4), lw=3)
@@ -29,7 +30,7 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[2 + 5*i for i in rang
         plt.legend(['', '', 'learned', 'original'], ncol=2, columnspacing=0.1, fontsize=15)
         plt.tick_params(axis='both', which='major', labelsize=18)
         plt.ylim(ymin, ymax)
-        plt.xlim(0.0, 5.0)
+        plt.xlim(np.min(t), np.max(t))
         plt.axhline(y=0.0, linestyle=':', color='0.5')
         plt.title("Simulation Result", fontsize=28, pad=30)
         plt.xlabel("time", fontsize=24)
@@ -37,25 +38,28 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[2 + 5*i for i in rang
         # plt.savefig(f"figures/{env_type}/{subj}/angular_velocity{j}.png")
         plt.show()
 
+
 def draw_trajectories():
-    env_type = "HPC_custom"
-    subj = "sub01"
+    env_type = "HPC_pybullet"
+    subj = "ppo"
     wrapper = ActionWrapper if "HPC" in env_type else None
+    # pltqs, init_states = [], []
+    # for i in range(5):
+    #     pltqs += [io.loadmat(f"../demos/HPC/{subj}/{subj}i{i+1}.mat")['pltq']]
+    #     init_states += [io.loadmat(f"../demos/HPC/{subj}/{subj}i{i+1}.mat")['state'][0, :4]]
     env = make_env(f"{env_type}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
-    name = f"{env_type}/BC/ext_{subj}_noreset"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "019")
-    algo = SAC.load(model_dir + "/agent")
-    agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=True, render="None", repeat_num=35)
-    # expt = def_policy("IDP", env)
-    # expt = PPO.load("../../RL/IDP/tmp/log/IDP_custom/ppo/policies_10/ppo0")
-    # env = make_env(f"{env_type}-v0", use_vec_env=False)
-    # _, expt_obs, _ = verify_policy(env, expt, deterministic=True, render="None", repeat_num=1)
+    # env = make_env(f"{env_type}-v0", wrapper=wrapper, pltqs=pltqs, init_states=init_states)
+    name = f"{env_type}/MaxEntIRL/sq_{subj}_linear_reset"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "009")
     with open(f"../demos/HPC/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
-    expt_obs = [expert_trajs[i].obs for i in range(35)]
-    expt_acts = [expert_trajs[i].acts for i in range(35)]
-    # draw_time_trajs(agent_obs, expt_obs)
-    draw_time_trajs(agent_acts, expt_acts, name="actions")
+    lnum = len(expert_trajs)
+    expt_obs = [expert_trajs[i].obs for i in range(lnum)]
+    expt_acts = [expert_trajs[i].acts for i in range(lnum)]
+    algo = SAC.load(model_dir + "/agent")
+    agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=True, render="None", repeat_num=lnum)
+    draw_time_trajs(agent_obs, expt_obs)
+    # draw_time_trajs(agent_acts, expt_acts, name="actions")
 
 
 def draw_costfigure():

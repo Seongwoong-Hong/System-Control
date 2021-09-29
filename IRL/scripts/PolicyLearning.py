@@ -1,15 +1,21 @@
 import os
 import pickle
 import torch as th
+import numpy as np
 
 from stable_baselines3.common import callbacks
 from stable_baselines3.common.vec_env import VecNormalize
 from imitation.policies import serialize
+from imitation.data.rollout import make_sample_until, flatten_trajectories
+from matplotlib import pyplot as plt
 
 from IRL.scripts.project_policies import def_policy
+from algos.torch.MaxEntIRL import RewardNet
+from algos.torch.sac import SAC
 from common.callbacks import VideoCallback
 from common.util import make_env
 from common.wrappers import ActionRewardWrapper
+from common.rollouts import generate_trajectories_without_shuffle
 from scipy import io
 
 
@@ -87,7 +93,40 @@ def learning_whole_iter():
         filename = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model/{n:03d}/reward_net.pkl")
 
 
+def reward_learning():
+    vec_env = make_env("HPC_pybullet-v0", subpath="../demos/HPC/sub01/sub01",
+                       use_vec_env=True, num_envs=1, wrapper="ActionWrapper")
+    load_dir = "../tmp/log/HPC_pybullet/MaxEntIRL/cnn_sub01_reset/model/000"
+    reward_net = RewardNet(inp=8, arch=[8, 8], feature_fn=feature_fn,
+                           use_action_as_inp=True, device='cpu', alpha=0.1).double()
+    agent = SAC.load(load_dir + "/agent")
+    reward_net.train()
+    losses = []
+    for _ in range(200):
+        sample_until = make_sample_until(n_timesteps=None, n_episodes=35)
+        trajectories = generate_trajectories_without_shuffle(agent, vec_env, sample_until, deterministic_policy=False)
+        agent_trans = flatten_trajectories(trajectories)
+        expert_dir = "../demos/HPC/sub01.pkl"
+        with open(expert_dir, "rb") as f:
+            expert_trajs = pickle.load(f)
+        expt_trans = flatten_trajectories(expert_trajs)
+        acts = vec_env.env_method('action', agent_trans.acts)[0]
+        agent_input = th.from_numpy(np.concatenate([agent_trans.obs, acts], axis=1)).double()
+        expt_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1)).double()
+        agent_rewards = reward_net(agent_input)
+        expt_rewards = reward_net(expt_input)
+        loss = (agent_rewards.sum() - expt_rewards.sum()) / 35
+        reward_net.optimizer.zero_grad()
+        loss.backward()
+        print(loss.item())
+        losses += [loss.item()]
+        reward_net.optimizer.step()
+    plt.plot(losses)
+    plt.show()
+
+
 if __name__ == "__main__":
     def feature_fn(x):
-        return th.cat([x, x.square()], dim=1)
-    learning_specific_one()
+        return x
+        # return th.cat([x, x.square()], dim=1)
+    reward_learning()

@@ -117,9 +117,9 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
 
     def step(self, a):
         prev_state = self.robot.calc_state()
-        reward = -(prev_state[0] ** 2 + prev_state[1] ** 2
-                   + 0.1 * prev_state[2] ** 2 + 0.1 * prev_state[3] ** 2
-                   + 1e-6 * (((self.robot.gear * a[0]) ** 2) + (self.robot.gear * a[1]) ** 2))
+        reward = 1 - (prev_state[0] ** 2 + prev_state[1] ** 2
+                      + 0.1 * prev_state[2] ** 2 + 0.1 * prev_state[3] ** 2
+                      + 5e-6 * (((self.robot.gear * a[0]) ** 2) + (self.robot.gear * a[1]) ** 2))
         self._set_plt_torque()
         self.robot.apply_action(a)
         self.scene.global_step()

@@ -34,7 +34,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
         return SAC(MlpPolicy,
                    env=env,
                    batch_size=256,
-                   learning_starts=256,
+                   learning_starts=100,
                    train_freq=(500, 'step'),
                    gradient_steps=1000,
                    gamma=0.99,

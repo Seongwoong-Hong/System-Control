@@ -3,12 +3,10 @@ import pickle
 import numpy as np
 import torch as th
 
-from copy import deepcopy
-from scipy import io
-from matplotlib import cm
 from matplotlib import pyplot as plt
 from imitation.data.rollout import flatten_trajectories, make_sample_until, generate_trajectories
 from stable_baselines3.common.vec_env import DummyVecEnv
+from scipy import io
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
@@ -101,12 +99,16 @@ def expt_cost():
 def compare_obs():
     env_type = "HPC"
     env_id = f"{env_type}_pybullet"
-    subj = "sub01"
-    name = f"no_{subj}_reset"
+    subj = "ppo"
+    name = f"sq_{subj}_linear_reset"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     assert os.path.isdir(proj_path)
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
+    # pltqs, init_states = [], []
+    # for i in range(5):
+    #     pltqs += [io.loadmat(subpath + f"i{i+1}.mat")['pltq']]
+    #     init_states += [io.loadmat(subpath + f"i{i+1}.mat")['state'][0, :4]]
     with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     wrapper = ActionWrapper if env_type == "HPC" else None
@@ -118,18 +120,19 @@ def compare_obs():
         if os.path.isfile(os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")):
             stats_path = os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")
         env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, subpath=subpath, use_norm=stats_path)
+        # env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, pltqs=pltqs, init_states=init_states)
         _, agent_obs, _ = verify_policy(env, agent, deterministic=True, render="None", repeat_num=35)
         if stats_path is not None:
             agent_obs = env.unnormalize_obs(agent_obs)
         errors, maximums = [], []
         for k in range(35):
-            errors += [abs(expert_trajs[k].obs[:, :2] - agent_obs[k][:, :2]).mean()]
+            errors += [abs(expert_trajs[k].obs[:, :2] - agent_obs[k][:, :2]).mean(axis=0)]
             maximums += [abs(expert_trajs[k].obs[:, :2] - agent_obs[k][:, :2]).max()]
-        error_list.append(sum(errors) / len(errors))
+        error_list.append(np.array(errors).sum(axis=0) / len(errors))
         max_list.append(sum(maximums) / len(maximums))
-        print(f"{i:03d} Error: {error_list[-1]}, Max: {max_list[-1]}")
+        print(f"{i:03d} Error: {error_list[-1]}, {error_list[-1].mean()}, Max: {max_list[-1]}")
         i += 1
-    print(f"minimum error index: {np.argmin(error_list)}, minimum max index: {np.argmin(max_list)}")
+    print(f"minimum error index: {np.argmin(np.array(error_list).mean(axis=1))}, minimum max index: {np.argmin(max_list)}")
 
 
 def feature():
