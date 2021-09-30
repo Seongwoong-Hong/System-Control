@@ -82,7 +82,7 @@ class MaxEntIRL:
         else:
             raise NotImplementedError("Not implemented reward net type")
 
-    def _reset_agent(self, n_episodes, **kwargs):
+    def _reset_agent(self, n_agent_episodes, **kwargs):
         reward_wrapper = kwargs.pop("reward_wrapper", ActionRewardWrapper)
         norm_wrapper = kwargs.pop("vec_normalizer", None)
         self.reward_net.eval()
@@ -92,15 +92,15 @@ class MaxEntIRL:
             self.wrap_env = norm_wrapper(DummyVecEnv([lambda: Monitor(self.wrap_env)]), **kwargs)
         else:
             self.wrap_env = DummyVecEnv([lambda: Monitor(self.wrap_env)])
-            self.vec_eval_env = DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_episodes)])
+            self.vec_eval_env = DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_agent_episodes)])
         self.agent.reset(self.wrap_env)
 
-    def collect_rollouts(self, n_episodes):
+    def collect_rollouts(self, n_agent_episodes):
         print("Collecting rollouts from the current agent...")
         if isinstance(self.wrap_env, VecEnvWrapper):
             self.vec_eval_env = deepcopy(self.wrap_env)
-            self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_episodes)]))
-        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes * 30)
+            self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_agent_episodes)]))
+        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_agent_episodes * 30)
         self.agent_trajectories += generate_trajectories_without_shuffle(
                 self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
         self.agent.set_env(self.wrap_env)
@@ -121,13 +121,27 @@ class MaxEntIRL:
 
     def cal_loss(self, n_episodes) -> Tuple:
         expert_transitions = deepcopy(self.expert_transitions)
-        agent_transitions = flatten_trajectories(random.sample(self.agent_trajectories, n_episodes * 15))
+        agent_transitions = flatten_trajectories(self.agent_trajectories)
         agent_reward, expt_reward, _ = self.mean_transition_reward(agent_transitions, expert_transitions)
         weight_norm = 0.0
         for param in self.reward_net.parameters():
             weight_norm += param.norm().detach().item()
-        loss = agent_reward / (n_episodes * 15) - expt_reward / n_episodes
+        loss = agent_reward / len(self.agent_trajectories) - expt_reward / n_episodes
         return loss, weight_norm, None
+
+    def sample_and_cal_loss(self, n_episodes):
+        expert_transitions = deepcopy(self.expert_transitions)
+        if isinstance(self.wrap_env, VecEnvWrapper):
+            self.vec_eval_env = deepcopy(self.wrap_env)
+            self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_episodes)]))
+        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes * 5)
+        agent_trajectories = generate_trajectories_without_shuffle(
+                self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
+        self.agent.set_env(self.wrap_env)
+        agent_transitions = flatten_trajectories(agent_trajectories)
+        agent_reward, expt_reward, _ = self.mean_transition_reward(agent_transitions, expert_transitions)
+        loss = agent_reward / (n_episodes * 5) - expt_reward / n_episodes
+        return loss
 
     def learn(
             self,
@@ -170,7 +184,7 @@ class MaxEntIRL:
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
                     logger.dump(step=self.agent.num_timesteps)
-                    loss_diff, _, _ = self.cal_loss(n_episodes)
+                    loss_diff = self.sample_and_cal_loss(n_episodes)
                     logger.record("loss_diff", loss_diff.item())
                     logger.record("agent_steps", agent_steps, exclude="tensorboard")
                     logger.dump(agent_steps)
