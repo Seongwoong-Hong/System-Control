@@ -43,6 +43,7 @@ class MaxEntIRL:
         self.eval_env = eval_env
         self.expert_transitions = expert_transitions
         self.agent_trajectories = []
+        self.expand_ratio = 30
 
         if self.env_kwargs is None:
             self.env_kwargs = {}
@@ -100,7 +101,7 @@ class MaxEntIRL:
         if isinstance(self.wrap_env, VecEnvWrapper):
             self.vec_eval_env = deepcopy(self.wrap_env)
             self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_agent_episodes)]))
-        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_agent_episodes * 30)
+        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_agent_episodes * self.expand_ratio)
         self.agent_trajectories += generate_trajectories_without_shuffle(
                 self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
         self.agent.set_env(self.wrap_env)
@@ -121,12 +122,15 @@ class MaxEntIRL:
 
     def cal_loss(self, n_episodes) -> Tuple:
         expert_transitions = deepcopy(self.expert_transitions)
-        agent_transitions = flatten_trajectories(self.agent_trajectories)
-        agent_reward, expt_reward, _ = self.mean_transition_reward(agent_transitions, expert_transitions)
+        losses = []
+        for i in range(0, len(self.agent_trajectories), self.expand_ratio * n_episodes):
+            agent_transitions = flatten_trajectories(self.agent_trajectories[i:i + self.expand_ratio * n_episodes])
+            agent_reward, expt_reward, _ = self.mean_transition_reward(agent_transitions, expert_transitions)
+            losses.append(agent_reward / (self.expand_ratio * n_episodes) - expt_reward / n_episodes)
         weight_norm = 0.0
         for param in self.reward_net.parameters():
             weight_norm += param.norm().detach().item()
-        loss = agent_reward / len(self.agent_trajectories) - expt_reward / n_episodes
+        loss = np.max(losses)
         return loss, weight_norm, None
 
     def sample_and_cal_loss(self, n_episodes):
