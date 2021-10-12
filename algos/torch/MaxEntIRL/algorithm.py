@@ -56,9 +56,10 @@ class MaxEntIRL:
         if hasattr(self.env, "num_timesteps"):
             num_timesteps = self.env.num_timesteps
 
-        inp = self.env.observation_space.sample()
+        self.env.reset()
+        _, _, _, info = self.env.step(self.env.action_space.sample())
         if self.use_action_as_input:
-            inp = np.concatenate([inp, self.env.action_space.sample()])
+            inp = np.append(info['obs'], self.env.action_space.sample())
         inp = feature_fn(th.from_numpy(inp).reshape(1, -1))
 
         RNet_type = rew_kwargs.pop("type", None)
@@ -107,15 +108,17 @@ class MaxEntIRL:
         self.agent.set_env(self.wrap_env)
 
     def mean_transition_reward(self, agent_trans: Transitions, expt_trans: Transitions) -> Tuple:
+        agent_obs = np.concatenate([agent_trans.obs, agent_trans.next_obs], axis=1)
+        expt_obs = np.concatenate([expt_trans.obs, expt_trans.next_obs], axis=1)
         if self.use_action_as_input:
             acts = agent_trans.acts
             if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
                 acts = self.wrap_eval_env.action(acts)
-            agent_input = th.from_numpy(np.concatenate([agent_trans.obs, acts], axis=1)).double()
-            expt_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1)).double()
+            agent_input = th.from_numpy(np.concatenate([agent_obs, acts], axis=1)).double()
+            expt_input = th.from_numpy(np.concatenate([expt_obs, expt_trans.acts], axis=1)).double()
         else:
-            agent_input = th.from_numpy(agent_trans.obs).double()
-            expt_input = th.from_numpy(expt_trans.obs).double()
+            agent_input = th.from_numpy(agent_obs).double()
+            expt_input = th.from_numpy(expt_obs).double()
         agent_rewards = self.reward_net(agent_input)
         expt_rewards = self.reward_net(expt_input)
         return agent_rewards.sum(), expt_rewards.sum(), None
