@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/cnn_{expt}_noreset_0.1"
+    log_dir += f"/cnn_{expt}_mm_reset_0.1"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     )
 
     with logger.accumulate_means("BC"):
-        learner.train(n_epochs=100)
+        learner.train(n_epochs=150)
 
     learner.save_policy(model_dir + "/policy")
 
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         rew_arch=[4, 4, 4, 4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.0},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
     )
 
     # Run Learning
@@ -107,10 +107,10 @@ if __name__ == "__main__":
         total_iter=50,
         agent_learning_steps=1e4,
         n_episodes=expt_traj_num,
-        max_agent_iter=15,
-        min_agent_iter=3,
-        max_gradient_steps=60,
-        min_gradient_steps=15,
+        max_agent_iter=20,
+        min_agent_iter=5,
+        max_gradient_steps=300,
+        min_gradient_steps=30,
         callback=save_net_callback.net_save,
         early_stop=True,
     )

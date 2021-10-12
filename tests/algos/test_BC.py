@@ -21,7 +21,7 @@ def irl_path():
 @pytest.fixture
 def pltqs(irl_path):
     pltqs = []
-    for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+    for i in range(35):
         file = f"{irl_path}/demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
     return pltqs
@@ -64,18 +64,18 @@ def test_learn(env, expert, policy_type="sac"):
         policy_kwargs=policy_kwargs,
         expert_data=expert,
         device='cpu',
-        ent_weight=1e-2,
+        ent_weight=5e-2,
         l2_weight=1e-2,
     )
     with logger.accumulate_means("./BC"):
-        learner.train(n_epochs=200)
+        learner.train(n_epochs=100)
 
     learner.save_policy("policy")
     return learner
 
 
 def test_irl(env, expert):
-    policy_type = "ppo"
+    policy_type = "sac"
     learner = test_learn(env, expert, policy_type=policy_type)
     agent = def_policy(policy_type, env, device="cpu", verbose=1)
     agent.policy = learner.policy
@@ -98,7 +98,7 @@ def test_irl(env, expert):
     # Run Learning
     learner.learn(
         total_iter=50,
-        agent_learning_steps=2e5,
+        agent_learning_steps=1e4,
         gradient_steps=150,
         n_episodes=10,
         max_agent_iter=1,
@@ -117,11 +117,11 @@ def test_irl(env, expert):
 def test_policy(env, expert):
     policy = bc.reconstruct_policy("policy")
     learned_acts = []
-    for obs in expert.obs:
+    for obs in expert.obs[:600, :]:
         act, _ = policy.predict(obs, deterministic=True)
         learned_acts.append(act)
     plt.plot(learned_acts)
     plt.show()
-    plt.plot(expert.acts)
+    plt.plot(expert.acts[:600, :])
     plt.show()
 

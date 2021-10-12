@@ -21,7 +21,7 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in rang
     ymax, ymin = 0.4, -0.4
     # ymax, ymin = np.max(np.array(inp2)[:, :, :2]), np.min(np.array(inp2)[:, :, :2])
     for j in labels:
-        yval_list = [0.4*inp1[j], inp2[j]]
+        yval_list = [inp1[j], inp2[j]]
         plt.figure(figsize=[9, 6.4], dpi=600.0)
         plt.plot(t, yval_list[0][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
         plt.plot(t, yval_list[1][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 0.4), lw=3)
@@ -40,16 +40,16 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in rang
 
 
 def draw_trajectories():
-    env_type = "HPC_pybullet"
-    subj = "ppo"
+    env_type = "HPC_custom"
+    subj = "sac"
     wrapper = ActionWrapper if "HPC" in env_type else None
     # pltqs, init_states = [], []
-    # for i in range(5):
-    #     pltqs += [io.loadmat(f"../demos/HPC/{subj}/{subj}i{i+1}.mat")['pltq']]
-    #     init_states += [io.loadmat(f"../demos/HPC/{subj}/{subj}i{i+1}.mat")['state'][0, :4]]
+    # for i in range(5, 10):
+    #     pltqs += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['pltq']]
+    #     init_states += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['state'][0, :4]]
     env = make_env(f"{env_type}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
     # env = make_env(f"{env_type}-v0", wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-    name = f"{env_type}/MaxEntIRL/sq_{subj}_linear_reset"
+    name = f"{env_type}/BC/sq_{subj}_linear_mm_reset_0.1"
     model_dir = os.path.join("..", "tmp", "log", name, "model", "009")
     with open(f"../demos/HPC/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
@@ -58,8 +58,8 @@ def draw_trajectories():
     expt_acts = [expert_trajs[i].acts for i in range(lnum)]
     algo = SAC.load(model_dir + "/agent")
     agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=True, render="None", repeat_num=lnum)
-    draw_time_trajs(agent_obs, expt_obs)
-    # draw_time_trajs(agent_acts, expt_acts, name="actions")
+    draw_time_trajs(agent_obs, expt_obs)# labels=[i for i in range(5, 10)])
+    # draw_time_trajs(agent_acts, expt_acts, name="actions", labels=[i for i in range(35)])
 
 
 def draw_costfigure():

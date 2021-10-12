@@ -74,8 +74,8 @@ class SACCustom(SAC):
                 # add entropy term
                 target_q = target_q - ent_coef * next_log_prob.reshape(-1, 1)
                 # td error + entropy term
-                # q_backup = replay_data.rewards + (1 - replay_data.dones) * self.gamma * target_q
-                q_backup = replay_data.rewards + self.gamma * target_q
+                q_backup = replay_data.rewards + (1 - replay_data.dones) * self.gamma * target_q
+                # q_backup = replay_data.rewards + self.gamma * target_q
 
             # Get current Q estimates for each critic network
             # using action from the replay buffer

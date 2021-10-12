@@ -1,3 +1,4 @@
+import time
 import pytest
 import numpy as np
 
@@ -57,7 +58,6 @@ def test_hpc_obs_reset():
 
 
 def test_init():
-    import time
     env = make_env("IDP_custom-v1", subpath="../../IRL/demos/HPC/sub01/sub01")
     env.render()
     env.reset()
@@ -68,3 +68,19 @@ def test_init():
         env.render()
         print(env.current_obs)
         time.sleep(env.dt)
+
+
+def test_2dworld():
+    env = make_env("2DWorld-v1")
+    trajs = []
+    for i in range(10):
+        env.reset()
+        done = False
+        sts, rs = [], []
+        while not done:
+            action = env.action_space.sample()
+            st, r, done, _ = env.step(action)
+            sts.append(st)
+            rs.append(r)
+        trajs.append(np.append(np.array(sts), np.array(rs).reshape(-1, 1), axis=1))
+    env.draw(trajs)

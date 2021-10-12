@@ -20,10 +20,10 @@ if __name__ == "__main__":
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}_pybullet"
-    expt = "sac"
+    expt = "sub01"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
-    pltqs, init_states = [], []
+    # pltqs, init_states = [], []
     # for i in range(5, 10):
     #     pltqs += [io.loadmat(subpath + f"i{i+1}.mat")['pltq']]
     #     init_states += [io.loadmat(subpath + f"i{i+1}.mat")['state'][0, :4]]
@@ -41,16 +41,15 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/rewft_{expt}_linear_reset_real"
+    log_dir += f"/cnnprev_{expt}_mm_reset_0.01"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        # return x
-        inp = th.cat([x[:4], x[6:]])
-        return inp.square()
+        return x
+        # return x.square()
         # return th.cat([x, x.square()], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
@@ -71,10 +70,10 @@ if __name__ == "__main__":
         agent=agent,
         expert_transitions=transitions,
         use_action_as_input=True,
-        rew_arch=[],
+        rew_arch=[4, 4, 4, 4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.05},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
     )
 
     # Run Learning
@@ -82,9 +81,9 @@ if __name__ == "__main__":
         total_iter=50,
         agent_learning_steps=1e4,
         n_episodes=expt_traj_num,
-        max_agent_iter=20,
+        max_agent_iter=25,
         min_agent_iter=5,
-        max_gradient_steps=100,
+        max_gradient_steps=500,
         min_gradient_steps=30,
         callback=save_net_callback.net_save,
     )

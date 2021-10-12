@@ -38,7 +38,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    train_freq=(500, 'step'),
                    gradient_steps=1000,
                    gamma=0.99,
-                   ent_coef='auto',
+                   ent_coef=0.1,
                    target_update_interval=1,
                    verbose=verbose,
                    device=device,

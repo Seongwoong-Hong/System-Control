@@ -46,7 +46,7 @@ def learner(env, expert, eval_env):
     def feature_fn(x):
         return th.cat([x, x.square()], dim=1)
 
-    agent = def_policy("sac", env, device='cuda:3', verbose=1)
+    agent = def_policy("sac", env, device='cpu', verbose=1)
 
     return MaxEntIRL(
         env,
@@ -55,7 +55,7 @@ def learner(env, expert, eval_env):
         feature_fn=feature_fn,
         expert_transitions=expert,
         rew_arch=[],
-        device='cpu',
+        device=agent.device,
         env_kwargs={'vec_normalizer': None},
         rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.0},
     )
@@ -82,7 +82,7 @@ def test_validity(learner):
         total_iter=10,
         agent_learning_steps=10000,
         min_gradient_steps=3,
-        n_episodes=35,
+        n_episodes=5,
         max_agent_iter=5,
     )
 

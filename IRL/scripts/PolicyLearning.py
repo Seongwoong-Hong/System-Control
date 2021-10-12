@@ -21,11 +21,11 @@ from scipy import io
 
 def learning_specific_one():
     env_type = "HPC"
-    algo_type = "BC"
-    name = "ext_sub01_linear_noreset"
+    algo_type = "MaxEntIRL"
+    name = "sq_sac_linear_ppoagent_mm_reset"
     env_id = f"{env_type}_custom"
 
-    n = 7
+    n = 21
     load_dir = os.path.abspath(os.path.join("..", "tmp", "log", env_id, algo_type, name, "model", f"{n:03d}"))
 
     stats_path = None
@@ -38,19 +38,19 @@ def learning_specific_one():
     env = make_env(f"{env_id}-v1", subpath="../demos/HPC/sub01/sub01", num_envs=1,
                    wrapper=ActionRewardWrapper, wrapper_kwrags={'rwfn': reward_net.eval()}, use_norm=stats_path)
 
-    device = "cuda:3"
+    device = "cpu"
     log_dir = os.path.join(load_dir, "add_rew_learning")
 
     algo_used = "sac"
     algo = def_policy(algo_used, env, device=device, log_dir=log_dir, verbose=1)
     from algos.torch.sac import SAC
-    prev_algo = SAC.load(os.path.abspath(os.path.join(load_dir, "..", f"{n - 1:03d}", "agent")))
-    algo.policy.load_from_vector(prev_algo.policy.parameters_to_vector())
+    # prev_algo = PPO.load(os.path.abspath(os.path.join(load_dir, "..", f"{n - 1:03d}", "agent")))
+    # algo.policy.load_from_vector(prev_algo.policy.parameters_to_vector())
     os.makedirs(log_dir + f"/{algo_used}_policies_{n:03d}", exist_ok=True)
     save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/{algo_used}_policies_{n:03d}", None)
     save_policy_callback = callbacks.EveryNTimesteps(int(3e5), save_policy_callback)
     for i in range(15):
-        algo.learn(total_timesteps=int(1e4), tb_log_name="extra", callback=save_policy_callback, reset_num_timesteps=False)
+        algo.learn(total_timesteps=int(3e4), tb_log_name="extra", callback=save_policy_callback, reset_num_timesteps=False)
         algo.save(log_dir + f"/{algo_used}_policies_{n:03d}/{algo_used}{i}")
     print(f"saved as {algo_used}_policies_{n}/{algo_used}")
 
@@ -127,6 +127,7 @@ def reward_learning():
 
 if __name__ == "__main__":
     def feature_fn(x):
-        return x
+        # return x
+        return x.square()
         # return th.cat([x, x.square()], dim=1)
-    reward_learning()
+    learning_specific_one()

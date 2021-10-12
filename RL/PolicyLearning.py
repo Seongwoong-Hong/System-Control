@@ -11,13 +11,14 @@ from RL.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "HPC"
+    env_type = "2DWorld"
     algo_type = "sac"
-    name = f"{env_type}_pybullet"
+    name = f"{env_type}"
     device = "cpu"
     env_id = f"{name}-v1"
-    subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
-    env = make_env(env_id, use_vec_env=False, num_envs=1, subpath=subpath, wrapper=ActionWrapper, use_norm=False)
+    # subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
+    # env = make_env(env_id, use_vec_env=False, num_envs=1, subpath=subpath, wrapper=ActionWrapper, use_norm=False)
+    env = make_env(env_id, use_vec_env=False)
     name += ""
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
