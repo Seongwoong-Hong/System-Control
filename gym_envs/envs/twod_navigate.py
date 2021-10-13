@@ -9,23 +9,25 @@ class TwoDWorld(gym.Env):
     def __init__(self):
         self.height = 5.0
         self.width = 5.0
-        self.dt = 0.01
+        self.dt = 0.1
         self.st = None
-        self.next_st = None
         self.observation_space = gym.spaces.Box(low=np.array([-self.width, -self.height]),
                                                 high=np.array([self.width, self.height]))
         self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(2,))
 
     def step(self, action: np.ndarray):
-        assert self.next_st is not None, "Can't step the environment before calling reset function"
-        self.st = self.next_st
+        assert self.st is not None, "Can't step the environment before calling reset function"
         r = self.reward_fn(self.st)
-        next_st = self.st + self.dt * action
-        return next_st, r, None, {}
+        info = {'obs': self.st.reshape(1, -1), 'acts': action.reshape(1, -1)}
+        self.st = self.st + self.dt * action
+        return self.st, r, None, info
+
+    def _get_obs(self):
+        return self.st
 
     def reset(self):
-        self.st = None
-        self.next_st = np.random.uniform(low=[-self.width, -self.height], high=[self.width, self.height])
+        self.st = np.random.uniform(low=[-self.width, -self.height], high=[self.width, self.height])
+        return self._get_obs()
 
     def reward_fn(self, state) -> float:
         x, y = state[0], state[1]
@@ -55,3 +57,35 @@ class TwoDWorld(gym.Env):
 
     def render(self, mode='human'):
         pass
+
+
+class TwoDWorldDet(TwoDWorld):
+    def __init__(self):
+        super().__init__()
+        self.init_state = 5 * np.array(([-0.5, 0.15],
+                                       [-0.4, 0.15],
+                                       [-0.3, 0.15],
+                                       [-0.2, 0.15],
+                                       [-0.1, 0.15],
+                                       [0.0, 0.15],
+                                       [0.1, 0.15],
+                                       [0.2, 0.15],
+                                       [0.3, 0.15],
+                                       [0.4, 0.15],
+                                       [0.5, 0.15],
+                                       [-0.5, -0.15],
+                                       [-0.4, -0.15],
+                                       [-0.3, -0.15],
+                                       [-0.2, -0.15],
+                                       [-0.1, -0.15],
+                                       [0.0, -0.15],
+                                       [0.1, -0.15],
+                                       [0.2, -0.15],
+                                       [0.3, -0.15],
+                                       [0.4, -0.15],
+                                       [0.5, -0.15]))
+
+    def reset(self):
+        idx = np.random.randint(len(self.init_state))
+        self.st = self.init_state[idx, :]
+        return self._get_obs()
