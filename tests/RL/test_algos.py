@@ -26,8 +26,8 @@ def test_mujoco_envs_learned_policy():
 
 def test_rl_learned_policy(rl_path):
     env_type = "HPC"
-    name = f"{env_type}_pybullet"
-    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "sac", "policies_5")
+    name = f"{env_type}_custom"
+    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "sac", "policies_1")
     stats_path = None
     if os.path.isfile(model_dir + "normalization.pkl"):
         stats_path = model_dir + "normalization.pkl"
@@ -38,6 +38,26 @@ def test_rl_learned_policy(rl_path):
     plt.show()
     plt.plot(o_list[10][:, :2])
     plt.show()
+
+
+def test_2dworld(rl_path):
+    name = "2DWorld"
+    env = make_env(f"{name}-v1")
+    model_dir = os.path.join(rl_path, name, "tmp", "log", name, "sac", "policies_2")
+    algo = SAC.load(model_dir + f"/agent")
+    trajs = []
+    for i in range(10):
+        st = env.reset()
+        done = False
+        sts, rs = [], []
+        while not done:
+            action, _ = algo.predict(st)
+            st, r, done, _ = env.step(action)
+            sts.append(st)
+            rs.append(r)
+        trajs.append(np.append(np.array(sts), np.array(rs).reshape(-1, 1), axis=1))
+    env.draw(trajs)
+
 
 
 def test_total_reward(rl_path):

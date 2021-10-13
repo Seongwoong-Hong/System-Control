@@ -64,14 +64,19 @@ def draw_trajectories():
 
 def draw_costfigure():
     def expt_cost(inp):
-        return inp[0, :2].square().sum() + 0.1 * inp[0, 2:4].square().sum() + 1e-5 * (200 * inp[0, 6:]).square().sum()
-    env_type = "HPC"
-    env_id = f"{env_type}_custom"
-    subj = "sub01"
+        x, y = inp[:, 0], inp[:, 1]
+        return th.exp(-0.5 * (x ** 2 + y ** 2)) \
+               - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y - 5 / 2) ** 2)) \
+               - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y - 5 / 2) ** 2)) \
+               - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y + 5 / 2) ** 2)) \
+               - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y + 5 / 2) ** 2))
+    env_type = "2DWorld"
+    env_id = f"{env_type}"
+    subj = "sac"
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
     env = make_env(f"{env_id}-v1", use_vec_env=False, subpath=subpath + f"/{subj}")
-    name = f"extcnn_{subj}_deep_noreset_rewfirst_0.2"
-    num = 14
+    name = f"cnn_{subj}_mm_reset_0.1"
+    num = 15
     load_dir = os.path.abspath(f"../tmp/log/{env_id}/MaxEntIRL/{name}/model")
     algo = SAC.load(load_dir + f"/{num:03d}/agent")
     # algo = def_policy("IDP", env)
@@ -80,7 +85,7 @@ def draw_costfigure():
         reward_fn = pickle.load(f).double()
 
     ndim, nact = env.observation_space.shape[0], env.action_space.shape[0]
-    d1, d2 = np.meshgrid(np.linspace(-0.2, 0.2, 100), np.linspace(-0.2, 0.2, 100))
+    d1, d2 = np.meshgrid(np.linspace(-5, 5, 100), np.linspace(-5, 5, 100))
     pact = np.zeros((100, 100), dtype=np.float64)
     cost1, cost2 = np.zeros(d1.shape), np.zeros(d1.shape)
     for i in range(d1.shape[0]):
@@ -140,6 +145,6 @@ def draw_costmaps():
 
 if __name__ == "__main__":
     def feature_fn(x):
-        # return x
-        return th.cat([x, x.square()], dim=1)
-    draw_trajectories()
+        return x
+        # return th.cat([x, x.square()], dim=1)
+    draw_costfigure()

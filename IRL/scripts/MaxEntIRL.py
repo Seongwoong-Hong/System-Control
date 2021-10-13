@@ -11,23 +11,24 @@ from scipy import io
 
 from common.util import make_env
 from common.callbacks import SaveCallback
+from common.wrappers import RewardWrapper
 from algos.torch.MaxEntIRL import MaxEntIRL
 from IRL.scripts.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "HPC"
+    env_type = "2DWorld"
     algo_type = "MaxEntIRL"
     device = "cpu"
-    name = f"{env_type}_pybullet"
-    expt = "sub01"
+    name = f"{env_type}"
+    expt = "sac"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     # pltqs, init_states = [], []
     # for i in range(5, 10):
     #     pltqs += [io.loadmat(subpath + f"i{i+1}.mat")['pltq']]
     #     init_states += [io.loadmat(subpath + f"i{i+1}.mat")['state'][0, :4]]
-    env = make_env(f"{name}-v1", subpath=subpath)
+    env = make_env(f"{name}-v0", subpath=subpath)
     eval_env = make_env(f"{name}-v0", subpath=subpath)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
@@ -41,16 +42,16 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/cnnprev_{expt}_mm_reset_0.01"
+    log_dir += f"/ext_{expt}_linear_mm_reset_0.01_real"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return x
-        # return x.square()
-        # return th.cat([x, x.square()], dim=1)
+        # return x
+        # return x ** 2
+        return th.cat([x, x**2, x**3, x**4], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -69,11 +70,11 @@ if __name__ == "__main__":
         feature_fn=feature_fn,
         agent=agent,
         expert_transitions=transitions,
-        use_action_as_input=True,
-        rew_arch=[4, 4, 4, 4, 4, 4],
+        use_action_as_input=False,
+        rew_arch=[],
         device=device,
-        env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
     )
 
     # Run Learning
@@ -82,8 +83,8 @@ if __name__ == "__main__":
         agent_learning_steps=1e4,
         n_episodes=expt_traj_num,
         max_agent_iter=25,
-        min_agent_iter=5,
-        max_gradient_steps=500,
+        min_agent_iter=8,
+        max_gradient_steps=20000,
         min_gradient_steps=30,
         callback=save_net_callback.net_save,
     )
