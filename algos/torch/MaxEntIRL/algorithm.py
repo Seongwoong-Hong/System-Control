@@ -58,8 +58,9 @@ class MaxEntIRL:
 
         self.env.reset()
         _, _, _, info = self.env.step(self.env.action_space.sample())
+        inp = info['obs']
         if self.use_action_as_input:
-            inp = np.append(info['obs'], self.env.action_space.sample())
+            inp = np.append(inp, self.env.action_space.sample())
         inp = feature_fn(th.from_numpy(inp).reshape(1, -1))
 
         RNet_type = rew_kwargs.pop("type", None)
@@ -108,8 +109,10 @@ class MaxEntIRL:
         self.agent.set_env(self.wrap_env)
 
     def mean_transition_reward(self, agent_trans: Transitions, expt_trans: Transitions) -> Tuple:
-        agent_obs = np.concatenate([agent_trans.obs, agent_trans.next_obs], axis=1)
-        expt_obs = np.concatenate([expt_trans.obs, expt_trans.next_obs], axis=1)
+        # agent_obs = np.concatenate([agent_trans.obs, agent_trans.next_obs], axis=1)
+        # expt_obs = np.concatenate([expt_trans.obs, expt_trans.next_obs], axis=1)
+        agent_obs = agent_trans.obs
+        expt_obs = expt_trans.obs
         if self.use_action_as_input:
             acts = agent_trans.acts
             if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
