@@ -62,6 +62,7 @@ class TwoDWorld(gym.Env):
 class TwoDWorldDet(TwoDWorld):
     def __init__(self):
         super().__init__()
+        self.i = 0
         self.init_state = 5 * np.array(([-0.5, 0.15],
                                        [-0.4, 0.15],
                                        [-0.3, 0.15],
@@ -86,6 +87,7 @@ class TwoDWorldDet(TwoDWorld):
                                        [0.5, -0.15]))
 
     def reset(self):
-        idx = np.random.randint(len(self.init_state))
-        self.st = self.init_state[idx, :]
+        # idx = np.random.randint(len(self.init_state))
+        self.st = self.init_state[self.i, :]
+        self.i = (self.i + 1) % len(self.init_state)
         return self._get_obs()
