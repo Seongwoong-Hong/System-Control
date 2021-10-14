@@ -97,19 +97,19 @@ def expt_cost():
 
 
 def compare_obs():
-    env_type = "HPC"
-    env_id = f"{env_type}_custom"
+    env_type = "2DWorld"
+    env_id = f"{env_type}"
     subj = "sac"
-    name = f"sq_{subj}_linear_mm_reset_0.1"
+    name = f"ext_{subj}_linear_mm_reset_0.01_real"
     print(name)
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "BC", name))
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     assert os.path.isdir(proj_path)
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
     # pltqs, init_states = [], []
     # for i in range(5, 10):
     #     pltqs += [io.loadmat(subpath + f"i{i+1}.mat")['pltq']]
     #     init_states += [io.loadmat(subpath + f"i{i+1}.mat")['state'][0, :4]]
-    with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
+    with open(f"../demos/{env_type}/{subj}_check.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     lnum = len(expert_trajs)
     wrapper = ActionWrapper if env_type == "HPC" else None
@@ -122,7 +122,7 @@ def compare_obs():
             stats_path = os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")
         env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, subpath=subpath, use_norm=stats_path)
         # env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-        _, agent_obs, _ = verify_policy(env, agent, deterministic=True, render="None", repeat_num=lnum)
+        _, agent_obs, _ = verify_policy(env, agent, deterministic=True, render="None", repeat_num=22)
         if stats_path is not None:
             agent_obs = env.unnormalize_obs(agent_obs)
         errors, maximums = [], []

@@ -18,20 +18,23 @@ from common.wrappers import ActionWrapper
 
 def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in range(7)]):
     t = np.linspace(0, 1/120 * (len(inp1[0])-1), len(inp1[0]))
-    ymax, ymin = 0.4, -0.4
+    ymax, ymin = 5, -5
     # ymax, ymin = np.max(np.array(inp2)[:, :, :2]), np.min(np.array(inp2)[:, :, :2])
     for j in labels:
         yval_list = [inp1[j], inp2[j]]
         plt.figure(figsize=[9, 6.4], dpi=600.0)
-        plt.plot(t, yval_list[0][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
-        plt.plot(t, yval_list[1][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 0.4), lw=3)
-        plt.plot(t, yval_list[0][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 1), lw=3)
-        plt.plot(t, yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 0.6), lw=3)
-        plt.legend(['', '', 'learned', 'original'], ncol=2, columnspacing=0.1, fontsize=15)
+        plt.plot(yval_list[0][:, 0], yval_list[0][:, 1], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
+        # plt.plot(t, yval_list[1][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 0.4), lw=3)
+        plt.plot(yval_list[1][:, 0], yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 1), lw=3)
+        # plt.plot(t, yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 0.6), lw=3)
+        # plt.legend(['', '', 'learned', 'original'], ncol=2, columnspacing=0.1, fontsize=15)
+        plt.legend(['learned', 'original'], ncol=2, columnspacing=0.1, fontsize=15)
         plt.tick_params(axis='both', which='major', labelsize=18)
         plt.ylim(ymin, ymax)
-        plt.xlim(np.min(t), np.max(t))
+        # plt.xlim(np.min(t), np.max(t))
+        plt.xlim(-5, 5)
         plt.axhline(y=0.0, linestyle=':', color='0.5')
+        plt.axvline(x=0.0, linestyle=':', color='0.5')
         plt.title("Simulation Result", fontsize=28, pad=30)
         plt.xlabel("time", fontsize=24)
         plt.ylabel(name, fontsize=24)
@@ -40,7 +43,7 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in rang
 
 
 def draw_trajectories():
-    env_type = "HPC_custom"
+    env_type = "2DWorld"
     subj = "sac"
     wrapper = ActionWrapper if "HPC" in env_type else None
     # pltqs, init_states = [], []
@@ -49,16 +52,16 @@ def draw_trajectories():
     #     init_states += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['state'][0, :4]]
     env = make_env(f"{env_type}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
     # env = make_env(f"{env_type}-v0", wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-    name = f"{env_type}/BC/sq_{subj}_linear_mm_reset_0.1"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "009")
-    with open(f"../demos/HPC/{subj}.pkl", "rb") as f:
+    name = f"{env_type}/MaxEntIRL/ext_{subj}_linear_mm_reset_0.01_real"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "017")
+    with open(f"../demos/2DWorld/{subj}_check.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     lnum = len(expert_trajs)
     expt_obs = [expert_trajs[i].obs for i in range(lnum)]
     expt_acts = [expert_trajs[i].acts for i in range(lnum)]
     algo = SAC.load(model_dir + "/agent")
     agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=True, render="None", repeat_num=lnum)
-    draw_time_trajs(agent_obs, expt_obs)# labels=[i for i in range(5, 10)])
+    draw_time_trajs(agent_obs, expt_obs, labels=[i for i in range(22)])
     # draw_time_trajs(agent_acts, expt_acts, name="actions", labels=[i for i in range(35)])
 
 
@@ -66,10 +69,10 @@ def draw_costfigure():
     def expt_cost(inp):
         x, y = inp[:, 0], inp[:, 1]
         return th.exp(-0.5 * (x ** 2 + y ** 2)) \
-               - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y - 5 / 2) ** 2)) \
-               - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y - 5 / 2) ** 2)) \
-               - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y + 5 / 2) ** 2)) \
-               - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y + 5 / 2) ** 2))
+            - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y - 5 / 2) ** 2)) \
+            - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y - 5 / 2) ** 2)) \
+            - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y + 5 / 2) ** 2)) \
+            - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y + 5 / 2) ** 2))
     env_type = "2DWorld"
     env_id = f"{env_type}"
     subj = "sac"
@@ -147,4 +150,4 @@ if __name__ == "__main__":
     def feature_fn(x):
         return x
         # return th.cat([x, x.square()], dim=1)
-    draw_costfigure()
+    draw_trajectories()
