@@ -43,7 +43,7 @@ class MaxEntIRL:
         self.eval_env = eval_env
         self.expert_transitions = expert_transitions
         self.agent_trajectories = []
-        self.expand_ratio = 30
+        self.expand_ratio = 5
 
         if self.env_kwargs is None:
             self.env_kwargs = {}
@@ -219,21 +219,18 @@ class GuidedCostLearning(MaxEntIRL):
         log_probs = th.sum(get_trajectories_probs(transition, self.agent.policy))
         return -costs + log_probs
 
-    def cal_loss(self, **kwargs) -> Tuple:
-        n_episodes = kwargs.pop('n_episodes', 10)
-        n_agent_episodes = n_episodes * self.vec_eval_env.num_envs
+    def cal_loss(self, n_episodes) -> Tuple:
         expert_transitions = deepcopy(self.expert_transitions)
-        agent_trajs = self.rollout_from_agent(n_agent_episodes)
-        losses = th.zeros(len(agent_trajs))
-        for i, traj in enumerate(agent_trajs):
-            losses[i] = self.transition_is(flatten_trajectories([traj]))
-        IOCLoss2 = th.logsumexp(losses, 0)
-        agent_transitions = flatten_trajectories(agent_trajs)
+        islosses = th.zeros(int(len(self.agent_trajectories) / (self.expand_ratio * n_episodes)))
+        for idx, i in enumerate(range(0, len(self.agent_trajectories), self.expand_ratio * n_episodes)):
+            agent_transitions = flatten_trajectories(self.agent_trajectories[i:i + self.expand_ratio * n_episodes])
+            islosses[idx] = (self.transition_is(agent_transitions))
         _, expt_reward, lcr = self.mean_transition_reward(agent_transitions, expert_transitions)
         weight_norm = 0.0
         for param in self.reward_net.parameters():
             weight_norm += param.norm().detach().item()
-        return -expt_reward / n_episodes + IOCLoss2, weight_norm, lcr
+        loss = th.logsumexp(islosses, 0) - expt_reward / n_episodes
+        return loss, weight_norm, None
 
     def learn(
             self,
