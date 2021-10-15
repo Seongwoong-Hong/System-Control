@@ -5,7 +5,7 @@ import random
 import numpy as np
 import torch as th
 from imitation.data.rollout import make_sample_until, flatten_trajectories
-from imitation.data.types import Transitions
+from imitation.data.types import Trajectory, Transitions
 from imitation.util import logger
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnvWrapper
 from stable_baselines3.common.type_aliases import GymEnv
@@ -22,9 +22,9 @@ class MaxEntIRL:
             env: GymEnv,
             feature_fn,
             agent,
-            expert_transitions: Transitions,
-            device='cpu',
-            eval_env=None,
+            expert_trajectories: List[Trajectory],
+            device: str = 'cpu',
+            eval_env: GymEnv = None,
             rew_arch: List[int] = None,
             use_action_as_input: bool = True,
             rew_kwargs: Optional[Dict] = None,
@@ -41,9 +41,10 @@ class MaxEntIRL:
         self.env_kwargs = env_kwargs
         self.rew_kwargs = rew_kwargs
         self.eval_env = eval_env
-        self.expert_transitions = expert_transitions
+        self.expert_trajectories = expert_trajectories
+        self.expert_transitions = flatten_trajectories(expert_trajectories)
         self.agent_trajectories = []
-        self.expand_ratio = 5
+        self.expand_ratio = 30
 
         if self.env_kwargs is None:
             self.env_kwargs = {}
@@ -206,6 +207,16 @@ class MaxEntIRL:
 
 
 class GuidedCostLearning(MaxEntIRL):
+    def collect_rollouts(self, n_agent_episodes):
+        print("Collecting rollouts from the current agent...")
+        if isinstance(self.wrap_env, VecEnvWrapper):
+            self.vec_eval_env = deepcopy(self.wrap_env)
+            self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_agent_episodes)]))
+        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_agent_episodes * self.expand_ratio)
+        self.agent_trajectories = generate_trajectories_without_shuffle(
+                self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
+        self.agent.set_env(self.wrap_env)
+
     def transition_is(self, transition: Transitions) -> th.Tensor:
         if self.use_action_as_input:
             acts = transition.acts
@@ -215,16 +226,16 @@ class GuidedCostLearning(MaxEntIRL):
             th_input = th.from_numpy(np_input).double()
         else:
             th_input = th.from_numpy(transition.obs).double()
-        costs = -th.sum(self.reward_net(th_input))
+        reward = th.sum(self.reward_net(th_input))
         log_probs = th.sum(get_trajectories_probs(transition, self.agent.policy))
-        return -costs + log_probs
+        return reward - log_probs
 
     def cal_loss(self, n_episodes) -> Tuple:
-        expert_transitions = deepcopy(self.expert_transitions)
-        islosses = th.zeros(int(len(self.agent_trajectories) / (self.expand_ratio * n_episodes)))
-        for idx, i in enumerate(range(0, len(self.agent_trajectories), self.expand_ratio * n_episodes)):
-            agent_transitions = flatten_trajectories(self.agent_trajectories[i:i + self.expand_ratio * n_episodes])
-            islosses[idx] = (self.transition_is(agent_transitions))
+        expert_transitions = flatten_trajectories(self.expert_trajectories)
+        islosses = th.zeros(len(self.agent_trajectories + self.expert_trajectories))
+        for idx, traj in enumerate(self.agent_trajectories + self.expert_trajectories):
+            agent_transitions = flatten_trajectories([traj])
+            islosses[idx] = self.transition_is(agent_transitions)
         _, expt_reward, lcr = self.mean_transition_reward(agent_transitions, expert_transitions)
         weight_norm = 0.0
         for param in self.reward_net.parameters():

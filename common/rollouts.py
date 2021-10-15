@@ -12,13 +12,10 @@ def get_trajectories_probs(
         trans,
         policy,
 ) -> torch.Tensor:
-    obs = torch.from_numpy(trans[0]['obs'].reshape(1, -1)).to(policy.device)
-    acts = torch.from_numpy(trans[0]['acts'].reshape(1, -1)).to(policy.device)
-    log_probs = policy.get_log_prob_from_act(obs, acts)
-    for i in range(len(trans)-1):
-        obs = torch.from_numpy(trans[i+1]['obs'].reshape(1, -1)).to(policy.device)
-        acts = torch.from_numpy(trans[i+1]['acts'].reshape(1, -1)).to(policy.device)
-        log_probs = torch.cat([log_probs, policy.get_log_prob_from_act(obs, acts)], dim=0)
+    with torch.no_grad():
+        obs = torch.from_numpy(trans.obs).to(policy.device)
+        acts = torch.from_numpy(trans.acts).to(policy.device)
+        log_probs = policy.get_log_prob_from_act(obs, acts)
     return log_probs
 
 
