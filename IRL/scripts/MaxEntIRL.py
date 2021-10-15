@@ -19,7 +19,7 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "2DWorld"
     algo_type = "MaxEntIRL"
-    device = "cpu"
+    device = "cuda:2"
     name = f"{env_type}"
     expt = "sac"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -38,7 +38,6 @@ if __name__ == "__main__":
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
-    transitions = rollout.flatten_trajectories(expert_trajs)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
@@ -69,7 +68,7 @@ if __name__ == "__main__":
         env,
         feature_fn=feature_fn,
         agent=agent,
-        expert_transitions=transitions,
+        expert_trajectories=expert_trajs,
         use_action_as_input=False,
         rew_arch=[],
         device=device,

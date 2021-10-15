@@ -11,7 +11,7 @@ from common.rollouts import generate_trajectories_without_shuffle
 from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
-    n_episodes = 60
+    n_episodes = 22
     env_type = "2DWorld"
     name = f"{env_type}"
     subpath = "HPC/sub01/sub01"
@@ -23,6 +23,6 @@ if __name__ == "__main__":
     # ExpertPolicy = PPO.load(f"{proj_path}/tmp/log/IDP/ppo/lqrppo/000000500000/model.pkl")
     trajectories = generate_trajectories_without_shuffle(
         ExpertPolicy, DummyVecEnv([lambda: env]), sample_until, deterministic_policy=False)
-    save_name = f"{env_type}/sac.pkl"
+    save_name = f"{env_type}/sac_check.pkl"
     types.save(save_name, trajectories)
     print(f"Expert Trajectories are saved in the {save_name}")

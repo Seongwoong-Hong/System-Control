@@ -10,16 +10,17 @@ from stable_baselines3.common.vec_env import VecNormalize
 
 from common.util import make_env
 from common.callbacks import SaveCallback
+from common.wrappers import RewardWrapper
 from algos.torch.MaxEntIRL import GuidedCostLearning
 from IRL.scripts.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "HPC"
+    env_type = "2DWorld"
     algo_type = "GCL"
-    device = "cuda:3"
-    sub = "sub01_crop"
-    name = f"{env_type}_crop"
+    device = "cpu"
+    sub = "sac"
+    name = f"{env_type}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, sub, sub)
     env = make_env(f"{name}-v1", use_vec_env=False, subpath=subpath)
@@ -29,19 +30,18 @@ if __name__ == "__main__":
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
-    transitions = rollout.flatten_trajectories(expert_trajs)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/no_{sub}_ppoagent_reset"
+    log_dir += f"/ext_{sub}_linear_ppoagent_reset"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return x
-        # return th.cat([x, x.square()], dim=1)
+        # return x
+        return th.cat([x, x**2, x**3, x**4], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -59,12 +59,12 @@ if __name__ == "__main__":
         env,
         feature_fn=feature_fn,
         agent=agent,
-        expert_transitions=transitions,
-        use_action_as_input=True,
-        rew_arch=[32, 32],
+        expert_trajectories=expert_trajs,
+        use_action_as_input=False,
+        rew_arch=[],
         device=device,
-        env_kwargs={'vec_normalizer': None},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.05},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
     )
 
     # Run Learning
@@ -72,11 +72,12 @@ if __name__ == "__main__":
         total_iter=50,
         agent_learning_steps=1e5,
         n_episodes=expt_traj_num,
-        max_agent_iter=15,
-        min_agent_iter=5,
-        max_gradient_steps=100,
-        min_gradient_steps=15,
+        max_agent_iter=25,
+        min_agent_iter=10,
+        max_gradient_steps=500,
+        min_gradient_steps=300,
         callback=save_net_callback.net_save,
+        early_stop=True,
     )
 
     # Save the result of learning
