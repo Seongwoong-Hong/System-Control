@@ -19,7 +19,7 @@ register(
 register(
     id="2DWorld-v0",
     entry_point='gym_envs.envs:TwoDWorldDet',
-    max_episode_steps=50,
+    max_episode_steps=100,
 )
 
 register(

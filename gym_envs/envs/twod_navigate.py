@@ -7,26 +7,58 @@ from typing import List
 
 class TwoDWorld(gym.Env):
     def __init__(self):
-        self.height = 5.0
-        self.width = 5.0
-        self.dt = 0.1
+        self.height = 3.0
+        self.width = 3.0
+        self.dt = 0.05
         self.st = None
         self.observation_space = gym.spaces.Box(low=np.array([-self.width, -self.height]),
                                                 high=np.array([self.width, self.height]))
         self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(2,))
+        self.idx = 0
+        self.init_state = 5.0 * np.array(([-0.5, 0.35],
+                                          [-0.4, 0.35],
+                                          [-0.3, 0.35],
+                                          [-0.2, 0.35],
+                                          [-0.1, 0.35],
+                                          [0.0, 0.35],
+                                          [0.1, 0.35],
+                                          [0.2, 0.35],
+                                          [0.3, 0.35],
+                                          [0.4, 0.35],
+                                          [0.5, 0.35],
+                                          [-0.5, -0.35],
+                                          [-0.4, -0.35],
+                                          [-0.3, -0.35],
+                                          [-0.2, -0.35],
+                                          [-0.1, -0.35],
+                                          [0.0, -0.35],
+                                          [0.1, -0.35],
+                                          [0.2, -0.35],
+                                          [0.3, -0.35],
+                                          [0.4, -0.35],
+                                          [0.5, -0.35]))
 
     def step(self, action: np.ndarray):
         assert self.st is not None, "Can't step the environment before calling reset function"
         r = self.reward_fn(self.st)
         info = {'obs': self.st.reshape(1, -1), 'acts': action.reshape(1, -1)}
-        self.st = self.st + self.dt * action
+        st = self.st + self.dt * action
+        done = bool(
+            self.st[0] < -self.width
+            or self.st[0] > self.width
+            or self.st[1] < -self.height
+            or self.st[1] > self.height
+        )
+        if not done:
+            self.st = st
         return self.st, r, None, info
 
     def _get_obs(self):
         return self.st
 
     def reset(self):
-        self.st = np.random.uniform(low=[-self.width, -self.height], high=[self.width, self.height])
+        self.idx = np.random.randint(len(self.init_state))
+        self.st = self.init_state[self.idx, :]
         return self._get_obs()
 
     def reward_fn(self, state) -> float:
@@ -60,34 +92,7 @@ class TwoDWorld(gym.Env):
 
 
 class TwoDWorldDet(TwoDWorld):
-    def __init__(self):
-        super().__init__()
-        self.i = 0
-        self.init_state = 5 * np.array(([-0.5, 0.15],
-                                       [-0.4, 0.15],
-                                       [-0.3, 0.15],
-                                       [-0.2, 0.15],
-                                       [-0.1, 0.15],
-                                       [0.0, 0.15],
-                                       [0.1, 0.15],
-                                       [0.2, 0.15],
-                                       [0.3, 0.15],
-                                       [0.4, 0.15],
-                                       [0.5, 0.15],
-                                       [-0.5, -0.15],
-                                       [-0.4, -0.15],
-                                       [-0.3, -0.15],
-                                       [-0.2, -0.15],
-                                       [-0.1, -0.15],
-                                       [0.0, -0.15],
-                                       [0.1, -0.15],
-                                       [0.2, -0.15],
-                                       [0.3, -0.15],
-                                       [0.4, -0.15],
-                                       [0.5, -0.15]))
-
     def reset(self):
-        # idx = np.random.randint(len(self.init_state))
-        self.st = self.init_state[self.i, :]
-        self.i = (self.i + 1) % len(self.init_state)
+        self.st = self.init_state[self.idx, :]
+        self.idx = (self.idx + 1) % len(self.init_state)
         return self._get_obs()
