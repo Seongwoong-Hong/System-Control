@@ -1,6 +1,7 @@
 import os
 import pytest
 from scipy import io
+import numpy as np
 
 from IRL.scripts.project_policies import def_policy
 from algos.torch.ppo import PPO
@@ -99,3 +100,22 @@ def test_mujoco_policy(irl_path):
     algo = PPO.load(model_dir + "/gen")
     for _ in range(10):
         verify_policy(env, algo, deterministic=False)
+
+
+def test_2dworld(irl_path):
+    name = "2DWorld"
+    env = make_env(f"{name}-v0")
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "MaxEntIRL", "ext_sac_linear_mm_reset_0.01_real", "model", "003")
+    algo = SAC.load(model_dir + f"/agent")
+    trajs = []
+    for i in range(10):
+        st = env.reset()
+        done = False
+        sts, rs = [], []
+        while not done:
+            action, _ = algo.predict(st)
+            st, r, done, _ = env.step(action)
+            sts.append(st)
+            rs.append(r)
+        trajs.append(np.append(np.array(sts), np.array(rs).reshape(-1, 1), axis=1))
+    env.draw(trajs)

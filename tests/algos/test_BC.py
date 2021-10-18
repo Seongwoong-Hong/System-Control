@@ -32,7 +32,7 @@ def expert(irl_path):
     expert_dir = os.path.join(irl_path, "demos", "HPC", "sub01.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
-    return rollout.flatten_trajectories(expert_trajs)
+    return expert_trajs
 
 
 @pytest.fixture
@@ -87,7 +87,7 @@ def test_irl(env, expert):
         env,
         feature_fn=feature_fn,
         agent=agent,
-        expert_transitions=expert,
+        expert_trajectories=expert,
         use_action_as_input=True,
         rew_arch=[8, 8, 8, 8],
         device="cpu",

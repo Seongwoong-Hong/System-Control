@@ -42,22 +42,21 @@ def test_rl_learned_policy(rl_path):
 
 def test_2dworld(rl_path):
     name = "2DWorld"
-    env = make_env(f"{name}-v1")
-    model_dir = os.path.join(rl_path, name, "tmp", "log", name, "sac", "policies_2")
+    env = make_env(f"{name}-v0")
+    model_dir = os.path.join(rl_path, name, "tmp", "log", name, "sac", "policies_1")
     algo = SAC.load(model_dir + f"/agent")
     trajs = []
-    for i in range(10):
+    for i in range(22):
         st = env.reset()
         done = False
         sts, rs = [], []
         while not done:
-            action, _ = algo.predict(st)
+            action, _ = algo.predict(st, deterministic=False)
             st, r, done, _ = env.step(action)
             sts.append(st)
             rs.append(r)
         trajs.append(np.append(np.array(sts), np.array(rs).reshape(-1, 1), axis=1))
     env.draw(trajs)
-
 
 
 def test_total_reward(rl_path):

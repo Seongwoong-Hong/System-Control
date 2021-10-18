@@ -19,16 +19,16 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, "HPC", "sub01.pkl")
+    expert_dir = os.path.join(demo_dir, "2DWorld", "sac.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
-    return rollout.flatten_trajectories(expert_trajs)
+    return expert_trajs
 
 
 @pytest.fixture
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env("HPC_pybullet-v1", subpath=subpath)
+    return make_env("2DWorld-v1", subpath=subpath)
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def learner(env, expert, eval_env):
         eval_env=eval_env,
         agent=agent,
         feature_fn=feature_fn,
-        expert_transitions=expert,
+        expert_trajectories=expert,
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None},
@@ -90,7 +90,7 @@ def test_validity(learner):
 def test_GCL(env, expert):
     from imitation.util import logger
     from IRL.scripts.project_policies import def_policy
-    logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
+    logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
         return x
@@ -101,9 +101,10 @@ def test_GCL(env, expert):
         env,
         agent=agent,
         feature_fn=feature_fn,
-        expert_transitions=expert,
+        expert_trajectories=expert,
+        use_action_as_input=True,
         rew_arch=[8, 8],
-        device='cuda:0',
+        device='cpu',
         env_kwargs={},
         rew_kwargs={'type': 'ann'}
     )
