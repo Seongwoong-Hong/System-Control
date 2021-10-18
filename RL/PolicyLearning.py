@@ -12,9 +12,9 @@ from RL.project_policies import def_policy
 
 if __name__ == "__main__":
     env_type = "2DWorld"
-    algo_type = "sac"
+    algo_type = "ppo"
     name = f"{env_type}"
-    device = "cpu"
+    device = "cuda:2"
     env_id = f"{name}-v1"
     # subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
     # env = make_env(env_id, use_vec_env=False, num_envs=1, subpath=subpath, wrapper=ActionWrapper, use_norm=False)
@@ -33,9 +33,9 @@ if __name__ == "__main__":
     #                                n_eval_episodes=5,
     #                                render_freq=int(0.5e5))
     save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
-    save_policy_callback = callbacks.EveryNTimesteps(int(5e4), save_policy_callback)
+    save_policy_callback = callbacks.EveryNTimesteps(int(5e5), save_policy_callback)
     # callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
-    algo.learn(total_timesteps=int(4e4), tb_log_name="extra", callback=save_policy_callback)
+    algo.learn(total_timesteps=int(4e6), tb_log_name="extra", callback=save_policy_callback)
     algo.save(log_dir+f"/policies_{n}/agent")
     if algo.get_vec_normalize_env():
         algo.env.save(log_dir+f"/policies_{n}/normalization.pkl")

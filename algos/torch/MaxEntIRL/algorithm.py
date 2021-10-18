@@ -44,7 +44,7 @@ class MaxEntIRL:
         self.expert_trajectories = expert_trajectories
         self.expert_transitions = flatten_trajectories(expert_trajectories)
         self.agent_trajectories = []
-        self.expand_ratio = 30
+        self.expand_ratio = 10
 
         if self.env_kwargs is None:
             self.env_kwargs = {}

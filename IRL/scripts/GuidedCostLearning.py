@@ -18,12 +18,13 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "2DWorld"
     algo_type = "GCL"
-    device = "cpu"
+    device = "cuda:3"
     sub = "sac"
     name = f"{env_type}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, sub, sub)
     env = make_env(f"{name}-v1", use_vec_env=False, subpath=subpath)
+    eval_env = make_env(f"{name}-v0", use_vec_env=False, subpath=subpath)
 
     # Load data
     expert_dir = os.path.join(proj_path, "demos", env_type, f"{sub}.pkl")
@@ -33,15 +34,15 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{sub}_linear_ppoagent_reset"
+    log_dir += f"/no_{sub}_reset"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        # return x
-        return th.cat([x, x**2, x**3, x**4], dim=1)
+        return x
+        # return th.cat([x, x**2, x**3, x**4], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -54,14 +55,15 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("ppo", env, device=device, verbose=1)
+    agent = def_policy("sac", env, device=device, verbose=1)
     learner = GuidedCostLearning(
         env,
+        eval_env=eval_env,
         feature_fn=feature_fn,
         agent=agent,
         expert_trajectories=expert_trajs,
         use_action_as_input=False,
-        rew_arch=[],
+        rew_arch=[32, 32],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
@@ -70,7 +72,7 @@ if __name__ == "__main__":
     # Run Learning
     learner.learn(
         total_iter=50,
-        agent_learning_steps=1e5,
+        agent_learning_steps=1e4,
         n_episodes=expt_traj_num,
         max_agent_iter=25,
         min_agent_iter=10,
