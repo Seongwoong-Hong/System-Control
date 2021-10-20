@@ -1,3 +1,4 @@
+import os
 from copy import deepcopy
 from typing import List, Dict, Optional, Union, Tuple
 
@@ -29,6 +30,7 @@ class MaxEntIRL:
             use_action_as_input: bool = True,
             rew_kwargs: Optional[Dict] = None,
             env_kwargs: Optional[Dict] = None,
+            **kwargs,
     ):
         assert (
             logger.is_configured()
@@ -207,15 +209,9 @@ class MaxEntIRL:
 
 
 class GuidedCostLearning(MaxEntIRL):
-    def collect_rollouts(self, n_agent_episodes):
-        print("Collecting rollouts from the current agent...")
-        if isinstance(self.wrap_env, VecEnvWrapper):
-            self.vec_eval_env = deepcopy(self.wrap_env)
-            self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_agent_episodes)]))
-        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_agent_episodes * self.expand_ratio)
-        self.agent_trajectories = generate_trajectories_without_shuffle(
-                self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
-        self.agent.set_env(self.wrap_env)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.model_dir = kwargs['model_dir']
 
     def transition_is(self, transition: Transitions) -> th.Tensor:
         if self.use_action_as_input:
@@ -227,20 +223,26 @@ class GuidedCostLearning(MaxEntIRL):
         else:
             th_input = th.from_numpy(transition.obs).double()
         reward = th.sum(self.reward_net(th_input))
-        log_probs = th.sum(get_trajectories_probs(transition, self.agent.policy))
-        return reward - log_probs
+        i = 0
+        probs = th.exp(th.sum(get_trajectories_probs(transition, self.agent.policy)).double()).reshape(1)
+        while os.path.isdir(self.model_dir + f"/{i:03d}"):
+            prev_agent = self.agent.load(self.model_dir + f"/{i:03d}/agent", device=self.device)
+            probs = th.cat([probs, th.exp(th.sum(get_trajectories_probs(transition, prev_agent.policy)).double()).reshape(1)])
+            i += 1
+        return reward - th.log(probs.mean())
 
     def cal_loss(self, n_episodes) -> Tuple:
         expert_transitions = flatten_trajectories(self.expert_trajectories)
-        islosses = th.zeros(len(self.agent_trajectories + self.expert_trajectories))
-        for idx, traj in enumerate(self.agent_trajectories + self.expert_trajectories):
+        demo_trajs = random.sample(self.agent_trajectories + self.expert_trajectories, n_episodes * self.expand_ratio)
+        islosses = th.zeros(len(demo_trajs))
+        for idx, traj in enumerate(demo_trajs):
             agent_transitions = flatten_trajectories([traj])
             islosses[idx] = self.transition_is(agent_transitions)
         _, expt_reward, lcr = self.mean_transition_reward(agent_transitions, expert_transitions)
+        loss = th.logsumexp(islosses, 0) - expt_reward / n_episodes
         weight_norm = 0.0
         for param in self.reward_net.parameters():
             weight_norm += param.norm().detach().item()
-        loss = th.logsumexp(islosses, 0) - expt_reward / n_episodes
         return loss, weight_norm, None
 
     def learn(
