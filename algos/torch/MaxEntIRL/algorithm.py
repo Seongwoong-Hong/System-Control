@@ -212,6 +212,8 @@ class GuidedCostLearning(MaxEntIRL):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model_dir = kwargs['model_dir']
+        self.prev_agents = []
+        self.i = 0
 
     def transition_is(self, transition: Transitions) -> th.Tensor:
         if self.use_action_as_input:
@@ -223,18 +225,18 @@ class GuidedCostLearning(MaxEntIRL):
         else:
             th_input = th.from_numpy(transition.obs).double()
         reward = th.sum(self.reward_net(th_input))
-        i = 0
-        probs = th.exp(th.sum(get_trajectories_probs(transition, self.agent.policy)).double()).reshape(1)
-        while os.path.isdir(self.model_dir + f"/{i:03d}"):
-            prev_agent = self.agent.load(self.model_dir + f"/{i:03d}/agent", device=self.device)
-            probs = th.cat([probs, th.exp(th.sum(get_trajectories_probs(transition, prev_agent.policy)).double()).reshape(1)])
-            i += 1
-        return reward - th.log(probs.mean())
+        log_probs = th.sum(get_trajectories_probs(transition, self.agent.policy)).reshape(1)
+        if os.path.isdir(self.model_dir + f"/{self.i:03d}"):
+            self.prev_agents.append(self.agent.load(self.model_dir + f"/{self.i:03d}/agent", device=self.device))
+            self.i += 1
+        for prev_agent in self.prev_agents:
+            log_probs = th.cat([log_probs, th.sum(get_trajectories_probs(transition, prev_agent.policy)).reshape(1)])
+        return reward - (th.logsumexp(log_probs, 0) - th.log(th.tensor(len(log_probs)).double()))
 
     def cal_loss(self, n_episodes) -> Tuple:
         expert_transitions = flatten_trajectories(self.expert_trajectories)
         demo_trajs = random.sample(self.agent_trajectories + self.expert_trajectories, n_episodes * self.expand_ratio)
-        islosses = th.zeros(len(demo_trajs))
+        islosses = th.zeros(len(demo_trajs)).double()
         for idx, traj in enumerate(demo_trajs):
             agent_transitions = flatten_trajectories([traj])
             islosses[idx] = self.transition_is(agent_transitions)
