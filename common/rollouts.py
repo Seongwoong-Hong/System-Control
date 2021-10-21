@@ -13,8 +13,8 @@ def get_trajectories_probs(
         policy,
 ) -> torch.Tensor:
     with torch.no_grad():
-        obs = torch.from_numpy(trans.obs).to(policy.device)
-        acts = torch.from_numpy(trans.acts).to(policy.device)
+        obs = torch.from_numpy(trans.obs).to(policy.device).double()
+        acts = torch.from_numpy(trans.acts).to(policy.device).double()
         log_probs = policy.get_log_prob_from_act(obs, acts)
     return log_probs
 

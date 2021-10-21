@@ -25,7 +25,7 @@ class RewardWrapper(gym.RewardWrapper):
         return ob, self.reward(inp), done, info
 
     def reward(self, inp) -> float:
-        rwinp = torch.from_numpy(inp).reshape(1, -1).to(self.rwfn.device)
+        rwinp = torch.from_numpy(inp).reshape(1, -1).to(self.rwfn.device).double()
         return self.rwfn.forward(rwinp).item()
 
 
