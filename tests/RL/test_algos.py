@@ -42,11 +42,11 @@ def test_rl_learned_policy(rl_path):
 
 def test_2dworld(rl_path):
     name = "2DWorld"
-    env = make_env(f"{name}-v0")
-    model_dir = os.path.join(rl_path, name, "tmp", "log", name, "sac", "policies_1")
+    env = make_env(f"{name}-v2")
+    model_dir = os.path.join(rl_path, name, "tmp", "log", name, "sac", "policies_5")
     algo = SAC.load(model_dir + f"/agent")
     trajs = []
-    for i in range(22):
+    for i in range(110):
         st = env.reset()
         done = False
         sts, rs = [], []

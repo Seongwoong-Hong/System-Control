@@ -95,7 +95,9 @@ def test_GCL(env, expert):
     def feature_fn(x):
         return x
 
-    agent = def_policy("ppo", env, device='cpu', verbose=1)
+    model_dir = os.path.abspath("../../IRL/tmp/log/2DWorld/GCL/ext_ppo_linear_reset_0ent/model")
+
+    agent = def_policy("sac", env, device='cpu', verbose=1)
 
     learner = GuidedCostLearning(
         env,
@@ -106,7 +108,8 @@ def test_GCL(env, expert):
         rew_arch=[8, 8],
         device='cpu',
         env_kwargs={},
-        rew_kwargs={'type': 'ann'}
+        rew_kwargs={'type': 'ann'},
+        model_dir=model_dir,
     )
 
     learner.learn(
