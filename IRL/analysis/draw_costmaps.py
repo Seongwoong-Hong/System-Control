@@ -20,9 +20,9 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in rang
     t = np.linspace(0, 1/120 * (len(inp1[0])-1), len(inp1[0]))
     ymax, ymin = 5, -5
     # ymax, ymin = np.max(np.array(inp2)[:, :, :2]), np.min(np.array(inp2)[:, :, :2])
+    plt.figure(figsize=[9, 6.4], dpi=600.0)
     for j in labels:
         yval_list = [inp1[j], inp2[j]]
-        plt.figure(figsize=[9, 6.4], dpi=600.0)
         plt.plot(yval_list[0][:, 0], yval_list[0][:, 1], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
         # plt.plot(t, yval_list[1][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 0.4), lw=3)
         plt.plot(yval_list[1][:, 0], yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 1), lw=3)
@@ -39,7 +39,7 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in rang
         plt.xlabel("time", fontsize=24)
         plt.ylabel(name, fontsize=24)
         # plt.savefig(f"figures/{env_type}/{subj}/angular_velocity{j}.png")
-        plt.show()
+    plt.show()
 
 
 def draw_trajectories():
@@ -52,14 +52,14 @@ def draw_trajectories():
     #     init_states += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['state'][0, :4]]
     env = make_env(f"{env_type}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
     # env = make_env(f"{env_type}-v0", wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-    name = f"{env_type}/GCL/ext_{subj}_linear_ppoagent_reset"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "049")
-    with open(f"../demos/2DWorld/{subj}_check.pkl", "rb") as f:
+    name = f"{env_type}/GCL/ext_{subj}_linear_reset_accum_0ent"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "000")
+    with open(f"../demos/2DWorld/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     lnum = len(expert_trajs)
     expt_obs = [expert_trajs[i].obs for i in range(lnum)]
     expt_acts = [expert_trajs[i].acts for i in range(lnum)]
-    algo = PPO.load(model_dir + "/agent")
+    algo = SAC.load(model_dir + "/agent")
     agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=True, render="None", repeat_num=lnum)
     draw_time_trajs(agent_obs, expt_obs, labels=[i for i in range(22)])
     # draw_time_trajs(agent_acts, expt_acts, name="actions", labels=[i for i in range(35)])
@@ -78,10 +78,10 @@ def draw_costfigure():
     subj = "sac"
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
     env = make_env(f"{env_id}-v1", use_vec_env=False, subpath=subpath + f"/{subj}")
-    name = f"ext_{subj}_linear_ppoagent_reset"
-    num = 3
+    name = f"cnn_{subj}_reset_0ent"
+    num = 15
     load_dir = os.path.abspath(f"../tmp/log/{env_id}/GCL/{name}/model")
-    algo = PPO.load(load_dir + f"/{num:03d}/agent")
+    algo = SAC.load(load_dir + f"/{num:03d}/agent")
     # algo = def_policy("IDP", env)
     # algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
     with open(load_dir + f"/{num:03d}/reward_net.pkl", "rb") as f:
@@ -151,4 +151,4 @@ if __name__ == "__main__":
     def feature_fn(x):
         # return x
         return th.cat([x, x**2, x**3, x**4], dim=1)
-    draw_costfigure()
+    draw_trajectories()

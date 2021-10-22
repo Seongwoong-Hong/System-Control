@@ -18,12 +18,12 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "2DWorld"
     algo_type = "GCL"
-    device = "cuda:3"
+    device = "cuda:2"
     sub = "sac"
     name = f"{env_type}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, sub, sub)
-    env = make_env(f"{name}-v1", use_vec_env=False, subpath=subpath)
+    env = make_env(f"{name}-v2", use_vec_env=False, subpath=subpath)
     eval_env = make_env(f"{name}-v0", use_vec_env=False, subpath=subpath)
 
     # Load data
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/no_{sub}_reset"
+    log_dir += f"/cnn_{sub}_reset_accum_0ent2"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -63,10 +63,11 @@ if __name__ == "__main__":
         agent=agent,
         expert_trajectories=expert_trajs,
         use_action_as_input=False,
-        rew_arch=[32, 32],
+        rew_arch=[4, 4, 4, 4, 4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
+        model_dir=model_dir,
     )
 
     # Run Learning
@@ -76,7 +77,7 @@ if __name__ == "__main__":
         n_episodes=expt_traj_num,
         max_agent_iter=25,
         min_agent_iter=10,
-        max_gradient_steps=500,
+        max_gradient_steps=1500,
         min_gradient_steps=300,
         callback=save_net_callback.net_save,
         early_stop=True,

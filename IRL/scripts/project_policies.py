@@ -120,7 +120,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
             target_update_interval=1,
             gamma=0.99,
             ent_coef='auto',
-            target_entropy='auto',
+            target_entropy=0.0,
             device=device,
             verbose=verbose,
             tensorboard_log=log_dir,

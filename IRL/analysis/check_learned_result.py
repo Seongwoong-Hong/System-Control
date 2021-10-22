@@ -100,7 +100,7 @@ def compare_obs():
     env_type = "2DWorld"
     env_id = f"{env_type}"
     subj = "sac"
-    name = f"ext_{subj}_linear_ppoagent_reset"
+    name = f"ext_{subj}_linear_reset_accum_0ent"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "GCL", name))
     assert os.path.isdir(proj_path)
@@ -116,7 +116,7 @@ def compare_obs():
     error_list, max_list = [], []
     i = 0
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        agent = PPO.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
+        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
         stats_path = None
         if os.path.isfile(os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")):
             stats_path = os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")
