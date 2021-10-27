@@ -34,6 +34,24 @@ register(
     max_episode_steps=100,
 )
 
+register(
+    id='2DWorld_disc-v0',
+    entry_point='gym_envs.envs:TwoDWorldDiscDetOrder',
+    max_episode_steps=100,
+)
+
+register(
+    id='2DWorld_disc-v1',
+    entry_point='gym_envs.envs:TwoDWorldDiscDet',
+    max_episode_steps=100,
+)
+
+register(
+    id='2DWorld_disc-v2',
+    entry_point='gym_envs.envs:TwoDWorldDisc',
+    max_episode_steps=100,
+)
+
 # environments based on mujoco
 # expert: v0, agent: v1
 # v2 environment is not used yet
