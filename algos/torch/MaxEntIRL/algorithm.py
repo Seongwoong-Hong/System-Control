@@ -46,7 +46,7 @@ class MaxEntIRL:
         self.expert_trajectories = expert_trajectories
         self.expert_transitions = flatten_trajectories(expert_trajectories)
         self.agent_trajectories = []
-        self.expand_ratio = 10
+        self.expand_ratio = 30
 
         if self.env_kwargs is None:
             self.env_kwargs = {}
@@ -209,11 +209,9 @@ class MaxEntIRL:
 
 
 class GuidedCostLearning(MaxEntIRL):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.model_dir = kwargs['model_dir']
-        self.prev_agents = []
-        self.i = 0
+    def collect_rollouts(self, n_agent_episodes):
+        self.agent_trajectories = []
+        super().collect_rollouts(n_agent_episodes)
 
     def transition_is(self, transition: Transitions) -> th.Tensor:
         if self.use_action_as_input:
@@ -225,17 +223,12 @@ class GuidedCostLearning(MaxEntIRL):
         else:
             th_input = th.from_numpy(transition.obs).double()
         reward = th.sum(self.reward_net(th_input))
-        log_probs = th.sum(get_trajectories_probs(transition, self.agent.policy)).reshape(1)
-        if os.path.isdir(self.model_dir + f"/{self.i:03d}"):
-            self.prev_agents.append(self.agent.load(self.model_dir + f"/{self.i:03d}/agent", device=self.device))
-            self.i += 1
-        for prev_agent in self.prev_agents:
-            log_probs = th.cat([log_probs, th.sum(get_trajectories_probs(transition, prev_agent.policy)).reshape(1)])
-        return reward - (th.logsumexp(log_probs, 0) - th.log(th.tensor(len(log_probs)).double()))
+        log_probs = th.sum(get_trajectories_probs(transition, self.agent.policy))
+        return reward - log_probs
 
     def cal_loss(self, n_episodes) -> Tuple:
         expert_transitions = flatten_trajectories(self.expert_trajectories)
-        demo_trajs = random.sample(self.agent_trajectories + self.expert_trajectories, n_episodes * self.expand_ratio)
+        demo_trajs = self.agent_trajectories + self.expert_trajectories
         islosses = th.zeros(len(demo_trajs)).double()
         for idx, traj in enumerate(demo_trajs):
             agent_transitions = flatten_trajectories([traj])
