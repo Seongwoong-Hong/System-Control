@@ -36,9 +36,9 @@ class ActorCriticPolicyCustom(ActorCriticPolicy):
         :return: Action distribution
         """
         mean_actions = self.action_net(latent_pi)
-        log_std = th.clamp(self.log_std, self.log_std_low, self.log_std_high)
 
         if isinstance(self.action_dist, DiagGaussianDistribution):
+            log_std = th.clamp(self.log_std, self.log_std_low, self.log_std_high)
             return self.action_dist.proba_distribution(mean_actions, log_std)
         elif isinstance(self.action_dist, CategoricalDistribution):
             # Here mean_actions are the logits before the softmax
@@ -50,6 +50,7 @@ class ActorCriticPolicyCustom(ActorCriticPolicy):
             # Here mean_actions are the logits (before rounding to get the binary actions)
             return self.action_dist.proba_distribution(action_logits=mean_actions)
         elif isinstance(self.action_dist, StateDependentNoiseDistribution):
+            log_std = th.clamp(self.log_std, self.log_std_low, self.log_std_high)
             return self.action_dist.proba_distribution(mean_actions, log_std, latent_sde)
         else:
             raise ValueError("Invalid action distribution")
