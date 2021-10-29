@@ -71,7 +71,7 @@ def test_init():
 
 
 def test_2dworld():
-    env = make_env("2DWorld-v1")
+    env = make_env("2DWorld-v2")
     trajs = []
     for i in range(10):
         env.reset()
