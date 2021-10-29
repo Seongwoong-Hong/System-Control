@@ -46,7 +46,7 @@ class MaxEntIRL:
         self.expert_trajectories = expert_trajectories
         self.expert_transitions = flatten_trajectories(expert_trajectories)
         self.agent_trajectories = []
-        self.expand_ratio = 30
+        self.expand_ratio = 10
 
         if self.env_kwargs is None:
             self.env_kwargs = {}
@@ -130,16 +130,17 @@ class MaxEntIRL:
         return agent_rewards.sum(), expt_rewards.sum(), None
 
     def cal_loss(self, n_episodes) -> Tuple:
-        expert_transitions = deepcopy(self.expert_transitions)
-        losses = []
-        for i in range(0, len(self.agent_trajectories), self.expand_ratio * n_episodes):
-            agent_transitions = flatten_trajectories(self.agent_trajectories[i:i + self.expand_ratio * n_episodes])
-            agent_reward, expt_reward, _ = self.mean_transition_reward(agent_transitions, expert_transitions)
-            losses.append(agent_reward / (self.expand_ratio * n_episodes) - expt_reward / n_episodes)
+        expert_trajectories = deepcopy(self.expert_trajectories)
+        agent_trajectories = deepcopy(self.agent_trajectories)
+        target = th.cat([th.ones(len(expert_trajectories)), -th.ones(len(agent_trajectories))])
+        y = th.zeros(len(expert_trajectories + agent_trajectories))
+        for i, traj in enumerate(expert_trajectories + agent_trajectories):
+            trans = flatten_trajectories([traj])
+            y[i], _, _ = self.mean_transition_reward(trans, trans)
+        loss = th.mean(th.clamp(1 - y * target, min=0))
         weight_norm = 0.0
         for param in self.reward_net.parameters():
             weight_norm += param.norm().detach().item()
-        loss = np.max(losses)
         return loss, weight_norm, None
 
     def sample_and_cal_loss(self, n_episodes):
