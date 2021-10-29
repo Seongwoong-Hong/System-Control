@@ -8,6 +8,7 @@ from copy import deepcopy
 from matplotlib import pyplot as plt
 from matplotlib import cm
 from scipy import io
+from imitation.algorithms import bc
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
@@ -44,24 +45,27 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in rang
 
 def draw_trajectories():
     env_type = "2DWorld"
-    subj = "sac"
+    env_id = f"{env_type}_disc"
+    subj = "ppo"
     wrapper = ActionWrapper if "HPC" in env_type else None
     # pltqs, init_states = [], []
     # for i in range(5, 10):
     #     pltqs += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['pltq']]
     #     init_states += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['state'][0, :4]]
-    env = make_env(f"{env_type}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
+    env = make_env(f"{env_id}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
     # env = make_env(f"{env_type}-v0", wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-    name = f"{env_type}/GCL/ext_{subj}_linear_reset_accum_0ent"
+    name = f"{env_id}/GCL/no_{subj}_disc_reset_0.2"
     model_dir = os.path.join("..", "tmp", "log", name, "model", "000")
-    with open(f"../demos/2DWorld/{subj}.pkl", "rb") as f:
+    with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     lnum = len(expert_trajs)
     expt_obs = [expert_trajs[i].obs for i in range(lnum)]
     expt_acts = [expert_trajs[i].acts for i in range(lnum)]
-    algo = SAC.load(model_dir + "/agent")
-    agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=True, render="None", repeat_num=lnum)
-    draw_time_trajs(agent_obs, expt_obs, labels=[i for i in range(22)])
+    # algo = SAC.load("../../RL/2DWorld/tmp/log/2DWorld/sac/policies_4/agent.zip")
+    # algo = bc.reconstruct_policy("../../tests/algos/policy")
+    algo = PPO.load(model_dir + "/agent")
+    agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=False, render="None", repeat_num=lnum)
+    draw_time_trajs(agent_obs, expt_obs, labels=[i for i in range(110)])
     # draw_time_trajs(agent_acts, expt_acts, name="actions", labels=[i for i in range(35)])
 
 
@@ -74,20 +78,20 @@ def draw_costfigure():
             - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y + 5 / 2) ** 2)) \
             - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y + 5 / 2) ** 2))
     env_type = "2DWorld"
-    env_id = f"{env_type}"
-    subj = "sac"
+    env_id = f"{env_type}_disc"
+    subj = "ppo"
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
     env = make_env(f"{env_id}-v1", use_vec_env=False, subpath=subpath + f"/{subj}")
-    name = f"cnn_{subj}_reset_0ent"
-    num = 15
+    name = f"no_{subj}_disc_reset_0.2"
+    num = 4
     load_dir = os.path.abspath(f"../tmp/log/{env_id}/GCL/{name}/model")
-    algo = SAC.load(load_dir + f"/{num:03d}/agent")
+    algo = PPO.load(load_dir + f"/{num:03d}/agent")
     # algo = def_policy("IDP", env)
     # algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
     with open(load_dir + f"/{num:03d}/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).double()
 
-    ndim, nact = env.observation_space.shape[0], env.action_space.shape[0]
+    ndim = env.observation_space.shape[0]
     d1, d2 = np.meshgrid(np.linspace(-5, 5, 100), np.linspace(-5, 5, 100))
     pact = np.zeros((100, 100), dtype=np.float64)
     cost1, cost2 = np.zeros(d1.shape), np.zeros(d1.shape)
@@ -96,7 +100,7 @@ def draw_costfigure():
             iobs = np.zeros(ndim)
             iobs[0], iobs[1] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
             iacts, _ = algo.predict(np.array(iobs), deterministic=True)
-            pact[i][j] = iacts[0]
+            # pact[i][j] = iacts[0]
             # inp = th.from_numpy(np.append(iobs, iacts)).double().to(algo.device).reshape(1, -1)
             inp = th.from_numpy(iobs).double().to(algo.device).reshape(1, -1)
             cost1[i][j] = -expt_reward(inp)
@@ -149,6 +153,7 @@ def draw_costmaps():
 
 if __name__ == "__main__":
     def feature_fn(x):
-        # return x
-        return th.cat([x, x**2, x**3, x**4], dim=1)
-    draw_trajectories()
+        return x
+        # return th.cat([x, x**2, x**3, x**4], dim=1)
+    draw_costfigure()
+    # draw_trajectories()

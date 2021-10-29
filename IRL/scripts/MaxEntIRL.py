@@ -17,9 +17,9 @@ from IRL.scripts.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "2DWorld"
+    env_type = "2DTarget"
     algo_type = "MaxEntIRL"
-    device = "cuda:2"
+    device = "cuda:3"
     name = f"{env_type}"
     expt = "sac"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -28,8 +28,8 @@ if __name__ == "__main__":
     # for i in range(5, 10):
     #     pltqs += [io.loadmat(subpath + f"i{i+1}.mat")['pltq']]
     #     init_states += [io.loadmat(subpath + f"i{i+1}.mat")['state'][0, :4]]
-    env = make_env(f"{name}-v0", subpath=subpath)
-    eval_env = make_env(f"{name}-v0", subpath=subpath)
+    env = make_env(f"{name}-v2", subpath=subpath)
+    eval_env = make_env(f"{name}-v2", subpath=subpath)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
@@ -41,16 +41,16 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{expt}_linear_mm_reset_0.01_real"
+    log_dir += f"/cnn_{expt}_mm_reset_0.2"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        # return x
+        return x
         # return x ** 2
-        return th.cat([x, x**2, x**3, x**4], dim=1)
+        # return th.cat([x, x**2], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -70,10 +70,10 @@ if __name__ == "__main__":
         agent=agent,
         expert_trajectories=expert_trajs,
         use_action_as_input=False,
-        rew_arch=[],
+        rew_arch=[8, 8, 8, 8],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'alpha': 0.1},
     )
 
     # Run Learning
@@ -83,8 +83,8 @@ if __name__ == "__main__":
         n_episodes=expt_traj_num,
         max_agent_iter=25,
         min_agent_iter=8,
-        max_gradient_steps=20000,
-        min_gradient_steps=30,
+        max_gradient_steps=2000,
+        min_gradient_steps=200,
         callback=save_net_callback.net_save,
     )
 

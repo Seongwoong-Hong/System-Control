@@ -29,7 +29,7 @@ def verify_policy(environment, policy, render="human", deterministic=True, repea
     acts_list = []
     obs_list = []
     for _ in range(repeat_num):
-        actions = np.zeros((1,) + environment.action_space.shape)
+        actions = []
         environment.render(mode=render)
         ob = environment.reset()
         obs = deepcopy(ob.reshape(1, -1))
@@ -42,12 +42,12 @@ def verify_policy(environment, policy, render="human", deterministic=True, repea
             img = environment.render(mode=render)
             if hasattr(environment, "action") and callable(environment.action):
                 act = environment.action(act)
-            actions = np.append(actions, act.reshape(1, -1), 0)
+            actions.append(act)
             obs = np.append(obs, ob.reshape(1, -1), 0)
             if render == 'human':
                 time.sleep(environment.dt)
             imgs.append(img)
-        acts_list.append(actions[1:, :])
+        acts_list.append(np.array(actions))
         obs_list.append(obs)
     return acts_list, obs_list, imgs
 

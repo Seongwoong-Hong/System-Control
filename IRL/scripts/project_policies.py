@@ -119,7 +119,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
             gradient_steps=1000,
             target_update_interval=1,
             gamma=0.99,
-            ent_coef='auto',
+            ent_coef=0.2,
             target_entropy=0.0,
             device=device,
             verbose=verbose,

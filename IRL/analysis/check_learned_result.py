@@ -100,7 +100,7 @@ def compare_obs():
     env_type = "2DWorld"
     env_id = f"{env_type}"
     subj = "sac"
-    name = f"ext_{subj}_linear_reset_accum_0ent"
+    name = f"ext_{subj}_rand_reset_0.2"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "GCL", name))
     assert os.path.isdir(proj_path)
