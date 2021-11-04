@@ -19,9 +19,9 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "2DTarget"
     algo_type = "MaxEntIRL"
-    device = "cuda:1"
+    device = "cpu"
     name = f"{env_type}"
-    expt = "sac"
+    expt = "ppo"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     # pltqs, init_states = [], []
@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{expt}_linear_svm_reset_0.2"
+    log_dir += f"/ext_{expt}_linear_ppoagent_svm_reset_0.2"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("sac", env, device=device, verbose=1)
+    agent = def_policy("ppo", env, device=device, verbose=1)
     learner = MaxEntIRL(
         env,
         feature_fn=feature_fn,
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     # Run Learning
     learner.learn(
         total_iter=50,
-        agent_learning_steps=1e4,
+        agent_learning_steps=1e5,
         n_episodes=expt_traj_num,
         max_agent_iter=25,
         min_agent_iter=8,

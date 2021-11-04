@@ -97,26 +97,26 @@ def expt_cost():
 
 
 def compare_obs():
-    env_type = "2DWorld"
+    env_type = "2DTarget"
     env_id = f"{env_type}"
-    subj = "sac"
-    name = f"ext_{subj}_rand_reset_0.2"
+    subj = "ppo"
+    name = f"ext_{subj}_linear_ppoagent_svm_reset_0.2"
     print(name)
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "GCL", name))
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     assert os.path.isdir(proj_path)
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
     # pltqs, init_states = [], []
     # for i in range(5, 10):
     #     pltqs += [io.loadmat(subpath + f"i{i+1}.mat")['pltq']]
     #     init_states += [io.loadmat(subpath + f"i{i+1}.mat")['state'][0, :4]]
-    with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
+    with open(f"../demos/{env_type}/{subj}_check.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     lnum = len(expert_trajs)
     wrapper = ActionWrapper if env_type == "HPC" else None
     error_list, max_list = [], []
     i = 0
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
+        agent = PPO.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
         stats_path = None
         if os.path.isfile(os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")):
             stats_path = os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")
@@ -166,7 +166,7 @@ def feature():
 
 if __name__ == "__main__":
     def feature_fn(x):
-        # return x
+        return x
         # return x.square()
-        return th.cat([x, x**2, x**3, x**4], dim=1)
+        # return th.cat([x, x**2], dim=1)
     compare_obs()

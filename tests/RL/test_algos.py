@@ -42,10 +42,10 @@ def test_rl_learned_policy(rl_path):
 
 def test_2d(rl_path):
     name = "2DTarget"
-    env_id = f"{name}"
+    env_id = f"{name}_disc"
     env = make_env(f"{env_id}-v2")
-    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "sac", "policies_1")
-    algo = SAC.load(model_dir + f"/agent")
+    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "ppo", "policies_1")
+    algo = PPO.load(model_dir + f"/agent")
     trajs = []
     for i in range(20):
         st = env.reset()

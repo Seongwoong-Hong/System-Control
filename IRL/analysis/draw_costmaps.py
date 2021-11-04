@@ -19,7 +19,7 @@ from common.wrappers import ActionWrapper
 
 def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in range(7)]):
     t = np.linspace(0, 1/120 * (len(inp1[0])-1), len(inp1[0]))
-    ymax, ymin = 5, -5
+    ymax, ymin = 1, -1
     # ymax, ymin = np.max(np.array(inp2)[:, :, :2]), np.min(np.array(inp2)[:, :, :2])
     plt.figure(figsize=[9, 6.4], dpi=600.0)
     for j in labels:
@@ -33,7 +33,7 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in rang
         plt.tick_params(axis='both', which='major', labelsize=18)
         plt.ylim(ymin, ymax)
         # plt.xlim(np.min(t), np.max(t))
-        plt.xlim(-5, 5)
+        plt.xlim(-1, 1)
         plt.axhline(y=0.0, linestyle=':', color='0.5')
         plt.axvline(x=0.0, linestyle=':', color='0.5')
         plt.title("Simulation Result", fontsize=28, pad=30)
@@ -44,8 +44,9 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in rang
 
 
 def draw_trajectories():
-    env_type = "2DWorld"
-    env_id = f"{env_type}_disc"
+    env_type = "2DTarget"
+    algo_type = "MaxEntIRL"
+    env_id = f"{env_type}"
     subj = "ppo"
     wrapper = ActionWrapper if "HPC" in env_type else None
     # pltqs, init_states = [], []
@@ -54,9 +55,9 @@ def draw_trajectories():
     #     init_states += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['state'][0, :4]]
     env = make_env(f"{env_id}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
     # env = make_env(f"{env_type}-v0", wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-    name = f"{env_id}/GCL/no_{subj}_disc_reset_0.2"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "000")
-    with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
+    name = f"{env_id}/{algo_type}/ext_{subj}_linear_ppoagent_svm_reset_0.2"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "003")
+    with open(f"../demos/{env_type}/{subj}_check.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     lnum = len(expert_trajs)
     expt_obs = [expert_trajs[i].obs for i in range(lnum)]
@@ -65,26 +66,30 @@ def draw_trajectories():
     # algo = bc.reconstruct_policy("../../tests/algos/policy")
     algo = PPO.load(model_dir + "/agent")
     agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=False, render="None", repeat_num=lnum)
-    draw_time_trajs(agent_obs, expt_obs, labels=[i for i in range(110)])
+    draw_time_trajs(agent_obs, expt_obs, labels=[i for i in range(12)])
     # draw_time_trajs(agent_acts, expt_acts, name="actions", labels=[i for i in range(35)])
 
 
 def draw_costfigure():
+    # def expt_reward(inp):
+    #     x, y = inp[:, 0], inp[:, 1]
+    #     return th.exp(-0.5 * (x ** 2 + y ** 2)) \
+    #         - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y - 5 / 2) ** 2)) \
+    #         - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y - 5 / 2) ** 2)) \
+    #         - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y + 5 / 2) ** 2)) \
+    #         - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y + 5 / 2) ** 2))
     def expt_reward(inp):
         x, y = inp[:, 0], inp[:, 1]
-        return th.exp(-0.5 * (x ** 2 + y ** 2)) \
-            - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y - 5 / 2) ** 2)) \
-            - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y - 5 / 2) ** 2)) \
-            - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y + 5 / 2) ** 2)) \
-            - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y + 5 / 2) ** 2))
-    env_type = "2DWorld"
-    env_id = f"{env_type}_disc"
+        return -((x - 2/3) ** 2 + (y - 2/3) ** 2)
+    env_type = "2DTarget"
+    algo_type = "MaxEntIRL"
+    env_id = f"{env_type}"
     subj = "ppo"
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
-    env = make_env(f"{env_id}-v1", use_vec_env=False, subpath=subpath + f"/{subj}")
-    name = f"no_{subj}_disc_reset_0.2"
-    num = 4
-    load_dir = os.path.abspath(f"../tmp/log/{env_id}/GCL/{name}/model")
+    env = make_env(f"{env_id}-v0", use_vec_env=False, subpath=subpath + f"/{subj}")
+    name = f"ext_{subj}_linear_ppoagent_svm_reset_0.2"
+    num = 6
+    load_dir = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model")
     algo = PPO.load(load_dir + f"/{num:03d}/agent")
     # algo = def_policy("IDP", env)
     # algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
@@ -92,7 +97,7 @@ def draw_costfigure():
         reward_fn = pickle.load(f).double()
 
     ndim = env.observation_space.shape[0]
-    d1, d2 = np.meshgrid(np.linspace(-5, 5, 100), np.linspace(-5, 5, 100))
+    d1, d2 = np.meshgrid(np.linspace(-1, 1, 100), np.linspace(-1, 1, 100))
     pact = np.zeros((100, 100), dtype=np.float64)
     cost1, cost2 = np.zeros(d1.shape), np.zeros(d1.shape)
     for i in range(d1.shape[0]):
@@ -123,6 +128,7 @@ def draw_costfigure():
         ax.set_ylabel(ylabel, labelpad=15.0, fontsize=28)
         ax.set_title(title_list[i], fontsize=32)
         ax.tick_params(axis='both', which='major', labelsize=20)
+        ax.view_init(elev=90, azim=0)
         # clb.ax.set_title(title_list[i], fontsize=24)
     # plt.savefig("check.png")
     plt.show()
@@ -153,7 +159,7 @@ def draw_costmaps():
 
 if __name__ == "__main__":
     def feature_fn(x):
-        return x
-        # return th.cat([x, x**2, x**3, x**4], dim=1)
+        # return x
+        return th.cat([x, x**2], dim=1)
     draw_costfigure()
     # draw_trajectories()

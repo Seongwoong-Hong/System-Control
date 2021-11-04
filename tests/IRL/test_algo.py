@@ -1,4 +1,5 @@
 import os
+import pickle
 import pytest
 from scipy import io
 import numpy as np
@@ -8,7 +9,7 @@ from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from common.util import make_env
 from common.verification import verify_policy
-from common.wrappers import ActionWrapper
+from common.wrappers import *
 
 from imitation.algorithms import bc
 
@@ -102,13 +103,13 @@ def test_mujoco_policy(irl_path):
         verify_policy(env, algo, deterministic=False)
 
 
-def test_2dworld(irl_path):
-    name = "2DWorld"
+def test_2D(irl_path):
+    name = "2DTarget"
     env = make_env(f"{name}-v0")
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "MaxEntIRL", "ext_sac_linear_mm_reset_0.01_real", "model", "003")
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "GCL", "ext_sac_linear_reset_0.2_2", "model", "029")
     algo = SAC.load(model_dir + f"/agent")
     trajs = []
-    for i in range(10):
+    for i in range(20):
         st = env.reset()
         done = False
         sts, rs = [], []
