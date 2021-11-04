@@ -133,10 +133,10 @@ class MaxEntIRL:
         expert_trajectories = deepcopy(self.expert_trajectories)
         agent_trajectories = deepcopy(self.agent_trajectories)
         target = th.cat([th.ones(len(expert_trajectories)), -th.ones(len(agent_trajectories))])
-        y = th.zeros(len(expert_trajectories + agent_trajectories))
-        for i, traj in enumerate(expert_trajectories + agent_trajectories):
-            trans = flatten_trajectories([traj])
-            y[i], _, _ = self.mean_transition_reward(trans, trans)
+        trajs = expert_trajectories + agent_trajectories
+        y = th.zeros(len(trajs))
+        for i in range(0, len(trajs), 2):
+            y[i], y[i+1], _ = self.mean_transition_reward(flatten_trajectories([trajs[i]]), flatten_trajectories([trajs[i+1]]))
         loss = th.mean(th.clamp(1 - y * target, min=0))
         weight_norm = 0.0
         for param in self.reward_net.parameters():
@@ -212,9 +212,9 @@ class MaxEntIRL:
 class GuidedCostLearning(MaxEntIRL):
     def collect_rollouts(self, n_agent_episodes):
         self.agent_trajectories = []
-        super().collect_rollouts(n_agent_episodes)
+        super().collect_rollouts(3*n_agent_episodes)
 
-    def transition_is(self, transition: Transitions) -> th.Tensor:
+    def transition_is(self, transition: Transitions) -> Tuple[th.Tensor, th.Tensor]:
         if self.use_action_as_input:
             acts = transition.acts
             if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
@@ -224,18 +224,23 @@ class GuidedCostLearning(MaxEntIRL):
         else:
             th_input = th.from_numpy(transition.obs).double()
         reward = th.sum(self.reward_net(th_input))
-        log_probs = th.sum(get_trajectories_probs(transition, self.agent.policy))
-        return reward - log_probs
+        log_prob = th.sum(get_trajectories_probs(transition, self.agent.policy))
+        return reward, log_prob
 
     def cal_loss(self, n_episodes) -> Tuple:
         expert_transitions = flatten_trajectories(self.expert_trajectories)
-        demo_trajs = self.agent_trajectories + self.expert_trajectories
+        demo_trajs =  self.expert_trajectories + random.sample(self.agent_trajectories, n_episodes)
         islosses = th.zeros(len(demo_trajs)).double()
+        log_probs = []
         for idx, traj in enumerate(demo_trajs):
             agent_transitions = flatten_trajectories([traj])
-            islosses[idx] = self.transition_is(agent_transitions)
+            reward, log_prob = self.transition_is(agent_transitions)
+            islosses[idx] = reward - log_prob
+            log_probs.append(log_prob.item())
         _, expt_reward, lcr = self.mean_transition_reward(agent_transitions, expert_transitions)
         loss = th.logsumexp(islosses, 0) - expt_reward / n_episodes
+        logger.record("log_probs_mean", np.mean(log_probs))
+        logger.record("log_probs_var", np.var(log_probs))
         weight_norm = 0.0
         for param in self.reward_net.parameters():
             weight_norm += param.norm().detach().item()
