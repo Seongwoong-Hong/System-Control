@@ -58,6 +58,24 @@ register(
     max_episode_steps=100,
 )
 
+register(
+    id='2DTarget-v0',
+    entry_point='gym_envs.envs:TwoDTargetDet',
+    max_episode_steps=100,
+)
+
+register(
+    id='2DTarget_disc-v0',
+    entry_point='gym_envs.envs:TwoDTargetDiscDet',
+    max_episode_steps=100,
+)
+
+register(
+    id='2DTarget_disc-v2',
+    entry_point='gym_envs.envs:TwoDTargetDisc',
+    max_episode_steps=100,
+)
+
 # environments based on mujoco
 # expert: v0, agent: v1
 # v2 environment is not used yet

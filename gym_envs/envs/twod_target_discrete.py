@@ -5,7 +5,7 @@ from matplotlib import cm
 from typing import List
 
 
-class TwoDTarget(gym.Env):
+class TwoDTargetDisc(gym.Env):
     def __init__(self):
         self.height = 1.0
         self.width = 1.0
@@ -13,10 +13,11 @@ class TwoDTarget(gym.Env):
         self.st = None
         self.observation_space = gym.spaces.Box(low=np.array([-self.width, -self.height]),
                                                 high=np.array([self.width, self.height]))
-        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(2,))
+        self.action_space = gym.spaces.MultiDiscrete([3, 3])
 
     def step(self, action: np.ndarray):
         assert self.st is not None, "Can't step the environment before calling reset function"
+        action = action.astype('float64') - 1.0
         r = self.reward_fn(self.st)
         info = {'obs': self.st.reshape(1, -1), 'acts': action.reshape(1, -1)}
         st = self.st + self.dt * action + 0.03 * np.random.random(self.st.shape)
@@ -63,9 +64,9 @@ class TwoDTarget(gym.Env):
         pass
 
 
-class TwoDTargetDet(TwoDTarget):
+class TwoDTargetDiscDet(TwoDTargetDisc):
     def __init__(self):
-        super(TwoDTargetDet, self).__init__()
+        super(TwoDTargetDiscDet, self).__init__()
         self.init_state = np.array([[-0.85, 0.85],
                                     [-0.85, -0.85],
                                     [0.85, -0.85]])
