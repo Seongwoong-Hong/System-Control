@@ -7,12 +7,13 @@ from typing import List
 
 class TwoDTargetDisc(gym.Env):
     def __init__(self):
-        self.height = 1.0
-        self.width = 1.0
-        self.dt = 0.01
+        self.height = 0.5
+        self.width = 0.5
+        self.dt = 0.1
         self.st = None
+        self.timesteps = 0.0
         self.observation_space = gym.spaces.Box(low=np.array([-self.width, -self.height]),
-                                                high=np.array([self.width, self.height]))
+                                                high=np.array([self.width, self.height]), dtype=np.float64)
         self.action_space = gym.spaces.MultiDiscrete([3, 3])
 
     def step(self, action: np.ndarray):
@@ -20,7 +21,7 @@ class TwoDTargetDisc(gym.Env):
         action = action.astype('float64') - 1.0
         r = self.reward_fn(self.st)
         info = {'obs': self.st.reshape(1, -1), 'acts': action.reshape(1, -1)}
-        st = self.st + self.dt * action + 0.03 * np.random.random(self.st.shape)
+        st = self.st + self.dt * action  # + 0.03 * np.random.random(self.st.shape)
         done = bool(
             self.st[0] < -self.width
             or self.st[0] > self.width
@@ -29,13 +30,16 @@ class TwoDTargetDisc(gym.Env):
         )
         if not done:
             self.st = st
+        self.timesteps += self.dt
         return self.st, r, None, info
 
     def _get_obs(self):
         return self.st
+        # return np.append(self.st, self.timesteps)
 
     def reset(self):
-        self.st = self.observation_space.sample()
+        self.st = np.round_(self.observation_space.sample(), 1)
+        self.timesteps = 0.0
         return self._get_obs()
 
     def reward_fn(self, state) -> float:
@@ -74,5 +78,6 @@ class TwoDTargetDiscDet(TwoDTargetDisc):
 
     def reset(self):
         self.st = self.init_state[self.n % len(self.init_state), :]
+        self.timesteps = 0.0
         self.n += 1
         return self._get_obs()
