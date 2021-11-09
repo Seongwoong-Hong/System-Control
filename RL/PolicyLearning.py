@@ -14,7 +14,7 @@ if __name__ == "__main__":
     env_type = "2DTarget"
     algo_type = "ppo"
     name = f"{env_type}_disc"
-    device = "cuda:3"
+    device = "cuda:2"
     env_id = f"{name}-v2"
     # subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
     # env = make_env(env_id, use_vec_env=False, num_envs=1, subpath=subpath, wrapper=ActionWrapper, use_norm=False)
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
     save_policy_callback = callbacks.EveryNTimesteps(int(5e10), save_policy_callback)
     # callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
-    algo.learn(total_timesteps=int(1e6), tb_log_name="extra", callback=save_policy_callback)
+    algo.learn(total_timesteps=int(1e5), tb_log_name="extra", callback=save_policy_callback)
     algo.save(log_dir+f"/policies_{n}/agent")
     if algo.get_vec_normalize_env():
         algo.env.save(log_dir+f"/policies_{n}/normalization.pkl")

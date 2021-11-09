@@ -19,35 +19,37 @@ from common.wrappers import ActionWrapper
 
 def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in range(7)]):
     t = np.linspace(0, 1/120 * (len(inp1[0])-1), len(inp1[0]))
-    ymax, ymin = 1, -1
-    # ymax, ymin = np.max(np.array(inp2)[:, :, :2]), np.min(np.array(inp2)[:, :, :2])
+    # ymax, ymin = 1, -1
+    ymax, ymin = np.max(np.array(inp2)[:, :, :2]), np.min(np.array(inp2)[:, :, :2])
     plt.figure(figsize=[9, 6.4], dpi=600.0)
     for j in labels:
         yval_list = [inp1[j], inp2[j]]
-        plt.plot(yval_list[0][:, 0], yval_list[0][:, 1], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
-        # plt.plot(t, yval_list[1][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 0.4), lw=3)
-        plt.plot(yval_list[1][:, 0], yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 1), lw=3)
-        # plt.plot(t, yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 0.6), lw=3)
-        # plt.legend(['', '', 'learned', 'original'], ncol=2, columnspacing=0.1, fontsize=15)
-        plt.legend(['learned', 'original'], ncol=2, columnspacing=0.1, fontsize=15)
+        # plt.plot(yval_list[0][:, 0], yval_list[0][:, 1], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
+        plt.plot(t, yval_list[0][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
+        plt.plot(t, yval_list[1][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 0.4), lw=3)
+        # plt.plot(yval_list[1][:, 0], yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 1), lw=3)
+        plt.plot(t, yval_list[0][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 1), lw=3)
+        plt.plot(t, yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 0.6), lw=3)
+        plt.legend(['', '', 'learned', 'original'], ncol=2, columnspacing=0.1, fontsize=15)
+        # plt.legend(['learned', 'original'], ncol=2, columnspacing=0.1, fontsize=15)
         plt.tick_params(axis='both', which='major', labelsize=18)
         plt.ylim(ymin, ymax)
-        # plt.xlim(np.min(t), np.max(t))
-        plt.xlim(-1, 1)
+        plt.xlim(np.min(t), np.max(t))
+        # plt.xlim(-1, 1)
         plt.axhline(y=0.0, linestyle=':', color='0.5')
         plt.axvline(x=0.0, linestyle=':', color='0.5')
         plt.title("Simulation Result", fontsize=28, pad=30)
         plt.xlabel("time", fontsize=24)
         plt.ylabel(name, fontsize=24)
         # plt.savefig(f"figures/{env_type}/{subj}/angular_velocity{j}.png")
-    plt.show()
+        plt.show()
 
 
 def draw_trajectories():
-    env_type = "2DTarget"
+    env_type = "HPC"
     algo_type = "MaxEntIRL"
-    env_id = f"{env_type}"
-    subj = "ppo"
+    env_id = f"{env_type}_custom"
+    subj = "sub01"
     wrapper = ActionWrapper if "HPC" in env_type else None
     # pltqs, init_states = [], []
     # for i in range(5, 10):
@@ -55,9 +57,9 @@ def draw_trajectories():
     #     init_states += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['state'][0, :4]]
     env = make_env(f"{env_id}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
     # env = make_env(f"{env_type}-v0", wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-    name = f"{env_id}/{algo_type}/ext_{subj}_linear_ppoagent_svm_reset_0.2"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "003")
-    with open(f"../demos/{env_type}/{subj}_check.pkl", "rb") as f:
+    name = f"{env_id}/{algo_type}/ext_{subj}_linear_ppoagent_svm_reset"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "002")
+    with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     lnum = len(expert_trajs)
     expt_obs = [expert_trajs[i].obs for i in range(lnum)]
@@ -66,7 +68,7 @@ def draw_trajectories():
     # algo = bc.reconstruct_policy("../../tests/algos/policy")
     algo = PPO.load(model_dir + "/agent")
     agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=False, render="None", repeat_num=lnum)
-    draw_time_trajs(agent_obs, expt_obs, labels=[i for i in range(12)])
+    draw_time_trajs(agent_obs, expt_obs)
     # draw_time_trajs(agent_acts, expt_acts, name="actions", labels=[i for i in range(35)])
 
 
@@ -82,13 +84,13 @@ def draw_costfigure():
         x, y = inp[:, 0], inp[:, 1]
         return -((x - 2/3) ** 2 + (y - 2/3) ** 2)
     env_type = "2DTarget"
-    algo_type = "MaxEntIRL"
     env_id = f"{env_type}"
     subj = "ppo"
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
     env = make_env(f"{env_id}-v0", use_vec_env=False, subpath=subpath + f"/{subj}")
+    algo_type = "MaxEntIRL"
     name = f"ext_{subj}_linear_ppoagent_svm_reset_0.2"
-    num = 6
+    num = 8
     load_dir = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model")
     algo = PPO.load(load_dir + f"/{num:03d}/agent")
     # algo = def_policy("IDP", env)
@@ -160,6 +162,6 @@ def draw_costmaps():
 if __name__ == "__main__":
     def feature_fn(x):
         # return x
-        return th.cat([x, x**2], dim=1)
-    draw_costfigure()
-    # draw_trajectories()
+        return th.cat([x, x**2, x**3, x**4], dim=1)
+    # draw_costfigure()
+    draw_trajectories()
