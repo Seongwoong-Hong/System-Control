@@ -41,7 +41,7 @@ def eval_env(demo_dir):
 def learner(env, expert, eval_env):
     from imitation.util import logger
     from IRL.scripts.project_policies import def_policy
-    logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
+    logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
         return th.cat([x, x**2], dim=1)
@@ -114,11 +114,11 @@ def test_GCL(env, expert):
 
     learner.learn(
         total_iter=50,
-        agent_learning_steps=1e5,
+        agent_learning_steps=1e4,
         n_episodes=len(expert),
         max_agent_iter=25,
         min_agent_iter=8,
-        max_gradient_steps=500,
-        min_gradient_steps=500,
+        max_gradient_steps=100,
+        min_gradient_steps=100,
         early_stop=True,
     )
