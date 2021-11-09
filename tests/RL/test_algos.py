@@ -47,7 +47,7 @@ def test_2d(rl_path):
     model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "ppo", "policies_1")
     algo = PPO.load(model_dir + f"/agent")
     trajs = []
-    for i in range(20):
+    for i in range(5):
         st = env.reset()
         done = False
         sts, rs = [], []
