@@ -19,7 +19,7 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     env_type = "2DTarget"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
+    device = "cpu"
     name = f"{env_type}_disc"
     expt = "ppo_disc"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
