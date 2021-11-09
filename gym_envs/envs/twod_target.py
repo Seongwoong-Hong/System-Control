@@ -7,10 +7,11 @@ from typing import List
 
 class TwoDTarget(gym.Env):
     def __init__(self):
-        self.height = 1.0
-        self.width = 1.0
+        self.height = 0.5
+        self.width = 0.5
         self.dt = 0.01
         self.st = None
+        self.timesteps = 0.0
         self.observation_space = gym.spaces.Box(low=np.array([-self.width, -self.height]),
                                                 high=np.array([self.width, self.height]))
         self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(2,))
@@ -19,7 +20,7 @@ class TwoDTarget(gym.Env):
         assert self.st is not None, "Can't step the environment before calling reset function"
         r = self.reward_fn(self.st)
         info = {'obs': self.st.reshape(1, -1), 'acts': action.reshape(1, -1)}
-        st = self.st + self.dt * action + 0.03 * np.random.random(self.st.shape)
+        st = self.st + self.dt * action + 0.01 * np.random.random(self.st.shape)
         done = bool(
             self.st[0] < -self.width
             or self.st[0] > self.width
@@ -28,13 +29,16 @@ class TwoDTarget(gym.Env):
         )
         if not done:
             self.st = st
-        return self.st, r, None, info
+        self.timesteps += self.dt
+        return self._get_obs(), r, None, info
 
     def _get_obs(self):
         return self.st
+        # return np.append(self.st, self.timesteps)
 
     def reset(self):
-        self.st = self.observation_space.sample()
+        self.st = self.observation_space.sample()[:2]
+        self.timesteps = 0.0
         return self._get_obs()
 
     def reward_fn(self, state) -> float:
@@ -73,5 +77,6 @@ class TwoDTargetDet(TwoDTarget):
 
     def reset(self):
         self.st = self.init_state[self.n % len(self.init_state), :]
+        self.timesteps = 0.0
         self.n += 1
         return self._get_obs()

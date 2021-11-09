@@ -45,7 +45,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         self._timesteps += 1
         ob = self._get_obs()
         done = False
-        info = {"obs": np.append(prev_ob, ob).reshape(1, -1), "acts": action.reshape(1, -1)}
+        info = {"obs": prev_ob.reshape(1, -1), "acts": action.reshape(1, -1)}
         return ob, r, done, info
 
     def _get_obs(self):
