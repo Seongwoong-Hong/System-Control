@@ -141,7 +141,7 @@ class MaxEntIRL:
 
     def cal_loss(self, n_episodes) -> Tuple:
         expert_trajectories = deepcopy(self.expert_trajectories)
-        agent_trajectories = random.sample(deepcopy(self.agent_trajectories), n_episodes * self.expand_ratio)
+        agent_trajectories = deepcopy(self.current_agent_trajectories)
         target = th.cat([th.ones(len(expert_trajectories)), -th.ones(len(agent_trajectories))])
         agent_rewards, expert_rewards, _ = self.mean_transition_reward(agent_trajectories, expert_trajectories)
         y = th.cat([expert_rewards, agent_rewards], dim=0)
@@ -180,17 +180,19 @@ class MaxEntIRL:
     ):
         self._reset_agent(n_episodes, **self.env_kwargs)
         for itr in range(total_iter):
+            self.reward_net.reset_optim()
             with logger.accumulate_means(f"{itr}/reward"):
                 self.collect_rollouts(n_episodes)
                 self.reward_net.train()
                 reward_diffs = []
+                self.current_agent_trajectories = random.sample(self.agent_trajectories, n_episodes * self.expand_ratio * (int(itr/3) + 1))
                 for rew_steps in range(max_gradient_steps):
                     loss_diff, weight_norm, _ = self.cal_loss(n_episodes)
                     loss = loss_diff
                     self.reward_net.optimizer.zero_grad()
                     loss.backward()
                     with th.no_grad():
-                        agents = random.sample(deepcopy(self.agent_trajectories), self.expand_ratio * n_episodes)
+                        agents = deepcopy(self.current_agent_trajectories)
                         expts = deepcopy(self.expert_trajectories)
                         agent_rewards, expt_rewards, _ = self.mean_transition_reward(agents, expts)
                         diffs = agent_rewards.mean().item() - expt_rewards.mean().item()
@@ -200,9 +202,9 @@ class MaxEntIRL:
                     logger.record("reward_diff", diffs)
                     logger.record("steps", rew_steps, exclude="tensorboard")
                     logger.dump(rew_steps)
-                    if np.mean(reward_diffs[-min_gradient_steps:]) <= -0.1 and \
+                    if np.mean(reward_diffs[-min_gradient_steps:]) <= -0.05 and \
                             reward_diffs[-1] < 0.0 and \
-                            rew_steps >= min_gradient_steps:
+                            rew_steps >= min_gradient_steps and early_stop:
                         self.reward_net.optimizer.zero_grad()
                         break
                     self.reward_net.optimizer.step()
@@ -218,7 +220,9 @@ class MaxEntIRL:
                     logger.record("agent_steps", agent_steps, exclude="tensorboard")
                     logger.dump(agent_steps)
                     reward_diffs.append(reward_diff.item())
-                    if np.mean(reward_diffs[-min_agent_iter:]) > 0 and agent_steps >= min_agent_iter and early_stop:
+                    if np.mean(reward_diffs[-min_agent_iter:]) > 0 and \
+                            reward_diffs[-1] > 0.0 and \
+                            agent_steps >= min_agent_iter and early_stop:
                         break 
             if callback:
                 callback(self, itr)
@@ -251,7 +255,7 @@ class GuidedCostLearning(MaxEntIRL):
 
     def cal_loss(self, n_episodes) -> Tuple:
         expert_trajectories = deepcopy(self.expert_trajectories)
-        demo_trajs = self.expert_trajectories + random.sample(self.agent_trajectories, n_episodes)
+        demo_trajs = expert_trajectories + deepcopy(self.current_agent_trajectories)
         rewards, log_probs = self.transition_is(demo_trajs)
         _, expt_rewards, lcr = self.mean_transition_reward([demo_trajs[0]], expert_trajectories)
         loss = th.logsumexp(rewards - log_probs, 0) - expt_rewards.mean()

@@ -26,6 +26,7 @@ class RewardNet(nn.Module):
         self.feature_fn = feature_fn
         self.optim_cls = optim_cls
         self.in_features = inp
+        self._build_args = [lr, alpha, [self.in_features] + arch]
         self._build(lr, alpha, [self.in_features] + arch)
         self.trainmode = False
 
@@ -38,9 +39,17 @@ class RewardNet(nn.Module):
         else:
             for i in range(len(arch) - 1):
                 layers.append(nn.Linear(arch[i], arch[i + 1]))
-        layers.append(nn.Linear(arch[-1], 1, bias=False))
+        layers.append(nn.Linear(arch[-1], 1, bias=True))
         self.layers = nn.Sequential(*layers)
         self.optimizer = self.optim_cls(self.parameters(), lr, weight_decay=alpha)
+
+    def reset_optim(self):
+        self.optimizer = self.optim_cls(self.parameters(), self._build_args[0], weight_decay=self._build_args[1])
+        self.to(self.device).double()
+
+    def reset(self):
+        self._build(*self._build_args)
+        self.to(self.device).double()
 
     def forward(self, x: th.Tensor) -> th.Tensor:
         x = self.feature_fn(x).to(self.device)
@@ -67,7 +76,7 @@ class CNNRewardNet(RewardNet):
             if self.act_fnc is not None:
                 layers.append(self.act_fnc())
         self.conv_layers = nn.Sequential(*layers)
-        self.fcnn = nn.Linear(arch[-1] * self.in_features, 1, bias=False)
+        self.fcnn = nn.Linear(arch[-1] * self.in_features, 1, bias=True)
         self.optimizer = self.optim_cls(self.parameters(), lr, weight_decay=alpha)
 
     def forward(self, x: th.Tensor) -> th.Tensor:
