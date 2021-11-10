@@ -8,19 +8,19 @@
   <size nstack="3000" nuserdata="100" nuser_actuator="10"/>
   <worldbody>
     <geom name="floor" pos="0 0 -3" rgba="1 1 1 1" size="40 40 40" type="plane"/>
-    <body name="pole1" pos="0 0 0">
-      <joint axis="0 1 0" limited="true" range="-0.5 0.5" name="hinge" pos="0 0 0" type="hinge"/>
-      <geom fromto="0 0 0 0 0 1.0" name="cpole" rgba="0.9 0.4 0.0 0.7" size="0.045" type="capsule"/>
-      <inertial pos="0 0 0.5" mass="5.0" diaginertia="0.41667 0.41667 0.0001"/>
-      <body name="pole2" pos ="0 0 1.0">
-        <joint axis="0 1 0" limited="true" range="-0.5 0.5" name="hinge2" pos="0 0 0" type="hinge"/>
-        <geom fromto="0 0 0 0 0 1.0" name="cpole2" rgba="0.8 0.4 0.0 0.7" size="0.045" type="capsule"/>
-        <inertial pos="0 0 0.5" mass="5.0" diaginertia="0.41667 0.41667 0.0001"/>
+    <body name="leg" pos="0 0 0">
+      <joint axis="0 1 0" limited="true" name="hinge" pos="0 0 0" range="-0.5 0.5" type="hinge" />
+      <geom fromto="0 0 0 0 0 0.7790" name="cpole" rgba="0.9 0.4 0.0 0.7" size="0.045" type="capsule" />
+      <inertial diaginertia="0.872503 0.872503 0.001" mass="17.8391" pos="0 0 0.4980" />
+      <body name="body" pos="0 0 0.7790">
+        <joint axis="0 1 0" limited="true" name="hinge2" pos="0 0 0" range="-1.0 1.0" type="hinge" />
+        <geom fromto="0 0 0 0 0 0.7610" name="cpole2" rgba="0.8 0.4 0.0 0.7" size="0.045" type="capsule" />
+        <inertial diaginertia="1.074783 1.074783 0.001" mass="35.3379" pos="0 0 0.2802" />
       </body>
     </body>
   </worldbody>
   <actuator>
-    <motor ctrllimited="true" ctrlrange='-1 1' gear="200" joint="hinge"/>
-    <motor ctrllimited="true" ctrlrange='-1 1' gear="200" joint="hinge2"/>
+    <motor ctrllimited="true" ctrlrange='-1 1' gear="300" joint="hinge"/>
+    <motor ctrllimited="true" ctrlrange='-1 1' gear="300" joint="hinge2"/>
   </actuator>
 </mujoco>

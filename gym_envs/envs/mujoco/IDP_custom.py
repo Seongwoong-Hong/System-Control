@@ -8,20 +8,24 @@ from gym.envs.mujoco import mujoco_env
 class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
         self._order = 0
+        self.time = 0.0
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 8)
         utils.EzPickle.__init__(self)
+        self.observation_space = spaces.Box(low=np.array([-1, -1, -1, -1, 0]), high=np.array([1, 1, 1, 1, 1]), dtype=np.float64)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
+        self.time = 0.0
 
-    def step(self, action):
+    def step(self, action: np.ndarray):
         prev_ob = self._get_obs()
-        r = - (prev_ob[0] ** 2 + prev_ob[1] ** 2 + 0.1 * (prev_ob[2] ** 2 + prev_ob[3] ** 2)
-               + 1e-5 * (self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T))
+        r = 1.0 - (prev_ob[0] ** 2 + prev_ob[1] ** 2 + 0.1 * (prev_ob[2] ** 2 + prev_ob[3] ** 2)
+                   + 1e-6 * (self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T))
         self.do_simulation(action, self.frame_skip)
+        self.time += self.dt / 4.8
         ob = self._get_obs()
         done = False
-        info = {'rw_inp': prev_ob}
+        info = {'obs': prev_ob.reshape(1, -1), "acts": action.reshape(1, -1)}
         return ob, r, done, info
 
     @property
@@ -31,7 +35,8 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def _get_obs(self):
         return np.concatenate([
             self.sim.data.qpos,  # link angles
-            self.sim.data.qvel   # link angular velocities
+            self.sim.data.qvel,   # link angular velocities
+            np.array([self.time])
         ]).ravel()
 
     @property
@@ -39,9 +44,10 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         return self._get_obs()
 
     def reset_model(self):
+        self.time = 0.0
         self.set_state(
             self.init_qpos + self.np_random.uniform(low=-.3, high=.3, size=self.model.nq),
-            self.init_qvel + self.np_random.uniform(low=-.3, high=.3, size=self.model.nv)
+            self.init_qvel + self.np_random.uniform(low=-.3, high=.3, size=self.model.nv),
         )
         return self._get_obs()
 
