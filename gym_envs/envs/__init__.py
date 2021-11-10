@@ -5,3 +5,4 @@ from gym_envs.envs.twod_navigate import TwoDWorld, TwoDWorldDet, TwoDWorldDetOrd
 from gym_envs.envs.twod_navigate_discrete import TwoDWorldDiscDet, TwoDWorldDiscDetOrder, TwoDWorldDisc
 from gym_envs.envs.twod_target import TwoDTarget, TwoDTargetDet
 from gym_envs.envs.twod_target_discrete import TwoDTargetDisc, TwoDTargetDiscDet
+from gym_envs.envs.oned_target_discrete import OneDTargetDiscDet, OneDTargetDisc

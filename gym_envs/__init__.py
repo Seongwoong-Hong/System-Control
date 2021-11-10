@@ -76,6 +76,18 @@ register(
     max_episode_steps=10,
 )
 
+register(
+    id='1DTarget_disc-v2',
+    entry_point='gym_envs.envs:OneDTargetDisc',
+    max_episode_steps=10,
+)
+
+register(
+    id='1DTarget_disc-v0',
+    entry_point='gym_envs.envs:OneDTargetDiscDet',
+    max_episode_steps=10,
+)
+
 # environments based on mujoco
 # expert: v0, agent: v1
 # v2 environment is not used yet
@@ -105,14 +117,8 @@ register(
 )
 
 register(
-    id='IDP_custom-v1',
-    entry_point='gym_envs.envs.mujoco:IDPCustom',
-    max_episode_steps=600,
-)
-
-register(
     id='IDP_custom-v2',
-    entry_point='gym_envs.envs.mujoco:IDPCustomEasy',
+    entry_point='gym_envs.envs.mujoco:IDPCustom',
     max_episode_steps=600,
 )
 
@@ -149,7 +155,7 @@ register(
 )
 
 register(
-    id='IDP_pybullet-v1',
+    id='IDP_pybullet-v2',
     entry_point='gym_envs.envs.pybullet:InvertedDoublePendulumBulletEnv',
     max_episode_steps=600,
 )
