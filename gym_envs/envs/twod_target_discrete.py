@@ -71,9 +71,9 @@ class TwoDTargetDisc(gym.Env):
 class TwoDTargetDiscDet(TwoDTargetDisc):
     def __init__(self):
         super(TwoDTargetDiscDet, self).__init__()
-        self.init_state = np.array([[-0.8, 0.8],
-                                    [-0.8, -0.8],
-                                    [0.8, -0.8]])
+        self.init_state = np.array([[-0.3, 0.3],
+                                    [-0.3, -0.3],
+                                    [0.3, -0.3]])
         self.n = 0
 
     def reset(self):

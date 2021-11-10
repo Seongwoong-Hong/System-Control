@@ -70,9 +70,9 @@ class TwoDTarget(gym.Env):
 class TwoDTargetDet(TwoDTarget):
     def __init__(self):
         super(TwoDTargetDet, self).__init__()
-        self.init_state = np.array([[-0.85, 0.85],
-                                    [-0.85, -0.85],
-                                    [0.85, -0.85]])
+        self.init_state = np.array([[-0.3, 0.3],
+                                    [-0.3, -0.3],
+                                    [0.3, -0.3]])
         self.n = 0
 
     def reset(self):
