@@ -185,7 +185,9 @@ class MaxEntIRL:
                 self.collect_rollouts(n_episodes)
                 self.reward_net.train()
                 reward_diffs = []
-                self.current_agent_trajectories = random.sample(self.agent_trajectories, n_episodes * self.expand_ratio * (int(itr/3) + 1))
+                self.current_agent_trajectories = \
+                    self.agent_trajectories[-n_episodes * self.expand_ratio:] + \
+                    random.sample(self.agent_trajectories, n_episodes * self.expand_ratio * (int(itr/3) + 1))
                 for rew_steps in range(max_gradient_steps):
                     loss_diff, weight_norm, _ = self.cal_loss(n_episodes)
                     loss = loss_diff
