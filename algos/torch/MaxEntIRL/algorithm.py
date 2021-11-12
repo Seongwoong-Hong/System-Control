@@ -74,7 +74,7 @@ class MaxEntIRL:
                 use_action_as_inp=self.use_action_as_input,
                 device=self.device,
                 **self.rew_kwargs
-            ).double().to(self.device)
+            ).to(self.device)
         elif RNet_type is "cnn":
             self.reward_net = CNNRewardNet(
                 inp=inp.shape[1] * num_timesteps,
@@ -83,7 +83,7 @@ class MaxEntIRL:
                 use_action_as_inp=self.use_action_as_input,
                 device=self.device,
                 **self.rew_kwargs
-            ).double().to(self.device)
+            ).to(self.device)
         else:
             raise NotImplementedError("Not implemented reward net type")
 
@@ -107,7 +107,7 @@ class MaxEntIRL:
             self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_agent_episodes)]))
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_agent_episodes * self.expand_ratio)
         self.agent_trajectories += generate_trajectories_without_shuffle(
-                self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
+                self.agent, self.vec_eval_env, sample_until, deterministic_policy=True)
         self.agent.set_env(self.wrap_env)
 
     def mean_transition_reward(self, agent_trajs: Sequence[Trajectory], expt_trajs: Sequence[Trajectory]) -> Tuple:
@@ -123,11 +123,11 @@ class MaxEntIRL:
             acts = agent_trans.acts
             if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
                 acts = self.wrap_eval_env.action(acts)
-            agent_input = th.from_numpy(np.concatenate([agent_obs, acts], axis=1)).double()
-            expt_input = th.from_numpy(np.concatenate([expt_obs, expt_trans.acts], axis=1)).double()
+            agent_input = th.from_numpy(np.concatenate([agent_obs, acts], axis=1)).float()
+            expt_input = th.from_numpy(np.concatenate([expt_obs, expt_trans.acts], axis=1)).float()
         else:
-            agent_input = th.from_numpy(agent_obs).double()
-            expt_input = th.from_numpy(expt_obs).double()
+            agent_input = th.from_numpy(agent_obs).float()
+            expt_input = th.from_numpy(expt_obs).float()
         agent_gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(agent_trans))]).to(self.device)
         expt_gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(expt_trans))]).to(self.device)
         trans_agent_rewards = agent_gammas * self.reward_net(agent_input).flatten()
@@ -156,12 +156,12 @@ class MaxEntIRL:
         if isinstance(self.wrap_env, VecEnvWrapper):
             self.vec_eval_env = deepcopy(self.wrap_env)
             self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_episodes)]))
-        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
+        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes*self.env.observation_space.nvec[0])
         agent_trajectories = generate_trajectories_without_shuffle(
-                self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
+                self.agent, self.vec_eval_env, sample_until, deterministic_policy=True)
         self.agent.set_env(self.wrap_env)
         agent_rewards, expert_rewards, _ = self.mean_transition_reward(agent_trajectories, expert_trajectories)
-        loss = th.mean(agent_rewards - expert_rewards)
+        loss = th.mean(agent_rewards) - th.mean(expert_rewards)
         return loss
 
     def learn(
@@ -185,10 +185,8 @@ class MaxEntIRL:
                 self.collect_rollouts(n_episodes)
                 self.reward_net.train()
                 reward_diffs = []
-                self.current_agent_trajectories = \
-                    self.agent_trajectories[-n_episodes * self.expand_ratio:] + \
-                    random.sample(self.agent_trajectories, n_episodes * self.expand_ratio * (int(itr/3) + 1))
                 for rew_steps in range(max_gradient_steps):
+                    self.current_agent_trajectories = random.sample(self.agent_trajectories, n_episodes)
                     loss_diff, weight_norm, _ = self.cal_loss(n_episodes)
                     loss = loss_diff
                     self.reward_net.optimizer.zero_grad()
@@ -204,7 +202,7 @@ class MaxEntIRL:
                     logger.record("reward_diff", diffs)
                     logger.record("steps", rew_steps, exclude="tensorboard")
                     logger.dump(rew_steps)
-                    if np.mean(reward_diffs[-min_gradient_steps:]) <= -0.05 and \
+                    if np.mean(reward_diffs[-min_gradient_steps:]) <= -0.1 and \
                             reward_diffs[-1] < 0.0 and \
                             rew_steps >= min_gradient_steps and early_stop:
                         self.reward_net.optimizer.zero_grad()
@@ -243,9 +241,9 @@ class GuidedCostLearning(MaxEntIRL):
             if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
                 acts = self.wrap_eval_env.action(acts)
             np_input = np.concatenate([transitions.obs, acts], axis=1)
-            th_input = th.from_numpy(np_input).double()
+            th_input = th.from_numpy(np_input)
         else:
-            th_input = th.from_numpy(transitions.obs).double()
+            th_input = th.from_numpy(transitions.obs)
         gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(th_input))]).to(self.device)
         trans_reward = gammas * self.reward_net(th_input).flatten()
         trans_log_prob = get_trajectories_probs(transitions, self.agent.policy)

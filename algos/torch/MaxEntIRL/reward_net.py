@@ -45,11 +45,11 @@ class RewardNet(nn.Module):
 
     def reset_optim(self):
         self.optimizer = self.optim_cls(self.parameters(), self._build_args[0], weight_decay=self._build_args[1])
-        self.to(self.device).double()
+        self.to(self.device)
 
     def reset(self):
         self._build(*self._build_args)
-        self.to(self.device).double()
+        self.to(self.device)
 
     def forward(self, x: th.Tensor) -> th.Tensor:
         x = self.feature_fn(x).to(self.device)
