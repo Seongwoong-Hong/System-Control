@@ -79,13 +79,13 @@ register(
 register(
     id='1DTarget_disc-v2',
     entry_point='gym_envs.envs:OneDTargetDisc',
-    max_episode_steps=10,
+    max_episode_steps=50,
 )
 
 register(
     id='1DTarget_disc-v0',
     entry_point='gym_envs.envs:OneDTargetDiscDet',
-    max_episode_steps=10,
+    max_episode_steps=50,
 )
 
 # environments based on mujoco
