@@ -16,16 +16,17 @@ class OneDTargetDisc(gym.Env):
     def step(self, action: np.ndarray):
         assert self.st is not None, "Can't step the environment before calling reset function"
         info = {'obs': self.st.reshape(1, -1), 'acts': action.reshape(1, -1)}
-        st = self.st + action - 1  # + 0.03 * np.random.random(self.st.shape)
-        done = bool(
-            st[0] < 0
-            or st[0] > 10
-        )
-        if not done:
-            self.st = st
         r = self.reward_fn(self.st, action)
+        self.st = self.st + action - 1  # + 0.03 * np.random.random(self.st.shape)
+        done = bool(
+            self.st[0] < 0
+            or self.st[0] > 10
+        )
+        if done:
+            r -= 1000
+        info['done'] = done
         self.timesteps += self.dt
-        return self.st, r, None, info
+        return self.st, r, done, info
 
     def _get_obs(self):
         return self.st
@@ -40,8 +41,9 @@ class OneDTargetDisc(gym.Env):
         return self._get_obs()
 
     def reward_fn(self, state, action) -> float:
+        # x = state[0] + action[0] - 1
         x = state[0]
-        return - ((x - 8) ** 2)
+        return 1 - ((x - 8) ** 2)
 
     def render(self, mode='human'):
         pass
@@ -57,3 +59,12 @@ class OneDTargetDiscDet(OneDTargetDisc):
         self.timesteps = 0.0
         self.n += 1
         return self._get_obs()
+
+    def step(self, action: np.ndarray):
+        ns, r, done, info = super(OneDTargetDiscDet, self).step(action)
+        if done:
+            if ns < 0:
+                self.st += 1
+            if ns > 10:
+                self.st -= 1
+        return self.st, r, None, info

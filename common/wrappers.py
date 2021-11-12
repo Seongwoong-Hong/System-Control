@@ -18,15 +18,27 @@ class RewardWrapper(gym.RewardWrapper):
         self.use_action_as_inp = self.rwfn.use_action_as_inp
 
     def step(self, action: np.ndarray):
-        ob, rew, done, info = self.env.step(action)
+        next_ob, rew, done, info = self.env.step(action)
         inp = info['obs']
         if self.use_action_as_inp:
             inp = np.append(inp, info['acts'], axis=1)
-        return ob, self.reward(inp), done, info
+        r = self.reward(inp)
+        if info.get('done'):
+            r -= 1000
+        return next_ob, r, done, info
 
     def reward(self, inp) -> float:
-        rwinp = torch.from_numpy(inp).reshape(1, -1).to(self.rwfn.device).double()
+        rwinp = torch.from_numpy(inp).reshape(1, -1).float().to(self.rwfn.device)
         return self.rwfn.forward(rwinp).item()
+
+
+class ObsRewardWrapper(RewardWrapper):
+    def step(self, action: np.ndarray):
+        next_ob, rew, done, info = self.env.step(action)
+        inp = info['obs'] / 10
+        if self.use_action_as_inp:
+            inp = np.append(inp, info['acts'] / 2, axis=1)
+        return next_ob, self.reward(inp), done, info
 
 
 class ActionRewardWrapper(RewardWrapper):

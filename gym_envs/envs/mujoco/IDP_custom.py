@@ -11,7 +11,6 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         self.time = 0.0
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 8)
         utils.EzPickle.__init__(self)
-        self.observation_space = spaces.Box(low=np.array([-1, -1, -1, -1, 0]), high=np.array([1, 1, 1, 1, 1]), dtype=np.float64)
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
@@ -24,8 +23,14 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         self.do_simulation(action, self.frame_skip)
         self.time += self.dt / 4.8
         ob = self._get_obs()
-        done = False
+        done = bool(
+            0.95 <= ob[0] or ob[0] <= -0.95 or
+            0.95 <= ob[1] or ob[1] <= -0.95
+        )
         info = {'obs': prev_ob.reshape(1, -1), "acts": action.reshape(1, -1)}
+        if done:
+            r -= 1000
+            info['done'] = done
         return ob, r, done, info
 
     @property
@@ -81,6 +86,10 @@ class IDPCustomExp(IDPCustom):
             q[1].reshape(self.model.nv)
         )
         return self._get_obs()
+
+    def step(self, action: np.ndarray):
+        ns, r, done, info = super().step(action)
+        return ns, r, None, info
 
 
 class IDPCustomEasy(IDPCustom):
