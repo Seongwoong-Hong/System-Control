@@ -55,7 +55,7 @@ def test_hpc_learned_policy(irl_path, pltqs, bsp, subj):
     name = f"{env_name}/MaxEntIRL/cnn_{subj}_reset_0.1"
     model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
     # algo = bc.reconstruct_policy(model_dir + "/policy")
-    algo = SAC.load(model_dir + "/015/agent.zip")
+    algo = SAC.load(model_dir + "/015/agent.pkl")
     a_list, o_list, _ = verify_policy(env, algo, render="human", repeat_num=len(pltqs))
 
 
@@ -66,7 +66,7 @@ def test_hpc_action_verification(irl_path, pltqs, bsp, subj):
     env = make_env(f"{env_name}-v1", wrapper=ActionWrapper, pltqs=pltqs, bsp=bsp)
     name = f"{env_name}/BC/ext_{subj}_noreset"
     model_dir = f"{irl_path}/tmp/log/{name}/model"
-    algo = SAC.load(model_dir + "/019/agent.zip")
+    algo = SAC.load(model_dir + "/019/agent.pkl")
     actuations = []
     obs = env.reset()
     done = False
@@ -120,3 +120,13 @@ def test_2D(irl_path):
             rs.append(r)
         trajs.append(np.append(np.array(sts), np.array(rs).reshape(-1, 1), axis=1))
     env.draw(trajs)
+
+
+def test_1D(irl_path):
+    name = "1DTarget"
+    env_id = f"{name}_disc"
+    env = make_env(f"{env_id}-v0")
+    model_dir = os.path.join(irl_path, "tmp", "log", env_id, "MaxEntIRL", "ext_ppo_disc_linear_ppoagent_svm_reset", "model")
+    algo = PPO.load(model_dir + "/008/agent")
+    a_list, o_list, _ = verify_policy(env, algo, render="None", repeat_num=9, deterministic=False)
+    print('end')
