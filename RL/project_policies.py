@@ -13,7 +13,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    env=env,
                    n_steps=n_steps,
                    batch_size=batch_size,
-                   gamma=0.99,
+                   gamma=0.975,
                    gae_lambda=0.95,
                    learning_rate=3e-4,
                    ent_coef=0.0,
@@ -37,7 +37,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    learning_starts=100,
                    train_freq=(500, 'step'),
                    gradient_steps=1000,
-                   gamma=0.99,
+                   gamma=0.975,
                    ent_coef=0.1,
                    target_entropy=0.0,
                    target_update_interval=1,
@@ -47,5 +47,11 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    policy_kwargs={'net_arch': {'pi': [32, 32], 'qf': [32, 32]}},
                    **kwargs,
                    )
+    elif algo_type == "viter":
+        from algos.tabular.viter import Viter
+        return Viter(env=env, gamma=0.8, epsilon=0.1, device=device)
+    elif algo_type == "qlearning":
+        from algos.tabular.qlearning import QLearning
+        return QLearning(env, gamma=0.8, epsilon=0.2, alpha=0.9, device=device)
     else:
         raise NameError("Not implemented policy name")

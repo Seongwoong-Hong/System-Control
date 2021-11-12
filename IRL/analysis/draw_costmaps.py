@@ -64,7 +64,7 @@ def draw_trajectories():
     lnum = len(expert_trajs)
     expt_obs = [expert_trajs[i].obs for i in range(lnum)]
     expt_acts = [expert_trajs[i].acts for i in range(lnum)]
-    # algo = SAC.load("../../RL/2DWorld/tmp/log/2DWorld/sac/policies_4/agent.zip")
+    # algo = SAC.load("../../RL/2DWorld/tmp/log/2DWorld/sac/policies_4/agent.pkl")
     # algo = bc.reconstruct_policy("../../tests/algos/policy")
     algo = PPO.load(model_dir + "/agent")
     agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=False, render="None", repeat_num=lnum)
@@ -152,7 +152,7 @@ def draw_costmaps():
     def cost_fn(*args):
         inp = th.cat([args[0], args[1]], dim=1)
         return -reward_net(inp).item()
-    agent = SAC.load(model_dir + "/agent.zip")
+    agent = SAC.load(model_dir + "/agent.pkl")
     # expt = def_policy(env_type, expt_env)
     expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
     # expt = PPO.load(f"tmp/log/{env_type}/ppo/forward/model/extra_ppo0.zip")

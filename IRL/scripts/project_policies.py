@@ -83,7 +83,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
         return HPCDivPolicy(env, **kwargs)
     elif algo_type == "ppo":
         from algos.torch.ppo import MlpPolicy
-        n_steps, batch_size = 4096, 256
+        n_steps, batch_size = 2048, 256
         if hasattr(env, "num_envs"):
             n_steps = int(n_steps / int(env.num_envs))
             batch_size = int(batch_size / int(env.num_envs))
@@ -91,10 +91,10 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    env=env,
                    n_steps=n_steps,
                    batch_size=batch_size,
-                   gamma=0.99,
-                   gae_lambda=0.95,
+                   gamma=0.75,
+                   gae_lambda=0.75,
                    learning_rate=3e-4,
-                   ent_coef=0.0,
+                   ent_coef=0.005,
                    n_epochs=10,
                    ent_schedule=1.0,
                    clip_range=0.2,
@@ -128,5 +128,11 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                            'optimizer_kwargs': {'betas': (0.9, 0.999)}},
             **kwargs
         )
+    elif algo_type == "viter":
+        from algos.tabular.viter import Viter
+        return Viter(env=env, gamma=0.8, epsilon=0.1, device=device)
+    elif algo_type == "qlearning":
+        from algos.tabular.qlearning import QLearning
+        return QLearning(env, gamma=0.8, epsilon=0.1, alpha=0.9, device=device)
     else:
         raise NameError("Not implemented policy name")
