@@ -97,10 +97,10 @@ def expt_cost():
 
 
 def compare_obs():
-    env_type = "1DTarget"
+    env_type = "2DTarget"
     env_id = f"{env_type}_disc"
     subj = "viter_disc"
-    name = f"ext_{subj}_qlearning_linear_svm_reset"
+    name = f"ext_{subj}_linear_svm_reset"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     assert os.path.isdir(proj_path)

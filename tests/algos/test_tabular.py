@@ -3,20 +3,28 @@ import torch as th
 import pickle
 from common.util import make_env
 from common.wrappers import RewardWrapper
-from algos.tabular.qlearning import QLearning
+from algos.tabular.qlearning import QLearning, SoftQLearning
 from algos.tabular.viter import Viter
 
 
 def test_qlearning():
-    env = make_env("1DTarget_disc-v2")
-    algo = QLearning(env, gamma=0.8, epsilon=0.2, alpha=0.9, device='cpu')
-    algo.learn(1000)
+    env = make_env("2DTarget_disc-v2")
+    algo = QLearning(env, gamma=0.8, epsilon=0.4, alpha=0.4, device='cpu')
+    algo.learn(int(5e4))
+
+    print('end')
+
+
+def test_soft_q_learning():
+    env = make_env("2DTarget_disc-v2")
+    algo = SoftQLearning(env, gamma=0.8, epsilon=0.4, alpha=0.1, device='cpu')
+    algo.learn(int(5e4))
 
     print('end')
 
 
 def test_viter():
-    env = make_env("1DTarget_disc-v2")
+    env = make_env("2DTarget_disc-v2")
     algo = Viter(env, gamma=0.8, epsilon=0.2, device='cpu')
     algo.learn(200)
 

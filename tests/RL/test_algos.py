@@ -1,5 +1,6 @@
 import os
 import pytest
+import pickle
 import numpy as np
 
 from algos.torch.ppo import PPO
@@ -27,13 +28,13 @@ def test_mujoco_envs_learned_policy():
 def test_rl_learned_policy(rl_path):
     env_type = "IDP"
     name = f"{env_type}_custom"
-    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "ppo", "policies_2")
+    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "ppo", "policies_1")
     stats_path = None
     if os.path.isfile(model_dir + "normalization.pkl"):
         stats_path = model_dir + "normalization.pkl"
     env = make_env(f"{name}-v2", subpath="../../IRL/demos/HPC/sub01/sub01", wrapper=None, use_norm=stats_path)
     algo = PPO.load(model_dir + f"/agent")
-    a_list, o_list, _ = verify_policy(env, algo, render="human", repeat_num=1, deterministic=True)
+    a_list, o_list, _ = verify_policy(env, algo, render="human", repeat_num=10, deterministic=True)
     plt.plot(a_list[0])
     plt.show()
     plt.plot(o_list[0][:, :2])
@@ -44,10 +45,12 @@ def test_2d(rl_path):
     name = "2DTarget"
     env_id = f"{name}_disc"
     env = make_env(f"{env_id}-v2")
-    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "ppo", "policies_1")
-    algo = PPO.load(model_dir + f"/agent")
+    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "softqlearning", "policies_1")
+    with open(model_dir + "/agent.pkl", "rb") as f:
+        algo = pickle.load(f)
+    # algo = PPO.load(model_dir + f"/agent")
     trajs = []
-    for i in range(5):
+    for i in range(10):
         st = env.reset()
         done = False
         sts, rs = [], []

@@ -19,15 +19,16 @@ from common.wrappers import ActionWrapper
 
 def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in range(7)]):
     t = np.linspace(0, 1/120 * (len(inp1[0])-1), len(inp1[0]))
-    ymax, ymin = 0.5, -0.5
+    t = range(51)
+    ymax, ymin = 10, 0
     # ymax, ymin = np.max(np.array(inp2)[:, :, :2]), np.min(np.array(inp2)[:, :, :2])
     plt.figure(figsize=[9, 6.4], dpi=600.0)
     for j in labels:
         yval_list = [inp1[j], inp2[j]]
-        plt.plot(yval_list[0][:, 0], yval_list[0][:, 1], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
-        # plt.plot(t, yval_list[0][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
-        # plt.plot(t, yval_list[1][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 0.4), lw=3)
-        plt.plot(yval_list[1][:, 0], yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 1), lw=3)
+        # plt.plot(yval_list[0][:, 0], yval_list[0][:, 1], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
+        plt.plot(t, yval_list[0][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 1), lw=3)
+        plt.plot(t, yval_list[1][:, 0], color=(19 / 255, 0 / 255, 182 / 255, 0.4), lw=3)
+        # plt.plot(yval_list[1][:, 0], yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 1), lw=3)
         # plt.plot(t, yval_list[0][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 1), lw=3)
         # plt.plot(t, yval_list[1][:, 1], color=(255 / 255, 105 / 255, 21 / 255, 0.6), lw=3)
         # plt.legend(['', '', 'learned', 'original'], ncol=2, columnspacing=0.1, fontsize=15)
@@ -35,21 +36,21 @@ def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in rang
         plt.tick_params(axis='both', which='major', labelsize=18)
         plt.ylim(ymin, ymax)
         # plt.xlim(np.min(t), np.max(t))
-        plt.xlim(-0.5, 0.5)
+        plt.xlim(0, 50)
         plt.axhline(y=0.0, linestyle=':', color='0.5')
         plt.axvline(x=0.0, linestyle=':', color='0.5')
         plt.title("Simulation Result", fontsize=28, pad=30)
         plt.xlabel("time", fontsize=24)
         plt.ylabel(name, fontsize=24)
         # plt.savefig(f"figures/{env_type}/{subj}/angular_velocity{j}.png")
-    plt.show()
+        plt.show()
 
 
 def draw_trajectories():
-    env_type = "2DTarget"
+    env_type = "1DTarget"
     algo_type = "MaxEntIRL"
     env_id = f"{env_type}_disc"
-    subj = "ppo_disc"
+    subj = "viter_disc"
     wrapper = ActionWrapper if "HPC" in env_type else None
     # pltqs, init_states = [], []
     # for i in range(5, 10):
@@ -57,8 +58,8 @@ def draw_trajectories():
     #     init_states += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['state'][0, :4]]
     env = make_env(f"{env_id}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
     # env = make_env(f"{env_type}-v0", wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-    name = f"{env_id}/{algo_type}/ext_{subj}_linear_ppoagent_svm_reset"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "010")
+    name = f"{env_id}/{algo_type}/ext_{subj}_qlearning_linear_svm_reset"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "047")
     with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     lnum = len(expert_trajs)
@@ -66,9 +67,11 @@ def draw_trajectories():
     expt_acts = [expert_trajs[i].acts for i in range(lnum)]
     # algo = SAC.load("../../RL/2DWorld/tmp/log/2DWorld/sac/policies_4/agent.pkl")
     # algo = bc.reconstruct_policy("../../tests/algos/policy")
-    algo = PPO.load(model_dir + "/agent")
-    agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=False, render="None", repeat_num=lnum)
-    draw_time_trajs(agent_obs, expt_obs)
+    with open(model_dir + "/agent.pkl", "rb") as f:
+        algo = pickle.load(f)
+    # algo = PPO.load(model_dir + "/agent")
+    agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=True, render="None", repeat_num=lnum)
+    draw_time_trajs(agent_obs, expt_obs, labels=[i for i in range(lnum)])
     # draw_time_trajs(agent_acts, expt_acts, name="actions", labels=[i for i in range(35)])
 
 

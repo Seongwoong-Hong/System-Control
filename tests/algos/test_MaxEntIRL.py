@@ -19,7 +19,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, "1DTarget", "viter_disc.pkl")
+    expert_dir = os.path.join(demo_dir, "2DTarget", "softqlearning_disc.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -28,13 +28,13 @@ def expert(demo_dir):
 @pytest.fixture
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env("1DTarget_disc-v2", subpath=subpath)
+    return make_env("2DTarget_disc-v2", subpath=subpath)
 
 
 @pytest.fixture
 def eval_env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env("1DTarget_disc-v0", subpath=subpath)
+    return make_env("2DTarget_disc-v0", subpath=subpath)
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def learner(env, expert, eval_env):
     def feature_fn(x):
         return th.cat([x, x**2], dim=1)
 
-    agent = def_policy("viter", env, device='cpu', verbose=1)
+    agent = def_policy("softqlearning", env, device='cpu', verbose=1)
 
     return MaxEntIRL(
         env,

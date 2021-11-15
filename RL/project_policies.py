@@ -6,7 +6,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
     if algo_type == "ppo":
         from algos.torch.ppo import MlpPolicy
         n_steps = 2048
-        batch_size = 256
+        batch_size = 64
         if hasattr(env, "num_envs"):
             n_steps = int(n_steps / int(env.num_envs))
         return PPO(MlpPolicy,
@@ -38,8 +38,8 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    train_freq=(500, 'step'),
                    gradient_steps=1000,
                    gamma=0.975,
-                   ent_coef=0.1,
-                   target_entropy=0.0,
+                   ent_coef='auto',
+                   target_entropy=2.0,
                    target_update_interval=1,
                    verbose=verbose,
                    device=device,
@@ -52,6 +52,9 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
         return Viter(env=env, gamma=0.8, epsilon=0.1, device=device)
     elif algo_type == "qlearning":
         from algos.tabular.qlearning import QLearning
-        return QLearning(env, gamma=0.8, epsilon=0.2, alpha=0.9, device=device)
+        return QLearning(env, gamma=0.8, epsilon=0.4, alpha=0.4, device=device)
+    elif algo_type == "softqlearning":
+        from algos.tabular.qlearning import SoftQLearning
+        return SoftQLearning(env, gamma=0.8, epsilon=0.4, alpha=0.1, device=device)
     else:
         raise NameError("Not implemented policy name")
