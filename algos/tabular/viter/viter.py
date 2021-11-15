@@ -56,11 +56,12 @@ class Viter:
 
     def learn(self, total_timesteps, **kwargs):
         t = 0
-        while True:
+        while t < total_timesteps:
             self.num_timesteps = t
             old_value = deepcopy(self.policy.v_table)
             self.train()
             error = np.max(np.abs(old_value - self.policy.v_table))
+            logger.record("num_timesteps", t, exclude="tensorboard")
             logger.record("Value Error", error)
             logger.dump(t)
             print(f"{self.num_timesteps}th iter: Mean difference btw old value and current value is {error:.3f}")

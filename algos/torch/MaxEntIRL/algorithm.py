@@ -107,7 +107,7 @@ class MaxEntIRL:
             self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_agent_episodes)]))
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_agent_episodes * self.expand_ratio)
         self.agent_trajectories += generate_trajectories_without_shuffle(
-                self.agent, self.vec_eval_env, sample_until, deterministic_policy=True)
+                self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
         self.agent.set_env(self.wrap_env)
 
     def mean_transition_reward(self, agent_trajs: Sequence[Trajectory], expt_trajs: Sequence[Trajectory]) -> Tuple:
