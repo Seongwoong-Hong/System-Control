@@ -41,8 +41,7 @@ class OneDTargetDisc(gym.Env):
         return self._get_obs()
 
     def reward_fn(self, state, action) -> float:
-        # x = state[0] + action[0] - 1
-        x = state[0]
+        x = state[0] + action[0] - 1
         return 1 - ((x - 8) ** 2)
 
     def render(self, mode='human'):
