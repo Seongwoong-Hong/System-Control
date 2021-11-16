@@ -6,6 +6,7 @@ from stable_baselines3.common.policies import ActorCriticCnnPolicy, ActorCriticP
 
 from typing import Optional
 
+import numpy as np
 import torch as th
 
 from stable_baselines3.common.distributions import (
@@ -55,10 +56,12 @@ class ActorCriticPolicyCustom(ActorCriticPolicy):
         else:
             raise ValueError("Invalid action distribution")
 
-    def get_log_prob_from_act(self, observation: th.Tensor, action: th.Tensor) -> th.Tensor:
-        latent_pi, _, latent_sde = self._get_latent(observation)
+    def get_log_prob_from_act(self, observation: np.ndarray, action: np.ndarray) -> th.Tensor:
+        obs = th.from_numpy(observation).to(self.device)
+        acts = th.from_numpy(action).to(self.device)
+        latent_pi, _, latent_sde = self._get_latent(obs)
         distribution = self._get_action_dist_from_latent(latent_pi, latent_sde=latent_sde)
-        log_prob = distribution.log_prob(action)
+        log_prob = distribution.log_prob(acts)
         return log_prob
 
 
