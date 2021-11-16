@@ -16,14 +16,14 @@ from IRL.scripts.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "HPC"
+    env_type = "2DTarget"
     algo_type = "GCL"
-    device = "cuda:1"
-    sub = "sub01"
-    name = f"{env_type}_custom"
+    device = "cpu"
+    sub = "softqlearning_disc"
+    name = f"{env_type}_disc"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, sub, sub)
-    env = make_env(f"{name}-v1", use_vec_env=False, subpath=subpath)
+    env = make_env(f"{name}-v2", use_vec_env=False, subpath=subpath)
     eval_env = make_env(f"{name}-v0", use_vec_env=False, subpath=subpath)
 
     # Load data
@@ -34,15 +34,15 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{sub}_linear_ppoagent_reset"
+    log_dir += f"/no_{sub}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        # return x
-        return th.cat([x, x**2, x**3, x**4], dim=1)
+        return x
+        # return th.cat([x, x**2], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("ppo", env, device=device, verbose=1)
+    agent = def_policy("softqlearning", env, device=device, verbose=1)
     learner = GuidedCostLearning(
         env,
         eval_env=eval_env,
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         agent=agent,
         expert_trajectories=expert_trajs,
         use_action_as_input=True,
-        rew_arch=[],
+        rew_arch=[8, 2],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
@@ -74,10 +74,10 @@ if __name__ == "__main__":
         total_iter=50,
         agent_learning_steps=1e5,
         n_episodes=expt_traj_num,
-        max_agent_iter=30,
-        min_agent_iter=12,
-        max_gradient_steps=1200,
-        min_gradient_steps=100,
+        max_agent_iter=1,
+        min_agent_iter=1,
+        max_gradient_steps=2500,
+        min_gradient_steps=1000,
         callback=save_net_callback.net_save,
         early_stop=True,
     )

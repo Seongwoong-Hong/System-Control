@@ -167,7 +167,7 @@ register(
 )
 
 register(
-    id='HPC_pybullet-v1',
+    id='HPC_pybullet-v2',
     entry_point='gym_envs.envs.pybullet:HumanBalanceBulletEnv',
     max_episode_steps=599,
 )

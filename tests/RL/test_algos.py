@@ -44,7 +44,7 @@ def test_rl_learned_policy(rl_path):
 def test_2d(rl_path):
     name = "2DTarget"
     env_id = f"{name}_disc"
-    env = make_env(f"{env_id}-v2")
+    env = make_env(f"{env_id}-v0")
     model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "softqlearning", "policies_1")
     with open(model_dir + "/agent.pkl", "rb") as f:
         algo = pickle.load(f)

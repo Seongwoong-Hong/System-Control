@@ -6,7 +6,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
     if algo_type == "ppo":
         from algos.torch.ppo import MlpPolicy
         n_steps = 2048
-        batch_size = 64
+        batch_size = 256
         if hasattr(env, "num_envs"):
             n_steps = int(n_steps / int(env.num_envs))
         return PPO(MlpPolicy,
@@ -39,7 +39,7 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
                    gradient_steps=1000,
                    gamma=0.975,
                    ent_coef='auto',
-                   target_entropy=2.0,
+                   target_entropy='auto',
                    target_update_interval=1,
                    verbose=verbose,
                    device=device,

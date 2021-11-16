@@ -95,7 +95,7 @@ class TwoDTargetDisc(gym.Env):
 class TwoDTargetDiscDet(TwoDTargetDisc):
     def __init__(self):
         super(TwoDTargetDiscDet, self).__init__()
-        self.init_state = range(100)
+        self.init_state = range(0, 100, 5)
         self.n = 0
 
     def step(self, action: np.ndarray):

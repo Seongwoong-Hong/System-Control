@@ -91,16 +91,16 @@ def test_validity(learner, expert):
     )
 
 
-def test_GCL(env, expert):
+def test_GCL(env, expert, eval_env):
     from imitation.util import logger
     from IRL.scripts.project_policies import def_policy
     logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
         # return x
-        return th.cat([x, x**2, x**3, x**4], dim=1)
+        return th.cat([x, x**2], dim=1)
 
-    agent = def_policy("ppo", env, device='cpu', verbose=1)
+    agent = def_policy("softqlearning", env, device='cpu', verbose=1)
 
     learner = GuidedCostLearning(
         env,
@@ -110,17 +110,18 @@ def test_GCL(env, expert):
         use_action_as_input=False,
         rew_arch=[],
         device='cpu',
+        eval_env=eval_env,
         env_kwargs={'reward_wrapper': RewardWrapper},
         rew_kwargs={'type': 'ann'},
     )
 
     learner.learn(
         total_iter=50,
-        agent_learning_steps=1e4,
+        agent_learning_steps=1e5,
         n_episodes=len(expert),
-        max_agent_iter=25,
-        min_agent_iter=8,
-        max_gradient_steps=100,
-        min_gradient_steps=100,
+        max_agent_iter=1,
+        min_agent_iter=1,
+        max_gradient_steps=1200,
+        min_gradient_steps=500,
         early_stop=True,
     )

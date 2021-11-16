@@ -21,7 +21,7 @@ if __name__ == "__main__":
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}_disc"
-    expt = "softqlearning_disc"
+    expt = "viter_disc"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     # pltqs, init_states = [], []
@@ -41,16 +41,16 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/no_{expt}_svm_reset"
+    log_dir += f"/ext_{expt}_linear_small"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return x
+        # return x
         # return x ** 2
-        # return th.cat([x, x**2], dim=1)
+        return th.cat([x, x**2], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("softqlearning", env, device=device, verbose=1)
+    agent = def_policy("viter", env, device=device, verbose=1)
     learner = MaxEntIRL(
         env,
         eval_env=eval_env,
@@ -71,10 +71,10 @@ if __name__ == "__main__":
         agent=agent,
         expert_trajectories=expert_trajs,
         use_action_as_input=True,
-        rew_arch=[8, 2],
+        rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.05},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
     )
 
     # Run Learning
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         max_agent_iter=1,
         min_agent_iter=1,
         max_gradient_steps=12000,
-        min_gradient_steps=2000,
+        min_gradient_steps=5000,
         callback=save_net_callback.net_save,
     )
 
