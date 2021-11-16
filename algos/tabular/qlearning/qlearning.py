@@ -37,7 +37,8 @@ class QLearning:
             observation_space=self.observation_space,
             action_space=self.action_space,
             epsilon=self.epsilon,
-            alpha=self.alpha
+            alpha=self.alpha,
+            device=self.device,
         )
 
     def train(
@@ -55,11 +56,13 @@ class QLearning:
         else:
             self.policy.q_table[ob, action] += self.alpha * (reward - self.policy.q_table[ob, action])
 
-    def learn(self, total_timesteps, **kwargs) -> None:
-        t = 0
-        while t < total_timesteps:
+    def learn(self, total_timesteps, reset_num_timesteps=True, **kwargs) -> None:
+        if reset_num_timesteps:
+            self.num_timesteps = 0
+        else:
+            total_timesteps += self.num_timesteps
+        while self.num_timesteps < total_timesteps:
             prev_q_table = deepcopy(self.policy.q_table)
-            self.num_timesteps = t
             ob = self.env.reset()
             done = False
             while not done:
@@ -70,15 +73,15 @@ class QLearning:
             for ob in range(len(self.policy.policy_table)):
                 self.policy.policy_table[ob] = self.policy.arg_max(self.policy.q_table[ob, :])
             error = np.max(np.abs(self.policy.q_table - prev_q_table))
-            if t % 10 == 0:
-                logger.record("num_timesteps", t, exclude="tensorboard")
+            if self.num_timesteps % 100 == 0:
+                logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Action-Value Error", error)
-                logger.dump(t)
-            if error < 1e-5 and t > total_timesteps / 2:
+                logger.dump(self.num_timesteps)
+            if error < 1e-5 and self.num_timesteps > total_timesteps / 2:
                 logger.record("Action-Value Error", error)
-                logger.dump(t)
+                logger.dump(self.num_timesteps)
                 break
-            t += 1
+            self.num_timesteps += 1
 
     def reset(self, env):
         self._setup_model(env)
@@ -128,7 +131,8 @@ class SoftQLearning(QLearning):
             observation_space=self.observation_space,
             action_space=self.action_space,
             epsilon=self.epsilon,
-            alpha=self.alpha
+            alpha=self.alpha,
+            device=self.device,
         )
 
     def train(

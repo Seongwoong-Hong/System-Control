@@ -1,5 +1,6 @@
 import random
 import numpy as np
+import torch as th
 from typing import Optional, Tuple
 
 
@@ -9,12 +10,14 @@ class TabularPolicy:
             observation_space,
             action_space,
             epsilon,
-            alpha
+            alpha,
+            device,
     ):
         self.observation_space = observation_space
         self.action_space = action_space
         self.epsilon = epsilon
         self.alpha = alpha
+        self.device = device
         self.q_table = np.zeros([self.observation_space.nvec[0], self.action_space.nvec[0]])
         self.policy_table = np.zeros([self.observation_space.nvec[0]], dtype=int)
 
@@ -65,12 +68,19 @@ class TabularSoftPolicy(TabularPolicy):
                 action[i] = self.arg_max(self.q_table[ob, :])
         return action, None
 
-    def softmax(self, x):
-        y = np.exp(x - np.max(x))
-        f_x = y / np.sum(y)
+    def get_log_prob_from_act(self, obs, acts):
+        probs = self.softmax(self.q_table[obs, :])
+        log_probs = np.log(probs[range(len(acts)), 0, acts.flatten()].reshape(obs.shape))
+        return th.from_numpy(log_probs).float()
+
+    def softmax(self, x: np.ndarray):
+        if len(x.shape) == 1:
+            x = x[np.newaxis, :]
+        y = np.exp(x - np.max(x, axis=-1)[:, np.newaxis])
+        f_x = y / np.sum(y, axis=-1)[:, np.newaxis]
         return f_x
 
-    def arg_softmax(self, x):
+    def arg_softmax(self, x: np.ndarray):
         arg_probs = self.softmax(x)
-        arg = random.choices(range(len(x)), weights=arg_probs)[0]
+        arg = random.choices(range(len(x.flatten())), weights=arg_probs.flatten())[0]
         return arg
