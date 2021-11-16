@@ -17,13 +17,14 @@ class HumanIDP(MJCFBasedRobot):
         self.init_qvel = [0.0, 0.0]
         if bsp is not None:
             self._set_body_config(xml_path, bsp)
-        MJCFBasedRobot.__init__(self, xml_path, 'HPC', action_dim=2, obs_dim=6)
+        MJCFBasedRobot.__init__(self, xml_path, 'HPC', action_dim=2, obs_dim=7)
         self._plt_torque = None
 
     def robot_specific_reset(self, bullet_client):
         self._p = bullet_client
         self.j1 = self.jdict["hinge"]
         self.j2 = self.jdict["hinge2"]
+        self.timesteps = 0
         self.j1.reset_current_position(self.init_qpos[0], self.init_qvel[0])
         self.j2.reset_current_position(self.init_qpos[1], self.init_qvel[1])
         self.j1.set_motor_torque(self.plt_torque[0])
@@ -45,7 +46,7 @@ class HumanIDP(MJCFBasedRobot):
             gamma_dot,
             self.plt_torque[0],
             self.plt_torque[1],
-            # self.timesteps / 600,
+            self.timesteps / 600,
         ])
 
     @staticmethod
@@ -99,7 +100,6 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
     def reset(self):
         if self.stateId >= 0:
             self._p.restoreState(self.stateId)
-        self.robot.timesteps = 0
         self._order += 1
         self._set_pltqs()
         if self._init_states is not None:
@@ -111,6 +111,7 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
         return r
 
     def set_state(self, q, dq):
+        self.robot.timesteps = 0
         self.robot.j1.set_state(q[0], dq[0])
         self.robot.j2.set_state(q[1], dq[1])
         self._set_pltqs()
@@ -125,7 +126,14 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
         self.scene.global_step()
         state = self.robot.calc_state()
         self.robot.timesteps += 1
-        done = False
+        done = bool(
+            0.95 <= state[0] or state[0] <= -0.95 or
+            0.95 <= state[1] or state[1] <= -0.95
+        )
+        info = {'obs': prev_state.reshape(1, -1), "acts": a.reshape(1, -1)}
+        if done:
+            reward -= 1000
+            info['done'] = done
         self.HUD(state, a, done)
         return state, reward, done, {'obs': np.append(prev_state, state).reshape(1, -1), 'acts': a.reshape(1, -1)}
 
@@ -188,3 +196,7 @@ class HumanBalanceExpBulletEnv(HumanBalanceBulletEnv):
         else:
             self._pltq = None
         self._set_plt_torque()
+
+    def step(self, a):
+        ns, r, done, info = super().step(a)
+        return ns, r, None, info

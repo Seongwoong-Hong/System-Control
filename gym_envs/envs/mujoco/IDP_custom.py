@@ -11,6 +11,10 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         self.time = 0.0
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 8)
         utils.EzPickle.__init__(self)
+        self.observation_space = spaces.Box(
+            low=np.array([-1.0, -1.0, -1.0, -1.0, 0.0]),
+            high=np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+        )
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
@@ -48,8 +52,11 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def current_obs(self):
         return self._get_obs()
 
-    def reset_model(self):
+    def set_state(self, qpos, qvel):
+        super().set_state(qpos, qvel)
         self.time = 0.0
+
+    def reset_model(self):
         self.set_state(
             self.init_qpos + self.np_random.uniform(low=-.3, high=.3, size=self.model.nq),
             self.init_qvel + self.np_random.uniform(low=-.3, high=.3, size=self.model.nv),
