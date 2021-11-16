@@ -46,7 +46,7 @@ class MaxEntIRL:
         self.expert_trajectories = expert_trajectories
         self.expert_transitions = flatten_trajectories(expert_trajectories)
         self.agent_trajectories = []
-        self.expand_ratio = 11
+        self.expand_ratio = 1
 
         if self.env_kwargs is None:
             self.env_kwargs = {}
@@ -87,7 +87,7 @@ class MaxEntIRL:
         else:
             raise NotImplementedError("Not implemented reward net type")
 
-    def _reset_agent(self, n_agent_episodes, **kwargs):
+    def _reset_agent(self, **kwargs):
         reward_wrapper = kwargs.pop("reward_wrapper", ActionRewardWrapper)
         norm_wrapper = kwargs.pop("vec_normalizer", None)
         self.reward_net.eval()
@@ -97,7 +97,7 @@ class MaxEntIRL:
             self.wrap_env = norm_wrapper(DummyVecEnv([lambda: Monitor(self.wrap_env)]), **kwargs)
         else:
             self.wrap_env = DummyVecEnv([lambda: Monitor(self.wrap_env)])
-            self.vec_eval_env = DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_agent_episodes)])
+            self.vec_eval_env = DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(self.expand_ratio)])
         self.agent.reset(self.wrap_env)
 
     def collect_rollouts(self, n_agent_episodes):
@@ -156,9 +156,9 @@ class MaxEntIRL:
         if isinstance(self.wrap_env, VecEnvWrapper):
             self.vec_eval_env = deepcopy(self.wrap_env)
             self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_episodes)]))
-        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes*self.env.observation_space.nvec[0])
+        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes*self.expand_ratio)
         agent_trajectories = generate_trajectories_without_shuffle(
-                self.agent, self.vec_eval_env, sample_until, deterministic_policy=True)
+                self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
         self.agent.set_env(self.wrap_env)
         agent_rewards, expert_rewards, _ = self.mean_transition_reward(agent_trajectories, expert_trajectories)
         loss = th.mean(agent_rewards) - th.mean(expert_rewards)
@@ -178,7 +178,7 @@ class MaxEntIRL:
             n_episodes: int = 10,
             **kwargs
     ):
-        self._reset_agent(n_episodes, **self.env_kwargs)
+        self._reset_agent(**self.env_kwargs)
         for itr in range(total_iter):
             self.reward_net.reset_optim()
             with logger.accumulate_means(f"{itr}/reward"):
@@ -209,7 +209,7 @@ class MaxEntIRL:
                         break
                     self.reward_net.optimizer.step()
             with logger.accumulate_means(f"{itr}/agent"):
-                self._reset_agent(n_episodes, **self.env_kwargs)
+                self._reset_agent(**self.env_kwargs)
                 reward_diffs = []
                 for agent_steps in range(1, max_agent_iter + 1):
                     self.agent.learn(
@@ -241,9 +241,9 @@ class GuidedCostLearning(MaxEntIRL):
             if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
                 acts = self.wrap_eval_env.action(acts)
             np_input = np.concatenate([transitions.obs, acts], axis=1)
-            th_input = th.from_numpy(np_input)
+            th_input = th.from_numpy(np_input).float()
         else:
-            th_input = th.from_numpy(transitions.obs)
+            th_input = th.from_numpy(transitions.obs).float()
         gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(th_input))]).to(self.device)
         trans_reward = gammas * self.reward_net(th_input).flatten()
         trans_log_prob = get_trajectories_probs(transitions, self.agent.policy)
