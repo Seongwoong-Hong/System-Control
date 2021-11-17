@@ -22,26 +22,17 @@ class TwoDTargetDisc(gym.Env):
         r = self.reward_fn(st, act)
         info = {'obs': self.st.reshape(1, -1), 'acts': action.reshape(1, -1)}
         st += act - 1
-        done = bool(
-            st[0] < 0
-            or st[0] >= self.map_size
-            or st[1] < 0
-            or st[1] >= self.map_size
-        )
-        if done:
-            r -= 1000
-            info['done'] = done
-            if st[0] >= self.map_size:
-                st[0] -= 1
-            elif st[0] < 0:
-                st[0] += 1
-            if st[1] >= self.map_size:
-                st[1] -= 1
-            elif st[1] < 0:
-                st[1] += 1
+        if st[0] >= self.map_size:
+            st[0] -= 1
+        elif st[0] < 0:
+            st[0] += 1
+        if st[1] >= self.map_size:
+            st[1] -= 1
+        elif st[1] < 0:
+            st[1] += 1
         self.timesteps += self.dt
         self.st = self.ob_to_idx(st)
-        return self.st, r, done, info
+        return self.st, r, None, info
 
     def set_state(self, state):
         self.st = state
@@ -64,8 +55,8 @@ class TwoDTargetDisc(gym.Env):
         return np.array([ob[0] + 10 * ob[1]], dtype=int)
 
     def reward_fn(self, state, action) -> float:
-        x, y = state[0] + action[0] - 1, state[1] + action[1] - 1
-        return - ((x - 6) ** 2 + (y - 8) ** 2)
+        x, y = state[0], state[1]
+        return - ((x - 0) ** 2 + (y - 0) ** 2)
 
     def draw(self, trajs: List[np.ndarray] = None):
         if trajs is None:
@@ -97,10 +88,6 @@ class TwoDTargetDiscDet(TwoDTargetDisc):
         super(TwoDTargetDiscDet, self).__init__()
         self.init_state = range(0, 100, 5)
         self.n = 0
-
-    def step(self, action: np.ndarray):
-        next_ob, r, done, info = super().step(action)
-        return next_ob, r, None, info
 
     def reset(self):
         self.st = np.array([self.init_state[self.n % len(self.init_state)]], dtype=int)

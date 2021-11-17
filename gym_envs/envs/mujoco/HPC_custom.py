@@ -1,4 +1,6 @@
 import os
+
+import gym
 import mujoco_py
 from copy import deepcopy
 import random
@@ -19,6 +21,10 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         if bsp is not None:
             self._set_body_config(filepath, bsp)
         mujoco_env.MujocoEnv.__init__(self, filepath, frame_skip=5)
+        self.observation_space = gym.spaces.Box(
+            low=np.array([-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 0.0]),
+            high=np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+        )
         utils.EzPickle.__init__(self)
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
@@ -53,10 +59,10 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
             self.sim.data.qpos,  # link angles
             self.sim.data.qvel,  # link angular velocities
             self.plt_torque,  # torque from platform movement
+            np.array([self.timesteps / 600]),
         ]).ravel()
 
     def reset_model(self):
-        self._timesteps = 0
         self._order += 1
         if self._init_states is not None:
             self.init_qpos = np.array(self._init_states[self.order][:2])

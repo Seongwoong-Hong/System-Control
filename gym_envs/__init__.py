@@ -67,25 +67,25 @@ register(
 register(
     id='2DTarget_disc-v0',
     entry_point='gym_envs.envs:TwoDTargetDiscDet',
-    max_episode_steps=50,
+    max_episode_steps=200,
 )
 
 register(
     id='2DTarget_disc-v2',
     entry_point='gym_envs.envs:TwoDTargetDisc',
-    max_episode_steps=50,
+    max_episode_steps=200,
 )
 
 register(
     id='1DTarget_disc-v2',
     entry_point='gym_envs.envs:OneDTargetDisc',
-    max_episode_steps=50,
+    max_episode_steps=200,
 )
 
 register(
     id='1DTarget_disc-v0',
     entry_point='gym_envs.envs:OneDTargetDiscDet',
-    max_episode_steps=50,
+    max_episode_steps=200,
 )
 
 # environments based on mujoco
@@ -167,7 +167,7 @@ register(
 )
 
 register(
-    id='HPC_pybullet-v2',
+    id='HPC_pybullet-v1',
     entry_point='gym_envs.envs.pybullet:HumanBalanceBulletEnv',
     max_episode_steps=599,
 )

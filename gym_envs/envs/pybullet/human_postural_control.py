@@ -131,11 +131,8 @@ class HumanBalanceBulletEnv(MJCFBaseBulletEnv):
             0.95 <= state[1] or state[1] <= -0.95
         )
         info = {'obs': prev_state.reshape(1, -1), "acts": a.reshape(1, -1)}
-        if done:
-            reward -= 1000
-            info['done'] = done
         self.HUD(state, a, done)
-        return state, reward, done, {'obs': np.append(prev_state, state).reshape(1, -1), 'acts': a.reshape(1, -1)}
+        return state, reward, None, info
 
     def camera_adjust(self):
         self._p.resetDebugVisualizerCamera(2.4, -2.8, -27, [0, 0, 0.5])
@@ -196,7 +193,3 @@ class HumanBalanceExpBulletEnv(HumanBalanceBulletEnv):
         else:
             self._pltq = None
         self._set_plt_torque()
-
-    def step(self, a):
-        ns, r, done, info = super().step(a)
-        return ns, r, None, info

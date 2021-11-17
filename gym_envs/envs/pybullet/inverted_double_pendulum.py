@@ -18,8 +18,8 @@ class InvertedDoublePendulum(MJCFBasedRobot):
         self.j1 = self.jdict["hinge"]
         self.j2 = self.jdict["hinge2"]
         self.time = 0.0
-        u = self.np_random.uniform(low=-.1, high=.1, size=[2])
-        du = self.np_random.uniform(low=-.1, high=.1, size=[2])
+        u = self.np_random.uniform(low=-1, high=1, size=[2])
+        du = self.np_random.uniform(low=-1, high=1, size=[2])
         self.j1.reset_current_position(float(u[0]), float(du[0]))
         self.j2.reset_current_position(float(u[1]), float(du[1]))
         self.j1.set_motor_torque(0)
@@ -106,11 +106,8 @@ class InvertedDoublePendulumBulletEnv(MJCFBaseBulletEnv):
             0.95 <= state[1] or state[1] <= -0.95
         )
         info = {'obs': prev_state.reshape(1, -1), "acts": a.reshape(1, -1)}
-        if done:
-            reward -= 1000
-            info['done'] = done
         self.HUD(state, a, done)
-        return state, reward, done, info
+        return state, reward, None, info
 
     def camera_adjust(self):
         self._p.resetDebugVisualizerCamera(2.4, -2.8, -27, [0, 0, 0.5])
@@ -129,7 +126,3 @@ class InvertedDoublePendulumExpBulletEnv(InvertedDoublePendulumBulletEnv):
         self.robot = InvertedDoublePendulumExp()
         MJCFBaseBulletEnv.__init__(self, self.robot)
         self.stateId = -1
-
-    def step(self, a):
-        ns, r, done, info = super(InvertedDoublePendulumExpBulletEnv, self).step(a)
-        return ns, r, None, info

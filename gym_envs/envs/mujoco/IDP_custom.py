@@ -32,10 +32,7 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
             0.95 <= ob[1] or ob[1] <= -0.95
         )
         info = {'obs': prev_ob.reshape(1, -1), "acts": action.reshape(1, -1)}
-        if done:
-            r -= 1000
-            info['done'] = done
-        return ob, r, done, info
+        return ob, r, None, info
 
     @property
     def order(self):
@@ -93,10 +90,6 @@ class IDPCustomExp(IDPCustom):
             q[1].reshape(self.model.nv)
         )
         return self._get_obs()
-
-    def step(self, action: np.ndarray):
-        ns, r, done, info = super().step(action)
-        return ns, r, None, info
 
 
 class IDPCustomEasy(IDPCustom):
