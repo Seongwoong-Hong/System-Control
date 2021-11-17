@@ -43,22 +43,20 @@ class QLearning:
 
     def train(
             self,
-            ob,
-            action,
-            next_ob,
-            reward,
-            done,
+            ob: np.ndarray,
+            action: np.ndarray,
+            next_ob: np.ndarray,
+            reward: np.ndarray,
+            done: np.ndarray,
     ) -> None:
-        if not done:
-            self.policy.q_table[ob, action] += \
-                self.alpha * (reward + self.gamma * np.max(self.policy.q_table[next_ob, :])
-                              - self.policy.q_table[ob, action])
-        else:
-            self.policy.q_table[ob, action] += self.alpha * (reward - self.policy.q_table[ob, action])
+        self.policy.q_table[ob, action] += \
+            self.alpha * (reward + self.gamma * np.max(self.policy.q_table[next_ob, :])
+                          - self.policy.q_table[ob, action])
 
     def learn(self, total_timesteps, reset_num_timesteps=True, **kwargs) -> None:
         if reset_num_timesteps:
             self.num_timesteps = 0
+            self.policy.reset()
         else:
             total_timesteps += self.num_timesteps
         while self.num_timesteps < total_timesteps:
@@ -143,12 +141,9 @@ class SoftQLearning(QLearning):
             reward: np.ndarray,
             done: np.ndarray,
     ) -> None:
-        if not done:
-            self.policy.q_table[ob, action] += \
-                self.alpha * (reward - self.policy.q_table[ob, action]
-                              + self.gamma * self.logsumexp(self.policy.q_table[next_ob, :]))
-        else:
-            self.policy.q_table[ob, action] += self.alpha * (reward - self.policy.q_table[ob, action])
+        self.policy.q_table[ob, action] += \
+            self.alpha * (reward - self.policy.q_table[ob, action]
+                          + self.gamma * self.logsumexp(self.policy.q_table[next_ob, :]))
 
     def logsumexp(self, x):
         return np.max(x) + np.log(np.exp(x - np.max(x)).sum(axis=-1))

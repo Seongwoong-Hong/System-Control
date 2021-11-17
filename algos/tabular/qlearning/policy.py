@@ -18,6 +18,9 @@ class TabularPolicy:
         self.epsilon = epsilon
         self.alpha = alpha
         self.device = device
+        self._setup_table()
+
+    def _setup_table(self):
         self.q_table = np.zeros([self.observation_space.nvec[0], self.action_space.nvec[0]])
         self.policy_table = np.zeros([self.observation_space.nvec[0]], dtype=int)
 
@@ -37,6 +40,9 @@ class TabularPolicy:
 
     def forward(self, observation, deterministic=False):
         return self.predict(observation, deterministic=deterministic)
+
+    def reset(self):
+        self._setup_table()
 
     def arg_max(self, x):
         maxi = -np.inf

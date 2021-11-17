@@ -37,10 +37,10 @@ class Viter:
         )
 
     def train(self):
-        self.env.reset()
         for i in range(self.observation_space.nvec[0]):
             candi = []
             for j in range(self.action_space.nvec[0]):
+                self.env.reset()
                 if isinstance(self.env, VecEnv):
                     self.env.env_method("set_state", np.array([i], dtype=int))
                     ns, r, done, _ = self.env.step(np.array([[j]], dtype=int))
@@ -51,24 +51,26 @@ class Viter:
                     candi.append(r + self.gamma * self.policy.v_table[ns])
                 else:
                     candi.append(r)
-                    self.env.reset()
             self.policy.v_table[i] = np.max(candi)
 
-    def learn(self, total_timesteps, **kwargs):
-        t = 0
-        while t < total_timesteps:
-            self.num_timesteps = t
+    def learn(self, total_timesteps, reset_num_timesteps=True, **kwargs):
+        if reset_num_timesteps:
+            self.num_timesteps = 0
+            self.policy.reset()
+        else:
+            total_timesteps += self.num_timesteps
+        while self.num_timesteps < total_timesteps:
             old_value = deepcopy(self.policy.v_table)
             self.train()
             error = np.max(np.abs(old_value - self.policy.v_table))
-            logger.record("num_timesteps", t, exclude="tensorboard")
+            logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
             logger.record("Value Error", error)
-            logger.dump(t)
-            print(f"{self.num_timesteps}th iter: Mean difference btw old value and current value is {error:.3f}")
-            if error < 1e-8 and t > 10:
+            logger.dump(self.num_timesteps)
+            if error < 1e-8 and self.num_timesteps >= 100:
                 for i in range(self.observation_space.nvec[0]):
                     candi = []
                     for j in range(self.action_space.nvec[0]):
+                        self.env.reset()
                         if isinstance(self.env, VecEnv):
                             self.env.env_method("set_state", np.array([i], dtype=int))
                             ns, r, done, _ = self.env.step(np.array([[j]], dtype=int))
@@ -79,10 +81,9 @@ class Viter:
                             candi.append(r + self.gamma * self.policy.v_table[ns])
                         else:
                             candi.append(r)
-                            self.env.reset()
-                    self.policy.policy_table[i] = np.argmax(candi)
+                    self.policy.policy_table[i] = self.policy.arg_max(np.array(candi))
                 break
-            t += 1
+            self.num_timesteps += 1
 
     def predict(
             self,
