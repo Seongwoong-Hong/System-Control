@@ -37,18 +37,22 @@ class Viter:
         )
 
     def train(self):
-        for i in range(self.observation_space.nvec[0]):
+        for i in range(self.policy.obs_size):
             candi = []
-            for j in range(self.action_space.nvec[0]):
+            for j in range(self.policy.act_size):
                 self.env.reset()
                 if isinstance(self.env, VecEnv):
-                    self.env.env_method("set_state", np.array([i], dtype=int))
-                    ns, r, done, _ = self.env.step(np.array([[j]], dtype=int))
+                    states = self.policy.idx_to_obs(np.array([i]))
+                    actions = self.policy.idx_to_act(np.array([[j]]))
+                    self.env.env_method("set_state", states)
+                    ns, r, done, _ = self.env.step(actions)
                 else:
-                    self.env.set_state(np.array([i], dtype=int))
-                    ns, r, done, _ = self.env.step(np.array([j], dtype=int))
+                    state = self.policy.idx_to_obs(np.array([i]))
+                    action = self.policy.idx_to_act(np.array([j]))
+                    self.env.set_state(state)
+                    ns, r, done, _ = self.env.step(action)
                 if not done:
-                    candi.append(r + self.gamma * self.policy.v_table[ns])
+                    candi.append(r + self.gamma * self.policy.v_table[self.policy.obs_to_idx(ns)])
                 else:
                     candi.append(r)
             self.policy.v_table[i] = np.max(candi)
@@ -63,22 +67,29 @@ class Viter:
             old_value = deepcopy(self.policy.v_table)
             self.train()
             error = np.max(np.abs(old_value - self.policy.v_table))
-            logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
-            logger.record("Value Error", error)
-            logger.dump(self.num_timesteps)
+            if self.num_timesteps % 10 == 0:
+                logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
+                logger.record("Value Error", error)
+                logger.dump(self.num_timesteps)
             if error < 1e-8 and self.num_timesteps >= 100:
-                for i in range(self.observation_space.nvec[0]):
+                logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
+                logger.record("Value Error", error)
+                for i in range(self.policy.obs_size):
                     candi = []
-                    for j in range(self.action_space.nvec[0]):
+                    for j in range(self.policy.act_size):
                         self.env.reset()
                         if isinstance(self.env, VecEnv):
-                            self.env.env_method("set_state", np.array([i], dtype=int))
-                            ns, r, done, _ = self.env.step(np.array([[j]], dtype=int))
+                            states = self.policy.idx_to_obs(np.array([i]))
+                            actions = self.policy.idx_to_act(np.array([[j]]))
+                            self.env.env_method("set_state", states)
+                            ns, r, done, _ = self.env.step(actions)
                         else:
-                            self.env.set_state(np.array([i], dtype=int))
-                            ns, r, done, _ = self.env.step(np.array([j], dtype=int))
+                            state = self.policy.idx_to_obs(np.array([i]))
+                            action = self.policy.idx_to_act(np.array([j]))
+                            self.env.set_state(state)
+                            ns, r, done, _ = self.env.step(action)
                         if not done:
-                            candi.append(r + self.gamma * self.policy.v_table[ns])
+                            candi.append(r + self.gamma * self.policy.v_table[self.policy.obs_to_idx(ns)])
                         else:
                             candi.append(r)
                     self.policy.policy_table[i] = self.policy.arg_max(np.array(candi))

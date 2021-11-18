@@ -49,9 +49,12 @@ class QLearning:
             reward: np.ndarray,
             done: np.ndarray,
     ) -> None:
-        self.policy.q_table[ob, action] += \
-            self.alpha * (reward + self.gamma * np.max(self.policy.q_table[next_ob, :])
-                          - self.policy.q_table[ob, action])
+        ob_idx = self.policy.obs_to_idx(ob)
+        act_idx = self.policy.act_to_idx(action)
+        nob_idx = self.policy.obs_to_idx(next_ob)
+        self.policy.q_table[ob_idx, act_idx] += \
+            self.alpha * (reward + self.gamma * np.max(self.policy.q_table[nob_idx, :])
+                          - self.policy.q_table[ob_idx, act_idx])
 
     def learn(self, total_timesteps, reset_num_timesteps=True, **kwargs) -> None:
         if reset_num_timesteps:
@@ -68,8 +71,8 @@ class QLearning:
                 next_ob, reward, done, _ = self.env.step(act)
                 self.train(ob, act, next_ob, reward, done)
                 ob = next_ob
-            for ob in range(len(self.policy.policy_table)):
-                self.policy.policy_table[ob] = self.policy.arg_max(self.policy.q_table[ob, :])
+            for ob_idx in range(len(self.policy.policy_table)):
+                self.policy.policy_table[ob_idx] = self.policy.arg_max(self.policy.q_table[ob_idx, :])
             error = np.max(np.abs(self.policy.q_table - prev_q_table))
             if self.num_timesteps % 100 == 0:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
@@ -141,9 +144,12 @@ class SoftQLearning(QLearning):
             reward: np.ndarray,
             done: np.ndarray,
     ) -> None:
-        self.policy.q_table[ob, action] += \
-            self.alpha * (reward - self.policy.q_table[ob, action]
-                          + self.gamma * self.logsumexp(self.policy.q_table[next_ob, :]))
+        ob_idx = self.policy.obs_to_idx(ob)
+        act_idx = self.policy.act_to_idx(action)
+        nob_idx = self.policy.obs_to_idx(next_ob)
+        self.policy.q_table[ob_idx, act_idx] += \
+            self.alpha * (reward - self.policy.q_table[ob_idx, act_idx]
+                          + self.gamma * self.logsumexp(self.policy.q_table[nob_idx, :]))
 
     def logsumexp(self, x):
         return np.max(x) + np.log(np.exp(x - np.max(x)).sum(axis=-1))

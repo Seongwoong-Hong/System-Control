@@ -21,8 +21,21 @@ class TabularPolicy:
         self._setup_table()
 
     def _setup_table(self):
-        self.q_table = np.zeros([self.observation_space.nvec[0], self.action_space.nvec[0]])
-        self.policy_table = np.zeros([self.observation_space.nvec[0]], dtype=int)
+        self.map_size = self.observation_space.nvec[0]
+        self.act_size = self.action_space.nvec[0]
+        if len(self.observation_space.nvec) == 1:
+            self.dim = 1
+            self.obs_size = self.map_size
+            self.q_table = np.zeros([self.obs_size, self.act_size])
+            self.policy_table = np.zeros([self.obs_size], dtype=int)
+        elif len(self.observation_space.nvec) == 2:
+            self.dim = 2
+            self.obs_size = self.map_size * self.observation_space.nvec[1]
+            self.act_size *= self.action_space.nvec[1]
+            self.q_table = np.zeros([self.obs_size, self.act_size])
+            self.policy_table = np.zeros([self.obs_size], dtype=int)
+        else:
+            raise NotImplementedError
 
     def predict(
             self,
@@ -31,11 +44,13 @@ class TabularPolicy:
             mask: Optional[np.ndarray] = None,
             deterministic: bool = False
     ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-        action = self.policy_table[observation]
+        obs_idx = self.obs_to_idx(observation)
+        act_idx = self.policy_table[obs_idx]
         if not deterministic:
             rd = random.random()
             if rd < self.epsilon:
-                action = (self.action_space.np_random.random_sample(observation.shape) * self.action_space.nvec).astype(self.action_space.dtype)
+                act_idx = (self.action_space.np_random.random_sample(obs_idx.shape) * self.act_size).astype(self.action_space.dtype)
+        action = self.idx_to_act(act_idx)
         return action, None
 
     def forward(self, observation, deterministic=False):
@@ -57,6 +72,48 @@ class TabularPolicy:
         arg_max = random.sample(idx, 1)[0]
         return arg_max
 
+    def obs_to_idx(self, obs: np.ndarray) -> np.ndarray:
+        if self.dim == 1:
+            obs_idx = obs
+        elif self.dim == 2:
+            if len(obs.shape) == 1:
+                obs_idx = np.array([obs[0] + self.map_size * obs[1]], dtype=int)
+            else:
+                obs_idx = (obs[:, 0] + self.map_size * obs[:, 1]).reshape(-1, 1)
+        else:
+            raise NotImplementedError
+        return obs_idx
+
+    def idx_to_obs(self, idx: np.ndarray) -> np.ndarray:
+        if self.dim == 1:
+            obs = idx
+        elif self.dim == 2:
+            obs = np.append(idx % self.map_size, idx // self.map_size, axis=-1)
+        else:
+            raise NotImplementedError
+        return obs
+
+    def act_to_idx(self, act: np.ndarray) -> np.ndarray:
+        if self.dim == 1:
+            act_idx = act
+        elif self.dim == 2:
+            if len(act.shape) == 1:
+                act_idx = np.array([act[0] + self.action_space.nvec[0] * act[1]], dtype=int)
+            else:
+                act_idx = (act[:, 0] + self.action_space.nvec[0] * act[:, 1]).reshape(-1, 1)
+        else:
+            raise NotImplementedError
+        return act_idx
+
+    def idx_to_act(self, idx: np.ndarray) -> np.ndarray:
+        if self.dim == 1:
+            act = idx
+        elif self.dim == 2:
+            act = np.append(idx % self.action_space.nvec[0], idx // self.action_space.nvec[0], axis=-1)
+        else:
+            raise NotImplementedError
+        return act
+
 
 class TabularSoftPolicy(TabularPolicy):
     def predict(
@@ -66,12 +123,14 @@ class TabularSoftPolicy(TabularPolicy):
             mask: Optional[np.ndarray] = None,
             deterministic: bool = False
     ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-        action = np.zeros(observation.shape, dtype=int)
-        for i, ob in enumerate(observation):
+        obs_idx = self.obs_to_idx(observation)
+        act_idx = np.zeros(obs_idx.shape, dtype=int)
+        for i, ob in enumerate(obs_idx):
             if not deterministic:
-                action[i] = self.arg_softmax(self.q_table[ob, :])
+                act_idx[i] = self.arg_softmax(self.q_table[ob, :])
             else:
-                action[i] = self.arg_max(self.q_table[ob, :])
+                act_idx[i] = self.arg_max(self.q_table[ob, :])
+        action = self.idx_to_act(act_idx)
         return action, None
 
     def get_log_prob_from_act(self, obs, acts):

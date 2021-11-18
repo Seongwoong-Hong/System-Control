@@ -6,11 +6,12 @@ from typing import List
 
 
 class OneDTargetDisc(gym.Env):
-    def __init__(self):
+    def __init__(self, map_size=10):
         self.dt = 0.1
         self.timesteps = 0
         self.st = None
-        self.observation_space = gym.spaces.MultiDiscrete([100])
+        self.map_size = map_size
+        self.observation_space = gym.spaces.MultiDiscrete([self.map_size])
         self.action_space = gym.spaces.MultiDiscrete([3])
 
     def step(self, action: np.ndarray):
@@ -20,7 +21,7 @@ class OneDTargetDisc(gym.Env):
         self.st = self.st + action - 1  # + 0.03 * np.random.random(self.st.shape)
         if self.st[0] < 0:
             self.st[0] += 1
-        if self.st[0] >= self.observation_space.nvec[0]:
+        if self.st[0] >= self.map_size:
             self.st[0] -= 1
         self.timesteps += 1
         return self.st, r, None, info
@@ -29,7 +30,7 @@ class OneDTargetDisc(gym.Env):
         return self.st
 
     def set_state(self, obs: np.ndarray):
-        assert self.observation_space.nvec[0] > obs.item() >= 0
+        assert self.map_size > obs.item() >= 0
         self.st = obs
 
     def reset(self):
@@ -38,21 +39,21 @@ class OneDTargetDisc(gym.Env):
         return self._get_obs()
 
     def reward_fn(self, state, action) -> float:
-        x = state[0] + action[0] - 1
-        return - ((x - 80) ** 2)
+        x = state[0]
+        return - ((x - 15) ** 2)
 
     def render(self, mode='human'):
         pass
 
 
 class OneDTargetDiscDet(OneDTargetDisc):
-    def __init__(self):
-        super(OneDTargetDiscDet, self).__init__()
+    def __init__(self, map_size=10):
+        super(OneDTargetDiscDet, self).__init__(map_size=map_size)
         self.n = 0
 
     def reset(self):
-        self.st = np.array([self.n % self.observation_space.nvec[0]], dtype=int)
-        self.timesteps = 0.0
+        self.st = np.array([self.n % self.map_size], dtype=int)
+        self.timesteps = 0
         self.n += 1
         return self._get_obs()
 
