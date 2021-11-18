@@ -97,10 +97,11 @@ def expt_cost():
 
 
 def compare_obs():
-    env_type = "2DTarget"
+    env_type = "1DTarget"
     env_id = f"{env_type}_disc"
-    subj = "viter_disc"
-    name = f"ext_{subj}_linear_svm_reset"
+    map_size = 20
+    subj = f"viter_disc_{map_size}"
+    name = f"ext_{subj}_softq_linear"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     assert os.path.isdir(proj_path)
@@ -122,7 +123,7 @@ def compare_obs():
         stats_path = None
         if os.path.isfile(os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")):
             stats_path = os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")
-        env = make_env(f"{env_id}-v0", num_envs=1, wrapper=None, subpath=subpath, use_norm=stats_path)
+        env = make_env(f"{env_id}-v0", num_envs=1, wrapper=None, subpath=subpath, use_norm=stats_path, map_size=map_size)
         # env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, pltqs=pltqs, init_states=init_states)
         _, agent_obs, _ = verify_policy(env, agent, deterministic=True, render="None", repeat_num=lnum)
         if stats_path is not None:

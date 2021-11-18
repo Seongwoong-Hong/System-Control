@@ -35,9 +35,9 @@ class RewardWrapper(gym.RewardWrapper):
 class ObsRewardWrapper(RewardWrapper):
     def step(self, action: np.ndarray):
         next_ob, rew, done, info = self.env.step(action)
-        inp = info['obs'] / 10
+        inp = info['obs']
         if self.use_action_as_inp:
-            inp = np.append(inp, info['acts'] / 2, axis=1)
+            inp = np.append(inp, info['acts'], axis=1)
         return next_ob, self.reward(inp), done, info
 
 

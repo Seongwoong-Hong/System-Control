@@ -27,12 +27,12 @@ def test_mujoco_envs_learned_policy():
 
 def test_rl_learned_policy(rl_path):
     env_type = "IDP"
-    name = f"{env_type}_custom"
+    name = f"{env_type}_pybullet"
     model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "ppo", "policies_1")
     stats_path = None
     if os.path.isfile(model_dir + "normalization.pkl"):
         stats_path = model_dir + "normalization.pkl"
-    env = make_env(f"{name}-v2", subpath="../../IRL/demos/HPC/sub01/sub01", wrapper=None, use_norm=stats_path)
+    env = make_env(f"{name}-v2", subpath="../../IRL/demos/HPC/sub01/sub01", wrapper=ActionWrapper, use_norm=stats_path)
     algo = PPO.load(model_dir + f"/agent")
     a_list, o_list, _ = verify_policy(env, algo, render="human", repeat_num=10, deterministic=True)
     plt.plot(a_list[0])
@@ -67,8 +67,10 @@ def test_1d(rl_path):
     name = "1DTarget"
     env_id = f"{name}_disc"
     env = make_env(f"{env_id}-v0")
-    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "ppo", "policies_2")
-    algo = PPO.load(model_dir + "/agent")
+    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id + "_large", "viter", "policies_1")
+    with open(model_dir + "/agent.pkl", "rb") as f:
+        algo = pickle.load(f)
+    # algo = PPO.load(model_dir + "/agent")
     a_list, o_list, _ = verify_policy(env, algo, render="None", repeat_num=12, deterministic=False)
     print('end')
 

@@ -11,15 +11,16 @@ from RL.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "IDP"
-    algo_type = "sac"
-    name = f"{env_type}_pybullet"
+    env_type = "1DTarget"
+    algo_type = "softqlearning"
+    map_size = 50
+    name = f"{env_type}_disc"
     device = "cpu"
     env_id = f"{name}-v2"
     subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
-    env = make_env(env_id, use_vec_env=False, num_envs=1, subpath=subpath, wrapper=ActionWrapper, use_norm=False)
-    # env = make_env(env_id, use_vec_env=False)
-    name += ""
+    # env = make_env(env_id, use_vec_env=False, num_envs=1, subpath=subpath, wrapper=ActionWrapper, use_norm=False)
+    env = make_env(env_id, use_vec_env=False, map_size=map_size)
+    name += f"_{map_size}"
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     os.makedirs(log_dir, exist_ok=True)
@@ -35,7 +36,7 @@ if __name__ == "__main__":
     save_policy_callback = serialize.SavePolicyCallback(log_dir + f"/policies_{n}", None)
     save_policy_callback = callbacks.EveryNTimesteps(int(5e10), save_policy_callback)
     # callback_list = callbacks.CallbackList([video_recorder, save_policy_callback])
-    algo.learn(total_timesteps=int(2e5), tb_log_name="extra", callback=save_policy_callback)
+    algo.learn(total_timesteps=int(4e4), tb_log_name="extra", callback=save_policy_callback)
     algo.save(log_dir+f"/policies_{n}/agent")
     if algo.get_vec_normalize_env():
         algo.env.save(log_dir+f"/policies_{n}/normalization.pkl")

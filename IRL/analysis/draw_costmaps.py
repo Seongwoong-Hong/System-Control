@@ -84,35 +84,42 @@ def draw_costfigure():
     #         - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y + 5 / 2) ** 2)) \
     #         - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y + 5 / 2) ** 2))
     def expt_reward(inp):
-        x, y = inp[:, 0], inp[:, 1]
-        return -((x - 2/3) ** 2 + (y - 2/3) ** 2)
+        obs = inp[:, 0]
+        # obs, act = inp[:, 0], inp[:, 1]
+        # next_obs = obs + act - 1
+        return -((obs[0] % 4 - 2) ** 2 + (obs[0] // 4 - 2) ** 2)
     env_type = "2DTarget"
     env_id = f"{env_type}_disc"
-    subj = "ppo_disc"
+    map_size = 4
+    subj = f"viter_disc_{map_size}"
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
-    env = make_env(f"{env_id}-v0", use_vec_env=False, subpath=subpath + f"/{subj}")
+    env = make_env(f"{env_id}-v0", use_vec_env=False, subpath=subpath + f"/{subj}", map_size=map_size)
     algo_type = "MaxEntIRL"
-    name = f"ext_{subj}_linear_ppoagent_svm_reset"
-    num = 0
+    name = f"ext_{subj}_linear"
+    num = 21
     load_dir = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model")
-    algo = PPO.load(load_dir + f"/{num:03d}/agent")
+    with open(load_dir + f"/{num:03d}/agent.pkl", "rb") as f:
+        algo = pickle.load(f)
+    # algo = PPO.load(load_dir + f"/{num:03d}/agent")
     # algo = def_policy("IDP", env)
     # algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
     with open(load_dir + f"/{num:03d}/reward_net.pkl", "rb") as f:
-        reward_fn = pickle.load(f).double()
+        reward_fn = pickle.load(f)
 
     ndim = env.observation_space.shape[0]
-    d1, d2 = np.meshgrid(np.linspace(-1, 1, 100), np.linspace(-1, 1, 100))
+    ndim = 2
+    d1, d2 = np.meshgrid(np.linspace(0, map_size-1, map_size), np.linspace(0, map_size-1, map_size))
+    # d1, d2 = np.linspace(0, map_size-1, map_size).reshape(1, -1), np.full((1, map_size), 0)
     pact = np.zeros((100, 100), dtype=np.float64)
     cost1, cost2 = np.zeros(d1.shape), np.zeros(d1.shape)
     for i in range(d1.shape[0]):
         for j in range(d1.shape[1]):
-            iobs = np.zeros(ndim)
+            iobs = np.zeros(ndim, dtype=int)
             iobs[0], iobs[1] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
-            iacts, _ = algo.predict(np.array(iobs), deterministic=True)
+            iacts, _ = algo.predict(np.array(iobs[0] + map_size * iobs[1]), deterministic=True)
             # pact[i][j] = iacts[0]
-            # inp = th.from_numpy(np.append(iobs, iacts)).double().to(algo.device).reshape(1, -1)
-            inp = th.from_numpy(iobs).double().to(algo.device).reshape(1, -1)
+            # inp = th.from_numpy(np.append(iobs[0] + map_size * iobs[1], iacts)).float().to(algo.device).reshape(1, -1)
+            inp = th.from_numpy(np.array([iobs[0] + map_size * iobs[1]])).float().to(algo.device).reshape(1, -1)
             cost1[i][j] = -expt_reward(inp)
             cost2[i][j] = -reward_fn(inp).item()
     cost1 = (cost1 - np.min(cost1)) / (np.max(cost1) - np.min(cost1))
@@ -128,12 +135,13 @@ def draw_costfigure():
         # d1, d2 = np.meshgrid(d1, d2)
         surf = ax.plot_surface(d1, d2, yval_list[i], rstride=1, cstride=1, cmap=cm.rainbow,
                                vmax=max_list[i], vmin=min_list[i])
+        # ax.scatter(d1, yval_list[i], vmax=max_list[i], vmin=min_list[i])
         # clb = fig.colorbar(surf, ax=ax)
         ax.set_xlabel(xlabel, labelpad=15.0, fontsize=28)
         ax.set_ylabel(ylabel, labelpad=15.0, fontsize=28)
         ax.set_title(title_list[i], fontsize=32)
         ax.tick_params(axis='both', which='major', labelsize=20)
-        ax.view_init(elev=90, azim=0)
+        # ax.view_init(elev=90, azim=0)
         # clb.ax.set_title(title_list[i], fontsize=24)
     # plt.savefig("check.png")
     plt.show()
@@ -166,5 +174,5 @@ if __name__ == "__main__":
     def feature_fn(x):
         # return x
         return th.cat([x, x**2], dim=1)
-    # draw_costfigure()
-    draw_trajectories()
+    draw_costfigure()
+    # draw_trajectories()

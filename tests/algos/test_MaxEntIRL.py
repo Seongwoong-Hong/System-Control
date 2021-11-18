@@ -19,7 +19,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, "2DTarget", "softqlearning_disc.pkl")
+    expert_dir = os.path.join(demo_dir, "2DTarget", "viter_disc_4.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -46,7 +46,7 @@ def learner(env, expert, eval_env):
     def feature_fn(x):
         return th.cat([x, x**2], dim=1)
 
-    agent = def_policy("softqlearning", env, device='cpu', verbose=1)
+    agent = def_policy("viter", env, device='cpu', verbose=1)
 
     return MaxEntIRL(
         env,
@@ -81,12 +81,12 @@ def test_callback(learner):
 def test_validity(learner, expert):
     learner.learn(
         total_iter=50,
-        agent_learning_steps=1000,
+        agent_learning_steps=10000,
         n_episodes=len(expert),
         max_agent_iter=1,
         min_agent_iter=1,
-        max_gradient_steps=200,
-        min_gradient_steps=100,
+        max_gradient_steps=1200,
+        min_gradient_steps=500,
         early_stop=True,
     )
 
@@ -100,7 +100,7 @@ def test_GCL(env, expert, eval_env):
         # return x
         return th.cat([x, x**2], dim=1)
 
-    agent = def_policy("softqlearning", env, device='cpu', verbose=1)
+    agent = def_policy("viter", env, device='cpu', verbose=1)
 
     learner = GuidedCostLearning(
         env,
