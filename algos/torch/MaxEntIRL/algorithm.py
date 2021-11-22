@@ -220,8 +220,8 @@ class MaxEntIRL:
                     logger.record("agent_steps", agent_steps, exclude="tensorboard")
                     logger.dump(agent_steps)
                     reward_diffs.append(reward_diff.item())
-                    if np.mean(reward_diffs[-min_agent_iter:]) > 0 and \
-                            reward_diffs[-1] > 0.0 and \
+                    if np.mean(reward_diffs[-min_agent_iter:]) >= 0 and \
+                            reward_diffs[-1] >= 0.0 and \
                             agent_steps >= min_agent_iter and early_stop:
                         break 
             if callback:
