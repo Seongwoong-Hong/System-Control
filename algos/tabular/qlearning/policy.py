@@ -134,8 +134,10 @@ class TabularSoftPolicy(TabularPolicy):
         return action, None
 
     def get_log_prob_from_act(self, obs, acts):
-        probs = self.softmax(self.q_table[obs, :])
-        log_probs = np.log(probs[range(len(acts)), 0, acts.flatten()].reshape(obs.shape))
+        obs_idx = self.obs_to_idx(obs)
+        acts_idx = self.act_to_idx(acts)
+        probs = self.softmax(self.q_table[obs_idx])
+        log_probs = np.log(probs[range(len(acts_idx)), 0, acts_idx.flatten()].reshape(obs_idx.shape))
         return th.from_numpy(log_probs).float()
 
     def softmax(self, x: np.ndarray):

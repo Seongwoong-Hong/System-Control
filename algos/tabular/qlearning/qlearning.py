@@ -8,6 +8,7 @@ from copy import deepcopy
 
 from algos.tabular.qlearning.policy import TabularPolicy, TabularSoftPolicy
 from imitation.util import logger
+from stable_baselines3.common.vec_env import VecEnv
 
 
 class QLearning:
@@ -24,11 +25,14 @@ class QLearning:
         self.epsilon = epsilon
         self.alpha = alpha
         self.device = device
+        self.env = env
+        self.num_envs = 1
+        if isinstance(self.env, VecEnv):
+            self.num_envs = self.env.num_envs
         self._setup_model(env)
 
     def _setup_model(self, env):
         self.num_timesteps = 0
-        self.env = env
         self.observation_space = env.observation_space
         self.action_space = env.action_space
         assert isinstance(self.observation_space, gym.spaces.MultiDiscrete)\
@@ -47,7 +51,6 @@ class QLearning:
             action: np.ndarray,
             next_ob: np.ndarray,
             reward: np.ndarray,
-            done: np.ndarray,
     ) -> None:
         ob_idx = self.policy.obs_to_idx(ob)
         act_idx = self.policy.act_to_idx(action)
@@ -65,12 +68,22 @@ class QLearning:
         while self.num_timesteps < total_timesteps:
             prev_q_table = deepcopy(self.policy.q_table)
             ob = self.env.reset()
-            done = False
-            while not done:
+            act, _ = self.policy.predict(ob, deterministic=False)
+            next_ob, reward, done, _ = self.env.step(act)
+            ob_accum = deepcopy(ob)
+            act_accum = deepcopy(act)
+            nob_accum = deepcopy(next_ob)
+            rew_accum = deepcopy(reward)
+            ob = next_ob
+            while not done.all():
                 act, _ = self.policy.predict(ob, deterministic=False)
                 next_ob, reward, done, _ = self.env.step(act)
-                self.train(ob, act, next_ob, reward, done)
+                ob_accum = np.append(ob_accum, ob, axis=0)
+                act_accum = np.append(act_accum, act, axis=0)
+                nob_accum = np.append(nob_accum, next_ob, axis=0)
+                rew_accum = np.append(rew_accum, reward, axis=0)
                 ob = next_ob
+            self.train(ob_accum, act_accum, nob_accum, rew_accum)
             for ob_idx in range(len(self.policy.policy_table)):
                 self.policy.policy_table[ob_idx] = self.policy.arg_max(self.policy.q_table[ob_idx, :])
             error = np.max(np.abs(self.policy.q_table - prev_q_table))
@@ -82,9 +95,14 @@ class QLearning:
                 logger.record("Action-Value Error", error)
                 logger.dump(self.num_timesteps)
                 break
-            self.num_timesteps += 1
+            self.num_timesteps += self.num_envs
 
-    def reset(self, env):
+    def reset(self, env: None):
+        if env is None:
+            env = self.env
+        self.env = env
+        if isinstance(self.env, VecEnv):
+            self.num_envs = self.env.num_envs
         self._setup_model(env)
 
     def get_env(self):
@@ -115,6 +133,10 @@ class QLearning:
         pass
 
     def save(self, log_dir):
+        state = self.__dict__.copy()
+        del state['env']
+        self.__dict__.update(state)
+        self.env = None
         with open(log_dir + ".tmp", "wb") as f:
             pickle.dump(self, f)
         os.replace(log_dir + ".tmp", log_dir + ".pkl")
@@ -123,7 +145,6 @@ class QLearning:
 class SoftQLearning(QLearning):
     def _setup_model(self, env):
         self.num_timesteps = 0
-        self.env = env
         self.observation_space = env.observation_space
         self.action_space = env.action_space
         assert isinstance(self.observation_space, gym.spaces.MultiDiscrete) \
@@ -142,14 +163,13 @@ class SoftQLearning(QLearning):
             action: np.ndarray,
             next_ob: np.ndarray,
             reward: np.ndarray,
-            done: np.ndarray,
     ) -> None:
         ob_idx = self.policy.obs_to_idx(ob)
         act_idx = self.policy.act_to_idx(action)
         nob_idx = self.policy.obs_to_idx(next_ob)
         self.policy.q_table[ob_idx, act_idx] += \
-            self.alpha * (reward - self.policy.q_table[ob_idx, act_idx]
+            self.alpha * (reward.reshape(ob_idx.shape) - self.policy.q_table[ob_idx, act_idx]
                           + self.gamma * self.logsumexp(self.policy.q_table[nob_idx, :]))
 
     def logsumexp(self, x):
-        return np.max(x) + np.log(np.exp(x - np.max(x)).sum(axis=-1))
+        return np.max(x, axis=-1) + np.log(np.exp(x - np.max(x, axis=-1)[:, np.newaxis]).sum(axis=-1))
