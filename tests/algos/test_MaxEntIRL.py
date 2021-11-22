@@ -12,6 +12,7 @@ from common.util import make_env
 from common.wrappers import *
 
 
+map_size = 4
 @pytest.fixture
 def demo_dir():
     return os.path.abspath(os.path.join("..", "..", "IRL", "demos"))
@@ -19,7 +20,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, "2DTarget", "viter_disc_4.pkl")
+    expert_dir = os.path.join(demo_dir, "2DTarget", f"viter_disc_{map_size}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -28,13 +29,13 @@ def expert(demo_dir):
 @pytest.fixture
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env("2DTarget_disc-v2", subpath=subpath)
+    return make_env("2DTarget_disc-v2", subpath=subpath, map_size=map_size)
 
 
 @pytest.fixture
 def eval_env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env("2DTarget_disc-v0", subpath=subpath)
+    return make_env("2DTarget_disc-v0", subpath=subpath, map_size=map_size)
 
 
 @pytest.fixture
@@ -100,7 +101,7 @@ def test_GCL(env, expert, eval_env):
         # return x
         return th.cat([x, x**2], dim=1)
 
-    agent = def_policy("viter", env, device='cpu', verbose=1)
+    agent = def_policy("softqlearning", env, device='cpu', verbose=1)
 
     learner = GuidedCostLearning(
         env,
@@ -117,11 +118,11 @@ def test_GCL(env, expert, eval_env):
 
     learner.learn(
         total_iter=50,
-        agent_learning_steps=1e5,
+        agent_learning_steps=1e4,
         n_episodes=len(expert),
-        max_agent_iter=1,
-        min_agent_iter=1,
-        max_gradient_steps=1200,
-        min_gradient_steps=500,
+        max_agent_iter=12,
+        min_agent_iter=4,
+        max_gradient_steps=6000,
+        min_gradient_steps=1000,
         early_stop=True,
     )

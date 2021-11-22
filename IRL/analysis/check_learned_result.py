@@ -97,11 +97,11 @@ def expt_cost():
 
 
 def compare_obs():
-    env_type = "1DTarget"
+    env_type = "2DTarget"
     env_id = f"{env_type}_disc"
-    map_size = 20
+    map_size = 7
     subj = f"viter_disc_{map_size}"
-    name = f"ext_{subj}_softq_linear"
+    name = f"ext_{subj}_softq_linear_vec"
     print(name)
     proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     assert os.path.isdir(proj_path)

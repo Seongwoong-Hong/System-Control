@@ -21,8 +21,8 @@ if __name__ == "__main__":
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}_disc"
-    map_size = 20
-    expt = f"softqlearning_disc_{map_size}"
+    map_size = 50
+    expt = f"viter_disc_{map_size}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     # pltqs, init_states = [], []
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{expt}_linear"
+    log_dir += f"/ext_{expt}_softq_linear"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -81,10 +81,10 @@ if __name__ == "__main__":
     # Run Learning
     learner.learn(
         total_iter=50,
-        agent_learning_steps=5e4,
+        agent_learning_steps=5e3,
         n_episodes=expt_traj_num,
-        max_agent_iter=10,
-        min_agent_iter=1,
+        max_agent_iter=12,
+        min_agent_iter=2,
         max_gradient_steps=6000,
         min_gradient_steps=1000,
         callback=save_net_callback.net_save,

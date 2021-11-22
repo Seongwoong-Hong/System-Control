@@ -3,8 +3,6 @@ import numpy as np
 from datetime import datetime
 from functools import partial
 
-import click
-
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler
@@ -13,11 +11,16 @@ from algos.torch.sac import SAC, MlpPolicy
 from common.util import make_env
 
 
+def trial_str_creator(trial):
+    trialname = datetime.now().strftime('%Y-%m-%d_%H-%M-%S') + trial.trial_id
+    return trialname
+
+
 def try_train(config):
     algo = SAC(config['policy'],
                env=config['env'],
                batch_size=config['batch_size'],
-               learning_starts=100,
+               learning_starts=config['batch_size'] * 4,
                learning_rate=config['lr'],
                train_freq=(config['accum_steps'], 'step'),
                gradient_steps=config['gradient_steps'],
@@ -26,22 +29,12 @@ def try_train(config):
                target_update_interval=1,
                device='cuda')
 
-    for epoch in range(50):
-        """ Training """
-        algo.learn(total_timesteps=int(1e4), reset_num_timesteps=False)
+    for epoch in range(1000):
+        """ Learning """
+        algo.learn(total_timesteps=int(8.192e3), reset_num_timesteps=True)
 
-        """ Validation """
-        rewards = []
-        for _ in range(10):
-            obs = algo.env.reset()
-            done = False
-            traj_r = 0
-            while not done:
-                act, _ = algo.predict(obs, deterministic=False)
-                ns, r, done, info = algo.env.step(act)
-                traj_r += r
-            rewards.append(traj_r)
-        mean_reward = np.mean(rewards)
+        """ Testing """
+        mean_reward = np.mean([ep_info["r"] for ep_info in algo.ep_info_buffer])
 
         """ Temporally save a model"""
         trial_dir = tune.get_trial_dir()
@@ -51,26 +44,24 @@ def try_train(config):
         tune.report(mean_reward=mean_reward)
 
 
-@click.command()
-@click.option('--target', default='IDP')
 def main(target):
     env = make_env(f"{target}_custom-v2")
     config = {
         'policy': MlpPolicy,
         'env': env,
         'batch_size': tune.choice([64, 128, 256]),
-        'accum_steps': tune.choice([1000, 2000, 3000, 4000, 5000]),
-        'gradient_steps': tune.choice([1000, 2000, 3000]),
-        'gamma': tune.choice([0.99, 0.975, 0.95]),
-        'ent_coef': tune.choice([0.1, 0.2, 0.3, 0.4, 0.5]),
+        'accum_steps': tune.choice([512, 1024, 2048]),
+        'gradient_steps': tune.choice([1000, 1500, 2000]),
+        'gamma': tune.choice([0.99, 0.98, 0.97, 0.95]),
+        'ent_coef': tune.choice([0.1, 0.15, 0.2, 0.25]),
         'lr': tune.loguniform(1e-4, 5e-4),
     }
 
     scheduler = ASHAScheduler(
         metric="mean_reward",
         mode="max",
-        max_t=50,
-        grace_period=20,
+        max_t=100,
+        grace_period=10,
         reduction_factor=2,
     )
     reporter = CLIReporter(metric_columns=["mean_reward", "training_iteration"])
@@ -83,6 +74,7 @@ def main(target):
         scheduler=scheduler,
         progress_reporter=reporter,
         checkpoint_at_end=True,
+        trial_name_creator=trial_str_creator,
     )
 
     best_trial = result.get_best_trial("mean_reward", "max", "last")
@@ -94,4 +86,4 @@ def main(target):
 
 
 if __name__ == "__main__":
-    main()
+    main("IDP")

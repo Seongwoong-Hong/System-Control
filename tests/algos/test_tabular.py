@@ -20,7 +20,7 @@ def test_qlearning():
 
 
 def test_soft_q_learning():
-    env = make_env("1DTarget_disc-v2", map_size=50)
+    env = make_env("2DTarget_disc-v2", map_size=7, use_vec_env=True, num_envs=100)
     logger.configure(".", format_strs=['stdout'])
     algo = SoftQLearning(env, gamma=0.8, epsilon=0.4, alpha=0.1, device='cpu')
     algo.learn(int(4e4))

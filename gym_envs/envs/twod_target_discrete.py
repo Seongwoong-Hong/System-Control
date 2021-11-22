@@ -74,6 +74,7 @@ class TwoDTargetDisc(gym.Env):
 class TwoDTargetDiscDet(TwoDTargetDisc):
     def __init__(self, map_size=10):
         super(TwoDTargetDiscDet, self).__init__(map_size=map_size)
+        # x, y = np.meshgrid(range(0, map_size, 2), range(0, map_size, 2))
         x, y = np.meshgrid(range(map_size), range(map_size))
         self.init_state = np.array([x.flatten(), y.flatten()]).reshape(-1, 2)
         self.n = 0
