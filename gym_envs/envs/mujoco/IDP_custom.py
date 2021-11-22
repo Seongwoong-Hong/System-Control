@@ -8,7 +8,7 @@ from gym.envs.mujoco import mujoco_env
 class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
         self._order = 0
-        self.time = 0.0
+        self.timesteps = 0
         mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 8)
         utils.EzPickle.__init__(self)
         self.observation_space = spaces.Box(
@@ -18,14 +18,14 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
-        self.time = 0.0
+        self.timesteps = 0
 
     def step(self, action: np.ndarray):
         prev_ob = self._get_obs()
         r = 1.0 - (prev_ob[0] ** 2 + prev_ob[1] ** 2 + 0.1 * (prev_ob[2] ** 2 + prev_ob[3] ** 2)
                    + 1e-6 * (self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T))
         self.do_simulation(action, self.frame_skip)
-        self.time += self.dt / 4.8
+        self.timesteps += 1
         ob = self._get_obs()
         done = bool(
             0.95 <= ob[0] or ob[0] <= -0.95 or
@@ -42,7 +42,7 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         return np.concatenate([
             self.sim.data.qpos,  # link angles
             self.sim.data.qvel,   # link angular velocities
-            np.array([self.time])
+            np.array([self.timesteps / 600])
         ]).ravel()
 
     @property
@@ -51,7 +51,7 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def set_state(self, qpos, qvel):
         super().set_state(qpos, qvel)
-        self.time = 0.0
+        self.timesteps = 0
 
     def reset_model(self):
         self.set_state(
@@ -90,17 +90,3 @@ class IDPCustomExp(IDPCustom):
             q[1].reshape(self.model.nv)
         )
         return self._get_obs()
-
-
-class IDPCustomEasy(IDPCustom):
-    def __init__(self):
-        super().__init__()
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(4,), dtype=np.float64)
-
-    def step(self, action):
-        ob = self._get_obs()
-        r = - abs(ob[0]) - abs(ob[1])
-        self.do_simulation(action, self.frame_skip)
-        ob = self._get_obs()
-        done = False
-        return ob, r, done, {}
