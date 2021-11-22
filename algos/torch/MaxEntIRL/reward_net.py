@@ -1,3 +1,5 @@
+import os
+import pickle
 import torch as th
 
 from torch import nn
@@ -65,6 +67,15 @@ class RewardNet(nn.Module):
 
     def eval(self):
         return self.train(False)
+
+    def save(self, log_dir):
+        state = self.__dict__.copy()
+        del state['feature_fn']
+        self.__dict__.update(state)
+        self.feature_fn = None
+        with open(log_dir + ".tmp", "wb") as f:
+            pickle.dump(self, f)
+        os.replace(log_dir + ".tmp", log_dir + ".pkl")
 
 
 class CNNRewardNet(RewardNet):
