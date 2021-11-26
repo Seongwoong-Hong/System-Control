@@ -90,13 +90,14 @@ class MaxEntIRL:
     def _reset_agent(self, **kwargs):
         reward_wrapper = kwargs.pop("reward_wrapper", ActionRewardWrapper)
         norm_wrapper = kwargs.pop("vec_normalizer", None)
+        num_envs = kwargs.pop("num_envs", 1)
         self.reward_net.eval()
-        self.wrap_env = reward_wrapper(deepcopy(self.env), self.reward_net.eval())
+        self.wrap_env = reward_wrapper(self.env, self.reward_net.eval())
         self.wrap_eval_env = reward_wrapper(self.eval_env, self.reward_net.eval())
         if norm_wrapper:
-            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: Monitor(self.wrap_env)]), **kwargs)
+            self.wrap_env = norm_wrapper(DummyVecEnv([lambda: Monitor(deepcopy(self.wrap_env))]), **kwargs)
         else:
-            self.wrap_env = DummyVecEnv([lambda: Monitor(self.wrap_env)])
+            self.wrap_env = DummyVecEnv([lambda: Monitor(deepcopy(self.wrap_env)) for _ in range(num_envs)])
             self.vec_eval_env = DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(self.expand_ratio)])
         self.agent.reset(self.wrap_env)
 
@@ -145,7 +146,7 @@ class MaxEntIRL:
         target = th.cat([th.ones(len(expert_trajectories)), -th.ones(len(agent_trajectories))])
         agent_rewards, expert_rewards, _ = self.mean_transition_reward(agent_trajectories, expert_trajectories)
         y = th.cat([expert_rewards, agent_rewards], dim=0)
-        loss = th.mean(th.clamp(1 - y * target, min=0))
+        loss = th.mean(th.clamp(0.5 - y * target, min=0))
         weight_norm = 0.0
         for param in self.reward_net.parameters():
             weight_norm += param.norm().detach().item()
@@ -230,8 +231,8 @@ class MaxEntIRL:
 
 class GuidedCostLearning(MaxEntIRL):
     def collect_rollouts(self, n_agent_episodes):
-        self.agent_trajectories = []
-        super().collect_rollouts(3*n_agent_episodes)
+        # self.agent_trajectories = []
+        super().collect_rollouts(n_agent_episodes)
 
     def transition_is(self, trajectories: Sequence[Trajectory]) -> Tuple[th.Tensor, th.Tensor]:
         traj_len = len(trajectories[0].acts)
