@@ -6,9 +6,10 @@ import numpy as np
 from typing import Optional, Tuple
 from copy import deepcopy
 
-from algos.tabular.qlearning.policy import TabularPolicy, TabularSoftPolicy
+from algos.tabular.policy.policy import TabularPolicy, TabularSoftPolicy
 from imitation.util import logger
-from stable_baselines3.common.vec_env import VecEnv
+from imitation.data import rollout
+from stable_baselines3.common.vec_env import VecEnv, DummyVecEnv
 
 
 class QLearning:
@@ -29,12 +30,12 @@ class QLearning:
         self.num_envs = 1
         if isinstance(self.env, VecEnv):
             self.num_envs = self.env.num_envs
-        self._setup_model(env)
+        self._setup_model()
 
-    def _setup_model(self, env):
+    def _setup_model(self):
         self.num_timesteps = 0
-        self.observation_space = env.observation_space
-        self.action_space = env.action_space
+        self.observation_space = self.env.observation_space
+        self.action_space = self.env.action_space
         assert isinstance(self.observation_space, gym.spaces.MultiDiscrete)\
                and isinstance(self.action_space, gym.spaces.MultiDiscrete)
         self.policy = TabularPolicy(
@@ -56,7 +57,7 @@ class QLearning:
         act_idx = self.policy.act_to_idx(action)
         nob_idx = self.policy.obs_to_idx(next_ob)
         self.policy.q_table[ob_idx, act_idx] += \
-            self.alpha * (reward + self.gamma * np.max(self.policy.q_table[nob_idx, :])
+            self.alpha * (reward + self.gamma * np.max(self.policy.q_table[nob_idx, :], axis=-1)
                           - self.policy.q_table[ob_idx, act_idx])
 
     def learn(self, total_timesteps, reset_num_timesteps=True, **kwargs) -> None:
@@ -67,25 +68,14 @@ class QLearning:
             total_timesteps += self.num_timesteps
         while self.num_timesteps < total_timesteps:
             prev_q_table = deepcopy(self.policy.q_table)
-            ob = self.env.reset()
-            act, _ = self.policy.predict(ob, deterministic=False)
-            next_ob, reward, done, _ = self.env.step(act)
-            ob_accum = deepcopy(ob)
-            act_accum = deepcopy(act)
-            nob_accum = deepcopy(next_ob)
-            rew_accum = deepcopy(reward)
-            ob = next_ob
-            while not done.all():
-                act, _ = self.policy.predict(ob, deterministic=False)
-                next_ob, reward, done, _ = self.env.step(act)
-                ob_accum = np.append(ob_accum, ob, axis=0)
-                act_accum = np.append(act_accum, act, axis=0)
-                nob_accum = np.append(nob_accum, next_ob, axis=0)
-                rew_accum = np.append(rew_accum, reward, axis=0)
-                ob = next_ob
-            self.train(ob_accum, act_accum, nob_accum, rew_accum)
-            for ob_idx in range(len(self.policy.policy_table)):
-                self.policy.policy_table[ob_idx] = self.policy.arg_max(self.policy.q_table[ob_idx, :])
+            sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=self.num_envs)
+            if not isinstance(self.env, VecEnv):
+                self.env = DummyVecEnv([lambda: self.env])
+            trans = rollout.flatten_trajectories_with_rew(
+                rollout.generate_trajectories(self.policy, self.env, sample_until, deterministic_policy=False)
+            )
+            self.train(trans.obs, trans.acts, trans.next_obs, trans.rews)
+            self.policy.policy_table = self.policy.arg_max(self.policy.q_table)
             error = np.max(np.abs(self.policy.q_table - prev_q_table))
             if self.num_timesteps % 100 == 0:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
@@ -100,16 +90,17 @@ class QLearning:
     def reset(self, env: None):
         if env is None:
             env = self.env
-        self.env = env
-        if isinstance(self.env, VecEnv):
-            self.num_envs = self.env.num_envs
-        self._setup_model(env)
+        self.set_env(env)
+        self._setup_model()
 
     def get_env(self):
         return self.env
 
     def set_env(self, env):
         self.env = env
+        self.num_envs = 1
+        if isinstance(self.env, VecEnv):
+            self.num_envs = self.env.num_envs
 
     def get_vec_normalize_env(self):
         return None
@@ -143,10 +134,10 @@ class QLearning:
 
 
 class SoftQLearning(QLearning):
-    def _setup_model(self, env):
+    def _setup_model(self):
         self.num_timesteps = 0
-        self.observation_space = env.observation_space
-        self.action_space = env.action_space
+        self.observation_space = self.env.observation_space
+        self.action_space = self.env.action_space
         assert isinstance(self.observation_space, gym.spaces.MultiDiscrete) \
                and isinstance(self.action_space, gym.spaces.MultiDiscrete)
         self.policy = TabularSoftPolicy(
@@ -168,7 +159,7 @@ class SoftQLearning(QLearning):
         act_idx = self.policy.act_to_idx(action)
         nob_idx = self.policy.obs_to_idx(next_ob)
         self.policy.q_table[ob_idx, act_idx] += \
-            self.alpha * (reward.reshape(ob_idx.shape) - self.policy.q_table[ob_idx, act_idx]
+            self.alpha * (reward - self.policy.q_table[ob_idx, act_idx]
                           + self.gamma * self.logsumexp(self.policy.q_table[nob_idx, :]))
 
     def logsumexp(self, x):
