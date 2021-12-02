@@ -16,10 +16,10 @@ class QLearning:
     def __init__(
             self,
             env,
-            gamma,
-            epsilon,
-            alpha,
-            device,
+            gamma: float = 0.8,
+            epsilon: float = 0.4,
+            alpha: float = 0.5,
+            device: str = 'cpu',
             **kwargs,
     ):
         self.gamma = gamma
