@@ -15,11 +15,13 @@ class Viter:
             env,
             gamma: float = 0.9,
             epsilon: float = 0.4,
+            alpha: float = 4,
             device: str = 'cpu',
             **kwargs,
     ):
         self.gamma = gamma
         self.epsilon = epsilon
+        self.alpha = alpha
         self.device = device
         self.env = env
         if not isinstance(env, VecEnv):
@@ -37,6 +39,7 @@ class Viter:
             observation_space=self.observation_space,
             action_space=self.action_space,
             epsilon=self.epsilon,
+            alpha=self.alpha,
             device=self.device,
         )
 
@@ -110,6 +113,10 @@ class Viter:
         return None
 
     def save(self, log_dir):
+        state = self.__dict__.copy()
+        del state['env']
+        self.__dict__.update(state)
+        self.env = None
         with open(log_dir + ".tmp", "wb") as f:
             pickle.dump(self, f)
         os.replace(log_dir + ".tmp", log_dir + ".pkl")
@@ -129,6 +136,7 @@ class SoftQiter(Viter):
         )
 
     def train(self, p_mat, r_mat, d_mat):
-        self.policy.q_table = r_mat + self.gamma * (1 - d_mat) * \
-                              np.sum(p_mat * np.log(np.sum(np.exp(self.policy.q_table), axis=-1))[:, np.newaxis, np.newaxis], axis=0)
+        self.policy.q_table = r_mat + self.gamma * (1 - d_mat) * self.alpha * \
+                              np.sum(p_mat * np.log(np.sum(np.exp(self.policy.q_table / self.alpha), axis=-1))[:,
+                                             np.newaxis, np.newaxis], axis=0)
         self.policy.v_table = np.log(np.sum(np.exp(self.policy.q_table), axis=-1))
