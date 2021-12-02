@@ -12,15 +12,16 @@ class TabularPolicy:
             epsilon: float = 0.3,
             alpha: float = 0.5,
             device: str = 'cpu',
+            **kwargs,
     ):
         self.observation_space = observation_space
         self.action_space = action_space
         self.epsilon = epsilon
         self.alpha = alpha
         self.device = device
-        self._setup_table()
+        self._setup_table(**kwargs)
 
-    def _setup_table(self):
+    def _setup_table(self, **kwargs):
         self.map_size = self.observation_space.nvec[0]
         self.act_size = self.action_space.nvec[0]
         if len(self.observation_space.nvec) == 1:
@@ -33,7 +34,7 @@ class TabularPolicy:
         else:
             raise NotImplementedError
         self.q_table = np.zeros([self.obs_size, self.act_size], dtype=np.float32)
-        self.v_table = np.zeros([self.obs_size], dtype=np.float32)
+        self.v_table = np.full([self.obs_size], -np.inf, dtype=np.float32)
         self.policy_table = np.zeros([self.obs_size], dtype=int)
 
     def predict(
@@ -105,6 +106,10 @@ class TabularPolicy:
 
 
 class TabularSoftPolicy(TabularPolicy):
+    def _setup_table(self, **kwargs):
+        super(TabularSoftPolicy, self)._setup_table(**kwargs)
+        self.policy_table = np.full([self.obs_size, self.act_size], 1 / self.act_size).astype(np.float32)
+
     def predict(
             self,
             observation: np.ndarray,
@@ -141,3 +146,21 @@ class TabularSoftPolicy(TabularPolicy):
         for i, prob in enumerate(arg_probs):
             arg[i] = random.choices(range(anum), weights=prob)[0]
         return arg
+
+
+class FiniteTabularSoftPolicy(TabularSoftPolicy):
+    def _setup_table(self, **kwargs):
+        max_t = kwargs.pop('max_t')
+        super(FiniteTabularSoftPolicy, self)._setup_table(**kwargs)
+        self.policy_table = np.repeat(self.policy_table[None, :], max_t, axis=0)
+        self.q_table = np.repeat(self.q_table[None, :], max_t, axis=0)
+        self.v_table = np.repeat(self.v_table[None, :], max_t, axis=0)
+
+    def predict(
+            self,
+            observation: np.ndarray,
+            state: Optional[np.ndarray] = None,
+            mask: Optional[np.ndarray] = None,
+            deterministic: bool = False
+    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        raise NotImplementedError

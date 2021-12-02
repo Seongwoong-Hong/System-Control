@@ -17,7 +17,7 @@ from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
     env_type = "2DTarget"
-    algo_type = "APIRL"
+    algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}_disc"
     map_size = 10
@@ -41,16 +41,16 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/1hot_{expt}_linear"
+    log_dir += f"/ext_{expt}_softq_linear_finite"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        return x
+        # return x
         # return x ** 2
-        # return th.cat([x, x**2], dim=1)
+        return th.cat([x, x ** 2], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -63,8 +63,8 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("viter", env, device=device, verbose=1)
-    learner = APIRL(
+    agent = def_policy("finitesoftqiter", env, device=device, verbose=1)
+    learner = MaxEntIRL(
         env,
         eval_env=eval_env,
         feature_fn=feature_fn,
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper, 'num_envs': 1},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.3},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
     )
 
     # Run Learning
@@ -84,9 +84,10 @@ if __name__ == "__main__":
         n_episodes=expt_traj_num,
         max_agent_iter=1,
         min_agent_iter=1,
-        max_gradient_steps=6000,
-        min_gradient_steps=2000,
+        max_gradient_steps=2000,
+        min_gradient_steps=100,
         callback=save_net_callback.net_save,
+        early_stop=True,
     )
 
     # Save the result of learning

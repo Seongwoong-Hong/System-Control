@@ -43,7 +43,7 @@ def test_viter():
 def test_softiter():
     env = make_env("2DTarget_disc-v2", map_size=10, use_vec_env=True, num_envs=1)
     logger.configure(".", format_strs=['stdout'])
-    algo = SoftQiter(env, gamma=0.8, epsilon=0.2, device='cpu')
+    algo = SoftQiter(env, gamma=0.8, epsilon=0.2, alpha=1, device='cpu')
     algo.learn(2000)
 
     print('env')

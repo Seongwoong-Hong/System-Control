@@ -48,12 +48,12 @@ def learner(env, expert, eval_env):
     logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
-        return x
-        # return th.cat([x, x**2], dim=1)
+        # return x
+        return th.cat([x, x ** 2], dim=1)
 
-    agent = def_policy("viter", env, device='cpu', verbose=1)
+    agent = def_policy("finitesoftqiter", env, device='cpu', verbose=1)
 
-    return APIRL(
+    return MaxEntIRL(
         env,
         eval_env=eval_env,
         agent=agent,
@@ -63,7 +63,7 @@ def learner(env, expert, eval_env):
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1, 'lr': 0.1},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
     )
 
 
@@ -90,9 +90,9 @@ def test_validity(learner, expert):
         n_episodes=len(expert),
         max_agent_iter=1,
         min_agent_iter=1,
-        max_gradient_steps=6000,
-        min_gradient_steps=1000,
-        early_stop=False,
+        max_gradient_steps=600,
+        min_gradient_steps=100,
+        early_stop=True,
     )
 
 

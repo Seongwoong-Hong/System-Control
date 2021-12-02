@@ -47,7 +47,7 @@ class MaxEntIRL:
         self.expert_trajectories = expert_trajectories
         self.expert_transitions = flatten_trajectories(expert_trajectories)
         self.agent_trajectories = []
-        self.expand_ratio = 1
+        self.expand_ratio = 20
 
         if self.env_kwargs is None:
             self.env_kwargs = {}
@@ -103,70 +103,88 @@ class MaxEntIRL:
             self.vec_eval_env = DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(self.expand_ratio)])
         self.agent.reset(self.wrap_env)
 
-    def collect_rollouts(self, n_agent_episodes):
+    def collect_rollouts(self, n_episodes):
+        """
+        Collect trajectories using the agent
+        :param n_episodes: Number of expert trajectories
+        :return: Add new trajectories to agent_trajectories attribute
+        """
         print("Collecting rollouts from the current agent...")
         if isinstance(self.wrap_env, VecEnvWrapper):
             self.vec_eval_env = deepcopy(self.wrap_env)
-            self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_agent_episodes)]))
-        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_agent_episodes * self.expand_ratio)
+            self.vec_eval_env.set_venv(
+                DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(self.expand_ratio)]))
+        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes * self.expand_ratio)
         self.agent_trajectories += generate_trajectories_without_shuffle(
-                self.agent, self.vec_eval_env, sample_until, deterministic_policy=True)
+            self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
         self.agent.set_env(self.wrap_env)
 
-    def mean_transition_reward(self, agent_trajs: Sequence[Trajectory], expt_trajs: Sequence[Trajectory]) -> Tuple:
-        assert len(agent_trajs[0].acts) == len(expt_trajs[0].acts)
-        traj_len = len(expt_trajs[0].acts)
-        # agent_obs = np.concatenate([agent_trans.obs, agent_trans.next_obs], axis=1)
-        # expt_obs = np.concatenate([expt_trans.obs, expt_trans.next_obs], axis=1)
-        agent_trans = flatten_trajectories(agent_trajs)
-        expt_trans = flatten_trajectories(expt_trajs)
-        agent_obs = agent_trans.obs
-        expt_obs = expt_trans.obs
+    def mean_transition_reward(
+            self,
+            trajectories: Sequence[Trajectory],
+    ) -> Tuple[th.Tensor, None]:
+        """
+        Calculate rewards of every transitions using current reward function from trajectories
+        :param trajectories: List of trajectories for reward calculation
+        :return: (transition rewards, None)
+        """
+        traj_len = len(trajectories[0].acts)
+        trans = flatten_trajectories(trajectories)
+        obs = trans.obs
         if self.use_action_as_input:
-            acts = agent_trans.acts
+            acts = trans.acts
             if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
                 acts = self.wrap_eval_env.action(acts)
-            agent_input = th.from_numpy(np.concatenate([agent_obs, acts], axis=1)).float()
-            expt_input = th.from_numpy(np.concatenate([expt_obs, expt_trans.acts], axis=1)).float()
+            inp = th.from_numpy(np.concatenate([obs, acts], axis=1)).float()
         else:
-            agent_input = th.from_numpy(agent_obs).float()
-            expt_input = th.from_numpy(expt_obs).float()
-        agent_gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(agent_trans))]).to(self.device)
-        expt_gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(expt_trans))]).to(self.device)
-        trans_agent_rewards = agent_gammas * self.reward_net(agent_input).flatten()
-        trans_expt_rewards = expt_gammas * self.reward_net(expt_input).flatten()
-        agent_rewards, expt_rewards = th.zeros(len(agent_trajs)), th.zeros(len(expt_trajs))
-        for i in range(len(agent_trajs)):
-            agent_rewards[i] = trans_agent_rewards[i*traj_len:(i+1)*traj_len].sum()
-        for i in range(len(expt_trajs)):
-            expt_rewards[i] = trans_expt_rewards[i*traj_len:(i+1)*traj_len].sum()
-        return agent_rewards, expt_rewards, None
+            inp = th.from_numpy(obs).float()
+        gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(trans))]).to(self.device)
+        trans_rewards = gammas * self.reward_net(inp).flatten()
+        return th.sum(trans_rewards) / len(trajectories), None
 
-    def cal_loss(self, n_episodes) -> Tuple:
-        expert_trajectories = deepcopy(self.expert_trajectories)
-        agent_trajectories = deepcopy(self.current_agent_trajectories)
-        agent_rewards, expert_rewards, _ = self.mean_transition_reward(agent_trajectories, expert_trajectories)
-        target = th.cat([th.ones(len(expert_rewards)), -th.ones(len(agent_rewards))])
-        y = th.cat([expert_rewards, agent_rewards], dim=0).flatten()
-        loss = th.mean(- y * target)
-        # loss = th.mean(th.clamp(1 - y * target, min=0))
-        weight_norm = 0.0
-        for param in self.reward_net.parameters():
-            weight_norm += param.norm().detach().item()
-        return loss, weight_norm, None
+    def state_visitation(self) -> th.Tensor:
+        D = np.zeros([self.agent.T, self.agent.policy.obs_size], dtype=np.float32) / self.agent.policy.obs_size
+        D[0, :] = np.ones([self.agent.policy.obs_size]) / self.agent.policy.obs_size
+        for t in range(1, self.agent.T):
+            for a in range(self.agent.policy.act_size):
+                E = D[t - 1] * self.agent.policy.policy_table[t - 1, :, a]
+                D[t, :] += np.sum(self.agent.transition_mat[:, :, a] * E[None, :], axis=1)
+        Dcum = np.sum(np.array([[self.agent.gamma ** i] for i in range(self.agent.T)], dtype=np.float32) * D, axis=0)
+        return th.from_numpy(Dcum).to(self.device)
 
-    def sample_and_cal_loss(self, n_episodes):
-        expert_trajectories = deepcopy(self.expert_trajectories)
-        if isinstance(self.wrap_env, VecEnvWrapper):
-            self.vec_eval_env = deepcopy(self.wrap_env)
-            self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_episodes)]))
-        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes*self.expand_ratio)
-        agent_trajectories = generate_trajectories_without_shuffle(
-                self.agent, self.vec_eval_env, sample_until, deterministic_policy=True)
-        self.agent.set_env(self.wrap_env)
-        agent_rewards, expert_rewards, _ = self.mean_transition_reward(agent_trajectories, expert_trajectories)
-        loss = th.mean(agent_rewards) - th.mean(expert_rewards)
-        return loss
+    def get_whole_states_from_env(self):
+        """
+        Get whole states from the 1D or 2D discrete environment
+        :return: Set whole_state attribute
+        """
+        obs_space = self.env.observation_space
+        x = np.meshgrid(*[range(nvec) for nvec in obs_space.nvec])
+        self.whole_state = th.FloatTensor([data.flatten() for data in x]).t().to(self.device)
+
+    def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
+        self.reward_net.train()
+        reward_diffs = []
+        for rew_steps in range(max_gradient_steps):
+            expected_expert_rewards, _ = self.mean_transition_reward(self.expert_trajectories)
+            Ds = self.state_visitation()
+            whole_reward_values = self.reward_net(self.whole_state)
+            loss = th.dot(Ds, whole_reward_values.flatten()) - expected_expert_rewards
+            weight_norm = 0.0
+            for param in self.reward_net.parameters():
+                weight_norm += param.norm().detach().item()
+            self.reward_net.optimizer.zero_grad()
+            loss.backward()
+            reward_diffs.append(loss.item())
+            logger.record("weight norm", weight_norm)
+            logger.record("loss", loss.item())
+            logger.record("steps", rew_steps, exclude="tensorboard")
+            logger.dump(rew_steps)
+            if np.mean(reward_diffs[-min_gradient_steps:]) <= -0.1 and \
+                    reward_diffs[-1] < 0.0 and \
+                    rew_steps >= min_gradient_steps and self.early_stop:
+                self.reward_net.optimizer.zero_grad()
+                return
+            self.reward_net.optimizer.step()
 
     def learn(
             self,
@@ -182,36 +200,13 @@ class MaxEntIRL:
             n_episodes: int = 10,
             **kwargs
     ):
+        self.early_stop = early_stop
+        self.get_whole_states_from_env()
         self._reset_agent(**self.env_kwargs)
         for itr in range(total_iter):
             self.reward_net.reset_optim()
             with logger.accumulate_means(f"{itr}/reward"):
-                self.collect_rollouts(n_episodes)
-                self.reward_net.train()
-                reward_diffs = []
-                for rew_steps in range(max_gradient_steps):
-                    self.current_agent_trajectories = random.sample(self.agent_trajectories, n_episodes)
-                    loss_diff, weight_norm, _ = self.cal_loss(n_episodes)
-                    loss = loss_diff
-                    self.reward_net.optimizer.zero_grad()
-                    loss.backward()
-                    with th.no_grad():
-                        agents = deepcopy(self.current_agent_trajectories)
-                        expts = deepcopy(self.expert_trajectories)
-                        agent_rewards, expt_rewards, _ = self.mean_transition_reward(agents, expts)
-                        diffs = agent_rewards.mean().item() - expt_rewards.mean().item()
-                        reward_diffs.append(diffs)
-                    logger.record("weight norm", weight_norm)
-                    logger.record("loss", loss_diff.item())
-                    logger.record("reward_diff", diffs)
-                    logger.record("steps", rew_steps, exclude="tensorboard")
-                    logger.dump(rew_steps)
-                    if np.mean(reward_diffs[-min_gradient_steps:]) <= -0.1 and \
-                            reward_diffs[-1] < 0.0 and \
-                            rew_steps >= min_gradient_steps and early_stop:
-                        self.reward_net.optimizer.zero_grad()
-                        break
-                    self.reward_net.optimizer.step()
+                self.train_reward_fn(max_gradient_steps, min_gradient_steps)
             with logger.accumulate_means(f"{itr}/agent"):
                 self._reset_agent(**self.env_kwargs)
                 reward_diffs = []
@@ -219,7 +214,10 @@ class MaxEntIRL:
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
                     logger.dump(step=self.agent.num_timesteps)
-                    reward_diff = self.sample_and_cal_loss(n_episodes)
+                    expected_expert_rewards, _ = self.mean_transition_reward(self.expert_trajectories)
+                    Ds = self.state_visitation()
+                    whole_reward_values = self.reward_net(self.whole_state)
+                    reward_diff = th.dot(Ds, whole_reward_values.flatten()) - expected_expert_rewards
                     logger.record("loss_diff", reward_diff.item())
                     logger.record("agent_steps", agent_steps, exclude="tensorboard")
                     logger.dump(agent_steps)
@@ -318,7 +316,8 @@ class APIRL(MaxEntIRL):
             self.agent, self.vec_eval_env, sample_until, deterministic_policy=True)
         self.agent.set_env(self.wrap_env)
         agent_mean_feature = self.traj_to_mean_feature(agent_trajectories, n_episodes)
-        agent_rewards, expert_rewards, _ = self.mean_transition_reward(agent_mean_feature, expert_mean_feature)
+        agent_rewards, _ = self.mean_transition_reward(agent_mean_feature)
+        expert_rewards, _ = self.mean_transition_reward(expert_mean_feature)
         loss = th.mean(agent_rewards) - th.mean(expert_rewards)
         return loss
 
@@ -334,26 +333,40 @@ class APIRL(MaxEntIRL):
         gammas = np.array([self.agent.gamma ** (i % traj_len) for i in range(traj_len * len(traj))]).reshape(-1, 1)
         for i in range(0, len(traj), n_episodes):
             trans = flatten_trajectories(traj[i:i + n_episodes])
-            ft_array = np.zeros([traj_len * len(traj), self.agent.policy.obs_size])
-            ft_array[range(traj_len * len(traj)), self.agent.policy.obs_to_idx(trans.obs)] = 1
+            # ft_array = np.zeros([traj_len * len(traj), self.agent.policy.obs_size])
+            # ft_array[range(traj_len * len(traj)), self.agent.policy.obs_to_idx(trans.obs)] = 1
+            ft_array = self.reward_net.feature_fn(trans.obs)
             mean_feature.append(np.sum(gammas * ft_array, axis=0) / len(traj))
             # mean_feature.append(np.sum(gammas * np.append(trans.obs, trans.obs ** 2, axis=1), axis=0) / len(traj))
         return mean_feature
 
     def mean_transition_reward(
             self,
-            agent_trajs: Sequence[np.ndarray],
-            expt_trajs: Sequence[np.ndarray]
-    ) -> Tuple[th.Tensor, th.Tensor, None]:
+            trajectories: Sequence[np.ndarray],
+    ) -> Tuple[th.Tensor, None]:
         """
         Calculate mean of rewards of transitions from mean features of each agents
-        :param agent_trajs: Trajectories from each agents
-        :param expt_trajs: Trajectories from an expert
+        :param trajectories: List of Trajectories
         :return: (agent mean reward, expert mean reward, None)
         """
-        expt_rewards = self.reward_net(th.from_numpy(np.array(expt_trajs)).float())
-        agent_rewards = self.reward_net(th.from_numpy(np.array(agent_trajs)).float())
-        return agent_rewards, expt_rewards, None
+        weight = self.reward_net.layers[0].weight.detach()
+        rewards = th.dot(weight, th.from_numpy(np.array(trajectories)).float())
+        return rewards, None
+
+    def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
+        t = cp.Variable()
+        mu_e = np.array(deepcopy(self.expert_trajectories))
+        mu = np.array(deepcopy(self.current_agent_trajectories))
+        G = mu_e - mu
+        w = cp.Variable(mu_e.shape[1])
+        obj = cp.Maximize(t)
+        constraints = [G @ w >= t, cp.quad_form(w, np.eye(mu_e.shape[1])) <= 1]
+        prob = cp.Problem(obj, constraints)
+        prob.solve()
+        with th.no_grad():
+            self.reward_net.layers[0].weight = th.nn.Parameter(th.from_numpy(w.value).float(), requires_grad=True)
+        logger.record("t", t.value.item())
+        logger.dump()
 
     def learn(
             self,
@@ -376,19 +389,7 @@ class APIRL(MaxEntIRL):
             self.reward_net.reset_optim()
             with logger.accumulate_means(f"{itr}/reward"):
                 self.collect_rollouts(n_episodes)
-                t = cp.Variable()
-                mu_e = np.array(deepcopy(self.expert_trajectories))
-                mu = np.array(deepcopy(self.current_agent_trajectories))
-                G = mu_e - mu
-                w = cp.Variable(mu_e.shape[1])
-                obj = cp.Maximize(t)
-                constraints = [G @ w >= t, cp.quad_form(w, np.eye(mu_e.shape[1])) <= 1]
-                prob = cp.Problem(obj, constraints)
-                prob.solve()
-                with th.no_grad():
-                    self.reward_net.layers[0].weight = th.nn.Parameter(th.from_numpy(w.value).float())
-                logger.record("t", t.value.item())
-                logger.dump(itr)
+                self.train_reward_fn(max_gradient_steps, min_gradient_steps)
             with logger.accumulate_means(f"{itr}/agent"):
                 self._reset_agent(**self.env_kwargs)
                 reward_diffs = []
