@@ -9,6 +9,7 @@ from ray.tune.schedulers import ASHAScheduler
 
 from algos.torch.sac import SAC, MlpPolicy
 from common.util import make_env
+from common.wrappers import ActionWrapper
 
 
 def trial_str_creator(trial):
@@ -44,17 +45,21 @@ def try_train(config):
         tune.report(mean_reward=mean_reward)
 
 
-def main(target):
-    env = make_env(f"{target}_custom-v2")
+def main(env_id):
+    if env_id == "HPC":
+        subpath = os.path.abspath("../IRL/demos/HPC/sub01/sub01")
+        env = make_env(f"{env_id}_custom-v2", wrapper=ActionWrapper, subpath=subpath)
+    else:
+        env = make_env(f"{env_id}_custom-v2")
     config = {
         'policy': MlpPolicy,
         'env': env,
         'batch_size': tune.choice([64, 128, 256]),
         'accum_steps': tune.choice([512, 1024, 2048]),
         'gradient_steps': tune.choice([1000, 1500, 2000]),
-        'gamma': tune.choice([0.99, 0.98, 0.97, 0.95]),
+        'gamma': tune.choice([0.99, 0.975, 0.95]),
         'ent_coef': tune.choice([0.1, 0.15, 0.2, 0.25]),
-        'lr': tune.loguniform(1e-4, 5e-4),
+        'lr': tune.choice([1e-4, 3e-4, 5e-4]),
     }
 
     scheduler = ASHAScheduler(
@@ -67,14 +72,15 @@ def main(target):
     reporter = CLIReporter(metric_columns=["mean_reward", "training_iteration"])
     result = tune.run(
         partial(try_train),
-        name=target + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S'),
+        name=env_id + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S'),
         resources_per_trial={"cpu": 1, "gpu": 0.33},
         config=config,
-        num_samples=500,
+        num_samples=200,
         scheduler=scheduler,
         progress_reporter=reporter,
         checkpoint_at_end=True,
         trial_name_creator=trial_str_creator,
+        local_dir=f"~/hsw/Control/RL/{env_id}/tmp/log/ray_result"
     )
 
     best_trial = result.get_best_trial("mean_reward", "max", "last")

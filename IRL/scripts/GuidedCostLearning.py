@@ -16,10 +16,10 @@ from IRL.scripts.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "1DTarget"
+    env_type = "2DTarget"
     algo_type = "GCL"
     device = "cpu"
-    map_size = 50
+    map_size = 10
     sub = f"viter_disc_{map_size}"
     name = f"{env_type}_disc"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("softqlearning", env, device=device, verbose=1)
+    agent = def_policy("softqiter", env, device=device, verbose=1)
     learner = GuidedCostLearning(
         env,
         eval_env=eval_env,
@@ -66,8 +66,8 @@ if __name__ == "__main__":
         use_action_as_input=False,
         rew_arch=[],
         device=device,
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper, 'num_envs': 1},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.04},
     )
 
     # Run Learning
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         agent_learning_steps=5e3,
         n_episodes=expt_traj_num,
         max_agent_iter=12,
-        min_agent_iter=4,
+        min_agent_iter=2,
         max_gradient_steps=6000,
         min_gradient_steps=1000,
         callback=save_net_callback.net_save,

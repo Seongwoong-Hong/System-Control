@@ -29,7 +29,8 @@ def test_mujoco_envs_learned_policy():
 def test_rl_learned_policy(rl_path):
     env_type = "IDP"
     name = f"{env_type}_custom"
-    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "sac", "policies_1")
+    # model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "sac", "policies_1")
+    model_dir = os.path.join("..", "..", "IRL", "tmp", "log")
     stats_path = None
     if os.path.isfile(model_dir + "normalization.pkl"):
         stats_path = model_dir + "normalization.pkl"
@@ -68,8 +69,8 @@ def test_2d(rl_path):
 def test_1d(rl_path):
     name = "1DTarget"
     env_id = f"{name}_disc"
-    env = make_env(f"{env_id}-v0")
-    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id + "_large", "viter", "policies_1")
+    env = make_env(f"{env_id}-v2", map_size=50)
+    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id + "_50", "softqlearning", "policies_1")
     with open(model_dir + "/agent.pkl", "rb") as f:
         algo = pickle.load(f)
     # algo = PPO.load(model_dir + "/agent")

@@ -16,7 +16,9 @@ class OneDTargetDisc(gym.Env):
 
     def step(self, action: np.ndarray):
         assert self.st is not None, "Can't step the environment before calling reset function"
-        info = {'obs': self.st.reshape(1, -1), 'acts': action.reshape(1, -1)}
+        ft = np.zeros(self.map_size)
+        ft[self.st] = 1
+        info = {'obs': ft.reshape(1, -1), 'acts': action.reshape(1, -1)}
         r = self.reward_fn(self.st, action)
         self.st = self.st + action - 1  # + 0.03 * np.random.random(self.st.shape)
         if self.st[0] < 0:

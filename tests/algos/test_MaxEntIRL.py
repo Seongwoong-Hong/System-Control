@@ -6,21 +6,24 @@ import pytest
 from imitation.data import rollout
 from stable_baselines3.common.vec_env import VecNormalize
 
-from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning
+from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning, APIRL
 from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
 
+map_size = 10
+env_name = "2DTarget"
 
-map_size = 4
+
 @pytest.fixture
 def demo_dir():
-    return os.path.abspath(os.path.join("..", "..", "IRL", "demos"))
+    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    return os.path.join(proj_path, "IRL", "demos")
 
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, "2DTarget", f"viter_disc_{map_size}.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, f"viter_disc_{map_size}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -29,13 +32,13 @@ def expert(demo_dir):
 @pytest.fixture
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env("2DTarget_disc-v2", subpath=subpath, map_size=map_size)
+    return make_env(f"{env_name}_disc-v2", subpath=subpath, map_size=map_size)
 
 
 @pytest.fixture
 def eval_env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env("2DTarget_disc-v0", subpath=subpath, map_size=map_size)
+    return make_env(f"{env_name}_disc-v0", subpath=subpath, map_size=map_size)
 
 
 @pytest.fixture
@@ -45,21 +48,22 @@ def learner(env, expert, eval_env):
     logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
-        return th.cat([x, x**2], dim=1)
+        return x
+        # return th.cat([x, x**2], dim=1)
 
     agent = def_policy("viter", env, device='cpu', verbose=1)
 
-    return MaxEntIRL(
+    return APIRL(
         env,
         eval_env=eval_env,
         agent=agent,
         feature_fn=feature_fn,
         expert_trajectories=expert,
-        use_action_as_input=True,
+        use_action_as_input=False,
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1, 'lr': 0.1},
     )
 
 
@@ -82,13 +86,13 @@ def test_callback(learner):
 def test_validity(learner, expert):
     learner.learn(
         total_iter=50,
-        agent_learning_steps=10000,
+        agent_learning_steps=5000,
         n_episodes=len(expert),
         max_agent_iter=1,
         min_agent_iter=1,
-        max_gradient_steps=1200,
-        min_gradient_steps=500,
-        early_stop=True,
+        max_gradient_steps=6000,
+        min_gradient_steps=1000,
+        early_stop=False,
     )
 
 
@@ -112,17 +116,17 @@ def test_GCL(env, expert, eval_env):
         rew_arch=[],
         device='cpu',
         eval_env=eval_env,
-        env_kwargs={'reward_wrapper': RewardWrapper},
+        env_kwargs={'reward_wrapper': RewardWrapper, "num_envs": 10},
         rew_kwargs={'type': 'ann'},
     )
 
     learner.learn(
         total_iter=50,
-        agent_learning_steps=1e4,
+        agent_learning_steps=1e3,
         n_episodes=len(expert),
         max_agent_iter=12,
-        min_agent_iter=4,
-        max_gradient_steps=6000,
-        min_gradient_steps=1000,
+        min_agent_iter=2,
+        max_gradient_steps=1000,
+        min_gradient_steps=200,
         early_stop=True,
     )

@@ -97,13 +97,13 @@ def expt_cost():
 
 
 def compare_obs():
-    env_type = "2DTarget"
+    env_type = "1DTarget"
     env_id = f"{env_type}_disc"
-    map_size = 7
+    map_size = 100
     subj = f"viter_disc_{map_size}"
-    name = f"ext_{subj}_softq_linear_vec"
+    name = f"ext_{subj}_linear"
     print(name)
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "APIRL", name))
     assert os.path.isdir(proj_path)
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
     # pltqs, init_states = [], []
@@ -123,7 +123,8 @@ def compare_obs():
         stats_path = None
         if os.path.isfile(os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")):
             stats_path = os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")
-        env = make_env(f"{env_id}-v0", num_envs=1, wrapper=None, subpath=subpath, use_norm=stats_path, map_size=map_size)
+        env = make_env(f"{env_id}-v0", num_envs=1, use_vec_env=True, wrapper=None, subpath=subpath, use_norm=stats_path,
+                       map_size=map_size)
         # env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, pltqs=pltqs, init_states=init_states)
         _, agent_obs, _ = verify_policy(env, agent, deterministic=True, render="None", repeat_num=lnum)
         if stats_path is not None:
@@ -169,8 +170,8 @@ def feature():
 
 if __name__ == "__main__":
     def feature_fn(x):
-        # return x
+        return x
         # return x.square()
-        return th.cat([x, x**2], dim=1)
+        # return th.cat([x, x**2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
     compare_obs()

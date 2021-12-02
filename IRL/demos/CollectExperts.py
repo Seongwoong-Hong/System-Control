@@ -14,9 +14,11 @@ from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
     def feature_fn(x):
-        return th.cat([x, x**2], dim=1)
-    map_size = 5
-    n_episodes = 25
+        return th.cat([x, x ** 2], dim=1)
+
+
+    map_size = 10
+    n_episodes = 100
     env_type = "2DTarget"
     name = f"{env_type}_disc"
     subpath = "HPC/sub01/sub01"
@@ -31,7 +33,7 @@ if __name__ == "__main__":
     # ExpertPolicy = PPO.load(f"{proj_path}/../RL/{env_type}/tmp/log/{name}/ppo/policies_1/agent.pkl")
     # ExpertPolicy = PPO.load(f"{proj_path}/tmp/log/{name}/MaxEntIRL/ext_ppo_disc_samp_linear_ppoagent_svm_reset/model/000/agent")
     trajectories = generate_trajectories_without_shuffle(
-        ExpertPolicy, DummyVecEnv([lambda: env]), sample_until, deterministic_policy=False)
+        ExpertPolicy, DummyVecEnv([lambda: env]), sample_until, deterministic_policy=True)
     save_name = f"{env_type}/viter_disc_{map_size}.pkl"
     types.save(save_name, trajectories)
     print(f"Expert Trajectories are saved in the {save_name}")

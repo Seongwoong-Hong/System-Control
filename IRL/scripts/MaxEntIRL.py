@@ -12,16 +12,15 @@ from scipy import io
 from common.util import make_env
 from common.callbacks import SaveCallback
 from common.wrappers import RewardWrapper
-from algos.torch.MaxEntIRL import MaxEntIRL
+from algos.torch.MaxEntIRL import MaxEntIRL, APIRL
 from IRL.scripts.project_policies import def_policy
 
-
 if __name__ == "__main__":
-    env_type = "1DTarget"
-    algo_type = "MaxEntIRL"
+    env_type = "2DTarget"
+    algo_type = "APIRL"
     device = "cpu"
     name = f"{env_type}_disc"
-    map_size = 50
+    map_size = 10
     expt = f"viter_disc_{map_size}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
@@ -42,16 +41,16 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{expt}_softq_linear"
+    log_dir += f"/1hot_{expt}_linear"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
-        # return x
+        return x
         # return x ** 2
-        return th.cat([x, x**2], dim=1)
+        # return th.cat([x, x**2], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -64,8 +63,8 @@ if __name__ == "__main__":
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("softqlearning", env, device=device, verbose=1)
-    learner = MaxEntIRL(
+    agent = def_policy("viter", env, device=device, verbose=1)
+    learner = APIRL(
         env,
         eval_env=eval_env,
         feature_fn=feature_fn,
@@ -74,8 +73,8 @@ if __name__ == "__main__":
         use_action_as_input=False,
         rew_arch=[],
         device=device,
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.05},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper, 'num_envs': 1},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.3},
     )
 
     # Run Learning
@@ -83,10 +82,10 @@ if __name__ == "__main__":
         total_iter=50,
         agent_learning_steps=5e3,
         n_episodes=expt_traj_num,
-        max_agent_iter=12,
-        min_agent_iter=2,
+        max_agent_iter=1,
+        min_agent_iter=1,
         max_gradient_steps=6000,
-        min_gradient_steps=1000,
+        min_gradient_steps=2000,
         callback=save_net_callback.net_save,
     )
 

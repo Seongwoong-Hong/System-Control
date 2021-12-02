@@ -1,5 +1,6 @@
 import gym
 import numpy as np
+from copy import deepcopy
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from typing import List
@@ -18,7 +19,9 @@ class TwoDTargetDisc(gym.Env):
     def step(self, action: np.ndarray):
         assert self.st is not None, "Can't step the environment before calling reset function"
         r = self.reward_fn(self.st, action)
-        info = {'obs': self.st.reshape(1, -1), 'acts': action.reshape(1, -1)}
+        ft = np.zeros(self.map_size * self.map_size)
+        ft[self.st[0] + self.st[1] * self.map_size] = 1
+        info = {'obs': ft.reshape(1, -1), 'acts': action.reshape(1, -1)}
         self.st += action - 1
         if self.st[0] >= self.map_size:
             self.st[0] -= 1
@@ -76,11 +79,11 @@ class TwoDTargetDiscDet(TwoDTargetDisc):
         super(TwoDTargetDiscDet, self).__init__(map_size=map_size)
         # x, y = np.meshgrid(range(0, map_size, 2), range(0, map_size, 2))
         x, y = np.meshgrid(range(map_size), range(map_size))
-        self.init_state = np.array([x.flatten(), y.flatten()]).reshape(-1, 2)
+        self.init_state = np.append(x.reshape(-1, 1), y.reshape(-1, 1), axis=1)
         self.n = 0
 
     def reset(self):
-        self.st = self.init_state[self.n % len(self.init_state), :]
+        self.st = deepcopy(self.init_state[self.n % len(self.init_state), :])
         self.timesteps = 0
         self.n += 1
         return self._get_obs()
