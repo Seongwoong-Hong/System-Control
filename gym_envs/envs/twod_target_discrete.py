@@ -19,8 +19,6 @@ class TwoDTargetDisc(gym.Env):
     def step(self, action: np.ndarray):
         assert self.st is not None, "Can't step the environment before calling reset function"
         r = self.reward_fn(self.st, action)
-        # ft = np.append(self.st, self.st ** 2)
-        # ft[self.st[0] + self.st[1] * self.map_size] = 1
         info = {'obs': self.st.reshape(1, -1), 'acts': action.reshape(1, -1)}
         self.st += action - 1
         if self.st[0] >= self.map_size:

@@ -1,1 +1,1 @@
-from algos.tabular.policy.policy import TabularPolicy, TabularSoftPolicy, FiniteTabularSoftPolicy
+from algos.tabular.policy.policy import TabularPolicy, FiniteTabularSoftPolicy

@@ -23,7 +23,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, f"viter_disc_{map_size}.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, f"softqiter_disc_{map_size}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -48,10 +48,17 @@ def learner(env, expert, eval_env):
     logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
+        if len(x.shape) == 1:
+            x = x.reshape(1, -1)
+        ft = th.zeros([x.shape[0], 100], dtype=th.float32)
+        for i, row in enumerate(x):
+            idx = int((row[0] + row[1] * map_size).item())
+            ft[i, idx] = 1
+        return ft
         # return x
-        return th.cat([x, x ** 2], dim=1)
+        # return th.cat([x, x ** 2], dim=1)
 
-    agent = def_policy("finitesoftqiter", env, device='cpu', verbose=1)
+    agent = def_policy("finitesoftqiter", env, device='cuda:2', verbose=1)
 
     return MaxEntIRL(
         env,
@@ -130,3 +137,16 @@ def test_GCL(env, expert, eval_env):
         min_gradient_steps=200,
         early_stop=True,
     )
+
+
+def test_state_visitation(env, expert, learner):
+    from algos.tabular.viter import FiniteSoftQiter
+    policy = FiniteSoftQiter(env, gamma=0.8, alpha=1, device='cuda:2')
+    policy.learn(1000)
+    learner.agent = policy
+    Ds = learner.state_visitation()
+    learner.get_whole_states_from_env()
+    d1 = th.dot(Ds, learner.reward_net(learner.whole_state).flatten())
+    d2, _ = learner.mean_transition_reward(expert)
+    assert th.abs((d2 - d1) / d2).item() < 0.1
+    print(th.abs(d2 - d1).item())

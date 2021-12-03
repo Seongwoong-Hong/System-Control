@@ -93,7 +93,6 @@ class MaxEntIRL:
         reward_wrapper = kwargs.pop("reward_wrapper", ActionRewardWrapper)
         norm_wrapper = kwargs.pop("vec_normalizer", None)
         num_envs = kwargs.pop("num_envs", 1)
-        self.reward_net.eval()
         self.wrap_env = reward_wrapper(self.env, self.reward_net.eval())
         self.wrap_eval_env = reward_wrapper(self.eval_env, self.reward_net.eval())
         if norm_wrapper:
@@ -107,7 +106,7 @@ class MaxEntIRL:
         """
         Collect trajectories using the agent
         :param n_episodes: Number of expert trajectories
-        :return: Add new trajectories to agent_trajectories attribute
+        :return: Get new agent_trajectories attribute
         """
         print("Collecting rollouts from the current agent...")
         if isinstance(self.wrap_env, VecEnvWrapper):
@@ -115,7 +114,7 @@ class MaxEntIRL:
             self.vec_eval_env.set_venv(
                 DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(self.expand_ratio)]))
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes * self.expand_ratio)
-        self.agent_trajectories += generate_trajectories_without_shuffle(
+        self.agent_trajectories = generate_trajectories_without_shuffle(
             self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
         self.agent.set_env(self.wrap_env)
 
@@ -135,20 +134,20 @@ class MaxEntIRL:
             acts = trans.acts
             if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
                 acts = self.wrap_eval_env.action(acts)
-            inp = th.from_numpy(np.concatenate([obs, acts], axis=1)).float()
+            inp = th.from_numpy(np.concatenate([obs, acts], axis=1)).to(self.device).float()
         else:
-            inp = th.from_numpy(obs).float()
+            inp = th.from_numpy(obs).to(self.device).float()
         gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(trans))]).to(self.device)
         trans_rewards = gammas * self.reward_net(inp).flatten()
         return th.sum(trans_rewards) / len(trajectories), None
 
     def state_visitation(self) -> th.Tensor:
-        D = np.zeros([self.agent.T, self.agent.policy.obs_size], dtype=np.float32) / self.agent.policy.obs_size
+        D = np.zeros([self.agent.T, self.agent.policy.obs_size], dtype=np.float32)
         D[0, :] = np.ones([self.agent.policy.obs_size]) / self.agent.policy.obs_size
         for t in range(1, self.agent.T):
             for a in range(self.agent.policy.act_size):
                 E = D[t - 1] * self.agent.policy.policy_table[t - 1, :, a]
-                D[t, :] += np.sum(self.agent.transition_mat[:, :, a] * E[None, :], axis=1)
+                D[t, :] += E @ self.agent.transition_mat[:, :, a].T
         Dcum = np.sum(np.array([[self.agent.gamma ** i] for i in range(self.agent.T)], dtype=np.float32) * D, axis=0)
         return th.from_numpy(Dcum).to(self.device)
 
@@ -259,7 +258,7 @@ class GuidedCostLearning(MaxEntIRL):
         expert_trajectories = deepcopy(self.expert_trajectories)
         demo_trajs = expert_trajectories + deepcopy(self.current_agent_trajectories)
         rewards, log_probs = self.transition_is(demo_trajs)
-        _, expt_rewards, lcr = self.mean_transition_reward([demo_trajs[0]], expert_trajectories)
+        expt_rewards, _ = self.mean_transition_reward(expert_trajectories)
         loss = th.logsumexp(rewards - log_probs, 0) - expt_rewards.mean()
         logger.record("log_probs_mean", th.mean(log_probs).item())
         logger.record("log_probs_var", th.var(log_probs).item())

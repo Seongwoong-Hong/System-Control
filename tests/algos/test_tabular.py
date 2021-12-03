@@ -45,6 +45,8 @@ def test_softiter():
     logger.configure(".", format_strs=['stdout'])
     algo = SoftQiter(env, gamma=0.8, epsilon=0.2, alpha=1, device='cpu')
     algo.learn(2000)
+    algo2 = FiniteSoftQiter(env, gamma=0.8, alpha=1, device='cpu')
+    algo2.learn(2000)
 
     print('env')
 
