@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 from typing import Optional, Tuple
 from copy import deepcopy
-from algos.tabular.policy import TabularPolicy, TabularSoftPolicy
+from algos.tabular.policy import *
 from stable_baselines3.common.vec_env import VecEnv, DummyVecEnv
 from imitation.util import logger
 
@@ -28,8 +28,9 @@ class Viter:
             self.env = DummyVecEnv([lambda: env])
         assert self.env.num_envs == 1, "Multiple environments are not available"
         self._setup_model()
+        self.set_env_mats()
 
-    def _setup_model(self, ):
+    def _setup_model(self):
         self.observation_space = self.env.observation_space
         self.action_space = self.env.action_space
         self.num_timesteps = 0
@@ -43,20 +44,10 @@ class Viter:
             device=self.device,
         )
 
-    def train(self, p_mat, r_mat, d_mat):
-        self.policy.q_table = r_mat + self.gamma * (1 - d_mat) * \
-                              np.sum(p_mat * np.max(self.policy.q_table, axis=-1)[:, np.newaxis, np.newaxis], axis=0)
-        self.policy.v_table = np.max(self.policy.q_table, axis=-1)
-
-    def learn(self, total_timesteps, reset_num_timesteps=True, **kwargs):
-        if reset_num_timesteps:
-            self.num_timesteps = 0
-            self.policy.reset()
-        else:
-            total_timesteps += self.num_timesteps
-        p_mat = np.zeros([self.policy.obs_size, self.policy.obs_size, self.policy.act_size])
-        r_mat = np.zeros([self.policy.obs_size, self.policy.act_size])
-        d_mat = np.zeros([self.policy.obs_size, self.policy.act_size])
+    def set_env_mats(self):
+        self.transition_mat = np.zeros([self.policy.obs_size, self.policy.obs_size, self.policy.act_size])
+        self.reward_mat = np.zeros([self.policy.obs_size, self.policy.act_size])
+        self.done_mat = np.zeros([self.policy.obs_size, self.policy.act_size])
         for i in range(self.policy.obs_size):
             for j in range(self.policy.act_size):
                 self.env.reset()
@@ -65,22 +56,38 @@ class Viter:
                 self.env.env_method("set_state", states[0])
                 ns, r, done, _ = self.env.step(actions)
                 k = self.policy.obs_to_idx(ns).item()
-                p_mat[k, i, j] = 1
-                r_mat[i, j] = r[0]
+                self.transition_mat[k, i, j] = 1
+                self.reward_mat[i, j] = r[0]
                 if done:
-                    d_mat[i, j] = 1
+                    self.done_mat[i, j] = 1
+
+    def train(self):
+        self.policy.q_table = self.reward_mat + self.gamma * (1 - self.done_mat) * np.sum(
+            self.transition_mat * np.max(self.policy.q_table, axis=-1)[:, None, None], axis=0)
+        self.policy.v_table = np.max(self.policy.q_table, axis=-1)
+        self.policy.policy_table = np.zeros(self.policy.policy_table.shape)
+        self.policy.policy_table[range(self.policy.obs_size), self.policy.arg_max(self.policy.q_table).flatten()] = 1
+
+    def learn(self, total_timesteps, reset_num_timesteps=True, **kwargs):
+        min_timesteps = kwargs.pop("min_timesteps", 10)
+        if reset_num_timesteps:
+            self.num_timesteps = 0
+            self.policy.reset()
+        else:
+            total_timesteps += self.num_timesteps
+        self.set_env_mats()
         while self.num_timesteps < total_timesteps:
             old_value = deepcopy(self.policy.v_table)
-            self.train(p_mat, r_mat, d_mat)
+            self.train()
             error = np.max(np.abs(old_value - self.policy.v_table))
             if self.num_timesteps % 10 == 0:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error)
                 logger.dump(self.num_timesteps)
-            if error < 1e-8 and self.num_timesteps >= 100:
+            if error < 1e-10 and self.num_timesteps >= min_timesteps:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error)
-                self.policy.policy_table = self.policy.arg_max(self.policy.q_table)
+                self.policy.policy_table = np.round(self.policy.policy_table, 8)
                 break
             self.num_timesteps += 1
 
@@ -92,6 +99,10 @@ class Viter:
             deterministic: bool = False
     ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         return self.policy.predict(observation, state, mask, deterministic)
+
+    def logsumexp(self, x, axis=0):
+        assert len(x.shape) != 1
+        return np.max(x, axis=axis) + np.log(np.sum(np.exp(x - np.max(x, axis=axis)[:, None]), axis=axis))
 
     def reset(self, env: None):
         if env is None:
@@ -123,20 +134,34 @@ class Viter:
 
 
 class SoftQiter(Viter):
+    def train(self):
+        self.policy.v_table = self.alpha * self.logsumexp(self.policy.q_table / self.alpha, axis=-1)
+        self.policy.q_table = self.reward_mat + self.gamma * (1 - self.done_mat) * np.sum(
+            self.transition_mat * self.policy.v_table[:, None, None], axis=0)
+        self.policy.policy_table = np.exp((self.policy.q_table - self.policy.v_table[:, None]) / self.alpha)
+
+
+class FiniteSoftQiter(Viter):
     def _setup_model(self):
         self.num_timesteps = 0
         self.observation_space = self.env.observation_space
         self.action_space = self.env.action_space
+        self.T = 200  # self.env.max_time
         assert isinstance(self.observation_space, gym.spaces.MultiDiscrete) \
                and isinstance(self.action_space, gym.spaces.MultiDiscrete)
-        self.policy = TabularSoftPolicy(
+        self.policy = FiniteTabularSoftPolicy(
             observation_space=self.observation_space,
             action_space=self.action_space,
             device=self.device,
+            max_t=self.T
         )
 
-    def train(self, p_mat, r_mat, d_mat):
-        self.policy.q_table = r_mat + self.gamma * (1 - d_mat) * self.alpha * \
-                              np.sum(p_mat * np.log(np.sum(np.exp(self.policy.q_table / self.alpha), axis=-1))[:,
-                                             np.newaxis, np.newaxis], axis=0)
-        self.policy.v_table = np.log(np.sum(np.exp(self.policy.q_table), axis=-1))
+    def train(self):
+        self.policy.q_table[self.T - 1, :, :] = self.reward_mat
+        self.policy.v_table[self.T - 1, :] = self.alpha * self.logsumexp(
+            self.policy.q_table[self.T - 1, :, :] / self.alpha, axis=1)
+        for t in reversed(range(self.T - 1)):
+            self.policy.q_table[t, :, :] = self.reward_mat + self.gamma * np.sum(
+                self.transition_mat * self.policy.v_table[t + 1, :][:, None, None], axis=0)
+            self.policy.v_table[t, :] = self.alpha * self.logsumexp(self.policy.q_table[t, :, :] / self.alpha, axis=1)
+        self.policy.policy_table = np.exp((self.policy.q_table - self.policy.v_table[:, :, None]) / self.alpha)

@@ -1,1 +1,1 @@
-from algos.tabular.viter.viter import Viter, SoftQiter
+from algos.tabular.viter.viter import Viter, SoftQiter, FiniteSoftQiter

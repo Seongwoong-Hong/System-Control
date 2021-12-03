@@ -12,7 +12,7 @@ from RL.project_policies import def_policy
 
 if __name__ == "__main__":
     env_type = "2DTarget"
-    algo_type = "viter"
+    algo_type = "softqiter"
     map_size = 10
     name = f"{env_type}_disc"
     device = "cpu"

@@ -6,7 +6,7 @@ import numpy as np
 from typing import Optional, Tuple
 from copy import deepcopy
 
-from algos.tabular.policy.policy import TabularPolicy, TabularSoftPolicy
+from algos.tabular.policy.policy import TabularPolicy
 from imitation.util import logger
 from imitation.data import rollout
 from stable_baselines3.common.vec_env import VecEnv, DummyVecEnv
@@ -18,13 +18,15 @@ class QLearning:
             env,
             gamma: float = 0.8,
             epsilon: float = 0.4,
-            alpha: float = 0.5,
+            alpha: float = 1.0,
+            beta: float = 0.5,
             device: str = 'cpu',
             **kwargs,
     ):
         self.gamma = gamma
         self.epsilon = epsilon
         self.alpha = alpha
+        self.beta = beta
         self.device = device
         self.env = env
         self.num_envs = 1
@@ -57,8 +59,9 @@ class QLearning:
         act_idx = self.policy.act_to_idx(action)
         nob_idx = self.policy.obs_to_idx(next_ob)
         self.policy.q_table[ob_idx, act_idx] += \
-            self.alpha * (reward + self.gamma * np.max(self.policy.q_table[nob_idx, :], axis=-1)
-                          - self.policy.q_table[ob_idx, act_idx])
+            self.beta * (reward + self.gamma * np.max(self.policy.q_table[nob_idx, :], axis=-1)
+                         - self.policy.q_table[ob_idx, act_idx])
+        self.policy.policy_table[self.policy.arg_max(self.policy.q_table)] = 1
 
     def learn(self, total_timesteps, reset_num_timesteps=True, **kwargs) -> None:
         if reset_num_timesteps:
@@ -75,7 +78,6 @@ class QLearning:
                 rollout.generate_trajectories(self.policy, self.env, sample_until, deterministic_policy=False)
             )
             self.train(trans.obs, trans.acts, trans.next_obs, trans.rews)
-            self.policy.policy_table = self.policy.arg_max(self.policy.q_table)
             error = np.max(np.abs(self.policy.q_table - prev_q_table))
             if self.num_timesteps % 100 == 0:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
@@ -134,20 +136,6 @@ class QLearning:
 
 
 class SoftQLearning(QLearning):
-    def _setup_model(self):
-        self.num_timesteps = 0
-        self.observation_space = self.env.observation_space
-        self.action_space = self.env.action_space
-        assert isinstance(self.observation_space, gym.spaces.MultiDiscrete) \
-               and isinstance(self.action_space, gym.spaces.MultiDiscrete)
-        self.policy = TabularSoftPolicy(
-            observation_space=self.observation_space,
-            action_space=self.action_space,
-            epsilon=self.epsilon,
-            alpha=self.alpha,
-            device=self.device,
-        )
-
     def train(
             self,
             ob: np.ndarray,
@@ -159,8 +147,17 @@ class SoftQLearning(QLearning):
         act_idx = self.policy.act_to_idx(action)
         nob_idx = self.policy.obs_to_idx(next_ob)
         self.policy.q_table[ob_idx, act_idx] += \
-            self.alpha * (reward - self.policy.q_table[ob_idx, act_idx]
-                          + self.gamma * self.logsumexp(self.policy.q_table[nob_idx, :]))
+            self.beta * (reward - self.policy.q_table[ob_idx, act_idx]
+                         + self.gamma * self.alpha * self.logsumexp(self.policy.q_table[nob_idx, :] / self.alpha))
+        self.policy.policy_table = self.softmax(self.policy.q_table)
 
-    def logsumexp(self, x):
-        return np.max(x, axis=-1) + np.log(np.exp(x - np.max(x, axis=-1)[:, np.newaxis]).sum(axis=-1))
+    def logsumexp(self, x, axis=0):
+        assert len(x.shape) == 2
+        return np.max(x, axis=axis) + np.log(np.exp(x - np.max(x, axis=-1)[:, np.newaxis]).sum(axis=axis))
+
+    def softmax(self, x: np.ndarray):
+        if len(x.shape) == 1:
+            x = x[np.newaxis, :]
+        y = np.exp(x - np.max(x, axis=-1)[:, np.newaxis])
+        f_x = y / np.sum(y, axis=-1)[:, np.newaxis]
+        return f_x
