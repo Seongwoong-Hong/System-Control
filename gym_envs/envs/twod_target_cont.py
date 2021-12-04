@@ -86,7 +86,7 @@ class TwoDTargetCont(gym.Env):
 
         P.shape = (|A|, |S|, |S|)   where |A| = 9, |S| = map_size / h + 1
         """
-        N = int(self.map_size / h) + 1
+        N = round(self.map_size / h) + 1
 
         # vectorize all possible states and actions
         s_vec = np.stack(np.meshgrid(h * np.arange(0., N),
@@ -135,7 +135,7 @@ class TwoDTargetCont(gym.Env):
         next_v = sum(P @ A .* v, axis=0) forward_PAv(P, A, v)
         A.shape = (|A|, |S|)
         """
-        N = int(self.map_size / h) + 1
+        N = round(self.map_size / h) + 1
 
         # vectorize all possible states and actions
         s_vec = np.stack(np.meshgrid(h * np.arange(0., N),
@@ -153,7 +153,7 @@ class TwoDTargetCont(gym.Env):
         R.shape = (|S|)   where |S| = map_size / h + 1
         """
 
-        N = int(self.map_size / h) + 1
+        N = round(self.map_size / h) + 1
 
         # vectorize all possible states and actions
         s_vec = np.stack(np.meshgrid(h * np.arange(0., N), h * np.arange(0., N), indexing='xy'),

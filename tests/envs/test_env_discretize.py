@@ -64,12 +64,13 @@ def test_value_itr():
     """
     주어진 policy 에 대해 전환 행렬 P_pi 계산, value itr 수행
     optimal policy 와의 value 차이 계산
+    NOTE:: state diff (+- 1) 가 h 배수이면 value 차이는 매우 작음
     """
     env = gym.make('2DTarget_cont-v1')          # type: TwoDTargetCont
 
     opt_pi = env.get_optimal_policy()
-    h = 0.1
-    N = int(env.map_size / h) + 1
+    h = 0.007
+    N = round(env.map_size / h) + 1
     P = env.get_trans_mat(h=h)
     A = env.get_action_mat(opt_pi, h=h)
     R = env.get_reward_vec(opt_pi, h=h)
@@ -87,6 +88,7 @@ def test_value_itr():
                                  h * np.arange(0., N),
                                  indexing='xy'),
                      -1).reshape(-1, 2)
+    s_vec_origin = np.copy(s_vec)
 
     true_values = np.zeros(N ** 2)
     for _ in range(env.spec.max_episode_steps):
@@ -94,8 +96,14 @@ def test_value_itr():
         true_values += env.get_reward(s_vec, a_vec)
         s_vec = env.get_next_state(s_vec, a_vec)
 
+    # calc and plot value error
     err = np.abs(true_values - values[0])
+    plt.figure(figsize=(3, 3))
+    plt.tricontour(s_vec_origin[:, 0], s_vec_origin[:, 1], err)
+    plt.title(f'Value gap by dyn appx (h={h:.3f})')
+    plt.colorbar()
+    plt.show()
 
     print(f'\n'
           f':: Appx dyn vs. True VI :: \n'
-          f'Err max: {err.max():.2E}')
+          f'Err max: {err.max():.2E} @ {s_vec_origin[np.argmax(err)]}')

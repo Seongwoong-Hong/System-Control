@@ -6,7 +6,7 @@ def forward_trans(P, A, v):
     정책 A 와 전환 행렬 P 를 고려할 때 다음 스텝의 v 계산
     P.shape = (|A|, |S|, |S|)
     A.shape = (|A|, |S|)
-    v.shape = (|S|)
+    next_v.shape = (|S|)
     """
     num_actions = P.shape[0]
 
@@ -18,7 +18,10 @@ def forward_trans(P, A, v):
 
 def backward_trans(P, A, v):
     """
-    XX
+    정책 A 와 전환 행렬 P 를 고려할 때 이전 스텝의 v 계산
+    P.shape = (|A|, |S|, |S|)
+    A.shape = (|A|, |S|)
+    post_v.shape = (|S|)
     """
     num_actions = P.shape[0]
 
