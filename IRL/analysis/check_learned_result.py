@@ -131,8 +131,8 @@ def compare_obs():
             agent_obs = env.unnormalize_obs(agent_obs)
         errors, maximums = [], []
         for k in range(lnum):
-            errors += [abs(expert_trajs[k].obs[:-1, :2] - agent_obs[k][:, :2]).mean(axis=0)]
-            maximums += [abs(expert_trajs[k].obs[:-1, :2] - agent_obs[k][:, :2]).max()]
+            errors += [abs(expert_trajs[k].obs[:, :2] - agent_obs[k][:, :2]).mean(axis=0)]
+            maximums += [abs(expert_trajs[k].obs[:, :2] - agent_obs[k][:, :2]).max()]
         error_list.append(np.array(errors).sum(axis=0) / len(errors))
         max_list.append(sum(maximums) / len(maximums))
         print(f"{i:03d} Error: {error_list[-1]}, {error_list[-1].mean()}, Max: {max_list[-1]}")

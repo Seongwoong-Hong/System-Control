@@ -70,7 +70,7 @@ def learner(env, expert, eval_env):
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.5},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.5, 'lr': 0.1},
     )
 
 
@@ -92,7 +92,7 @@ def test_callback(learner):
 
 def test_validity(learner, expert):
     learner.learn(
-        total_iter=50,
+        total_iter=1,
         agent_learning_steps=5000,
         n_episodes=len(expert),
         max_agent_iter=1,

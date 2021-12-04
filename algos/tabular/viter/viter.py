@@ -181,11 +181,12 @@ class FiniteSoftQiter(Viter):
         obs_list, act_list = [], []
         self.env.reset()
         self.env.env_method("set_state", observation[0])
+        obs_list.append(observation.flatten())
         for t in range(self.max_t):
-            obs_list.append(observation.flatten())
             obs_idx = self.policy.obs_to_idx(observation)
             act_idx = choose_method(self.policy.policy_table[t, obs_idx, :])
             act = self.policy.idx_to_act(act_idx)
-            act_list.append(act.flatten())
             observation, _, _, _ = self.env.step(act)
+            act_list.append(act.flatten())
+            obs_list.append(observation.flatten())
         return np.array(obs_list), np.array(act_list)

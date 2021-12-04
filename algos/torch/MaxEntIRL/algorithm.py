@@ -148,9 +148,8 @@ class MaxEntIRL:
             for a in range(self.agent.policy.act_size):
                 E = D[t - 1] * self.agent.policy.policy_table[t - 1, :, a]
                 D[t, :] += E @ self.agent.transition_mat[:, :, a].T
-        Dcum = np.sum(np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32) * D,
-                      axis=0)
-        return th.from_numpy(Dcum).to(self.device)
+        Dc = np.sum(np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32) * D, axis=0)
+        return th.from_numpy(Dc).to(self.device)
 
     def get_whole_states_from_env(self):
         """
@@ -165,9 +164,9 @@ class MaxEntIRL:
         self.reward_net.train()
         for rew_steps in range(max_gradient_steps):
             expected_expert_rewards, _ = self.mean_transition_reward(self.expert_trajectories)
-            Ds = self.state_visitation()
+            Dc = self.state_visitation()
             whole_reward_values = self.reward_net(self.whole_state)
-            loss = th.dot(Ds, whole_reward_values.flatten()) - expected_expert_rewards
+            loss = th.dot(Dc, whole_reward_values.flatten()) - expected_expert_rewards
             self.reward_net.optimizer.zero_grad()
             loss.backward()
             self.reward_net.optimizer.step()

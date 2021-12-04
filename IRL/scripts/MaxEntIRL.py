@@ -92,8 +92,8 @@ if __name__ == "__main__":
         n_episodes=expt_traj_num,
         max_agent_iter=1,
         min_agent_iter=1,
-        max_gradient_steps=10,
-        min_gradient_steps=10,
+        max_gradient_steps=1,
+        min_gradient_steps=1,
         callback=save_net_callback.net_save,
         early_stop=True,
     )
