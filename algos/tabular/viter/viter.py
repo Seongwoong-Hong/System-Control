@@ -82,11 +82,11 @@ class Viter:
             error = np.max(np.abs(old_value - self.policy.v_table))
             if self.num_timesteps % 10 == 0:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
-                logger.record("Value Error", error)
+                logger.record("Value Error", error, exclude="tensorboard")
                 logger.dump(self.num_timesteps)
             if error < 1e-10 and self.num_timesteps >= min_timesteps:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
-                logger.record("Value Error", error)
+                logger.record("Value Error", error, exclude="tensorboard")
                 self.policy.policy_table = np.round(self.policy.policy_table, 8)
                 break
             self.num_timesteps += 1
@@ -146,22 +146,46 @@ class FiniteSoftQiter(Viter):
         self.num_timesteps = 0
         self.observation_space = self.env.observation_space
         self.action_space = self.env.action_space
-        self.T = 200  # self.env.max_time
+        assert hasattr(self.env.get_attr("spec")[0], "max_episode_steps"), "Didn't specify the maximum timestep"
+        self.max_t = self.env.get_attr("spec")[0].max_episode_steps
         assert isinstance(self.observation_space, gym.spaces.MultiDiscrete) \
                and isinstance(self.action_space, gym.spaces.MultiDiscrete)
         self.policy = FiniteTabularSoftPolicy(
             observation_space=self.observation_space,
             action_space=self.action_space,
             device=self.device,
-            max_t=self.T
+            max_t=self.max_t
         )
 
     def train(self):
-        self.policy.q_table[self.T - 1, :, :] = self.reward_mat
-        self.policy.v_table[self.T - 1, :] = self.alpha * self.logsumexp(
-            self.policy.q_table[self.T - 1, :, :] / self.alpha, axis=1)
-        for t in reversed(range(self.T - 1)):
+        self.policy.q_table[self.max_t - 1, :, :] = self.reward_mat
+        self.policy.v_table[self.max_t - 1, :] = self.alpha * self.logsumexp(
+            self.policy.q_table[self.max_t - 1, :, :] / self.alpha, axis=1)
+        for t in reversed(range(self.max_t - 1)):
             self.policy.q_table[t, :, :] = self.reward_mat + self.gamma * np.sum(
                 self.transition_mat * self.policy.v_table[t + 1, :][:, None, None], axis=0)
             self.policy.v_table[t, :] = self.alpha * self.logsumexp(self.policy.q_table[t, :, :] / self.alpha, axis=1)
         self.policy.policy_table = np.exp((self.policy.q_table - self.policy.v_table[:, :, None]) / self.alpha)
+
+    def predict(
+            self,
+            observation: np.ndarray,
+            state: Optional[np.ndarray] = None,
+            mask: Optional[np.ndarray] = None,
+            deterministic: bool = False
+    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        if not deterministic:
+            choose_method = self.policy.choice_act
+        else:
+            choose_method = self.policy.arg_max
+        obs_list, act_list = [], []
+        self.env.reset()
+        self.env.env_method("set_state", observation[0])
+        for t in range(self.max_t):
+            obs_list.append(observation.flatten())
+            obs_idx = self.policy.obs_to_idx(observation)
+            act_idx = choose_method(self.policy.policy_table[t, obs_idx, :])
+            act = self.policy.idx_to_act(act_idx)
+            act_list.append(act.flatten())
+            observation, _, _, _ = self.env.step(act)
+        return np.array(obs_list), np.array(act_list)

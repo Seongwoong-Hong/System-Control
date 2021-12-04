@@ -142,13 +142,14 @@ class MaxEntIRL:
         return th.sum(trans_rewards) / len(trajectories), None
 
     def state_visitation(self) -> th.Tensor:
-        D = np.zeros([self.agent.T, self.agent.policy.obs_size], dtype=np.float32)
+        D = np.zeros([self.agent.max_t, self.agent.policy.obs_size], dtype=np.float32)
         D[0, :] = np.ones([self.agent.policy.obs_size]) / self.agent.policy.obs_size
-        for t in range(1, self.agent.T):
+        for t in range(1, self.agent.max_t):
             for a in range(self.agent.policy.act_size):
                 E = D[t - 1] * self.agent.policy.policy_table[t - 1, :, a]
                 D[t, :] += E @ self.agent.transition_mat[:, :, a].T
-        Dcum = np.sum(np.array([[self.agent.gamma ** i] for i in range(self.agent.T)], dtype=np.float32) * D, axis=0)
+        Dcum = np.sum(np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32) * D,
+                      axis=0)
         return th.from_numpy(Dcum).to(self.device)
 
     def get_whole_states_from_env(self):
@@ -162,28 +163,21 @@ class MaxEntIRL:
 
     def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
         self.reward_net.train()
-        reward_diffs = []
         for rew_steps in range(max_gradient_steps):
             expected_expert_rewards, _ = self.mean_transition_reward(self.expert_trajectories)
             Ds = self.state_visitation()
             whole_reward_values = self.reward_net(self.whole_state)
             loss = th.dot(Ds, whole_reward_values.flatten()) - expected_expert_rewards
-            weight_norm = 0.0
-            for param in self.reward_net.parameters():
-                weight_norm += param.norm().detach().item()
             self.reward_net.optimizer.zero_grad()
             loss.backward()
-            reward_diffs.append(loss.item())
-            logger.record("weight norm", weight_norm)
-            logger.record("loss", loss.item())
-            logger.record("steps", rew_steps, exclude="tensorboard")
-            logger.dump(rew_steps)
-            if np.mean(reward_diffs[-min_gradient_steps:]) <= -0.1 and \
-                    reward_diffs[-1] < 0.0 and \
-                    rew_steps >= min_gradient_steps and self.early_stop:
-                self.reward_net.optimizer.zero_grad()
-                return
             self.reward_net.optimizer.step()
+            weight_norm, grad_norm = 0.0, 0.0
+            for param in self.reward_net.parameters():
+                weight_norm += param.norm().detach().item()
+                grad_norm += param.grad.norm().item()
+            logger.record("weight norm", weight_norm)
+            logger.record("grad norm", grad_norm)
+            logger.record("loss", loss.item())
 
     def learn(
             self,
@@ -204,11 +198,11 @@ class MaxEntIRL:
         self._reset_agent(**self.env_kwargs)
         for itr in range(total_iter):
             self.reward_net.reset_optim()
-            with logger.accumulate_means(f"{itr}/reward"):
+            with logger.accumulate_means(f"reward"):
                 self.train_reward_fn(max_gradient_steps, min_gradient_steps)
-            with logger.accumulate_means(f"{itr}/agent"):
+                logger.dump(itr)
+            with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)
-                reward_diffs = []
                 for agent_steps in range(1, max_agent_iter + 1):
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
@@ -219,12 +213,7 @@ class MaxEntIRL:
                     reward_diff = th.dot(Ds, whole_reward_values.flatten()) - expected_expert_rewards
                     logger.record("loss_diff", reward_diff.item())
                     logger.record("agent_steps", agent_steps, exclude="tensorboard")
-                    logger.dump(agent_steps)
-                    reward_diffs.append(reward_diff.item())
-                    if np.mean(reward_diffs[-min_agent_iter:]) >= 0 and \
-                            reward_diffs[-1] >= 0.0 and \
-                            agent_steps >= min_agent_iter and early_stop:
-                        break
+                    logger.dump(itr)
             if callback:
                 callback(self, itr)
 

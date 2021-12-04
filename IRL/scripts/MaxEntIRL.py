@@ -82,18 +82,18 @@ if __name__ == "__main__":
         rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper, 'num_envs': 1},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.5},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.5, 'lr': 0.01},
     )
 
     # Run Learning
     learner.learn(
-        total_iter=50,
+        total_iter=1000,
         agent_learning_steps=5e3,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
         min_agent_iter=1,
-        max_gradient_steps=2000,
-        min_gradient_steps=100,
+        max_gradient_steps=10,
+        min_gradient_steps=10,
         callback=save_net_callback.net_save,
         early_stop=True,
     )

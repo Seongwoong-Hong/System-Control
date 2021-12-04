@@ -97,13 +97,13 @@ def expt_cost():
 
 
 def compare_obs():
-    env_type = "1DTarget"
+    env_type = "2DTarget"
     env_id = f"{env_type}_disc"
-    map_size = 100
-    subj = f"viter_disc_{map_size}"
-    name = f"ext_{subj}_linear"
+    map_size = 10
+    subj = f"softqiter_disc_{map_size}"
+    name = f"ext_{subj}_linear_finite2"
     print(name)
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "APIRL", name))
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     assert os.path.isdir(proj_path)
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
     # pltqs, init_states = [], []
@@ -123,16 +123,16 @@ def compare_obs():
         stats_path = None
         if os.path.isfile(os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")):
             stats_path = os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")
-        env = make_env(f"{env_id}-v0", num_envs=1, use_vec_env=True, wrapper=None, subpath=subpath, use_norm=stats_path,
-                       map_size=map_size)
+        env = make_env(f"{env_id}-v0", num_envs=1, use_vec_env=True,
+                       wrapper=None, subpath=subpath, use_norm=stats_path, map_size=map_size)
         # env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, pltqs=pltqs, init_states=init_states)
         _, agent_obs, _ = verify_policy(env, agent, deterministic=True, render="None", repeat_num=lnum)
         if stats_path is not None:
             agent_obs = env.unnormalize_obs(agent_obs)
         errors, maximums = [], []
         for k in range(lnum):
-            errors += [abs(expert_trajs[k].obs[:, :2] - agent_obs[k][:, :2]).mean(axis=0)]
-            maximums += [abs(expert_trajs[k].obs[:, :2] - agent_obs[k][:, :2]).max()]
+            errors += [abs(expert_trajs[k].obs[:-1, :2] - agent_obs[k][:, :2]).mean(axis=0)]
+            maximums += [abs(expert_trajs[k].obs[:-1, :2] - agent_obs[k][:, :2]).max()]
         error_list.append(np.array(errors).sum(axis=0) / len(errors))
         max_list.append(sum(maximums) / len(maximums))
         print(f"{i:03d} Error: {error_list[-1]}, {error_list[-1].mean()}, Max: {max_list[-1]}")

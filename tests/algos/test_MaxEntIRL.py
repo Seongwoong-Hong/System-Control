@@ -58,7 +58,7 @@ def learner(env, expert, eval_env):
         # return x
         # return th.cat([x, x ** 2], dim=1)
 
-    agent = def_policy("finitesoftqiter", env, device='cuda:2', verbose=1)
+    agent = def_policy("finitesoftqiter", env, device='cpu', verbose=1)
 
     return MaxEntIRL(
         env,
@@ -70,7 +70,7 @@ def learner(env, expert, eval_env):
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.5},
     )
 
 
@@ -97,8 +97,8 @@ def test_validity(learner, expert):
         n_episodes=len(expert),
         max_agent_iter=1,
         min_agent_iter=1,
-        max_gradient_steps=600,
-        min_gradient_steps=100,
+        max_gradient_steps=1,
+        min_gradient_steps=1,
         early_stop=True,
     )
 
@@ -131,10 +131,10 @@ def test_GCL(env, expert, eval_env):
         total_iter=50,
         agent_learning_steps=1e3,
         n_episodes=len(expert),
-        max_agent_iter=12,
-        min_agent_iter=2,
-        max_gradient_steps=1000,
-        min_gradient_steps=200,
+        max_agent_iter=1,
+        min_agent_iter=1,
+        max_gradient_steps=1,
+        min_gradient_steps=1,
         early_stop=True,
     )
 

@@ -35,7 +35,7 @@ def BackwardPass(x, u):
         idx = n - 1 - k
         Ak, Bk = cal_dynamics(x[idx], u[idx][0])
         Kk = np.linalg.inv(Bk.T @ Sk @ Bk + R) @ Bk.T @ Sk @ Ak
-        Kvk = np.linalg.inv(Bk.T @ Sk @ Bk +R) @ Bk.T
+        Kvk = np.linalg.inv(Bk.T @ Sk @ Bk + R) @ Bk.T
         Kuk = np.linalg.inv(Bk.T @ Sk @ Bk + R) * R
         K[idx] = Kk
         Kv[idx]= Kvk

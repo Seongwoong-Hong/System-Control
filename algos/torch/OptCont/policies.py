@@ -30,7 +30,7 @@ class LQRPolicy(BasePolicy):
         if self.R.shape[0] >= 2:
             K = (np.linalg.inv(self.R) @ (self.B.T @ X))
         else:
-            K = (1/self.R * (self.B.T @ X)).reshape(-1)
+            K = (1 / self.R * (self.B.T @ X)).reshape(-1)
         return th.from_numpy(K)
 
     def _build_env(self) -> np.array:
