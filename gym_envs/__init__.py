@@ -17,6 +17,12 @@ register(
 )
 
 register(
+    id='DiscretePendulum-v0',
+    entry_point='gym_envs.envs:DiscretizedPendulum',
+    max_episode_steps=200,
+)
+
+register(
     id="2DWorld-v0",
     entry_point='gym_envs.envs:TwoDWorldDetOrder',
     max_episode_steps=100,
@@ -86,6 +92,18 @@ register(
     id='1DTarget_disc-v0',
     entry_point='gym_envs.envs:OneDTargetDiscDet',
     max_episode_steps=200,
+)
+
+register(
+    id='2DTarget_cont-v0',
+    entry_point='gym_envs.envs:TwoDTargetCont',
+    max_episode_steps=200,
+)
+
+register(
+    id='2DTarget_cont-v1',
+    entry_point='gym_envs.envs:TwoDTargetCont',
+    max_episode_steps=100,
 )
 
 # environments based on mujoco

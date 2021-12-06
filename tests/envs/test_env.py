@@ -1,4 +1,6 @@
 import time
+
+import gym
 import pytest
 import numpy as np
 
