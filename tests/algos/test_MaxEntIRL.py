@@ -11,8 +11,8 @@ from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
 
-map_size = 10
-env_name = "2DTarget"
+map_size = 20
+env_name = "1DTarget"
 
 
 @pytest.fixture
@@ -50,9 +50,9 @@ def learner(env, expert, eval_env):
     def feature_fn(x):
         if len(x.shape) == 1:
             x = x.reshape(1, -1)
-        ft = th.zeros([x.shape[0], 100], dtype=th.float32)
+        ft = th.zeros([x.shape[0], map_size], dtype=th.float32)
         for i, row in enumerate(x):
-            idx = int((row[0] + row[1] * map_size).item())
+            idx = int(row.item())
             ft[i, idx] = 1
         return ft
         # return x
@@ -70,7 +70,7 @@ def learner(env, expert, eval_env):
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.5, 'lr': 0.1},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.1, 'lr': 1e-3},
     )
 
 
@@ -92,7 +92,7 @@ def test_callback(learner):
 
 def test_validity(learner, expert):
     learner.learn(
-        total_iter=1,
+        total_iter=2,
         agent_learning_steps=5000,
         n_episodes=len(expert),
         max_agent_iter=1,

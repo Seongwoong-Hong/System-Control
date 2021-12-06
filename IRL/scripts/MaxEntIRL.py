@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/1hot_{expt}_linear_finite2"
+    log_dir += f"/ext_{expt}_linear_finite"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -49,16 +49,16 @@ if __name__ == "__main__":
 
 
     def feature_fn(x):
-        if len(x.shape) == 1:
-            x = x.reshape(1, -1)
-        ft = th.zeros([x.shape[0], 100], dtype=th.float32)
-        for i, row in enumerate(x):
-            idx = int((row[0] + row[1] * map_size).item())
-            ft[i, idx] = 1
-        return ft
+        # if len(x.shape) == 1:
+        #     x = x.reshape(1, -1)
+        # ft = th.zeros([x.shape[0], map_size], dtype=th.float32)
+        # for i, row in enumerate(x):
+        #     idx = int(row.item())
+        #     ft[i, idx] = 1
+        # return ft
         # return x
         # return x ** 2
-        # return th.cat([x, x ** 2], dim=1)
+        return th.cat((x / 10, (x / 10) ** 2), dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper, 'num_envs': 1},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.5, 'lr': 0.01},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-3},
     )
 
     # Run Learning
@@ -95,6 +95,7 @@ if __name__ == "__main__":
         max_gradient_steps=1,
         min_gradient_steps=1,
         callback=save_net_callback.net_save,
+        callback_period=10,
         early_stop=True,
     )
 

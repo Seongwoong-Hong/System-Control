@@ -48,6 +48,7 @@ class MaxEntIRL:
         self.expert_transitions = flatten_trajectories(expert_trajectories)
         self.agent_trajectories = []
         self.expand_ratio = 20
+        self.itr = 0
 
         if self.env_kwargs is None:
             self.env_kwargs = {}
@@ -188,18 +189,25 @@ class MaxEntIRL:
             min_agent_iter: int = 3,
             agent_callback=None,
             callback=None,
+            callback_period=1,
             early_stop=True,
             n_episodes: int = 10,
+            reset_num_timesteps: bool = True,
             **kwargs
     ):
+        if reset_num_timesteps:
+            self.itr = 0
+        else:
+            total_iter += self.itr
         self.early_stop = early_stop
         self.get_whole_states_from_env()
         self._reset_agent(**self.env_kwargs)
-        for itr in range(total_iter):
+        call_num = 0
+        while self.itr < total_iter:
             self.reward_net.reset_optim()
             with logger.accumulate_means(f"reward"):
                 self.train_reward_fn(max_gradient_steps, min_gradient_steps)
-                logger.dump(itr)
+                logger.dump(self.itr)
             with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)
                 for agent_steps in range(1, max_agent_iter + 1):
@@ -212,9 +220,11 @@ class MaxEntIRL:
                     reward_diff = th.dot(Ds, whole_reward_values.flatten()) - expected_expert_rewards
                     logger.record("loss_diff", reward_diff.item())
                     logger.record("agent_steps", agent_steps, exclude="tensorboard")
-                    logger.dump(itr)
-            if callback:
-                callback(self, itr)
+                    logger.dump(self.itr)
+            self.itr += 1
+            if callback and self.itr % callback_period == 0:
+                callback(self, call_num)
+                call_num += 1
 
 
 class GuidedCostLearning(MaxEntIRL):

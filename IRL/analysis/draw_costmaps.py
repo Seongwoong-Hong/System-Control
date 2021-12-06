@@ -17,9 +17,9 @@ from common.verification import CostMap, verify_policy
 from common.wrappers import ActionWrapper
 
 
-def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5*i for i in range(7)]):
-    t = np.linspace(0, 1/120 * (len(inp1[0])-1), len(inp1[0]))
-    t = range(51)
+def draw_time_trajs(inp1, inp2, name=r"$\theta$s", labels=[4 + 5 * i for i in range(7)]):
+    t = np.linspace(0, 1 / 120 * (len(inp1[0]) - 1), len(inp1[0]))
+    t = range(200)
     ymax, ymin = 10, 0
     # ymax, ymin = np.max(np.array(inp2)[:, :, :2]), np.min(np.array(inp2)[:, :, :2])
     plt.figure(figsize=[9, 6.4], dpi=600.0)
@@ -50,20 +50,20 @@ def draw_trajectories():
     env_type = "1DTarget"
     algo_type = "MaxEntIRL"
     env_id = f"{env_type}_disc"
-    subj = "viter_disc"
+    subj = "softqiter_disc_20"
     wrapper = ActionWrapper if "HPC" in env_type else None
     # pltqs, init_states = [], []
     # for i in range(5, 10):
     #     pltqs += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['pltq']]
     #     init_states += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['state'][0, :4]]
-    env = make_env(f"{env_id}-v0", wrapper=wrapper, use_vec_env=False, subpath=f"../demos/HPC/sub01/sub01")
+    env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, subpath=f"../demos/HPC/sub01/sub01")
     # env = make_env(f"{env_type}-v0", wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-    name = f"{env_id}/{algo_type}/ext_{subj}_qlearning_linear_svm_reset"
-    model_dir = os.path.join("..", "tmp", "log", name, "model", "047")
+    name = f"{env_id}/{algo_type}/1hot_{subj}_linear_finite"
+    model_dir = os.path.join("..", "tmp", "log", name, "model", "049")
     with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     lnum = len(expert_trajs)
-    expt_obs = [expert_trajs[i].obs for i in range(lnum)]
+    expt_obs = [expert_trajs[i].obs[:-1, :] for i in range(lnum)]
     expt_acts = [expert_trajs[i].acts for i in range(lnum)]
     # algo = SAC.load("../../RL/2DWorld/tmp/log/2DWorld/sac/policies_4/agent.pkl")
     # algo = bc.reconstruct_policy("../../tests/algos/policy")
@@ -89,15 +89,16 @@ def draw_costfigure():
         # next_obs = obs + act - 1
         return -((obs[0] - 2) ** 2 + (obs[1] - 2) ** 2)
         # return - (obs[0] - 15) ** 2
+
     env_type = "2DTarget"
     env_id = f"{env_type}_disc"
-    map_size = 4
-    subj = f"viter_disc_{map_size}"
+    map_size = 10
+    subj = f"softqiter_disc_{map_size}"
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
-    env = make_env(f"{env_id}-v0", use_vec_env=False, subpath=subpath + f"/{subj}", map_size=map_size)
+    env = make_env(f"{env_id}-v0", subpath=subpath + f"/{subj}", map_size=map_size)
     algo_type = "MaxEntIRL"
-    name = f"ext_{subj}_linear"
-    num = 23
+    name = f"ext_{subj}_linear_finite"
+    num = 79
     load_dir = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model")
     with open(load_dir + f"/{num:03d}/agent.pkl", "rb") as f:
         algo = pickle.load(f)
@@ -108,19 +109,19 @@ def draw_costfigure():
         reward_fn = pickle.load(f)
 
     ndim = env.observation_space.shape[0]
-    ndim = 2
+    # ndim = 1
     d1, d2 = np.meshgrid(np.linspace(0, map_size-1, map_size), np.linspace(0, map_size-1, map_size))
     # d1, d2 = np.linspace(0, map_size-1, map_size).reshape(1, -1), np.full((1, map_size), 0)
-    pact = np.zeros((100, 100), dtype=np.float64)
+    pact = np.zeros((100, 100), dtype=np.float32)
     cost1, cost2 = np.zeros(d1.shape), np.zeros(d1.shape)
     for i in range(d1.shape[0]):
         for j in range(d1.shape[1]):
             iobs = np.zeros(ndim, dtype=int)
-            iobs[0], iobs[1] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
-            iacts, _ = algo.predict(np.array([iobs[0], iobs[1]]), deterministic=True)
+            # iobs[0], iobs[1] = deepcopy(d1[i][j]), deepcopy(d2[i][j])
+            # iacts, _ = algo.predict(np.array([iobs[0], iobs[1]]), deterministic=True)
             # pact[i][j] = iacts[0]
             # inp = th.from_numpy(np.append(iobs[0] + map_size * iobs[1], iacts)).float().to(algo.device).reshape(1, -1)
-            inp = th.from_numpy(np.array([iobs[0], iobs[1]])).float().to(algo.device).reshape(1, -1)
+            inp = th.from_numpy(np.array([i, j])).float().to(algo.device).reshape(1, -1)
             cost1[i][j] = -expt_reward(inp)
             cost2[i][j] = -reward_fn(inp).item()
     cost1 = (cost1 - np.min(cost1)) / (np.max(cost1) - np.min(cost1))
@@ -137,13 +138,13 @@ def draw_costfigure():
         # d1, d2 = np.meshgrid(d1, d2)
         surf = ax.plot_surface(d1, d2, yval_list[i], rstride=1, cstride=1, cmap=cm.rainbow,
                                vmax=max_list[i], vmin=min_list[i])
-        # ax.scatter(d1, yval_list[i], vmax=max_list[i], vmin=min_list[i])
+        ax.scatter(d1, yval_list[i], vmax=max_list[i], vmin=min_list[i])
         # clb = fig.colorbar(surf, ax=ax)
         ax.set_xlabel(xlabel, labelpad=15.0, fontsize=28)
         ax.set_ylabel(ylabel, labelpad=15.0, fontsize=28)
         ax.set_title(title_list[i], fontsize=32)
         ax.tick_params(axis='both', which='major', labelsize=20)
-        # ax.view_init(elev=90, azim=0)
+        ax.view_init(elev=90, azim=0)
         # clb.ax.set_title(title_list[i], fontsize=24)
     # plt.savefig("check.png")
     plt.show()
@@ -155,8 +156,8 @@ def draw_costmaps():
     device = "cpu"
     name = "IDP_custom"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    env = make_env(f"{name}-v0", use_vec_env=False, n_steps=600, subpath="sub01")
-    expt_env = make_env(f"{name}-v2", use_vec_env=False, n_steps=600, subpath="sub01")
+    env = make_env(f"{name}-v0", n_steps=600, subpath="sub01")
+    expt_env = make_env(f"{name}-v2", n_steps=600, subpath="sub01")
     ana_dir = os.path.join(proj_path, "tmp", "log", env_type, algo_type, name + "_lqr")
     model_dir = os.path.join(ana_dir, "model")
     with open(model_dir + "/reward_net.pkl", "rb") as f:
@@ -165,6 +166,7 @@ def draw_costmaps():
     def cost_fn(*args):
         inp = th.cat([args[0], args[1]], dim=1)
         return -reward_net(inp).item()
+
     agent = SAC.load(model_dir + "/agent.pkl")
     # expt = def_policy(env_type, expt_env)
     expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
@@ -174,7 +176,14 @@ def draw_costmaps():
 
 if __name__ == "__main__":
     def feature_fn(x):
+        # if len(x.shape) == 1:
+        #     x = x.reshape(1, -1)
+        # ft = th.zeros([x.shape[0], 20], dtype=th.float32)
+        # for i, row in enumerate(x):
+        #     idx = int(row.item())
+        #     ft[i, idx] = 1
+        # return ft
         # return x
-        return th.cat([x, x**2], dim=1)
+        return th.cat([x / 10, (x / 10) ** 2], dim=1)
     draw_costfigure()
     # draw_trajectories()
