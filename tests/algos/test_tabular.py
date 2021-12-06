@@ -1,5 +1,6 @@
 import pytest
 import torch as th
+import numpy as np
 import pickle
 from common.util import make_env
 from common.wrappers import RewardWrapper
@@ -20,7 +21,7 @@ def test_qlearning():
 
 
 def test_soft_q_learning():
-    env = make_env("2DTarget_disc-v2", map_size=7, use_vec_env=True, num_envs=10)
+    env = make_env("2DTarget_disc-v2", map_size=7, num_envs=10)
     logger.configure(".", format_strs=['stdout'])
     algo = SoftQLearning(env, gamma=0.8, epsilon=0.4, alpha=0.2, device='cpu')
     import time
@@ -32,7 +33,7 @@ def test_soft_q_learning():
 
 
 def test_viter():
-    env = make_env("2DTarget_disc-v2", map_size=10, use_vec_env=True, num_envs=1)
+    env = make_env("2DTarget_disc-v2", map_size=10, num_envs=1)
     logger.configure(".", format_strs=['stdout'])
     algo = Viter(env, gamma=0.8, epsilon=0.2, device='cpu')
     algo.learn(2000)
@@ -41,7 +42,7 @@ def test_viter():
 
 
 def test_softiter():
-    env = make_env("2DTarget_disc-v2", map_size=10, use_vec_env=True, num_envs=1)
+    env = make_env("2DTarget_disc-v2", map_size=10, num_envs=1)
     logger.configure(".", format_strs=['stdout'])
     algo = SoftQiter(env, gamma=0.8, epsilon=0.2, alpha=0.01, device='cpu')
     algo.learn(2000)
@@ -49,6 +50,16 @@ def test_softiter():
     algo2.learn(2000)
 
     print('env')
+
+
+def test_finite_iter():
+    env = make_env("2DTarget_disc-v2", map_size=10, num_envs=1)
+    logger.configure(".", format_strs=['stdout'])
+    algo = FiniteSoftQiter(env, gamma=0.8, alpha=0.01, device='cpu')
+    algo.learn(2000)
+    algo2 = FiniteViter(env, gamma=0.8, device='cpu')
+    algo2.learn(2000)
+    print(np.abs(algo.policy.policy_table - algo2.policy.policy_table).max())
 
 
 def test_wrapped_reward():

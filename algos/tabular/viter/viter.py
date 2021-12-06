@@ -98,6 +98,7 @@ class Viter:
             mask: Optional[np.ndarray] = None,
             deterministic: bool = False
     ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+
         return self.policy.predict(observation, state, mask, deterministic)
 
     def logsumexp(self, x, axis=0):
@@ -141,7 +142,7 @@ class SoftQiter(Viter):
         self.policy.policy_table = np.exp((self.policy.q_table - self.policy.v_table[:, None]) / self.alpha)
 
 
-class FiniteSoftQiter(Viter):
+class FiniteViter(Viter):
     def _setup_model(self):
         self.num_timesteps = 0
         self.observation_space = self.env.observation_space
@@ -150,7 +151,7 @@ class FiniteSoftQiter(Viter):
         self.max_t = self.env.get_attr("spec")[0].max_episode_steps
         assert isinstance(self.observation_space, gym.spaces.MultiDiscrete) \
                and isinstance(self.action_space, gym.spaces.MultiDiscrete)
-        self.policy = FiniteTabularSoftPolicy(
+        self.policy = FiniteTabularPolicy(
             observation_space=self.observation_space,
             action_space=self.action_space,
             device=self.device,
@@ -159,13 +160,19 @@ class FiniteSoftQiter(Viter):
 
     def train(self):
         self.policy.q_table[self.max_t - 1, :, :] = self.reward_mat
-        self.policy.v_table[self.max_t - 1, :] = self.alpha * self.logsumexp(
-            self.policy.q_table[self.max_t - 1, :, :] / self.alpha, axis=1)
+        self.policy.v_table[self.max_t - 1, :] = np.max(self.policy.q_table[self.max_t - 1, :, :], axis=1)
+        policy_t = np.zeros([self.policy.obs_size, self.policy.act_size])
+        policy_t[range(self.policy.obs_size), self.policy.arg_max(
+            self.policy.q_table[self.max_t - 1, :, :]).flatten()] = 1
+        self.policy.policy_table[self.max_t - 1] = policy_t
         for t in reversed(range(self.max_t - 1)):
             self.policy.q_table[t, :, :] = self.reward_mat + self.gamma * np.sum(
                 self.transition_mat * self.policy.v_table[t + 1, :][:, None, None], axis=0)
-            self.policy.v_table[t, :] = self.alpha * self.logsumexp(self.policy.q_table[t, :, :] / self.alpha, axis=1)
-        self.policy.policy_table = np.exp((self.policy.q_table - self.policy.v_table[:, :, None]) / self.alpha)
+            self.policy.v_table[t, :] = np.max(self.policy.q_table[t, :, :], axis=1)
+            policy_t = np.zeros([self.policy.obs_size, self.policy.act_size])
+            policy_t[range(self.policy.obs_size), self.policy.arg_max(
+                self.policy.q_table[self.max_t - 1, :, :]).flatten()] = 1
+            self.policy.policy_table[t] = policy_t
 
     def predict(
             self,
@@ -181,12 +188,23 @@ class FiniteSoftQiter(Viter):
         obs_list, act_list = [], []
         self.env.reset()
         self.env.env_method("set_state", observation[0])
-        obs_list.append(observation.flatten())
         for t in range(self.max_t):
+            obs_list.append(observation.flatten())
             obs_idx = self.policy.obs_to_idx(observation)
             act_idx = choose_method(self.policy.policy_table[t, obs_idx, :])
             act = self.policy.idx_to_act(act_idx)
             observation, _, _, _ = self.env.step(act)
             act_list.append(act.flatten())
-            obs_list.append(observation.flatten())
         return np.array(obs_list), np.array(act_list)
+
+
+class FiniteSoftQiter(FiniteViter):
+    def train(self):
+        self.policy.q_table[self.max_t - 1, :, :] = self.reward_mat
+        self.policy.v_table[self.max_t - 1, :] = self.alpha * self.logsumexp(
+            self.policy.q_table[self.max_t - 1, :, :] / self.alpha, axis=1)
+        for t in reversed(range(self.max_t - 1)):
+            self.policy.q_table[t, :, :] = self.reward_mat + self.gamma * np.sum(
+                self.transition_mat * self.policy.v_table[t + 1, :][:, None, None], axis=0)
+            self.policy.v_table[t, :] = self.alpha * self.logsumexp(self.policy.q_table[t, :, :] / self.alpha, axis=1)
+        self.policy.policy_table = np.exp((self.policy.q_table - self.policy.v_table[:, :, None]) / self.alpha)

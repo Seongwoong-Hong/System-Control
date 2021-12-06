@@ -18,6 +18,7 @@ from algos.torch.MaxEntIRL import *
 from algos.tabular.qlearning import *
 from algos.tabular.viter import *
 from common.util import make_env
+from common.verification import verify_policy
 from common.wrappers import RewardWrapper
 from common.rollouts import generate_trajectories_without_shuffle
 
@@ -51,7 +52,7 @@ def try_train(config, demo_dir):
         def feature_fn(x):
             if len(x.shape) == 1:
                 x = x.reshape(1, -1)
-            ft = th.zeros([x.shape[0], 100], dtype=th.float32)
+            ft = th.zeros([x.shape[0], config['map_size'] ** 2], dtype=th.float32)
             for i, row in enumerate(x):
                 idx = int((row[0] + row[1] * config['map_size']).item())
                 ft[i, idx] = 1
@@ -79,13 +80,12 @@ def try_train(config, demo_dir):
         rew_arch=rew_arch,
         device='cpu',
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': config['norm_coeff'], 'lr': config['lr']},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': config['norm_coeff'], 'lr': config['lr']},
     )
     trial_dir = tune.get_trial_dir()
     eval_env = DummyVecEnv([lambda: eval_env])
+    expt_obs = rollout.flatten_trajectories(expert_trajs).obs
     for epoch in range(1000):
-        import time
-        t1 = time.time()
         os.makedirs(trial_dir + f"/model/{epoch:03d}", exist_ok=False)
 
         """ Learning """
@@ -102,24 +102,17 @@ def try_train(config, demo_dir):
         """ Testing """
         # trajectories = generate_trajectories_without_shuffle(
         #     algo.agent, eval_env, sample_until, deterministic_policy=False)
-        trajectories = []
-        t2 = time.time()
-        mean_obs_differ = 0.0
-        for expt_traj in expert_trajs:
-            init_ob = expt_traj.obs[0, :][None, :]
-            agent_obs, _ = algo.agent.predict(init_ob)
-            mean_obs_differ += np.abs(expt_traj.obs - agent_obs).mean()
+        obs, act, _ = verify_policy(eval_env, agent, deterministic=False, render="None", repeat_num=len(expert_trajs))
+        mean_obs_differ = np.abs(obs.reshape(-1, obs.shape[-1]) - expt_obs).sum()
         mean_obs_differ /= len(expert_trajs)
         # expt_obs = rollout.flatten_trajectories(expert_trajs).obs
         # agent_obs = rollout.flatten_trajectories(trajectories).obs
         # mean_obs_differ = np.abs((expt_obs - agent_obs)).mean()
-        if epoch % 20 == 0:
-            algo.agent.save(trial_dir + f"/model/{epoch:03d}/agent")
-            algo.reward_net.save(trial_dir + f"/model/{epoch:03d}/reward_net")
+        algo.agent.save(trial_dir + f"/model/{epoch:03d}/agent")
+        algo.reward_net.save(trial_dir + f"/model/{epoch:03d}/reward_net")
 
         algo.agent.set_env(env)
         algo.reward_net.feature_fn = feature_fn
-        t3 = time.time()
         tune.report(mean_obs_differ=mean_obs_differ)
 
 
@@ -129,21 +122,21 @@ def main(target):
     config = {
         'env_id': target,
         'gamma': tune.choice([0.8]),
-        'alpha': tune.uniform(0.05, 4),
+        'alpha': tune.uniform(0.05, 1),
         'use_action': tune.choice([False]),
         'expt': tune.choice(['softqiter']),
         'map_size': tune.choice([10]),
         'rew_arch': tune.choice(['linear']),
-        'feature': tune.choice(['ext', '1hot']),
-        'lr': tune.uniform(0.01, 0.1),
-        'norm_coeff': tune.choice([0.5]),
+        'feature': tune.choice(['1hot']),
+        'lr': tune.choice([1e-3]),
+        'norm_coeff': tune.uniform(0.01, 0.05),
     }
 
     scheduler = ASHAScheduler(
         metric=metric,
         mode="min",
-        max_t=100,
-        grace_period=20,
+        max_t=50,
+        grace_period=10,
         reduction_factor=2,
     )
     reporter = CLIReporter(metric_columns=[metric, "training_iteration"])
@@ -153,7 +146,7 @@ def main(target):
         name=target + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S'),
         resources_per_trial={"cpu": 1},
         config=config,
-        num_samples=500,
+        num_samples=100,
         scheduler=scheduler,
         progress_reporter=reporter,
         checkpoint_at_end=True,

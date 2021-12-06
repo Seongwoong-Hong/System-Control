@@ -11,7 +11,7 @@ from stable_baselines3.common.monitor import Monitor
 from common.wrappers import ActionWrapper
 
 
-def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, wrapper=None, **kwargs):
+def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):
     wrapper_kwargs = kwargs.pop('wrapper_kwrags', {})
     if isinstance(env_name, gym.Env):
         env = env_name
@@ -51,7 +51,7 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, wrapper=N
             env = VecNormalize.load(use_norm, env)
         else:
             env = VecNormalize(env, norm_obs=True, norm_reward=True)
-    elif use_vec_env:
+    elif num_envs:
         env = DummyVecEnv([lambda: deepcopy(env) for _ in range(num_envs)])
 
     return env

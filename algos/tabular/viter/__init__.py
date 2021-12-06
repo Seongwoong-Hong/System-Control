@@ -1,4 +1,4 @@
-from algos.tabular.viter.viter import Viter, SoftQiter, FiniteSoftQiter
+from algos.tabular.viter.viter import Viter, SoftQiter, FiniteViter, FiniteSoftQiter
 import numpy as np
 
 

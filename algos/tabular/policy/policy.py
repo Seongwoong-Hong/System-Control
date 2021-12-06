@@ -47,6 +47,8 @@ class TabularPolicy:
             mask: Optional[np.ndarray] = None,
             deterministic: bool = False
     ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        if len(observation.shape) == 1:
+            observation = observation.reshape(1, -1)
         obs_idx = self.obs_to_idx(observation)
         if not deterministic:
             act_idx = self.choice_act(self.policy_table[obs_idx])
@@ -122,10 +124,10 @@ class TabularPolicy:
         return act
 
 
-class FiniteTabularSoftPolicy(TabularPolicy):
+class FiniteTabularPolicy(TabularPolicy):
     def _setup_table(self, **kwargs):
         max_t = kwargs.pop('max_t')
-        super(FiniteTabularSoftPolicy, self)._setup_table(**kwargs)
+        super(FiniteTabularPolicy, self)._setup_table(**kwargs)
         self.policy_table = np.repeat(self.policy_table[None, :], max_t, axis=0)
         self.q_table = np.repeat(self.q_table[None, :], max_t, axis=0)
         self.v_table = np.repeat(self.v_table[None, :], max_t, axis=0)

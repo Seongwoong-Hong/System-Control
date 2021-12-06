@@ -15,9 +15,11 @@ from IRL.scripts.project_policies import def_policy
 if __name__ == "__main__":
     def feature_fn(x):
         return th.cat([x, x ** 2], dim=1)
-    map_size = 10
-    n_episodes = 1000
-    env_type = "2DTarget"
+
+
+    map_size = 20
+    n_episodes = 200
+    env_type = "1DTarget"
     name = f"{env_type}_disc"
     subpath = "HPC/sub01/sub01"
     wrapper = ActionWrapper if "HPC" in env_type else None
