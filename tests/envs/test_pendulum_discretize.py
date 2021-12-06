@@ -1,27 +1,30 @@
-import time
 from functools import partial
 
 import gym
-import numpy as np
 import pytest
+
+from algos.tabular.viter import backward_trans, forward_trans
+from gym_envs.envs import DiscretizedPendulum
+
+import numpy as np
 from scipy.special import softmax, logsumexp
 
-from algos.tabular.viter import backward_trans
-from gym_envs.envs import TwoDTargetCont
 
-
-def test_2d_target_cont():
+def test_discretized_pendulum():
     """ 기본 환경 테스트 """
-    env = gym.make('2DTarget_cont-v1')          # type: TwoDTargetCont
+    env = gym.make('DiscretePendulum-v0')          # type: DiscretizedPendulum
 
+    # step test
     s = env.reset()
-    a = env.get_optimal_action(s)
-    print(f'For target {env.target}, optimal action in {s} is {a}!')
+    env.render()
+    a = env.action_space.sample()
+    next_s, r, _, _ = env.step(a)
+    print(f'Step from {s} to {next_s} by action {a}, torque {env.get_torque(a)}')
 
     # rendering test (P control)
     s = env.reset()
     for _ in range(100):
-        a = env.get_optimal_action(s)
+        a = round(3 * (- s[0] + env.max_angle))
         s, r, d, _ = env.step(a)
         env.render()
 
@@ -29,17 +32,15 @@ def test_2d_target_cont():
             s = env.reset()
 
 
-def test_cal_trans_mat():
+def test_calc_trans_mat():
     """
     근사된 전환 행렬 P 에 대한 value iteration 수행
     계산 시간, 초기 상태에 대한 평균 에러 계산
     """
-    env = gym.make('2DTarget_cont-v1')          # type: TwoDTargetCont
+    env = gym.make('DiscretePendulum-v0')          # type: DiscretizedPendulum
 
     h = [0.05, 0.05]
-    t_start = time.time()
-    _ = env.get_trans_mat(h=h, verbose=True)
-    print(f'(h={h}) execution takes {time.time() - t_start:.2f} sec')
+    env.get_trans_mat(h=h, verbose=True)
 
 
 @pytest.mark.parametrize("soft", [True, False])
@@ -48,17 +49,17 @@ def test_value_itr(soft):
     주어진 policy 에 대해 이산화된 전환 행렬 이용, value itr 수행
     greedy, soft update 구현됨
     """
-    env = gym.make('2DTarget_cont-v1')          # type: TwoDTargetCont
+    env = gym.make('DiscretePendulum-v0')          # type: DiscretizedPendulum
     soft = soft
 
-    h = [0.05, 0.05]
-    n_x, n_y = env.get_num_cells(h)
-    P = env.get_trans_mat(h=h)
-    q_values = np.zeros([env.spec.max_episode_steps, 9, n_x * n_y])
+    h = [0.02, 0.2]
+    n_th, n_thd = env.get_num_cells(h)
+    P = env.get_trans_mat(h)
+    q_values = np.zeros([env.spec.max_episode_steps, env.num_actions, n_th * n_thd])
 
     def greedy_pi(s_array, q):
         # s_array.shape = (-1, 2), q.shape = (|A|, |S|), a_prob.shape = (|A|, -1)
-        s_ind = env.get_ind_from_state(s_array, h=h)
+        s_ind = env.get_ind_from_state(s_array, h=h, max_angle=env.max_angle, max_speed=env.max_speed)
         q_of_s = q @ s_ind.T
         a_prob = np.zeros_like(q_of_s)
         a_prob[np.argmax(q_of_s, axis=0).astype('i'), np.arange(q_of_s.shape[1])] = 1.0
@@ -66,7 +67,7 @@ def test_value_itr(soft):
 
     def soft_pi(s_array, q):
         # s_array.shape = (-1, 2), q.shape = (|A|, |S|), a_prob.shape = (|A|, -1)
-        s_ind = env.get_ind_from_state(s_array, h=h)
+        s_ind = env.get_ind_from_state(s_array, h=h, max_angle=env.max_angle, max_speed=env.max_speed)
         q_of_s = q @ s_ind.T
         a_prob = softmax(q_of_s, axis=0)
         return a_prob
@@ -100,15 +101,16 @@ def test_value_itr(soft):
         print(f'itr #{itr} Maximum Q err: {max_q_err:.2f}')
 
     # running with learned policy
+    # todo: q-value 와 rollout value 의 갭 줄이는 방법
     s_vec, _ = env.get_vectorized(h)
     for itr in range(5):
         s = env.reset()
         print(f'Try #{itr} @ initial state {s}')
         appx_v, v = 0., 0.
         for t_ind in range(env.spec.max_episode_steps):
-            s_ind = env.get_ind_from_state(s, h)
-            a_ind = np.argmax(q_values[t_ind] @ s_ind)
-            next_s, r, _, _ = env.step(np.array([a_ind % 3, a_ind // 3]))
+            s_ind = env.get_ind_from_state(s, h, env.max_angle, env.max_speed)
+            a = np.argmax(q_values[t_ind] @ s_ind)
+            next_s, r, _, _ = env.step(a)
             s = next_s
             v += r
 
