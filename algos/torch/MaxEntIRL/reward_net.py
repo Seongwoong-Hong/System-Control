@@ -41,7 +41,7 @@ class RewardNet(nn.Module):
         else:
             for i in range(len(arch) - 1):
                 layers.append(nn.Linear(arch[i], arch[i + 1]))
-        layers.append(nn.Linear(arch[-1], 1, bias=False))
+        layers.append(nn.Linear(arch[-1], 1, bias=True))
         self.layers = nn.Sequential(*layers)
         self.optimizer = self.optim_cls(self.parameters(), lr, weight_decay=norm_coeff)
 

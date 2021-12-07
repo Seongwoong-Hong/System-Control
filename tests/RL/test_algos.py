@@ -21,8 +21,7 @@ def test_mujoco_envs_learned_policy():
     env_name = "Pendulum"
     env = make_env(f"{env_name}-v0", use_vec_env=False)
     name = f"{env_name}/ppo"
-    model_dir = "/home/hsw/ray_results/IDP_2021-11-19_15-40-58/2021-11-21_05-26-21a8f72_00242_242_accum_steps=4,batch_size=64,ent_coef=0.25,gamma=0.99,gradient_steps=1,lr=0.00014096_2021-11-21_09-03-51"
-    # model_dir = os.path.join("..", "..", "RL", "mujoco_envs", "tmp", "log", name)
+    model_dir = os.path.join("..", "..", "RL", "mujoco_envs", "tmp", "log", name)
     algo = SAC.load(model_dir + "/agent")
     a_list, o_list, _ = verify_policy(env, algo, render='human', repeat_num=10)
 

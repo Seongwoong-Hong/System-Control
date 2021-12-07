@@ -1,4 +1,3 @@
-from algos.tabular.viter.viter import Viter, SoftQiter, FiniteViter, FiniteSoftQiter
 import numpy as np
 
 
@@ -34,3 +33,6 @@ def backward_trans(P, v):
     post_v = np.stack(post_v, axis=0)
 
     return post_v
+
+
+from algos.tabular.viter.viter import Viter, SoftQiter, FiniteViter, FiniteSoftQiter

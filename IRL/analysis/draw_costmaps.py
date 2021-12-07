@@ -97,7 +97,7 @@ def draw_costfigure():
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
     env = make_env(f"{env_id}-v0", subpath=subpath + f"/{subj}", map_size=map_size)
     algo_type = "MaxEntIRL"
-    name = f"ext_{subj}_linear_finite"
+    name = f"ext_{subj}_linear_finite2"
     num = 79
     load_dir = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model")
     with open(load_dir + f"/{num:03d}/agent.pkl", "rb") as f:
@@ -184,6 +184,6 @@ if __name__ == "__main__":
         #     ft[i, idx] = 1
         # return ft
         # return x
-        return th.cat([x / 10, (x / 10) ** 2], dim=1)
+        return th.cat([x, x ** 2], dim=1)
     draw_costfigure()
     # draw_trajectories()

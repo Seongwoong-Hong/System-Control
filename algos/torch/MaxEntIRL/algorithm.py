@@ -3,6 +3,8 @@ from copy import deepcopy
 from typing import List, Dict, Optional, Union, Tuple, Sequence
 
 import random
+
+import gym
 import numpy as np
 import cvxpy as cp
 import torch as th
@@ -21,7 +23,7 @@ from common.rollouts import get_trajectories_probs, generate_trajectories_withou
 class MaxEntIRL:
     def __init__(
             self,
-            env: GymEnv,
+            env,
             feature_fn,
             agent,
             expert_trajectories: List[Trajectory],
@@ -147,8 +149,8 @@ class MaxEntIRL:
         D[0, :] = np.ones([self.agent.policy.obs_size]) / self.agent.policy.obs_size
         for t in range(1, self.agent.max_t):
             for a in range(self.agent.policy.act_size):
-                E = D[t - 1] * self.agent.policy.policy_table[t - 1, :, a]
-                D[t, :] += E @ self.agent.transition_mat[:, :, a].T
+                E = D[t - 1] * self.agent.policy.policy_table[t - 1, a, :]
+                D[t, :] += self.agent.transition_mat[a] @ E
         Dc = np.sum(np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32) * D, axis=0)
         return th.from_numpy(Dc).to(self.device)
 
@@ -158,8 +160,15 @@ class MaxEntIRL:
         :return: Set whole_state attribute
         """
         obs_space = self.env.observation_space
-        x = np.meshgrid(*[range(nvec) for nvec in obs_space.nvec])
-        self.whole_state = th.FloatTensor([data.flatten() for data in x]).t().to(self.device)
+        if isinstance(obs_space, gym.spaces.MultiDiscrete):
+            x = np.meshgrid(*[range(nvec) for nvec in obs_space.nvec])
+            self.whole_state = th.FloatTensor([data.flatten() for data in x]).t().to(self.device)
+        elif isinstance(obs_space, gym.spaces.Box):
+            assert hasattr(self.env, "get_vectorized") and callable(getattr(self.env, "get_vectorized"))
+            self.whole_state, _ = self.env.get_vectorized()
+            self.whole_state = th.from_numpy(self.whole_state).float().to(self.device)
+        else:
+            raise NotImplementedError
 
     def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
         self.reward_net.train()

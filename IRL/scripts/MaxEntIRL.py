@@ -16,20 +16,20 @@ from algos.torch.MaxEntIRL import MaxEntIRL, APIRL
 from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
-    env_type = "2DTarget"
+    env_type = "DiscretizedPendulum"
     algo_type = "MaxEntIRL"
     device = "cpu"
-    name = f"{env_type}_disc"
-    map_size = 10
-    expt = f"softqiter_disc_{map_size}"
+    name = f"{env_type}"
+    env_op = 0.03
+    expt = f"softqiter_disc_{env_op}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     # pltqs, init_states = [], []
     # for i in range(5, 10):
     #     pltqs += [io.loadmat(subpath + f"i{i+1}.mat")['pltq']]
     #     init_states += [io.loadmat(subpath + f"i{i+1}.mat")['state'][0, :4]]
-    env = make_env(f"{name}-v2", subpath=subpath, map_size=map_size)
-    eval_env = make_env(f"{name}-v0", subpath=subpath, map_size=map_size)
+    env = make_env(f"{name}-v2", subpath=subpath, h=[env_op, env_op * 5])
+    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[env_op, env_op * 5])
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
@@ -58,7 +58,7 @@ if __name__ == "__main__":
         # return ft
         # return x
         # return x ** 2
-        return th.cat((x / 10, (x / 10) ** 2), dim=1)
+        return th.cat((x, x ** 2), dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
