@@ -25,7 +25,7 @@ def test_discretized_pendulum():
     # rendering test (P control)
     s = env.reset()
     for _ in range(400):
-        a = np.array([1, 1])
+        a = np.array([2, 2])
         s, r, d, _ = env.step(a)
         env.render()
 
@@ -48,15 +48,14 @@ def test_calc_trans_mat():
 
 
 # @pytest.mark.parametrize("soft", [True, False])
-def test_value_itr(soft=True):
+def test_value_itr(soft=False):
     """
     주어진 policy 에 대해 이산화된 전환 행렬 이용, value itr 수행
     greedy, soft update 구현됨
     """
     env = gym.make('DiscreteDoublePendulum-v0')          # type: DiscretizedDoublePendulum
 
-    h = [0.05, 0.03, 2.0, 2.0]
-    # h = [0.1, 0.1, 1.0, 1.0]
+    h = [0.1, 0.05, 1.0, 1.0]
     n_dim = np.prod(env.get_num_cells(h))
     P = env.get_trans_mat(h)
     q_values = np.zeros([env.spec.max_episode_steps, np.prod(env.num_actions), n_dim])
@@ -77,7 +76,7 @@ def test_value_itr(soft=True):
         return a_prob
 
     # q learning iteration
-    for itr in range(5):
+    for itr in range(2):
         old_q = np.copy(q_values)
 
         for t_ind in reversed(range(env.spec.max_episode_steps)):

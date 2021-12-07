@@ -17,7 +17,7 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def __init__(self):
         super(DiscretizedDoublePendulum, self).__init__()
-        self.max_torques = [10., 10.]
+        self.max_torques = [20., 10.]
         self.max_speeds = [8., 8.]
         self.max_angles = [np.pi / 3, np.pi / 6]
         self.dt = 0.05
@@ -148,11 +148,11 @@ class DiscretizedDoublePendulum(gym.Env):
                                      h_th1 * np.arange(n_th1) - self.max_angles[1],
                                      h_thd0 * np.arange(n_thd0) - self.max_speeds[0],
                                      h_thd1 * np.arange(n_thd1) - self.max_speeds[1],
-                                     indexing='xy'),
+                                     indexing='ij'),
                          -1).reshape(-1, 4)
         a_vec = np.stack(np.meshgrid(np.arange(self.num_actions[0]),
                                      np.arange(self.num_actions[1]),
-                                     indexing='xy'),
+                                     indexing='ij'),
                          -1).reshape(-1, 2)
 
         return s_vec, a_vec
