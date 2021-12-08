@@ -22,14 +22,21 @@ class RewardWrapper(gym.RewardWrapper):
         inp = info['obs']
         if self.use_action_as_inp:
             inp = np.append(inp, info['acts'], axis=1)
-        r = self.reward(inp)
+        r = self.reward(inp).item()
         if info.get('done'):
             r -= 1000
         return next_ob, r, done, info
 
-    def reward(self, inp) -> float:
-        rwinp = torch.from_numpy(inp).reshape(1, -1).float().to(self.rwfn.device)
-        return self.rwfn.forward(rwinp).item()
+    def get_reward_vec(self):
+        inp, a_vec = self.env.get_vectorized()
+        if self.use_action_as_inp:
+            inp = np.append(inp, a_vec, axie=1)
+        r = self.reward(inp)
+        return r.numpy().flatten()
+
+    def reward(self, inp: np.ndarray) -> float:
+        rwinp = torch.from_numpy(inp).float().to(self.rwfn.device)
+        return self.rwfn.forward(rwinp)
 
 
 class ObsRewardWrapper(RewardWrapper):

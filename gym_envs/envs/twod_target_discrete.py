@@ -33,7 +33,29 @@ class TwoDTargetDisc(gym.Env):
         return self.st, r, None, info
 
     def set_state(self, state):
+        assert state in self.observation_space
         self.st = state
+
+    def get_trans_mat(self):
+        trans_mat = np.zeros([self.act_size ** 2, self.map_size ** 2, self.map_size ** 2])
+        for j in range(self.map_size ** 2):
+            for i in range(self.act_size ** 2):
+                self.reset()
+                self.set_state(np.array([j % self.map_size, j // self.map_size]))
+                ns, _, _, _ = self.step(np.array([i % self.act_size, i // self.act_size]))
+                k = ns[0] + ns[1] * self.map_size
+                trans_mat[i, k, j] = 1
+        return trans_mat
+
+    def get_reward_vec(self):
+        s_vec, a_vec = self.get_vectorized()
+        return self.reward_fn(s_vec, a_vec)
+
+    def get_vectorized(self):
+        x, y = np.meshgrid(range(self.map_size), range(self.map_size))
+        s_vec = np.append(x.reshape(-1, 1), y.reshape(-1, 1), axis=1)
+        a_vec = np.array(range(self.act_size ** 2)).reshape(-1, 1)
+        return s_vec, a_vec
 
     def _get_obs(self):
         return self.st
@@ -44,7 +66,10 @@ class TwoDTargetDisc(gym.Env):
         return self._get_obs()
 
     def reward_fn(self, state, action) -> float:
-        x, y = state[0], state[1]
+        if state.ndim == 1:
+            x, y = state
+        else:
+            x, y = np.split(state, 2, axis=-1)
         return - ((x - 2) ** 2 + (y - 2) ** 2)
 
     def draw(self, trajs: List[np.ndarray] = None):
@@ -70,6 +95,25 @@ class TwoDTargetDisc(gym.Env):
 
     def render(self, mode='human'):
         pass
+
+    # TODO: Dimension이 1인 경우와 나누기
+    def get_idx_from_obs(self, obs: np.ndarray) -> np.ndarray:
+        obs_idx = obs[:, 0] + self.map_size * obs[:, 1]
+        return obs_idx
+
+    def get_obs_from_idx(self, idx: np.ndarray) -> np.ndarray:
+        idx = idx.reshape(-1, 1)
+        obs = np.append(idx % self.map_size, idx // self.map_size, axis=-1)
+        return obs
+
+    def get_idx_from_act(self, act: np.ndarray) -> np.ndarray:
+        act_idx = act[:, 0] + self.action_space.nvec[0] * act[:, 1]
+        return act_idx
+
+    def get_act_from_idx(self, idx: np.ndarray) -> np.ndarray:
+        idx = idx.reshape(-1, 1)
+        act = np.append(idx % self.action_space.nvec[0], idx // self.action_space.nvec[0], axis=-1)
+        return act
 
 
 class TwoDTargetDiscDet(TwoDTargetDisc):

@@ -1,4 +1,5 @@
 import gym
+from copy import deepcopy
 import numpy as np
 from gym.utils import seeding
 from scipy.sparse import csc_matrix
@@ -14,15 +15,16 @@ class DiscretizedPendulum(gym.Env):
     """
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 30}
 
-    def __init__(self):
+    def __init__(self, h=None):
         super(DiscretizedPendulum, self).__init__()
-        self.max_torque = 5.0   # gym version 보다 큼, swing 을 사용하지 않기 때문
-        self.max_speed = 8.0
+        self.max_torque = 5.0  # gym version 보다 큼, swing 을 사용하지 않기 때문
+        self.max_speed = 1.0
         self.max_angle = np.pi / 3
         self.dt = 0.05
         self.g = 9.81
         self.m = 1.0
         self.l = 1.0
+        self.h = h
         self.num_actions = 7
 
         self.np_random = None
@@ -30,9 +32,9 @@ class DiscretizedPendulum(gym.Env):
         self.viewer = None
         self.last_a = None
 
-        obs_high = np.array([self.max_angle, self.max_speed])
+        obs_high = np.array([self.max_angle, self.max_speed]) + self.h
         self.observation_space = gym.spaces.Box(low=-obs_high, high=obs_high, dtype=np.float32)
-        self.action_space = gym.spaces.Discrete(7)
+        self.action_space = gym.spaces.MultiDiscrete([7])
         self.torque_list = np.linspace(-self.max_torque, self.max_torque, self.num_actions)
 
         self.seed()
@@ -48,20 +50,22 @@ class DiscretizedPendulum(gym.Env):
 
         return self.get_obs()
 
-    def step(self, action):
+    def step(self, action: np.ndarray):
         assert self.state is not None, "Can't step the environment before calling reset function"
         assert action in self.action_space, f"{action} is Out of action space"
         self.last_a = action
+        info = {'obs': self.state.reshape(1, -1), 'act': action.reshape(1, -1)}
         r = self.get_reward(self.state, action)
         self.state = self.get_next_state(self.state, action)
 
-        return self.get_obs(), r, False, {}
+        return self.get_obs(), r, False, info
 
-    def set_state(self, state):
+    def set_state(self, state: np.ndarray):
+        assert state in self.observation_space
         self.state = state
 
     def get_torque(self, action):
-        return self.torque_list[action]
+        return self.torque_list[action.item()]
 
     def get_reward(self, state, action):
         if state.ndim == 1:
@@ -93,47 +97,58 @@ class DiscretizedPendulum(gym.Env):
     def get_obs(self):
         return self.state
 
-    def get_num_cells(self, h):
+    def get_num_cells(self, h=None):
         """
         분해능 h 로 이산화된 state 의 dimension 별 수 반환
         즉, |S| = n_x * n_y
         """
+        if h is None:
+            h = self.h
+        assert h is not None, "Env doesn't have resolution, h should be specified"
         h_th, h_thd = h
         n_th = round(2 * self.max_angle / h_th) + 1
         n_thd = round(2 * self.max_speed / h_thd) + 1
 
         return n_th, n_thd
 
-    def get_vectorized(self, h):
+    def get_vectorized(self, h=None):
         """
         분해능 h 로 이산화된 state 과 이산 action 의 vectorization 수행 및 반환
         vectorization 순서는 meshgrid xy indexing 을 따름
         s_vec.shape = (|S|, 2)
         a_vec.shape = (|A|, 2)
         """
+        if h is None:
+            h = self.h
+        assert h is not None, "Env doesn't have resolution, h should be specified"
         h_th, h_thd = h
         n_th, n_thd = self.get_num_cells(h)
 
         s_vec = np.stack(np.meshgrid(h_th * np.arange(0., n_th) - self.max_angle,
                                      h_thd * np.arange(0., n_thd) - self.max_speed,
-                                     indexing='xy'),
+                                     indexing='xy'
+                                     ),
                          -1).reshape(-1, 2)
         a_vec = np.arange(self.num_actions)
 
         return s_vec, a_vec
 
-    def get_ind_from_state(self, state, h, max_angle, max_speed):
+    # TODO: max_angle과 max_speed가 외부에서 입력될 필요가 있나?
+    def get_ind_from_state(self, state, h=None, max_angle=None, max_speed=None):
         """
         분해능 h 로 vectorized 되었을 때, 입력 state 의 index 반환
         state.shape = (-1, 2)
         ind_vec.shape = (-1, |S|)
         """
+        if h is None:
+            h = self.h
+        assert h is not None, "Env doesn't have resolution, h should be specified"
         h_th, h_thd = h
         n_th, n_thd = self.get_num_cells(h)
         th_vec, thd_vec = np.split(state, 2, axis=-1)
 
-        th_idx = np.round((th_vec + max_angle) / h_th).astype('i')
-        thd_idx = np.round((thd_vec + max_speed) / h_thd).astype('i')
+        th_idx = np.round((th_vec + self.max_angle) / h_th).astype('i')
+        thd_idx = np.round((thd_vec + self.max_speed) / h_thd).astype('i')
         tot_idx = n_th * thd_idx + th_idx
 
         if state.ndim == 1:
@@ -146,14 +161,30 @@ class DiscretizedPendulum(gym.Env):
 
         return ind_vec
 
-    def get_trans_mat(self, h, verbose=False):
+    def get_idx_from_obs(self, obs: np.ndarray):
+        h_th, h_thd = self.h
+        n_th, n_thd = self.get_num_cells(self.h)
+        th_vec, thd_vec = np.split(obs, 2, axis=-1)
+
+        th_idx = np.round((th_vec + self.max_angle) / h_th).astype('i')
+        thd_idx = np.round((thd_vec + self.max_speed) / h_thd).astype('i')
+        tot_idx = n_th * thd_idx + th_idx
+        return tot_idx.flatten()
+
+    def get_act_from_idx(self, idx: np.ndarray):
+        return idx.reshape(-1, 1)
+
+    def get_trans_mat(self, h=None, verbose=False):
         """
         분해능 h 주어질 때 모든 action 대한 전환 행렬 계산 (zero-hold 방식)
-        P[i, j, k] 은 i-th action 을 했을 때, j-th -> k-th state 로 옮겨갈 확률임
+        P[i, j, k] 은 i-th action 을 했을 때, k-th -> j-th state 로 옮겨갈 확률임
         verbose=True 일 때 uniform 초기 상태에 대한 평균 에러 계산
 
         P.shape = (|A|, |S|, |S|)
         """
+        if h is None:
+            h = self.h
+        assert h is not None, "Env doesn't have resolution, h should be specified"
         s_vec, a_vec = self.get_vectorized(h)
         next_s_vec_list = [self.get_next_state(s_vec, a) for a in a_vec]
         P = np.stack([self.get_ind_from_state(next_s_vec, h, self.max_angle, self.max_speed).T
@@ -175,7 +206,7 @@ class DiscretizedPendulum(gym.Env):
 
         return P
 
-    def get_action_mat(self, pi, h):
+    def get_action_mat(self, pi, h=None):
         """
         정책 pi, 분해능 h 가 주어졌을 때 forward 을 위한 action matrix, A 계산
         A[i, j] 는 j-th state 에서 i-th action 을 할 확률을 뜻함
@@ -185,18 +216,25 @@ class DiscretizedPendulum(gym.Env):
         pi: (-1, 2) -> (|A|, -1)
         A.shape = (|A|, |S|)
         """
+        if h is None:
+            h = self.h
+        assert h is not None, "Env doesn't have resolution, h should be specified"
         s_vec, _ = self.get_vectorized(h)
         return pi(s_vec)
 
-    def get_reward_vec(self, pi, h, soft=False):
+    def get_reward_vec(self, pi=None, h=None, soft=False):
         """
         정책 pi, 분해능 h 에 대해 모든 상태의 보상 계산, 벡터로 반환
         R.shape = (|S|)
         """
-        s_vec, _ = self.get_vectorized(h)
-        R = self.get_reward(s_vec, None).ravel()
+        if h is None:
+            h = self.h
+        assert h is not None, "Env doesn't have resolution, h should be specified"
+        s_vec, a_vec = self.get_vectorized(h)
+        R = self.get_reward(s_vec, a_vec).ravel()
 
         if soft:
+            assert pi is not None, "Soft version needs policy pi"
             a_prob = pi(s_vec)
             R += - (a_prob * np.log(a_prob)).sum(axis=0)
 
@@ -236,6 +274,25 @@ class DiscretizedPendulum(gym.Env):
         if self.viewer:
             self.viewer.close()
             self.viewer = None
+
+
+class DiscretizedPendulumDet(DiscretizedPendulum):
+    def __init__(self, h=None):
+        super(DiscretizedPendulumDet, self).__init__(h=h)
+        self.init_state, _ = super(DiscretizedPendulumDet, self).get_vectorized()
+        self.init_state = self.init_state[0:len(self.init_state):5]
+        self.n = 0
+
+    def reset(self):
+        self.set_state(self.init_state[self.n % len(self.init_state)])
+        self.n += 1
+        self.last_a = None
+        return self.get_obs()
+
+    def get_vectorized(self, h=None):
+        s_vec = deepcopy(self.init_state)
+        a_vec = np.arange(self.num_actions)
+        return s_vec, a_vec
 
 
 def angle_normalize(x):

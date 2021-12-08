@@ -1,4 +1,5 @@
 import os
+import warnings
 import os.path as p
 import gym
 import gym_envs  # needs for custom environments
@@ -42,11 +43,13 @@ def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):
     if wrapper is not None:
         if wrapper == "ActionWrapper":
             env = ActionWrapper(env)
+        elif isinstance(wrapper, str):
+            warnings.warn("Not specified wrapper name so it's ignored")
         else:
             env = wrapper(env, **wrapper_kwargs)
 
     if use_norm:
-        env = DummyVecEnv([lambda: Monitor(env) for _ in range(num_envs)])
+        env = DummyVecEnv([lambda: Monitor(deepcopy(env)) for _ in range(num_envs)])
         if isinstance(use_norm, str):
             env = VecNormalize.load(use_norm, env)
         else:
