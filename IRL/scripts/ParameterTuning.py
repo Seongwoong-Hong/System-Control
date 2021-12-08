@@ -18,6 +18,7 @@ from algos.torch.MaxEntIRL import *
 from algos.tabular.qlearning import *
 from algos.tabular.viter import *
 from common.util import make_env
+from common.verification import verify_policy
 from common.wrappers import RewardWrapper
 from common.rollouts import generate_trajectories_without_shuffle
 
@@ -31,7 +32,7 @@ def trial_str_creator(trial):
 
 
 def try_train(config, demo_dir):
-    logger.configure(tune.get_trial_dir(), format_strs=[])
+    logger.configure(tune.get_trial_dir(), format_strs=["tensorboard"])
 
     if config['rew_arch'] == 'linear':
         rew_arch = []
@@ -43,24 +44,33 @@ def try_train(config, demo_dir):
         raise NotImplementedError
     if config['feature'] == 'ext':
         def feature_fn(x):
-            return th.cat([x, x**2], dim=1)
+            return th.cat([x, x ** 2], dim=1)
     elif config['feature'] == 'no':
         def feature_fn(x):
             return x
+    elif config['feature'] == '1hot':
+        def feature_fn(x):
+            if len(x.shape) == 1:
+                x = x.reshape(1, -1)
+            ft = th.zeros([x.shape[0], config['map_size'] ** 2], dtype=th.float32)
+            for i, row in enumerate(x):
+                idx = int((row[0] + row[1] * config['map_size']).item())
+                ft[i, idx] = 1
+            return ft
     else:
         raise NotImplementedError
 
     env = make_env(f"{config['env_id']}_disc-v2", map_size=config['map_size'])
     eval_env = make_env(f"{config['env_id']}_disc-v0", map_size=config['map_size'])
 
-    agent = Viter(env, gamma=config['gamma'], alpha=config['alpha'], device='cpu')
+    agent = FiniteSoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cpu')
 
-    with open(demo_dir + f"/viter_disc_{config['map_size']}.pkl", "rb") as f:
+    with open(demo_dir + f"/{config['expt']}_disc_{config['map_size']}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
 
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=len(expert_trajs))
 
-    algo = APIRL(
+    algo = MaxEntIRL(
         env,
         eval_env=eval_env,
         feature_fn=feature_fn,
@@ -70,36 +80,39 @@ def try_train(config, demo_dir):
         rew_arch=rew_arch,
         device='cpu',
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': config['norm_coeff']},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': config['norm_coeff'], 'lr': config['lr']},
     )
     trial_dir = tune.get_trial_dir()
-    for epoch in range(50):
+    eval_env = DummyVecEnv([lambda: eval_env])
+    expt_obs = rollout.flatten_trajectories(expert_trajs).obs
+    for epoch in range(1000):
         os.makedirs(trial_dir + f"/model/{epoch:03d}", exist_ok=False)
 
         """ Learning """
         algo.learn(
-            total_iter=1,
+            total_iter=10,
             agent_learning_steps=5e3,
             n_episodes=len(expert_trajs),
             max_agent_iter=1,
             min_agent_iter=1,
-            max_gradient_steps=6000,
-            min_gradient_steps=1000,
+            max_gradient_steps=1,
+            min_gradient_steps=1,
         )
 
         """ Testing """
-        trajectories = generate_trajectories_without_shuffle(
-            algo.agent, DummyVecEnv([lambda: eval_env]), sample_until, deterministic_policy=False)
-
-        expt_obs = rollout.flatten_trajectories(expert_trajs).obs
-        agent_obs = rollout.flatten_trajectories(trajectories).obs
-        mean_obs_differ = np.abs((expt_obs - agent_obs)).mean()
+        # trajectories = generate_trajectories_without_shuffle(
+        #     algo.agent, eval_env, sample_until, deterministic_policy=False)
+        obs, act, _ = verify_policy(eval_env, agent, deterministic=False, render="None", repeat_num=len(expert_trajs))
+        mean_obs_differ = np.abs(obs.reshape(-1, obs.shape[-1]) - expt_obs).sum()
+        mean_obs_differ /= len(expert_trajs)
+        # expt_obs = rollout.flatten_trajectories(expert_trajs).obs
+        # agent_obs = rollout.flatten_trajectories(trajectories).obs
+        # mean_obs_differ = np.abs((expt_obs - agent_obs)).mean()
         algo.agent.save(trial_dir + f"/model/{epoch:03d}/agent")
         algo.reward_net.save(trial_dir + f"/model/{epoch:03d}/reward_net")
 
         algo.agent.set_env(env)
         algo.reward_net.feature_fn = feature_fn
-
         tune.report(mean_obs_differ=mean_obs_differ)
 
 
@@ -109,34 +122,36 @@ def main(target):
     config = {
         'env_id': target,
         'gamma': tune.choice([0.8]),
-        'alpha': tune.choice([0.4]),
+        'alpha': tune.uniform(0.05, 1),
         'use_action': tune.choice([False]),
-        'expt': tune.choice(['viter']),
+        'expt': tune.choice(['softqiter']),
         'map_size': tune.choice([10]),
         'rew_arch': tune.choice(['linear']),
-        'feature': tune.choice(['ext']),
-        'norm_coeff': tune.uniform(0.1, 1),
+        'feature': tune.choice(['1hot']),
+        'lr': tune.choice([1e-3]),
+        'norm_coeff': tune.uniform(0.01, 0.05),
     }
 
     scheduler = ASHAScheduler(
         metric=metric,
         mode="min",
         max_t=50,
-        grace_period=20,
+        grace_period=10,
         reduction_factor=2,
     )
     reporter = CLIReporter(metric_columns=[metric, "training_iteration"])
+    irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     result = tune.run(
         partial(try_train, demo_dir=demo_dir),
         name=target + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S'),
         resources_per_trial={"cpu": 1},
         config=config,
-        num_samples=50,
+        num_samples=100,
         scheduler=scheduler,
         progress_reporter=reporter,
         checkpoint_at_end=True,
         trial_name_creator=trial_str_creator,
-        local_dir="~/hsw/Control/IRL/tmp/log/ray_result"
+        local_dir=f"{irl_path}/tmp/log/ray_result"
     )
 
     best_trial = result.get_best_trial(metric, "min", "all")

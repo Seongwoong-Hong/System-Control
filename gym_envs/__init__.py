@@ -17,17 +17,22 @@ register(
 )
 
 register(
-    id='DiscretePendulum-v0',
+    id='DiscretizedPendulum-v2',
     entry_point='gym_envs.envs:DiscretizedPendulum',
     max_episode_steps=200,
 )
 
 register(
-    id='DiscreteDoublePendulum-v0',
-    entry_point='gym_envs.envs:DiscretizedDoublePendulum',
-    max_episode_steps=100,
+    id='DiscretizedPendulum-v0',
+    entry_point='gym_envs.envs:DiscretizedPendulumDet',
+    max_episode_steps=200,
 )
 
+register(
+    id='DiscretizedDoublePendulum-v2',
+    entry_point='gym_envs.envs:DiscretizedDoublePendulum',
+    max_episode_steps=200,
+)
 
 register(
     id="2DWorld-v0",
@@ -161,7 +166,7 @@ register(
 
 register(
     id="HPC_crop-v0",
-entry_point='gym_envs.envs.mujoco:IDPHumanExp',
+    entry_point='gym_envs.envs.mujoco:IDPHumanExp',
     max_episode_steps=300,
 )
 

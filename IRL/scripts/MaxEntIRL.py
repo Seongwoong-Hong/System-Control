@@ -16,20 +16,20 @@ from algos.torch.MaxEntIRL import MaxEntIRL, APIRL
 from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
-    env_type = "2DTarget"
+    env_type = "DiscretizedPendulum"
     algo_type = "MaxEntIRL"
     device = "cpu"
-    name = f"{env_type}_disc"
-    map_size = 10
-    expt = f"softqiter_disc_{map_size}"
+    name = f"{env_type}"
+    env_op = 0.03
+    expt = f"softqiter_disc_part_{env_op}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     # pltqs, init_states = [], []
     # for i in range(5, 10):
     #     pltqs += [io.loadmat(subpath + f"i{i+1}.mat")['pltq']]
     #     init_states += [io.loadmat(subpath + f"i{i+1}.mat")['state'][0, :4]]
-    env = make_env(f"{name}-v2", subpath=subpath, map_size=map_size)
-    eval_env = make_env(f"{name}-v0", subpath=subpath, map_size=map_size)
+    env = make_env(f"{name}-v2", subpath=subpath, h=[env_op, env_op * 5])
+    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[env_op, env_op * 5])
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/1hot_{expt}_linear_finite2"
+    log_dir += f"/ext_{expt}_linear_finite"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -49,16 +49,16 @@ if __name__ == "__main__":
 
 
     def feature_fn(x):
-        if len(x.shape) == 1:
-            x = x.reshape(1, -1)
-        ft = th.zeros([x.shape[0], 100], dtype=th.float32)
-        for i, row in enumerate(x):
-            idx = int((row[0] + row[1] * map_size).item())
-            ft[i, idx] = 1
-        return ft
+        # if len(x.shape) == 1:
+        #     x = x.reshape(1, -1)
+        # ft = th.zeros([x.shape[0], map_size], dtype=th.float32)
+        # for i, row in enumerate(x):
+        #     idx = int(row.item())
+        #     ft[i, idx] = 1
+        # return ft
         # return x
         # return x ** 2
-        # return th.cat([x, x ** 2], dim=1)
+        return th.cat((x, x ** 2), dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -82,19 +82,20 @@ if __name__ == "__main__":
         rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper, 'num_envs': 1},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.5},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-3},
     )
 
     # Run Learning
     learner.learn(
-        total_iter=50,
+        total_iter=1500,
         agent_learning_steps=5e3,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
         min_agent_iter=1,
-        max_gradient_steps=2000,
-        min_gradient_steps=100,
+        max_gradient_steps=1,
+        min_gradient_steps=1,
         callback=save_net_callback.net_save,
+        callback_period=10,
         early_stop=True,
     )
 

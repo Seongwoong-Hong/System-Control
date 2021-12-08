@@ -17,11 +17,11 @@ from IRL.scripts.project_policies import def_policy
 
 
 def learned_cost():
-    env_type = "HPC"
-    env_id = f"{env_type}_custom"
-    subj = "ppo"
-    name = f"extcnn_{subj}_stdreset"
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "BC", name))
+    env_type = "1DTarget"
+    env_id = f"{env_type}_disc"
+    subj = "softqiter_disc_20"
+    name = f"1hot_{subj}_linear_finite"
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     print(proj_path)
     with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
@@ -33,14 +33,15 @@ def learned_cost():
     sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
     i = 0
     cost_list = []
-    expt_input = th.from_numpy(np.concatenate([expt_trans.obs, env.action(expt_trans.acts)], axis=1)).double()
+    # expt_input = th.from_numpy(np.concatenate([expt_trans.obs, env.action(expt_trans.acts)], axis=1)).double()
     while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
         env = make_env(f"{env_id}-v0", wrapper=wrapper, subpath=subpath)
         agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
         if os.path.isfile(os.path.abspath(proj_path + f"/model/{i:03d}/normalization.pkl")):
             stats_path = os.path.abspath(proj_path + f"/model/{i:03d}/normalization.pkl")
-            venv = make_env(f"{env_id}-v0", use_vec_env=True, num_envs=1, use_norm=stats_path, wrapper=wrapper)
-            expt_input = th.from_numpy(np.concatenate([venv.normalize_obs(expt_trans.obs), expt_trans.acts], axis=1)).double()
+            venv = make_env(f"{env_id}-v0", num_envs=1, use_norm=stats_path, wrapper=wrapper)
+            expt_input = th.from_numpy(
+                np.concatenate([venv.normalize_obs(expt_trans.obs), expt_trans.acts], axis=1)).double()
         agent_trajs = generate_trajectories(agent, DummyVecEnv([lambda: env]), sample_until=sample_until, deterministic_policy=False)
         agent_trans = flatten_trajectories(agent_trajs)
         agent_input = th.from_numpy(np.concatenate([agent_trans.obs, env.action(agent_trans.acts)], axis=1)).double()
@@ -71,7 +72,7 @@ def expt_cost():
     test_len = len(expert_trajs)
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
     wrapper = ActionWrapper if env_type == "HPC" else None
-    venv = make_env(f"{env_id}-v0", use_vec_env=True, num_envs=1, wrapper=wrapper, subpath=subpath)
+    venv = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, subpath=subpath)
     th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
     print(f"expt_cost: {expt_fn(th_input).item() / test_len}")
     sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
@@ -99,11 +100,11 @@ def expt_cost():
 def compare_obs():
     env_type = "1DTarget"
     env_id = f"{env_type}_disc"
-    map_size = 100
-    subj = f"viter_disc_{map_size}"
-    name = f"ext_{subj}_linear"
+    map_size = 20
+    subj = f"softqiter_disc_{map_size}"
+    name = f"1hot_{subj}_linear_finite"
     print(name)
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "APIRL", name))
+    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
     assert os.path.isdir(proj_path)
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
     # pltqs, init_states = [], []
@@ -123,16 +124,16 @@ def compare_obs():
         stats_path = None
         if os.path.isfile(os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")):
             stats_path = os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")
-        env = make_env(f"{env_id}-v0", num_envs=1, use_vec_env=True, wrapper=None, subpath=subpath, use_norm=stats_path,
-                       map_size=map_size)
+        env = make_env(f"{env_id}-v0", num_envs=1,
+                       wrapper=None, subpath=subpath, use_norm=stats_path, map_size=map_size)
         # env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-        _, agent_obs, _ = verify_policy(env, agent, deterministic=True, render="None", repeat_num=lnum)
+        agent_acts, agent_obs, _ = verify_policy(env, agent, deterministic=False, render="None", repeat_num=lnum)
         if stats_path is not None:
             agent_obs = env.unnormalize_obs(agent_obs)
         errors, maximums = [], []
         for k in range(lnum):
-            errors += [abs(expert_trajs[k].obs[:, :2] - agent_obs[k][:, :2]).mean(axis=0)]
-            maximums += [abs(expert_trajs[k].obs[:, :2] - agent_obs[k][:, :2]).max()]
+            errors += [abs(expert_trajs[k].obs[:-1, :] - agent_obs[k]).mean(axis=0)]
+            maximums += [abs(expert_trajs[k].obs[:-1, :] - agent_obs[k]).max()]
         error_list.append(np.array(errors).sum(axis=0) / len(errors))
         max_list.append(sum(maximums) / len(maximums))
         print(f"{i:03d} Error: {error_list[-1]}, {error_list[-1].mean()}, Max: {max_list[-1]}")
@@ -156,7 +157,7 @@ def feature():
     test_len = len(expert_trajs)
     subpath = os.path.join("..", "demos", env_type, subj)
     wrapper = ActionWrapper if env_type == "HPC" else None
-    venv = make_env(f"{env_id}-v0", use_vec_env=True, num_envs=1, wrapper=wrapper, subpath=subpath + f"/{subj}")
+    venv = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, subpath=subpath + f"/{subj}")
     expt_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
     sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
     agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
@@ -170,8 +171,18 @@ def feature():
 
 if __name__ == "__main__":
     def feature_fn(x):
-        return x
+        if len(x.shape) == 1:
+            x = x.reshape(1, -1)
+        ft = th.zeros([x.shape[0], 20], dtype=th.float32)
+        for i, row in enumerate(x):
+            idx = int((row).item())
+            ft[i, idx] = 1
+        return ft
+        # return x
         # return x.square()
-        # return th.cat([x, x**2], dim=1)
+        # return th.cat([(x/10), (x/10)**2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
-    compare_obs()
+
+
+    # compare_obs()
+    learned_cost()

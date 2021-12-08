@@ -11,17 +11,17 @@ from RL.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "2DTarget"
+    env_type = "DiscretizedPendulum"
     algo_type = "softqiter"
-    map_size = 10
-    name = f"{env_type}_disc"
+    env_op = 0.03
+    name = f"{env_type}"
     device = "cpu"
     env_id = f"{name}-v2"
     subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
     # env = make_env(env_id, use_vec_env=False, num_envs=1, subpath=subpath, wrapper=ActionWrapper, use_norm=False)
-    env = make_env(env_id, use_vec_env=True, num_envs=1, map_size=map_size)
+    env = make_env(env_id, num_envs=1, h=[env_op, 5 * env_op])
     # env = make_env(env_id, use_vec_env=False)
-    name += f"_{map_size}"
+    name += f"_{env_op}"
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     os.makedirs(log_dir, exist_ok=True)
@@ -31,6 +31,7 @@ if __name__ == "__main__":
         n += 1
     os.makedirs(log_dir + f"/policies_{n}", exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir + f"/policies_{n}")
+    shutil.copy(os.path.dirname(__file__) + "/project_policies.py", log_dir + f"/policies_{n}")
     # video_recorder = VideoCallback(make_env(env_id, subpath=subpath, wrapper=ActionWrapper),
     #                                n_eval_episodes=5,
     #                                render_freq=int(0.5e5))

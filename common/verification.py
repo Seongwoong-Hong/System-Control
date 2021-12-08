@@ -22,6 +22,16 @@ def video_record(imgs: List, filename: str, dt: float):
 
 
 def verify_policy(environment, policy, render="human", deterministic=True, repeat_num=5):
+    if hasattr(policy, "max_t"):
+        assert render == "None"
+        obs_list, acts_list = [], []
+        for _ in range(repeat_num):
+            policy.set_env(deepcopy(environment))
+            ob = environment.reset().reshape(1, -1)
+            obs, acts = policy.predict(ob, deterministic=deterministic)
+            obs_list.append(obs)
+            acts_list.append(acts)
+        return np.array(acts_list), np.array(obs_list), None
     from mujoco_py import GlfwContext
     if render == 'rgb_array':
         GlfwContext(offscreen=True)
@@ -43,7 +53,7 @@ def verify_policy(environment, policy, render="human", deterministic=True, repea
             if hasattr(environment, "action") and callable(environment.action):
                 act = environment.action(act)
             actions.append(act)
-            obs = np.append(obs, ob.reshape(1, -1), 0)
+            obs = np.append(obs, ob.reshape(1, -1), axis=0)
             if render == 'human':
                 time.sleep(environment.dt)
             imgs.append(img)

@@ -7,6 +7,7 @@ from algos.tabular.viter import backward_trans, forward_trans
 from gym_envs.envs import DiscretizedPendulum
 
 import numpy as np
+import torch as th
 from scipy.special import softmax, logsumexp
 
 
@@ -37,7 +38,7 @@ def test_calc_trans_mat():
     근사된 전환 행렬 P 에 대한 value iteration 수행
     계산 시간, 초기 상태에 대한 평균 에러 계산
     """
-    env = gym.make('DiscretePendulum-v0')          # type: DiscretizedPendulum
+    env = gym.make('DiscretePendulum-v2')  # type: DiscretizedPendulum
 
     h = [0.05, 0.05]
     env.get_trans_mat(h=h, verbose=True)
@@ -49,10 +50,10 @@ def test_value_itr(soft):
     주어진 policy 에 대해 이산화된 전환 행렬 이용, value itr 수행
     greedy, soft update 구현됨
     """
-    env = gym.make('DiscretePendulum-v0')          # type: DiscretizedPendulum
+    env = gym.make('DiscretizedPendulum-v2')  # type: DiscretizedPendulum
     soft = soft
 
-    h = [0.02, 0.2]
+    h = [0.1, 1]
     n_th, n_thd = env.get_num_cells(h)
     P = env.get_trans_mat(h)
     q_values = np.zeros([env.spec.max_episode_steps, env.num_actions, n_th * n_thd])
@@ -98,10 +99,12 @@ def test_value_itr(soft):
                 q_values[t_ind] = R + backward_trans(P, next_values)
 
         max_q_err = np.max(np.abs(old_q - q_values))
+        assert not np.isnan(max_q_err)
         print(f'itr #{itr} Maximum Q err: {max_q_err:.2f}')
 
     # running with learned policy
     # todo: q-value 와 rollout value 의 갭 줄이는 방법
+    import time
     s_vec, _ = env.get_vectorized(h)
     for itr in range(5):
         s = env.reset()
@@ -125,6 +128,24 @@ def test_value_itr(soft):
                     appx_v = np.max(q_values[t_ind] @ s_ind)
 
             env.render()
+            time.sleep(0.01)
 
         print(f'{float(appx_v):.2f} (Q table) vs. {float(v):.2f} (rollout)')
     env.close()
+
+
+def test_det():
+    env = gym.make("DiscretizedPendulum-v0", h=[0.03, 0.15])
+    while env.n <= len(env.init_state):
+        env.reset()
+
+
+def test_reward_for_wrapped_env():
+    from common.wrappers import RewardWrapper
+    from common.util import make_env
+    from algos.torch.MaxEntIRL import RewardNet
+    rwfn = RewardNet(inp=2, use_action_as_inp=False, feature_fn=lambda x: x ** 2, arch=[])
+    env = make_env("DiscretizedPendulum-v2", h=[0.03, 0.15], num_envs=1, wrapper=RewardWrapper,
+                   wrapper_kwrags={'rwfn': rwfn})
+    env.env_method("get_reward_vec")
+    assert True

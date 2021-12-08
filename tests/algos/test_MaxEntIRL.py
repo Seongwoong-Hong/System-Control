@@ -11,8 +11,9 @@ from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
 
-map_size = 10
-env_name = "2DTarget"
+env_op = 0.03
+env_name = "DiscretizedPendulum"
+env_id = f"{env_name}"
 
 
 @pytest.fixture
@@ -23,7 +24,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, f"softqiter_disc_{map_size}.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, f"softqiter_disc_{env_op}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -32,13 +33,13 @@ def expert(demo_dir):
 @pytest.fixture
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env(f"{env_name}_disc-v2", subpath=subpath, map_size=map_size)
+    return make_env(f"{env_id}-v2", subpath=subpath, h=[env_op, env_op * 5])
 
 
 @pytest.fixture
 def eval_env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env(f"{env_name}_disc-v0", subpath=subpath, map_size=map_size)
+    return make_env(f"{env_id}-v0", subpath=subpath, h=[env_op, env_op * 5])
 
 
 @pytest.fixture
@@ -48,17 +49,17 @@ def learner(env, expert, eval_env):
     logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
-        if len(x.shape) == 1:
-            x = x.reshape(1, -1)
-        ft = th.zeros([x.shape[0], 100], dtype=th.float32)
-        for i, row in enumerate(x):
-            idx = int((row[0] + row[1] * map_size).item())
-            ft[i, idx] = 1
-        return ft
+        # if len(x.shape) == 1:
+        #     x = x.reshape(1, -1)
+        # ft = th.zeros([x.shape[0], env_op], dtype=th.float32)
+        # for i, row in enumerate(x):
+        #     idx = int(row.item())
+        #     ft[i, idx] = 1
+        # return ft
         # return x
-        # return th.cat([x, x ** 2], dim=1)
+        return th.cat([x, x ** 2], dim=1)
 
-    agent = def_policy("finitesoftqiter", env, device='cuda:2', verbose=1)
+    agent = def_policy("finitesoftqiter", env, device='cpu', verbose=1)
 
     return MaxEntIRL(
         env,
@@ -70,7 +71,7 @@ def learner(env, expert, eval_env):
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'alpha': 0.1},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-3},
     )
 
 
@@ -92,13 +93,13 @@ def test_callback(learner):
 
 def test_validity(learner, expert):
     learner.learn(
-        total_iter=50,
+        total_iter=2,
         agent_learning_steps=5000,
         n_episodes=len(expert),
         max_agent_iter=1,
         min_agent_iter=1,
-        max_gradient_steps=600,
-        min_gradient_steps=100,
+        max_gradient_steps=1,
+        min_gradient_steps=1,
         early_stop=True,
     )
 
@@ -131,17 +132,17 @@ def test_GCL(env, expert, eval_env):
         total_iter=50,
         agent_learning_steps=1e3,
         n_episodes=len(expert),
-        max_agent_iter=12,
-        min_agent_iter=2,
-        max_gradient_steps=1000,
-        min_gradient_steps=200,
+        max_agent_iter=1,
+        min_agent_iter=1,
+        max_gradient_steps=1,
+        min_gradient_steps=1,
         early_stop=True,
     )
 
 
 def test_state_visitation(env, expert, learner):
     from algos.tabular.viter import FiniteSoftQiter
-    policy = FiniteSoftQiter(env, gamma=0.8, alpha=1, device='cuda:2')
+    policy = FiniteSoftQiter(env, gamma=0.8, alpha=0.01, device='cpu')
     policy.learn(1000)
     learner.agent = policy
     Ds = learner.state_visitation()
@@ -149,4 +150,4 @@ def test_state_visitation(env, expert, learner):
     d1 = th.dot(Ds, learner.reward_net(learner.whole_state).flatten())
     d2, _ = learner.mean_transition_reward(expert)
     assert th.abs((d2 - d1) / d2).item() < 0.1
-    print(th.abs(d2 - d1).item())
+    print(th.abs((d2 - d1) / d2).item())
