@@ -29,6 +29,12 @@ register(
 )
 
 register(
+    id='DiscretizedDoublePendulum-v2',
+    entry_point='gym_envs.envs:DiscretizedDoublePendulum',
+    max_episode_steps=200,
+)
+
+register(
     id="2DWorld-v0",
     entry_point='gym_envs.envs:TwoDWorldDetOrder',
     max_episode_steps=100,
