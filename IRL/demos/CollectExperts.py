@@ -18,7 +18,7 @@ if __name__ == "__main__":
 
 
     env_op = 0.03
-    n_episodes = 9940
+    n_episodes = 1990
     env_type = "DiscretizedPendulum"
     name = f"{env_type}"
     subpath = "HPC/sub01/sub01"
@@ -33,6 +33,6 @@ if __name__ == "__main__":
     # ExpertPolicy = PPO.load(f"{proj_path}/../RL/{env_type}/tmp/log/{name}/ppo/policies_1/agent.pkl")
     # ExpertPolicy = PPO.load(f"{proj_path}/tmp/log/{name}/MaxEntIR L/ext_ppo_disc_samp_linear_ppoagent_svm_reset/model/000/agent")
     trajectories = generate_trajectories_without_shuffle(ExpertPolicy, venv, sample_until, deterministic_policy=True)
-    save_name = f"{env_type}/softqiter_disc_{env_op}.pkl"
+    save_name = f"{env_type}/softqiter_disc_part_{env_op}.pkl"
     types.save(save_name, trajectories)
     print(f"Expert Trajectories are saved in the {save_name}")

@@ -21,7 +21,7 @@ if __name__ == "__main__":
     device = "cpu"
     name = f"{env_type}"
     env_op = 0.03
-    expt = f"softqiter_disc_{env_op}"
+    expt = f"softqiter_disc_part_{env_op}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
     # pltqs, init_states = [], []
@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     # Run Learning
     learner.learn(
-        total_iter=1000,
+        total_iter=1500,
         agent_learning_steps=5e3,
         n_episodes=expt_traj_num,
         max_agent_iter=1,

@@ -1,4 +1,5 @@
 import gym
+from copy import deepcopy
 import numpy as np
 from gym.utils import seeding
 from scipy.sparse import csc_matrix
@@ -176,7 +177,7 @@ class DiscretizedPendulum(gym.Env):
     def get_trans_mat(self, h=None, verbose=False):
         """
         분해능 h 주어질 때 모든 action 대한 전환 행렬 계산 (zero-hold 방식)
-        P[i, j, k] 은 i-th action 을 했을 때, j-th -> k-th state 로 옮겨갈 확률임
+        P[i, j, k] 은 i-th action 을 했을 때, k-th -> j-th state 로 옮겨갈 확률임
         verbose=True 일 때 uniform 초기 상태에 대한 평균 에러 계산
 
         P.shape = (|A|, |S|, |S|)
@@ -278,7 +279,8 @@ class DiscretizedPendulum(gym.Env):
 class DiscretizedPendulumDet(DiscretizedPendulum):
     def __init__(self, h=None):
         super(DiscretizedPendulumDet, self).__init__(h=h)
-        self.init_state, _ = self.get_vectorized()
+        self.init_state, _ = super(DiscretizedPendulumDet, self).get_vectorized()
+        self.init_state = self.init_state[0:len(self.init_state):5]
         self.n = 0
 
     def reset(self):
@@ -286,6 +288,11 @@ class DiscretizedPendulumDet(DiscretizedPendulum):
         self.n += 1
         self.last_a = None
         return self.get_obs()
+
+    def get_vectorized(self, h=None):
+        s_vec = deepcopy(self.init_state)
+        a_vec = np.arange(self.num_actions)
+        return s_vec, a_vec
 
 
 def angle_normalize(x):

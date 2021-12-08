@@ -28,7 +28,7 @@ class MaxEntIRL:
             agent,
             expert_trajectories: List[Trajectory],
             device: str = 'cpu',
-            eval_env: GymEnv = None,
+            eval_env=None,
             rew_arch: List[int] = None,
             use_action_as_input: bool = True,
             rew_kwargs: Optional[Dict] = None,
@@ -145,8 +145,10 @@ class MaxEntIRL:
         return th.sum(trans_rewards) / len(trajectories), None
 
     def state_visitation(self) -> th.Tensor:
+        init_obs, _ = self.eval_env.get_vectorized()
+        init_idx = self.eval_env.get_idx_from_obs(init_obs)
         D = np.zeros([self.agent.max_t, self.agent.policy.obs_size], dtype=np.float32)
-        D[0, :] = np.ones([self.agent.policy.obs_size]) / self.agent.policy.obs_size
+        D[0, init_idx] = 1 / len(init_idx)
         for t in range(1, self.agent.max_t):
             for a in range(self.agent.policy.act_size):
                 E = D[t - 1] * self.agent.policy.policy_table[t - 1, a, :]
