@@ -74,7 +74,7 @@ class Viter:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 logger.dump(self.num_timesteps)
-            if error < 1e-10 and self.num_timesteps >= min_timesteps:
+            if error < 1e-10:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 self.policy.policy_table = np.round(self.policy.policy_table, 8)

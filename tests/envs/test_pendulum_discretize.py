@@ -13,7 +13,7 @@ from scipy.special import softmax, logsumexp
 
 def test_discretized_pendulum():
     """ 기본 환경 테스트 """
-    env = gym.make('DiscretePendulum-v0')          # type: DiscretizedPendulum
+    env = gym.make('DiscretizedPendulum-v0', h=[0.03, 0.15])  # type: DiscretizedPendulum
 
     # step test
     s = env.reset()
@@ -25,7 +25,7 @@ def test_discretized_pendulum():
     # rendering test (P control)
     s = env.reset()
     for _ in range(100):
-        a = round(3 * (- s[0] + env.max_angle))
+        a = np.array([0])
         s, r, d, _ = env.step(a)
         env.render()
 
@@ -82,7 +82,7 @@ def test_value_itr(soft):
                 pi = partial(soft_pi, q=q_values[t_ind])
             else:
                 pi = partial(greedy_pi, q=q_values[t_ind])
-            R = env.get_reward_vec(pi, h, soft=soft)
+            R = env.get_reward_vec()
 
             # q update
             if t_ind == env.spec.max_episode_steps - 1:

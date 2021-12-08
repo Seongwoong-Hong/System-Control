@@ -11,15 +11,15 @@ from RL.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "DiscretizedPendulum"
+    env_type = "DiscretizedDoublePendulum"
     algo_type = "softqiter"
-    env_op = 0.03
+    env_op = 0.1
     name = f"{env_type}"
     device = "cpu"
     env_id = f"{name}-v2"
     subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
     # env = make_env(env_id, use_vec_env=False, num_envs=1, subpath=subpath, wrapper=ActionWrapper, use_norm=False)
-    env = make_env(env_id, num_envs=1, h=[env_op, 5 * env_op])
+    env = make_env(env_id, num_envs=1, h=[env_op, env_op / 2, env_op * 2, env_op * 2])
     # env = make_env(env_id, use_vec_env=False)
     name += f"_{env_op}"
     current_path = os.path.dirname(__file__)

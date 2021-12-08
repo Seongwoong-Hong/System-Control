@@ -11,8 +11,8 @@ from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
 
-env_op = 0.03
-env_name = "DiscretizedPendulum"
+env_op = 0.1
+env_name = "DiscretizedDoublePendulum"
 env_id = f"{env_name}"
 
 
@@ -24,7 +24,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, f"softqiter_disc_{env_op}.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, f"softqiter_disc_part_{env_op}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -33,13 +33,13 @@ def expert(demo_dir):
 @pytest.fixture
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env(f"{env_id}-v2", subpath=subpath, h=[env_op, env_op * 5])
+    return make_env(f"{env_id}-v2", subpath=subpath, h=[env_op, env_op / 2, env_op * 2, env_op * 2])
 
 
 @pytest.fixture
 def eval_env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env(f"{env_id}-v0", subpath=subpath, h=[env_op, env_op * 5])
+    return make_env(f"{env_id}-v0", subpath=subpath, h=[env_op, env_op / 2, env_op * 2, env_op * 2])
 
 
 @pytest.fixture

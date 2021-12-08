@@ -222,7 +222,7 @@ class DiscretizedPendulum(gym.Env):
         s_vec, _ = self.get_vectorized(h)
         return pi(s_vec)
 
-    def get_reward_vec(self, pi=None, h=None, soft=False):
+    def get_reward_vec(self, h=None):
         """
         정책 pi, 분해능 h 에 대해 모든 상태의 보상 계산, 벡터로 반환
         R.shape = (|S|)
@@ -232,12 +232,6 @@ class DiscretizedPendulum(gym.Env):
         assert h is not None, "Env doesn't have resolution, h should be specified"
         s_vec, a_vec = self.get_vectorized(h)
         R = self.get_reward(s_vec, a_vec).ravel()
-
-        if soft:
-            assert pi is not None, "Soft version needs policy pi"
-            a_prob = pi(s_vec)
-            R += - (a_prob * np.log(a_prob)).sum(axis=0)
-
         return R
 
     def render(self, mode="human"):
@@ -284,8 +278,8 @@ class DiscretizedPendulumDet(DiscretizedPendulum):
         self.n = 0
 
     def reset(self):
-        self.set_state(self.init_state[self.n % len(self.init_state)])
-        self.n += 1
+        self.set_state(self.init_state[self.n])
+        self.n = (self.n + 1) % len(self.init_state)
         self.last_a = None
         return self.get_obs()
 

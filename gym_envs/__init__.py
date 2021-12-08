@@ -31,7 +31,13 @@ register(
 register(
     id='DiscretizedDoublePendulum-v2',
     entry_point='gym_envs.envs:DiscretizedDoublePendulum',
-    max_episode_steps=200,
+    max_episode_steps=100,
+)
+
+register(
+    id='DiscretizedDoublePendulum-v0',
+    entry_point='gym_envs.envs:DiscretizedDoublePendulumDet',
+    max_episode_steps=100,
 )
 
 register(
