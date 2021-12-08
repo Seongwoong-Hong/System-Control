@@ -1,3 +1,6 @@
+import time
+import pytest
+import numpy as np
 from common.util import make_env
 from RL.project_policies import def_policy
 
@@ -27,3 +30,25 @@ def test_iter_predict():
         ob, r, done, _ = env.step(act)
         obs.append(ob)
     print('end')
+
+
+def test_finite_rl():
+    env = make_env(f"DiscretizedDoublePendulum-v2", num_envs=1, h=[0.1, 0.05, 0.2, 0.2])
+    t1 = time.time()
+    algo = def_policy("finitesoftqiter", env)
+    algo.learn(2000)
+    algo2 = def_policy("softqiter", env)
+    # algo2.learn(2000)
+    algo2.policy.policy_table = algo.policy.policy_table[0]
+    print(time.time() - t1)
+    for _ in range(5):
+        obs = env.reset()
+        done = False
+        while not done:
+            a, _ = algo2.predict(obs, deterministic=True)
+            next_obs, r, done, _ = env.step(a)
+            obs = next_obs
+            time.sleep(env.envs[0].env.dt)
+            env.render()
+    env.close()
+    # assert np.abs(algo.policy.policy_table[0] - algo2.policy.policy_table).mean() <= 1e-4

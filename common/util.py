@@ -1,4 +1,5 @@
 import os
+import warnings
 import os.path as p
 import gym
 import gym_envs  # needs for custom environments
@@ -11,7 +12,7 @@ from stable_baselines3.common.monitor import Monitor
 from common.wrappers import ActionWrapper
 
 
-def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, wrapper=None, **kwargs):
+def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):
     wrapper_kwargs = kwargs.pop('wrapper_kwrags', {})
     if isinstance(env_name, gym.Env):
         env = env_name
@@ -42,16 +43,18 @@ def make_env(env_name, use_vec_env=False, num_envs=10, use_norm=False, wrapper=N
     if wrapper is not None:
         if wrapper == "ActionWrapper":
             env = ActionWrapper(env)
+        elif isinstance(wrapper, str):
+            warnings.warn("Not specified wrapper name so it's ignored")
         else:
             env = wrapper(env, **wrapper_kwargs)
 
     if use_norm:
-        env = DummyVecEnv([lambda: Monitor(env) for _ in range(num_envs)])
+        env = DummyVecEnv([lambda: Monitor(deepcopy(env)) for _ in range(num_envs)])
         if isinstance(use_norm, str):
             env = VecNormalize.load(use_norm, env)
         else:
             env = VecNormalize(env, norm_obs=True, norm_reward=True)
-    elif use_vec_env:
+    elif num_envs:
         env = DummyVecEnv([lambda: deepcopy(env) for _ in range(num_envs)])
 
     return env

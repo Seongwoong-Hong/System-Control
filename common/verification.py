@@ -26,9 +26,9 @@ def verify_policy(environment, policy, render="human", deterministic=True, repea
         assert render == "None"
         obs_list, acts_list = [], []
         for _ in range(repeat_num):
-            policy.set_env(environment)
+            policy.set_env(deepcopy(environment))
             ob = environment.reset().reshape(1, -1)
-            obs, acts = policy.predict(ob)
+            obs, acts = policy.predict(ob, deterministic=deterministic)
             obs_list.append(obs)
             acts_list.append(acts)
         return np.array(acts_list), np.array(obs_list), None

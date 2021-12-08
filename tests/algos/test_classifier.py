@@ -36,7 +36,7 @@ def fit(x, y):
 
 def fit_soft(x, y, C):
     num = x.shape[0]
-    K = y[:, None] * x
+    K = y * x
     K = np.dot(K, K.T)
     P = matrix(K)
     q = matrix(-np.ones((num, 1)))
@@ -131,7 +131,7 @@ def plot_clf(X, y, title, w, b):
     pt3 = [- (w[1] * max(xy_lim[1]) + b) / w[0], max(xy_lim[1])]
 
     pts = np.array([pt0, pt1, pt2, pt3])
-    pts = np.delete(pts, np.argmax(pts[:, 0]), axis=0)
+    pts = np.delete(pts, np.argmax(pts[:, 1]), axis=0)
     pts = np.delete(pts, np.argmin(pts[:, 1]), axis=0)
     ax.plot(pts[:, 0], pts[:, 1], c='k')
 
@@ -148,6 +148,16 @@ def test_classifier_hard_svm():
     plot_clf(X, y_pred, 'classified', clf.w, clf.b)
 
 
+def test_classifier_soft_svm():
+    clf = LinearSVM()
+    X, y = load_data_2d()
+    clf.fit(X=X, y=y, soft=True)
+    y_pred = clf.predict(X=X)
+
+    plot_clf(X, y, 'data', clf.w, clf.b)
+    plot_clf(X, y_pred, 'classified', clf.w, clf.b)
+
+
 def test_classifier():
     X, y = load_data_2d()
     X, y = torch.tensor(X).float(), torch.tensor(y).float()
@@ -157,10 +167,11 @@ def test_classifier():
     opt = torch.optim.SGD(params=[w, b], lr=1e-3)
 
     losses = []
-    for itr in range(1000):
+    for itr in range(3000):
         target = X @ w.T + b
-        # loss = torch.mean(torch.clamp(0.5 - y * target, min=0))
-        loss = torch.mean(- y * target)
+        loss = torch.mean(torch.clamp(1.0 - y * target, min=0))
+        # loss += torch.norm(w)
+        # loss = torch.mean(- y * target)
         losses.append(loss.item())
 
         opt.zero_grad()
