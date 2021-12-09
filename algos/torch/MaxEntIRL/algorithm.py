@@ -174,21 +174,15 @@ class MaxEntIRL:
 
     def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
         self.reward_net.train()
-        for rew_steps in range(max_gradient_steps):
-            expected_expert_rewards, _ = self.mean_transition_reward(self.expert_trajectories)
-            Dc = self.state_visitation()
-            whole_reward_values = self.reward_net(self.whole_state)
-            loss = th.dot(Dc, whole_reward_values.flatten()) - expected_expert_rewards
-            self.reward_net.optimizer.zero_grad()
-            loss.backward()
-            self.reward_net.optimizer.step()
-            weight_norm, grad_norm = 0.0, 0.0
-            for param in self.reward_net.parameters():
-                weight_norm += param.norm().detach().item()
-                grad_norm += param.grad.norm().item()
-            logger.record("weight norm", weight_norm)
-            logger.record("grad norm", grad_norm)
-            logger.record("loss", loss.item())
+        expected_expert_rewards, _ = self.mean_transition_reward(self.expert_trajectories)
+        Dc = self.state_visitation()
+        whole_reward_values = self.reward_net(self.whole_state)
+        loss = th.dot(Dc, whole_reward_values.flatten()) - expected_expert_rewards
+        self.reward_net.optimizer.zero_grad()
+        loss.backward()
+        self.reward_net.optimizer.step()
+        logger.record("loss", loss.item())
+        return loss.item()
 
     def learn(
             self,
@@ -217,19 +211,22 @@ class MaxEntIRL:
         while self.itr < total_iter:
             self.reward_net.reset_optim()
             with logger.accumulate_means(f"reward"):
-                self.train_reward_fn(max_gradient_steps, min_gradient_steps)
+                mean_loss = self.train_reward_fn(max_gradient_steps, min_gradient_steps)
+                weight_norm, grad_norm = 0.0, 0.0
+                for param in self.reward_net.parameters():
+                    weight_norm += param.norm().detach().item()
+                    grad_norm += param.grad.norm().item()
+                logger.record("weight norm", weight_norm)
+                logger.record("grad norm", grad_norm)
                 logger.dump(self.itr)
+                if np.abs(mean_loss) < 1e-3 and np.abs(grad_norm) < 1e-4:
+                    break
             with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)
                 for agent_steps in range(1, max_agent_iter + 1):
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
                     logger.dump(step=self.agent.num_timesteps)
-                    expected_expert_rewards, _ = self.mean_transition_reward(self.expert_trajectories)
-                    Ds = self.state_visitation()
-                    whole_reward_values = self.reward_net(self.whole_state)
-                    reward_diff = th.dot(Ds, whole_reward_values.flatten()) - expected_expert_rewards
-                    logger.record("loss_diff", reward_diff.item())
                     logger.record("agent_steps", agent_steps, exclude="tensorboard")
                     logger.dump(self.itr)
             self.itr += 1

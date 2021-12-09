@@ -19,8 +19,8 @@ class DiscretizedDoublePendulum(gym.Env):
     def __init__(self, h=None):
         super(DiscretizedDoublePendulum, self).__init__()
         self.max_torques = [20., 10.]
-        self.max_speeds = [1., 1.]
-        self.max_angles = [np.pi / 3, np.pi / 6]
+        self.max_speeds = [.8, 1.2]
+        self.max_angles = [np.pi / 30, np.pi / 20]
         self.dt = 0.05
         self.g = 9.81
         self.Is = [0.1, 0.1]
@@ -189,10 +189,21 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def get_idx_from_obs(self, obs: np.ndarray):
         dims = self.get_num_cells(self.h)
-
         obs_sub = np.round((obs + np.concatenate([self.max_angles, self.max_speeds])) / np.array(self.h)).astype('i')
         tot_idx = np.ravel_multi_index(obs_sub.T, dims, order='C')
         return tot_idx.flatten()
+
+    def get_obs_from_idx(self, idx: np.ndarray):
+        h_th0, h_th1, h_thd0, h_thd1 = self.h
+        n_th0, n_th1, n_thd0, n_thd1 = self.get_num_cells(self.h)
+
+        s_vec = np.stack(np.meshgrid(h_th0 * np.arange(n_th0) - self.max_angles[0],
+                                     h_th1 * np.arange(n_th1) - self.max_angles[1],
+                                     h_thd0 * np.arange(n_thd0) - self.max_speeds[0],
+                                     h_thd1 * np.arange(n_thd1) - self.max_speeds[1],
+                                     indexing='ij'),
+                         -1).reshape(-1, 4)
+        return s_vec[idx.flatten()]
 
     def get_act_from_idx(self, idx: np.ndarray):
         a_vec = np.stack(np.meshgrid(np.arange(self.num_actions[0]),
@@ -294,22 +305,59 @@ class DiscretizedDoublePendulum(gym.Env):
 
 
 class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
-    def __init__(self, h=None):
+    def __init__(self, h=None, init_states=None):
         super(DiscretizedDoublePendulumDet, self).__init__(h=h)
-        self.init_state, _ = super(DiscretizedDoublePendulumDet, self).get_vectorized()
-        self.init_state = self.init_state[0:len(self.init_state):100]
+        if init_states is None:
+            self.init_states, _ = super(DiscretizedDoublePendulumDet, self).get_vectorized()
+            self.init_states = self.init_states[0:len(self.init_states):100]
+        else:
+            self.init_states = self.get_obs_from_idx(self.get_idx_from_obs(init_states))
         self.n = 0
 
     def reset(self):
-        self.set_state(self.init_state[self.n])
-        self.n = (self.n + 1) % len(self.init_state)
+        self.set_state(self.init_states[self.n])
+        self.n = (self.n + 1) % len(self.init_states)
         self.last_a = None
         return self.get_obs()
 
     def get_vectorized(self, h=None):
-        s_vec = deepcopy(self.init_state)
+        s_vec = deepcopy(self.init_states)
         a_vec = np.stack(np.meshgrid(np.arange(self.num_actions[0]),
                                      np.arange(self.num_actions[1]),
                                      indexing='ij'),
                          -1).reshape(-1, 2)
         return s_vec, a_vec
+
+
+class DiscretizedHuman(DiscretizedDoublePendulum):
+    def __init__(self, bsp=None, h=None):
+        super(DiscretizedHuman, self).__init__(h=h)
+        if bsp is not None:
+            m_u, l_u, com_u, I_u = bsp[6, :]
+            m_s, l_s, com_s, I_s = bsp[2, :]
+            m_t, l_t, com_t, I_t = bsp[3, :]
+            l_l = l_s + l_t
+            m_l = 2 * (m_s + m_t)
+            com_l = (m_s * com_s + m_t * (l_s + com_t)) / (m_s + m_t)
+            I_l = 2 * (I_s + m_s * (com_l - com_s) ** 2 + I_t + m_t * (com_l - (l_s + com_t)) ** 2)
+            self.Is = [I_l, I_u]
+            self.ms = [m_l, m_u]
+            self.lcs = [com_l, com_u]
+            self.ls = [l_l, l_u]
+
+
+class DiscretizedHumanDet(DiscretizedDoublePendulumDet):
+    def __init__(self, bsp=None, h=None, init_states=None):
+        super(DiscretizedHumanDet, self).__init__(h=h, init_states=init_states)
+        if bsp is not None:
+            m_u, l_u, com_u, I_u = bsp[6, :]
+            m_s, l_s, com_s, I_s = bsp[2, :]
+            m_t, l_t, com_t, I_t = bsp[3, :]
+            l_l = l_s + l_t
+            m_l = 2 * (m_s + m_t)
+            com_l = (m_s * com_s + m_t * (l_s + com_t)) / (m_s + m_t)
+            I_l = 2 * (I_s + m_s * (com_l - com_s) ** 2 + I_t + m_t * (com_l - (l_s + com_t)) ** 2)
+            self.Is = [I_l, I_u]
+            self.ms = [m_l, m_u]
+            self.lcs = [com_l, com_u]
+            self.ls = [l_l, l_u]

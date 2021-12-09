@@ -17,15 +17,14 @@ def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):
     if isinstance(env_name, gym.Env):
         env = env_name
     else:
-        env_type = env_name[:env_name.find("_")]
-        if env_type == "HPC":
+        if "HPC" in env_name:
             subpath = kwargs.pop("subpath", None)
             pltqs = kwargs.get("pltqs")
             if pltqs is None and subpath is not None:
                 pltqs, init_states = [], []
                 i = 0
                 while True:
-                    file = subpath + f"i{i+1}.mat"
+                    file = subpath + f"i{i + 1}.mat"
                     if not p.isfile(file):
                         break
                     pltqs += [io.loadmat(file)['pltq']]
@@ -34,10 +33,11 @@ def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):
                     i += 1
                 kwargs['pltqs'] = pltqs
                 kwargs['init_states'] = init_states
+        elif "Human" not in env_name:
+            kwargs.pop('bsp', None)
         else:
             kwargs.pop('subpath', None)
             kwargs.pop('pltqs', None)
-            kwargs.pop('bsp', None)
         env = gym.make(env_name, **kwargs)
 
     if wrapper is not None:
