@@ -2,6 +2,7 @@ import os
 import pytest
 import pickle
 import numpy as np
+from scipy import io
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
@@ -27,21 +28,44 @@ def test_mujoco_envs_learned_policy():
 
 
 def test_rl_learned_policy(rl_path):
-    env_type = "IDP"
-    name = f"{env_type}_custom"
-    # model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "sac", "policies_1")
-    model_dir = os.path.join("..", "..", "IRL", "tmp", "log")
+    env_type = "DiscretizedHuman"
+    name = f"{env_type}"
+    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name + "_sub03_1", "softqiter", "policies_1")
+    # model_dir = os.path.join("..", "..", "IRL", "tmp", "log")
     stats_path = None
     if os.path.isfile(model_dir + "normalization.pkl"):
         stats_path = model_dir + "normalization.pkl"
     wrapper = ActionWrapper if env_type == "HPC" else None
-    env = make_env(f"{name}-v2", subpath="../../IRL/demos/HPC/sub01/sub01", wrapper=wrapper, use_norm=stats_path)
-    algo = SAC.load(model_dir + f"/agent")
-    a_list, o_list, _ = verify_policy(env, algo, render="human", repeat_num=10, deterministic=True)
-    plt.plot(a_list[0])
-    plt.show()
-    plt.plot(o_list[0][:, :2])
-    plt.show()
+    subj = "sub03"
+    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
+    subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
+    init_states = []
+    for i in range(1):
+        for j in range(1):
+            bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
+            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
+    env = make_env(f"{name}-v2", num_envs=1, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
+    # env = make_env(f"{name}-v2", subpath="../../IRL/demos/HPC/sub01/sub01", wrapper=wrapper, use_norm=stats_path)
+    with open(model_dir + "/agent.pkl", "rb") as f:
+        algo = pickle.load(f)
+    algo.set_env(env)
+    import time
+    for _ in range(5):
+        obs = env.reset()
+        done = False
+        while not done:
+            a, _ = algo.predict(obs, deterministic=True)
+            ns, _, done, _ = env.step(a)
+            env.render()
+            time.sleep(0.05)
+            obs = ns
+    env.close()
+    # algo = SAC.load(model_dir + f"/agent")
+    # a_list, o_list, _ = verify_policy(env, algo, render="human", repeat_num=10, deterministic=True)
+    # plt.plot(a_list[0])
+    # plt.show()
+    # plt.plot(o_list[0][:, :2])
+    # plt.show()
 
 
 def test_2d(rl_path):

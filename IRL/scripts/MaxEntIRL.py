@@ -20,17 +20,17 @@ if __name__ == "__main__":
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}"
-    subj = "sub03"
-    expt = f"{subj}_1"
+    subj = "sub07"
+    expt = f"{subj}_3"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
     init_states = []
-    for i in range(5):
-        for j in range(5):
+    for i in range(1):
+        for j in range(1):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    env = make_env(f"{name}-v2", subpath=subpath, h=[0.01, 0.01, 0.1, 0.1], bsp=bsp)
-    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[0.01, 0.01, 0.1, 0.1], bsp=bsp, init_states=init_states)
+    env = make_env(f"{name}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
+    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{expt}_linear_finite"
+    log_dir += f"/ext_{expt}_finite"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -59,7 +59,9 @@ if __name__ == "__main__":
         # return ft
         # return x
         # return x ** 2
-        return th.cat((x, x ** 2), dim=1)
+        # x1, x2, x3, x4 = th.split(x, 1, dim=1)
+        # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, x**2, x**3), dim=1)
+        return th.cat([x, x ** 2], dim=1)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
@@ -88,7 +90,7 @@ if __name__ == "__main__":
 
     # Run Learning
     learner.learn(
-        total_iter=1500,
+        total_iter=500,
         agent_learning_steps=5e3,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
@@ -96,7 +98,7 @@ if __name__ == "__main__":
         max_gradient_steps=1,
         min_gradient_steps=1,
         callback=save_net_callback.net_save,
-        callback_period=100,
+        callback_period=1000,
         early_stop=True,
     )
 

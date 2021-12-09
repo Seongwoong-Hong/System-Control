@@ -53,8 +53,19 @@ def test_value_itr(soft=True):
     주어진 policy 에 대해 이산화된 전환 행렬 이용, value itr 수행
     greedy, soft update 구현됨
     """
-    h = [0.1, 0.05, 1.0, 1.0]
-    env = gym.make('DiscretizedDoublePendulum-v2', h=h)  # type: DiscretizedDoublePendulum
+    import time, os
+    from scipy import io
+    subj = "sub03"
+    expt = f"{subj}_1"
+    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
+    subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
+    init_states = []
+    for i in range(1):
+        for j in range(1):
+            bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
+            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
+    h = [0.03, 0.03, 0.05, 0.08]
+    env = gym.make('DiscretizedHuman-v2', h=h, bsp=bsp)  # type: DiscretizedDoublePendulum
 
     n_dim = np.prod(env.get_num_cells(h))
     P = env.get_trans_mat(h)
@@ -76,7 +87,8 @@ def test_value_itr(soft=True):
         return a_prob
 
     # q learning iteration
-    for itr in range(5):
+    for itr in range(1):
+        t1 = time.time()
         old_q = np.copy(q_values)
 
         for t_ind in reversed(range(env.spec.max_episode_steps)):
@@ -99,14 +111,14 @@ def test_value_itr(soft=True):
                     next_values = q_values[t_ind + 1].T[next_A.T == 1]
 
                 q_values[t_ind] = R + backward_trans(P, v=next_values)
-
+        print(time.time() - t1)
         max_q_err = np.max(np.abs(old_q - q_values))
         print(f'itr #{itr} Maximum Q err: {max_q_err:.2f}')
 
     # running with learned policy
     # todo: q-value 와 rollout value 의 갭 줄이는 방법
     s_vec, a_vec = env.get_vectorized(h)
-    import time
+
     for itr in range(5):
         s = env.reset()
         print(f'Try #{itr} @ initial state {s}')

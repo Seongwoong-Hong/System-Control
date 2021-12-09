@@ -7,18 +7,18 @@ import numpy as np
 if __name__ == '__main__':
     env_type = "DiscretizedHuman"
     env_id = f"{env_type}-v2"
-    env = make_env(env_id, h=[0.01, 0.01, 0.1, 0.1])
+    env = make_env(env_id, h=[0.03, 0.03, 0.05, 0.08])
     act_coeff = 1
     # act_coeff = env.model.actuator_gear[0, 0]
     trajectories = []
-    subi = 2
-    actuation = 1
+    subi = 7
+    actuation = 3
     sub = f"sub{subi:02d}"
-    for i in range(5 * actuation):
+    for i in range(5 * (actuation - 1), 5 * actuation):
         for j in range(5):
             file = f"HPC/{sub}_cropped/{sub}i{i + 1}_{j}.mat"
             state = io.loadmat(file)['state'][:, :4]
-            # print(state.max(axis=0), state.min(axis=0))
+            # print(io.loadmat(file)['tq'].max(axis=0), io.loadmat(file)['tq'].min(axis=0))
             state = env.get_obs_from_idx(env.get_idx_from_obs(state))
             data = {'state': state,
                     'T': io.loadmat(file)['tq'] / act_coeff,

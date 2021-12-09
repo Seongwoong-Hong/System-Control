@@ -84,35 +84,31 @@ def draw_costfigure():
     #         - th.exp(-0.5 * ((x - 5 / 2) ** 2 + (y + 5 / 2) ** 2)) \
     #         - th.exp(-0.5 * ((x + 5 / 2) ** 2 + (y + 5 / 2) ** 2))
     def expt_reward(inp: th.Tensor) -> th.Tensor:
-        d1, d2 = th.split(inp, 1, dim=-1)
-        # obs, act = inp[:, 0], inp[:, 1]
-        # next_obs = obs + act - 1
-        return -(d1 ** 2 + 0.1 * (d2 ** 2))
-        # return - (obs[0] - 15) ** 2
+        d1, d2, d3, d4 = th.split(inp, 1, dim=-1)
+        return -(d1 ** 2 + d2 ** 2)
 
-    env_type = "DiscretizedPendulum"
+    env_type = "DiscretizedHuman"
     env_id = f"{env_type}"
-    env_op = 0.03
-    subj = f"softqiter_disc_part_{env_op}"
+    env_op = 1
+    subj = f"sub03"
+    bsp = io.loadmat(f"../../IRL/demos/HPC/{subj}/{subj}i1.mat")['bsp']
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
-    env = make_env(f"{env_id}-v2", subpath=subpath + f"/{subj}", h=[env_op, env_op * 5])
+    env = make_env(f"{env_id}-v2", subpath=subpath + f"/{subj}", h=[0.01, 0.02, 0.025, 0.05], bsp=bsp)
     algo_type = "MaxEntIRL"
-    name = f"ext_{subj}_linear_finite"
-    num = 99
+    name = f"ext_{subj}_1_linear_finite"
+    # num = 99
     load_dir = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model")
-    with open(load_dir + f"/{num:03d}/agent.pkl", "rb") as f:
-        algo = pickle.load(f)
     # algo = PPO.load(load_dir + f"/{num:03d}/agent")
     # algo = def_policy("IDP", env)
     # algo = PPO.load(f"../../RL/IDP/tmp/log/IDP_custom/ppo/policies_1/ppo0")
-    with open(load_dir + f"/{num:03d}/reward_net.pkl", "rb") as f:
+    with open(load_dir + f"/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f)
 
     s_vec, a_vec = env.get_vectorized()
-    n_d1, n_d2 = env.get_num_cells()
-    inp = th.from_numpy(s_vec).float().to(algo.device).reshape(-1, 2)
-    cost1 = -expt_reward(inp).reshape(n_d2, n_d1).numpy()
-    cost2 = -reward_fn(inp).reshape(n_d2, n_d1).numpy()
+    n_d1, n_d2, n_d3, n_d4 = env.get_num_cells()
+    inp = th.from_numpy(s_vec).float().to(reward_fn.device).reshape(-1, 4)
+    cost1 = -expt_reward(inp).reshape(n_d3 * n_d4, n_d1 * n_d2).numpy()
+    cost2 = -reward_fn(inp).detach().reshape(n_d3 * n_d4, n_d1 * n_d2).numpy()
     cost1 = (cost1 - np.min(cost1)) / (np.max(cost1) - np.min(cost1))
     cost2 = (cost2 - np.min(cost2)) / (np.max(cost2) - np.min(cost2))
     title_list = ["original cost", "learned cost"]
@@ -124,7 +120,7 @@ def draw_costfigure():
     for i in [0, 1]:
         # ax = fig.add_subplot(1, 2, i+1)
         ax = fig.add_subplot(1, 2, i + 1, projection='3d')
-        d1, d2 = np.meshgrid(range(n_d1), range(n_d2))
+        d1, d2 = np.meshgrid(range(n_d1 * n_d2), range(n_d3 * n_d4))
         surf = ax.plot_surface(d1, d2, yval_list[i], rstride=1, cstride=1, cmap=cm.rainbow,
                                vmax=max_list[i], vmin=min_list[i])
         # ax.scatter(d1, yval_list[i], vmax=max_list[i], vmin=min_list[i])

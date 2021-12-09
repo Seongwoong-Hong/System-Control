@@ -1,5 +1,6 @@
 import os
 import shutil
+from scipy import io
 
 from stable_baselines3.common import callbacks
 from imitation.policies import serialize
@@ -11,17 +12,26 @@ from RL.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "DiscretizedDoublePendulum"
+    env_type = "DiscretizedHuman"
     algo_type = "softqiter"
-    env_op = 0.1
+    # env_op = 0.1
     name = f"{env_type}"
     device = "cpu"
     env_id = f"{name}-v2"
-    subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
+    # subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
     # env = make_env(env_id, use_vec_env=False, num_envs=1, subpath=subpath, wrapper=ActionWrapper, use_norm=False)
-    env = make_env(env_id, num_envs=1, h=[env_op, env_op / 2, env_op * 2, env_op * 2])
+    subj = "sub03"
+    expt = f"{subj}_1"
+    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "IRL"))
+    subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
+    init_states = []
+    for i in range(1):
+        for j in range(1):
+            bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
+            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
+    env = make_env(env_id, num_envs=1, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
     # env = make_env(env_id, use_vec_env=False)
-    name += f"_{env_op}"
+    name += f"_{expt}"
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     os.makedirs(log_dir, exist_ok=True)

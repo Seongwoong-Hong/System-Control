@@ -1,7 +1,9 @@
 import os
+import time
 import pickle
 import pytest
 from scipy import io
+import torch as th
 import numpy as np
 
 from IRL.scripts.project_policies import def_policy
@@ -13,29 +15,29 @@ from common.wrappers import *
 
 from imitation.algorithms import bc
 
-
-@pytest.fixture
-def irl_path():
-    return os.path.abspath(os.path.join("..", "..", "IRL"))
-
-
-@pytest.fixture
-def subj():
-    return "sub01"
+subj = "sub03"
+irl_path = os.path.abspath(os.path.join("..", "..", "IRL"))
+bsp = io.loadmat(f"{irl_path}/demos/HPC/{subj}/{subj}i1.mat")['bsp']
 
 
 @pytest.fixture
-def pltqs(irl_path, subj):
+def pltqs():
     pltqs = []
-    for i in [0, 5, 10, 15, 20, 25, 30]:
-        file = os.path.join(irl_path, "demos", "HPC", subj, f"{subj}i{i + 1}.mat")
-        pltqs += [io.loadmat(file)['pltq']]
+    for i in range(5):
+        for j in range(5):
+            file = os.path.join(irl_path, "demos", "HPC", subj + "_cropped", f"{subj}i{i + 1}_{j}.mat")
+            pltqs += [io.loadmat(file)['pltq']]
     return pltqs
 
 
 @pytest.fixture
-def bsp(irl_path, subj):
-    return io.loadmat(f"{irl_path}/demos/HPC/{subj}/{subj}i1.mat")['bsp']
+def init_states():
+    init_states = []
+    for i in range(5):
+        for j in range(5):
+            file = os.path.join(irl_path, "demos", "HPC", subj + "_cropped", f"{subj}i{i + 1}_{j}.mat")
+            init_states += [io.loadmat(file)['state'][0, :4]]
+    return init_states
 
 
 def test_hpc_algo(env):
@@ -126,7 +128,30 @@ def test_1D(irl_path):
     name = "1DTarget"
     env_id = f"{name}_disc"
     env = make_env(f"{env_id}-v0")
-    model_dir = os.path.join(irl_path, "tmp", "log", env_id, "MaxEntIRL", "ext_ppo_disc_linear_ppoagent_svm_reset", "model")
+    model_dir = os.path.join(irl_path, "tmp", "log", env_id, "MaxEntIRL", "ext_ppo_disc_linear_ppoagent_svm_reset",
+                             "model")
     algo = PPO.load(model_dir + "/008/agent")
     a_list, o_list, _ = verify_policy(env, algo, render="None", repeat_num=9, deterministic=False)
     print('end')
+
+
+def test_discretized_env(init_states):
+    from algos.tabular.viter import SoftQiter
+    name = "DiscretizedHuman"
+    env_id = f"{name}"
+    env = make_env(f"{env_id}-v2", num_envs=1, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "MaxEntIRL", "cross_sub03_1_linear_finite", "model")
+    with open(model_dir + "/agent.pkl", "rb") as f:
+        agent = pickle.load(f)
+    algo = SoftQiter(env, gamma=0.8, alpha=0.01)
+    algo.policy.policy_table = agent.policy.policy_table[0]
+    for _ in range(5):
+        obs = env.reset()
+        done = False
+        while not done:
+            a, _ = algo.predict(obs, deterministic=True)
+            ns, _, done, _ = env.step(a)
+            env.render()
+            time.sleep(0.05)
+            obs = ns
+    env.close()

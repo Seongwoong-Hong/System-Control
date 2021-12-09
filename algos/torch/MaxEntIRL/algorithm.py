@@ -219,7 +219,7 @@ class MaxEntIRL:
                 logger.record("weight norm", weight_norm)
                 logger.record("grad norm", grad_norm)
                 logger.dump(self.itr)
-                if np.abs(mean_loss) < 1e-3 and np.abs(grad_norm) < 1e-4:
+                if mean_loss < -1e-2 and self.itr > 30 and np.abs(grad_norm) < 1e-4:
                     break
             with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)

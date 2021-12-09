@@ -1,6 +1,8 @@
+import os
 import time
 import pytest
 import numpy as np
+from scipy import io
 from common.util import make_env
 from RL.project_policies import def_policy
 
@@ -33,7 +35,15 @@ def test_iter_predict():
 
 
 def test_finite_rl():
-    env = make_env(f"DiscretizedDoublePendulum-v2", num_envs=1, h=[0.1, 0.05, 0.2, 0.2])
+    subpath = os.path.join("..", "..", "IRL", "demos", "HPC", f"sub03_cropped", "sub03")
+    init_states = []
+    for i in range(5):
+        for j in range(5):
+            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
+    bsp = io.loadmat(subpath + f"i1_0.mat")['bsp']
+    env = make_env(f"DiscretizedHuman-v2", num_envs=1, h=[0.01, 0.02, 0.025, 0.05], bsp=bsp)
+    eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, h=[0.01, 0.02, 0.025, 0.05], bsp=bsp,
+                        init_states=init_states)
     t1 = time.time()
     algo = def_policy("finitesoftqiter", env)
     algo.learn(2000)
@@ -41,14 +51,14 @@ def test_finite_rl():
     # algo2.learn(2000)
     algo2.policy.policy_table = algo.policy.policy_table[0]
     print(time.time() - t1)
-    for _ in range(5):
-        obs = env.reset()
+    for _ in range(25):
+        obs = eval_env.reset()
         done = False
         while not done:
             a, _ = algo2.predict(obs, deterministic=True)
-            next_obs, r, done, _ = env.step(a)
+            next_obs, r, done, _ = eval_env.step(a)
             obs = next_obs
             time.sleep(env.envs[0].env.dt)
-            env.render()
-    env.close()
+            eval_env.render()
+    eval_env.close()
     # assert np.abs(algo.policy.policy_table[0] - algo2.policy.policy_table).mean() <= 1e-4

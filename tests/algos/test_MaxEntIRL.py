@@ -14,6 +14,7 @@ from common.util import make_env
 from common.wrappers import *
 
 env_op = 1
+subj = "sub03"
 env_name = "DiscretizedHuman"
 env_id = f"{env_name}"
 
@@ -26,7 +27,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, f"sub02_{env_op}.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, f"{subj}_{env_op}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -34,24 +35,24 @@ def expert(demo_dir):
 
 @pytest.fixture
 def env(demo_dir):
-    subpath = os.path.join(demo_dir, "HPC", "sub02_cropped", "sub02")
+    subpath = os.path.join(demo_dir, "HPC", f"{subj}_cropped", subj)
     init_states = []
     for i in range(5):
         for j in range(5):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v2", subpath=subpath, h=[0.01, 0.01, 0.1, 0.1], bsp=bsp)
+    return make_env(f"{env_id}-v2", subpath=subpath, h=[0.005, 0.015, 0.025, 0.03], bsp=bsp)
 
 
 @pytest.fixture
 def eval_env(demo_dir):
-    subpath = os.path.join(demo_dir, "HPC", "sub02_cropped", "sub02")
+    subpath = os.path.join(demo_dir, "HPC", f"{subj}_cropped", subj)
     init_states = []
     for i in range(5):
         for j in range(5):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v0", subpath=subpath, h=[0.01, 0.01, 0.1, 0.1], bsp=bsp, init_states=init_states)
+    return make_env(f"{env_id}-v0", subpath=subpath, h=[0.005, 0.015, 0.025, 0.03], bsp=bsp, init_states=init_states)
 
 
 @pytest.fixture

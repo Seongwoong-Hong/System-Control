@@ -6,7 +6,8 @@ import numpy as np
 
 from scipy import io
 from matplotlib import pyplot as plt
-from imitation.data.rollout import flatten_trajectories
+from imitation.data.rollout import flatten_trajectories, make_sample_until
+from common.rollouts import generate_trajectories_without_shuffle
 
 from common.util import make_env
 
@@ -91,3 +92,31 @@ def test_demo_state(demo_dir):
             # env.render()
             # time.sleep(env.dt)
     env.close()
+
+
+def test_compare_demo_and_agent():
+    env_type = "DiscretizedHuman"
+    subj = f"sub03"
+    bsp = io.loadmat(f"../../IRL/demos/HPC/{subj}/{subj}i1.mat")['bsp']
+    init_states = []
+    for i in range(5):
+        for j in range(5):
+            init_states += [io.loadmat(f"../../IRL/demos/HPC/{subj}_cropped/{subj}i{i + 1}_{j}.mat")['state'][0, :4]]
+    with open(f"../../IRL/demos/DiscretizedHuman/sub03_1.pkl", "rb") as f:
+        expert_trajs = pickle.load(f)
+    env = make_env(f"{env_type}-v0", num_envs=1, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
+    algo_type = "MaxEntIRL"
+    name = f"cross_{subj}_1_1_linear_finite"
+    load_dir = os.path.abspath(f"../../IRL/tmp/log/{env_type}/{algo_type}/{name}/model")
+    with open(load_dir + f"/agent.pkl", "rb") as f:
+        algo = pickle.load(f)
+    from algos.tabular.viter import SoftQiter
+    agent = SoftQiter(env, gamma=0.8, alpha=0.01)
+    agent.policy.policy_table = algo.policy.policy_table[0]
+    sample_until = make_sample_until(n_timesteps=None, n_episodes=25)
+    trajs = generate_trajectories_without_shuffle(agent, env, sample_until, deterministic_policy=True)
+    for i in range(1):
+        plt.plot(expert_trajs[i].obs)
+        plt.show()
+        plt.plot(trajs[i].obs)
+        plt.show()

@@ -18,9 +18,11 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def __init__(self, h=None):
         super(DiscretizedDoublePendulum, self).__init__()
-        self.max_torques = [20., 10.]
-        self.max_speeds = [.8, 1.2]
-        self.max_angles = [np.pi / 30, np.pi / 20]
+        self.max_torques = [200., 200.]
+        self.max_speeds = np.array([0.2, 0.5])
+        self.min_speeds = np.array([-0.3, -0.3])
+        self.max_angles = np.array([0.3, 0.3])
+        self.min_angles = np.array([-0.3, -0.3])
         self.dt = 0.05
         self.g = 9.81
         self.Is = [0.1, 0.1]
@@ -28,7 +30,7 @@ class DiscretizedDoublePendulum(gym.Env):
         self.lcs = [0.5, 0.5]
         self.ls = [1., 1.]
         self.h = h
-        self.num_actions = [5, 5]
+        self.num_actions = [11, 11]
         self.Q = np.diag([1., 1., 0., 0.])
 
         self.np_random = None
@@ -37,7 +39,8 @@ class DiscretizedDoublePendulum(gym.Env):
         self.last_a = None
 
         obs_high = np.array([*self.max_angles, *self.max_speeds]) + h
-        self.observation_space = gym.spaces.Box(low=-obs_high, high=obs_high, dtype=np.float32)
+        obs_low = np.array([*self.min_angles, *self.min_speeds]) - h
+        self.observation_space = gym.spaces.Box(low=obs_low, high=obs_high, dtype=np.float32)
         self.action_space = gym.spaces.MultiDiscrete(self.num_actions)
         self.torque_lists = [np.linspace(-max_t, max_t, n_act)
                              for max_t, n_act in zip(self.max_torques, self.num_actions)]
@@ -49,8 +52,9 @@ class DiscretizedDoublePendulum(gym.Env):
         return [seed]
 
     def reset(self):
-        high = np.array([*self.max_angles, 1., 1.])
-        self.state = self.np_random.uniform(low=-high, high=high)
+        high = np.array([*self.max_angles, *self.max_speeds])
+        low = np.array([*self.min_angles, *self.min_speeds])
+        self.state = self.np_random.uniform(low=low, high=high)
 
         return self.get_obs()
 
@@ -121,17 +125,17 @@ class DiscretizedDoublePendulum(gym.Env):
 
         thd1[nc_ind] = thd1[nc_ind] + (-A10[nc_ind] * b0[nc_ind] + A00[nc_ind] * b1[nc_ind]) / A_det[nc_ind] * dt
         thd1[c_ind] = thd1[c_ind] + \
-                       (T1[c_ind] + m1 * g * lc1 * np.sin(th0_before[c_ind] + th1[c_ind])) / A11[c_ind] * dt
+                      (T1[c_ind] + m1 * g * lc1 * np.sin(th0_before[c_ind] + th1[c_ind])) / A11[c_ind] * dt
         th1 = th1 + thd1 * dt
 
         # 완전 비탄성 충돌
-        thd0[np.logical_or(self.max_angles[0] <= th0, th0 <= -self.max_angles[0])] = 0.
-        thd1[np.logical_or(self.max_angles[1] <= th1, th1 <= -self.max_angles[1])] = 0.
+        thd0[np.logical_or(self.max_angles[0] <= th0, th0 <= self.min_angles[0])] = 0.
+        thd1[np.logical_or(self.max_angles[1] <= th1, th1 <= self.min_angles[1])] = 0.
 
-        th0 = np.clip(th0, -self.max_angles[0], self.max_angles[0])
-        th1 = np.clip(th1, -self.max_angles[1], self.max_angles[1])
-        thd0 = np.clip(thd0, -self.max_speeds[0], self.max_speeds[0])
-        thd1 = np.clip(thd1, -self.max_speeds[1], self.max_speeds[1])
+        th0 = np.clip(th0, self.min_angles[0], self.max_angles[0])
+        th1 = np.clip(th1, self.min_angles[1], self.max_angles[1])
+        thd0 = np.clip(thd0, self.min_speeds[0], self.max_speeds[0])
+        thd1 = np.clip(thd1, self.min_speeds[1], self.max_speeds[1])
 
         return np.concatenate([th0, th1, thd0, thd1], axis=-1)
 
@@ -143,8 +147,8 @@ class DiscretizedDoublePendulum(gym.Env):
             h = self.h
         assert h is not None
         h_th0, h_th1, h_thd0, h_thd1 = h
-        n_th0, n_th1 = np.round(2 * (self.max_angles / np.array([h_th0, h_th1]))).astype('i') + 1
-        n_thd0, n_thd1 = np.round(2 * (self.max_speeds / np.array([h_thd0, h_thd1]))).astype('i') + 1
+        n_th0, n_th1 = np.round(((self.max_angles - self.min_angles) / np.array([h_th0, h_th1]))).astype('i') + 1
+        n_thd0, n_thd1 = np.round(((self.max_speeds - self.min_speeds) / np.array([h_thd0, h_thd1]))).astype('i') + 1
 
         return n_th0, n_th1, n_thd0, n_thd1
 
@@ -155,10 +159,10 @@ class DiscretizedDoublePendulum(gym.Env):
         h_th0, h_th1, h_thd0, h_thd1 = h
         n_th0, n_th1, n_thd0, n_thd1 = self.get_num_cells(h)
 
-        s_vec = np.stack(np.meshgrid(h_th0 * np.arange(n_th0) - self.max_angles[0],
-                                     h_th1 * np.arange(n_th1) - self.max_angles[1],
-                                     h_thd0 * np.arange(n_thd0) - self.max_speeds[0],
-                                     h_thd1 * np.arange(n_thd1) - self.max_speeds[1],
+        s_vec = np.stack(np.meshgrid(h_th0 * np.arange(n_th0) + self.min_angles[0],
+                                     h_th1 * np.arange(n_th1) + self.min_angles[1],
+                                     h_thd0 * np.arange(n_thd0) + self.min_speeds[0],
+                                     h_thd1 * np.arange(n_thd1) + self.min_speeds[1],
                                      indexing='ij'),
                          -1).reshape(-1, 4)
         a_vec = np.stack(np.meshgrid(np.arange(self.num_actions[0]),
@@ -174,7 +178,7 @@ class DiscretizedDoublePendulum(gym.Env):
         assert h is not None
         dims = self.get_num_cells(h)
 
-        state_sub = np.round((state + np.concatenate([self.max_angles, self.max_speeds])) / np.array(h)).astype('i')
+        state_sub = np.round((state - np.concatenate([self.min_angles, self.min_speeds])) / np.array(h)).astype('i')
         tot_idx = np.ravel_multi_index(state_sub.T, dims, order='C')
 
         if state.ndim == 1:
@@ -189,7 +193,7 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def get_idx_from_obs(self, obs: np.ndarray):
         dims = self.get_num_cells(self.h)
-        obs_sub = np.round((obs + np.concatenate([self.max_angles, self.max_speeds])) / np.array(self.h)).astype('i')
+        obs_sub = np.round((obs - np.concatenate([self.min_angles, self.min_speeds])) / np.array(self.h)).astype('i')
         tot_idx = np.ravel_multi_index(obs_sub.T, dims, order='C')
         return tot_idx.flatten()
 
@@ -197,10 +201,10 @@ class DiscretizedDoublePendulum(gym.Env):
         h_th0, h_th1, h_thd0, h_thd1 = self.h
         n_th0, n_th1, n_thd0, n_thd1 = self.get_num_cells(self.h)
 
-        s_vec = np.stack(np.meshgrid(h_th0 * np.arange(n_th0) - self.max_angles[0],
-                                     h_th1 * np.arange(n_th1) - self.max_angles[1],
-                                     h_thd0 * np.arange(n_thd0) - self.max_speeds[0],
-                                     h_thd1 * np.arange(n_thd1) - self.max_speeds[1],
+        s_vec = np.stack(np.meshgrid(h_th0 * np.arange(n_th0) + self.min_angles[0],
+                                     h_th1 * np.arange(n_th1) + self.min_angles[1],
+                                     h_thd0 * np.arange(n_thd0) + self.min_speeds[0],
+                                     h_thd1 * np.arange(n_thd1) + self.min_speeds[1],
                                      indexing='ij'),
                          -1).reshape(-1, 4)
         return s_vec[idx.flatten()]
@@ -222,9 +226,10 @@ class DiscretizedDoublePendulum(gym.Env):
         P = np.stack([self.get_ind_from_state(next_s_vec, h).T for next_s_vec in next_s_vec_list], 0)
 
         if verbose:
-            high = np.array([*self.max_angles, 1., 1.])
+            high = np.array([*self.max_angles, *self.max_speeds])
+            low = np.array([*self.min_angles, *self.min_speeds])
             err = calc_trans_mat_error(self, P, s_vec, a_vec, h, 10 ** 3,
-                                       sampler=lambda m: np.random.uniform(low=-high, high=high, size=[m, 4]))
+                                       sampler=lambda m: np.random.uniform(low=low, high=high, size=[m, 4]))
             print(f'(h={h}) 1 step prediction error: {err:.4f}')
 
         return P
@@ -252,20 +257,20 @@ class DiscretizedDoublePendulum(gym.Env):
             self.viewer = rendering.Viewer(500, 700)
             self.viewer.set_bounds(- 0.5 * height, 0.5 * height, -0.2 * height, 1.2 * height)
 
-            rod0 = rendering.make_capsule(self.ls[0], 0.2)
-            rod0.set_color(0.8, 0.3, 0.3)
+            self.rod = rendering.make_capsule(self.ls[0], 0.2)
+            self.rod.set_color(0.8, 0.3, 0.3)
             self.pole_transform0 = rendering.Transform()
-            rod0.add_attr(self.pole_transform0)
-            self.viewer.add_geom(rod0)
+            self.rod.add_attr(self.pole_transform0)
+            self.viewer.add_geom(self.rod)
             axle0 = rendering.make_circle(0.05)
             axle0.set_color(0, 0, 0)
             self.viewer.add_geom(axle0)
 
-            rod1 = rendering.make_capsule(self.ls[1], 0.2)
-            rod1.set_color(0.8, 0.3, 0.3)
+            self.rod1 = rendering.make_capsule(self.ls[1], 0.2)
+            self.rod1.set_color(0.8, 0.3, 0.3)
             self.pole_transform1 = rendering.Transform()
-            rod1.add_attr(self.pole_transform1)
-            self.viewer.add_geom(rod1)
+            self.rod1.add_attr(self.pole_transform1)
+            self.viewer.add_geom(self.rod1)
             axle1 = rendering.make_circle(0.05)
             axle1.set_color(0, 0, 0)
             self.axle_transform1 = rendering.Transform()
@@ -289,6 +294,15 @@ class DiscretizedDoublePendulum(gym.Env):
         hinge_y = self.ls[0] * np.sin(self.state[0] + np.pi / 2)
         self.pole_transform1.set_translation(hinge_x, hinge_y)
         self.axle_transform1.set_translation(hinge_x, hinge_y)
+
+        if self.state[0] <= self.min_angles[0] or self.state[0] >= self.max_angles[0]:
+            self.rod.set_color(0.8, 0.3, 0.3)
+        else:
+            self.rod.set_color(0.3, 0.8, 0.3)
+        if self.state[1] <= self.min_angles[1] or self.state[1] >= self.max_angles[1]:
+            self.rod1.set_color(0.8, 0.3, 0.3)
+        else:
+            self.rod1.set_color(0.3, 0.8, 0.3)
 
         if self.last_a is not None:
             torques = self.get_torque(self.last_a)

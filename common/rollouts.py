@@ -90,8 +90,7 @@ def generate_trajectories_without_shuffle(
       should truncate if required.
     """
     get_action = policy.predict
-    if isinstance(policy, BaseAlgorithm):
-        policy.set_env(venv)
+    policy.set_env(venv)
 
     # Collect rollout tuples.
     trajectories = []

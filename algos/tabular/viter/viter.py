@@ -65,7 +65,8 @@ class Viter:
             self.policy.reset()
         else:
             total_timesteps += self.num_timesteps
-        self.set_env_mats()
+        self.reward_vec = self.env.env_method('get_reward_vec')[0]
+        self.reward_mat = np.repeat(self.reward_vec.reshape(1, -1), self.policy.act_size, axis=0)
         while self.num_timesteps < total_timesteps:
             old_value = deepcopy(self.policy.v_table)
             self.train()
@@ -106,6 +107,7 @@ class Viter:
 
     def set_env(self, env):
         self.env = env
+        self.policy.env = env.envs[0]
         if not isinstance(env, VecEnv):
             self.env = DummyVecEnv([lambda: env])
         assert self.env.num_envs == 1, "Multiple environments are not available"
@@ -119,6 +121,7 @@ class Viter:
         del state['env']
         self.__dict__.update(state)
         self.env = None
+        self.policy.env = None
         with open(log_dir + ".tmp", "wb") as f:
             pickle.dump(self, f)
         os.replace(log_dir + ".tmp", log_dir + ".pkl")
