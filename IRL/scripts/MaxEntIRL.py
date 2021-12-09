@@ -16,20 +16,21 @@ from algos.torch.MaxEntIRL import MaxEntIRL, APIRL
 from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
-    env_type = "DiscretizedDoublePendulum"
+    env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}"
-    env_op = 0.1
-    expt = f"softqiter_disc_part_{env_op}"
+    subj = "sub03"
+    expt = f"{subj}_1"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    subpath = os.path.join(proj_path, "demos", env_type, "sub01", "sub01")
-    # pltqs, init_states = [], []
-    # for i in range(5, 10):
-    #     pltqs += [io.loadmat(subpath + f"i{i+1}.mat")['pltq']]
-    #     init_states += [io.loadmat(subpath + f"i{i+1}.mat")['state'][0, :4]]
-    env = make_env(f"{name}-v2", subpath=subpath, h=[env_op, env_op / 2, env_op * 2, env_op * 2])
-    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[env_op, env_op / 2, env_op * 2, env_op * 2])
+    subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
+    init_states = []
+    for i in range(5):
+        for j in range(5):
+            bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
+            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
+    env = make_env(f"{name}-v2", subpath=subpath, h=[0.01, 0.01, 0.1, 0.1], bsp=bsp)
+    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[0.01, 0.01, 0.1, 0.1], bsp=bsp, init_states=init_states)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
@@ -95,7 +96,7 @@ if __name__ == "__main__":
         max_gradient_steps=1,
         min_gradient_steps=1,
         callback=save_net_callback.net_save,
-        callback_period=10,
+        callback_period=100,
         early_stop=True,
     )
 

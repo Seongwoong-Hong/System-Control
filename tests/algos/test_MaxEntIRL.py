@@ -1,7 +1,9 @@
 import os
 import pickle
-import torch as th
 
+import numpy as np
+import torch as th
+from scipy import io
 import pytest
 from imitation.data import rollout
 from stable_baselines3.common.vec_env import VecNormalize
@@ -11,8 +13,8 @@ from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
 
-env_op = 0.1
-env_name = "DiscretizedDoublePendulum"
+env_op = 1
+env_name = "DiscretizedHuman"
 env_id = f"{env_name}"
 
 
@@ -24,7 +26,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, f"softqiter_disc_part_{env_op}.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, f"sub02_{env_op}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -32,14 +34,24 @@ def expert(demo_dir):
 
 @pytest.fixture
 def env(demo_dir):
-    subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env(f"{env_id}-v2", subpath=subpath, h=[env_op, env_op / 2, env_op * 2, env_op * 2])
+    subpath = os.path.join(demo_dir, "HPC", "sub02_cropped", "sub02")
+    init_states = []
+    for i in range(5):
+        for j in range(5):
+            bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
+            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
+    return make_env(f"{env_id}-v2", subpath=subpath, h=[0.01, 0.01, 0.1, 0.1], bsp=bsp)
 
 
 @pytest.fixture
 def eval_env(demo_dir):
-    subpath = os.path.join(demo_dir, "HPC", "sub01", "sub01")
-    return make_env(f"{env_id}-v0", subpath=subpath, h=[env_op, env_op / 2, env_op * 2, env_op * 2])
+    subpath = os.path.join(demo_dir, "HPC", "sub02_cropped", "sub02")
+    init_states = []
+    for i in range(5):
+        for j in range(5):
+            bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
+            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
+    return make_env(f"{env_id}-v0", subpath=subpath, h=[0.01, 0.01, 0.1, 0.1], bsp=bsp, init_states=init_states)
 
 
 @pytest.fixture

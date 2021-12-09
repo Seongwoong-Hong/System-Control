@@ -27,29 +27,19 @@ def generate_trajectories_from_data(
     # accumulator for incomplete trajectories
     trajectories_accum = rollout.TrajectoryAccumulator()
     trajectories_accum.add_step(dict(obs=data['state'][0]), 0)
-    num_timesteps = 1
-    if hasattr(env, "num_timesteps"):
-        num_timesteps = env.num_timesteps
-    obs_list = np.zeros([num_timesteps, env.observation_space.shape[0]])
-    obs_list[0] = data['state'][0]
-    acts_list = np.zeros([num_timesteps, env.action_space.shape[0]])
-    for i in range(len(data['state']) - 1):
-        obs = data['state'][i + 1].reshape(1, -1)
-        act = data['T'][i].reshape(1, -1)
-        acts_list = np.append(act, acts_list[:-1], axis=0)
-        info = {'obs': obs_list, 'acts': acts_list}
-        obs_list = np.append(obs, obs_list[:-1], axis=0)
-        if i + 1 == len(data['state']) - 1:
+    for i in range(len(data['state'])):
+        if i >= (len(data['state']) - 1):
             # Termination condition has been reached. Mark as inactive any environments
             # where a trajectory was completed this timestep.
+            obs = data['state'][-1].reshape(1, -1)
+            act = data['T'][-1].reshape(1, -1)
             done = np.array([True])
-            info["terminal_observation"] = data['state'][i]
-            info["pltq"] = data["pltq"][i]
-            obs_list = np.zeros([num_timesteps, env.observation_space.shape[0]])
-            acts_list = np.zeros([num_timesteps, env.action_space.shape[0]])
+            info = {"terminal_observation": data['state'][-1]}
         else:
+            act = data['T'][i].reshape(1, -1)
+            obs = data['state'][i + 1].reshape(1, -1)
             done = np.array([False])
-            info["pltq"] = data['pltq'][i]
+            info = {}
         rew = np.zeros([1, ])
 
         new_trajs = trajectories_accum.add_steps_and_auto_finish(

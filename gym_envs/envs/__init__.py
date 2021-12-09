@@ -8,4 +8,5 @@ from gym_envs.envs.twod_target_discrete import TwoDTargetDisc, TwoDTargetDiscDet
 from gym_envs.envs.oned_target_discrete import OneDTargetDiscDet, OneDTargetDisc
 from gym_envs.envs.twod_target_cont import TwoDTargetCont
 from gym_envs.envs.pendulum_discretized import DiscretizedPendulum, DiscretizedPendulumDet
-from gym_envs.envs.double_pendulum_discretized import DiscretizedDoublePendulum, DiscretizedDoublePendulumDet
+from gym_envs.envs.double_pendulum_discretized import DiscretizedDoublePendulum, DiscretizedDoublePendulumDet, \
+    DiscretizedHuman, DiscretizedHumanDet
