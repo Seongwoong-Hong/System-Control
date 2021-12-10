@@ -20,15 +20,15 @@ if __name__ == "__main__":
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}"
-    subj = "sub07"
-    expt = f"{subj}_3"
+    subj = "sub03"
+    actu, trial = 1, 1
+    expt = f"{subj}_{actu}_{trial}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
     init_states = []
-    for i in range(1):
-        for j in range(1):
-            bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
-            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
+    for part in range(6):
+        bsp = io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['bsp']
+        init_states += [io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['state'][0, :4]]
     env = make_env(f"{name}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
     eval_env = make_env(f"{name}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
@@ -85,12 +85,12 @@ if __name__ == "__main__":
         rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper, 'num_envs': 1},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-3},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 
     # Run Learning
     learner.learn(
-        total_iter=500,
+        total_iter=100,
         agent_learning_steps=5e3,
         n_episodes=expt_traj_num,
         max_agent_iter=1,

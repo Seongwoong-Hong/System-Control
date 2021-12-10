@@ -139,19 +139,27 @@ def test_discretized_env(init_states):
     from algos.tabular.viter import SoftQiter
     name = "DiscretizedHuman"
     env_id = f"{name}"
-    env = make_env(f"{env_id}-v2", num_envs=1, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "MaxEntIRL", "cross_sub03_1_linear_finite", "model")
+    init_states = []
+    i = 0
+    for j in range(1):
+        init_states += [io.loadmat(f"../../IRL/demos/HPC/{subj}_cropped/{subj}i{i + 1}_{j}.mat")['state'][0, :4]]
+    env = make_env(f"{env_id}-v0", num_envs=1, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
+    model_dir = os.path.join(irl_path, "tmp", "log", "ray_result", name + "_sub03", "sub03_1_1", "model", "000")
     with open(model_dir + "/agent.pkl", "rb") as f:
         agent = pickle.load(f)
     algo = SoftQiter(env, gamma=0.8, alpha=0.01)
     algo.policy.policy_table = agent.policy.policy_table[0]
     for _ in range(5):
+        obs_list = []
         obs = env.reset()
         done = False
+        obs_list.append(obs)
         while not done:
             a, _ = algo.predict(obs, deterministic=True)
             ns, _, done, _ = env.step(a)
             env.render()
             time.sleep(0.05)
             obs = ns
+            obs_list.append(obs)
+        obs_list = np.array(obs_list).reshape(-1, 4)
     env.close()

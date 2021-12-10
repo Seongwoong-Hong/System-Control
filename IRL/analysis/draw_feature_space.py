@@ -10,6 +10,8 @@ from common.verification import verify_policy
 from matplotlib import pyplot as plt
 import matplotlib.lines as lines
 
+irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
 
 def cal_feature_reward(obs, reward_fn):
     mu = []
@@ -82,9 +84,45 @@ def draw_feature_reward():
     plt.show()
 
 
+def draw_reward_weights():
+    log_dir = os.path.join(irl_path, "tmp", "log", "ray_result")
+    # get reward_weight and stack
+    weigths_stack = []
+    for subj in ["sub03", "sub07"]:
+        sub_stack = []
+        for pert in [1, 2, 3]:
+            for trial in [1, 2, 3, 4, 5]:
+                name = f"/DiscretizedHuman_{subj}/{subj}_{pert}_{trial}/model/000"
+                with open(log_dir + name + "/reward_net.pkl", "rb") as f:
+                    rwfn = pickle.load(f)
+                sub_stack.append(rwfn.layers[0].weight.detach().numpy().flatten())
+        weigths_stack.append(sub_stack)
+    weigths_stack = np.array(weigths_stack)
+    subplot_name = [f"Feat_{i}" for i in range(8)]
+    x = [f"Pert_{i // 5 + 1}" for i in range(15)]
+    # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
+    fig = plt.figure(figsize=[36, 12], dpi=300.0)
+    for i in range(len(subplot_name)):
+        ax = fig.add_subplot(2, 4, i + 1)
+        for j in range(len(subplot_name)):
+            # ax.scatter(x, weigths_stack[i, j*5:(j+1)*5, 4])
+            ax.scatter(x, weigths_stack[0, :, i], color=(0.3, 0.3, 0.8))
+            ax.scatter(x, weigths_stack[1, :, i], color=(0.8, 0.3, 0.3))
+        ax.legend(["sub03", "sub07"], ncol=1, columnspacing=0.1, fontsize=15)
+        ax.set_xlabel("Perturbation", labelpad=15.0, fontsize=28)
+        ax.set_ylabel("weight", labelpad=15.0, fontsize=28)
+        ax.set_title(subplot_name[i], fontsize=32)
+        ax.tick_params(axis='both', which='major', labelsize=15)
+    fig.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
     def feature_fn(x):
         # return x
-        return th.cat([(x/10), (x/10)**2], dim=1)
+        return th.cat([x, x ** 2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
-    draw_feature_reward()
+
+
+    # draw_feature_reward()
+    draw_reward_weights()
