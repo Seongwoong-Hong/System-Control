@@ -18,11 +18,16 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def __init__(self, h=None):
         super(DiscretizedDoublePendulum, self).__init__()
-        self.max_torques = [200., 200.]
+        self.max_torques = [20., 10.]
         self.max_speeds = np.array([0.2, 0.5])
         self.min_speeds = np.array([-0.3, -0.3])
         self.max_angles = np.array([0.3, 0.3])
         self.min_angles = np.array([-0.3, -0.3])
+        # self.max_speeds = np.array([1, 1])
+        # self.min_speeds = np.array([-1, -1])
+        # self.max_angles = np.array([np.pi/3, np.pi/6])
+        # self.min_angles = np.array([-np.pi/3, -np.pi/6])
+
         self.dt = 0.05
         self.g = 9.81
         self.Is = [0.1, 0.1]
@@ -30,7 +35,7 @@ class DiscretizedDoublePendulum(gym.Env):
         self.lcs = [0.5, 0.5]
         self.ls = [1., 1.]
         self.h = h
-        self.num_actions = [11, 11]
+        self.num_actions = [5, 5]
         self.Q = np.diag([1., 1., 0., 0.])
 
         self.np_random = None
@@ -323,7 +328,7 @@ class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
         super(DiscretizedDoublePendulumDet, self).__init__(h=h)
         if init_states is None:
             self.init_states, _ = super(DiscretizedDoublePendulumDet, self).get_vectorized()
-            self.init_states = self.init_states[0:len(self.init_states):100]
+            self.init_states = self.init_states[0:len(self.init_states):1000]
         else:
             self.init_states = self.get_obs_from_idx(self.get_idx_from_obs(init_states))
         self.n = 0

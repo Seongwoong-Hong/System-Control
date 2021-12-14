@@ -28,7 +28,7 @@ from common.rollouts import generate_trajectories_without_shuffle
 
 
 def trial_name_string(trial):
-    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_{trial.config['trial']}_" + trial.trial_id
+    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_{trial.config['trial']}_{trial.config['part']}_" + trial.trial_id
     return trialname
 
 
@@ -46,6 +46,10 @@ def try_train(config, demo_dir):
     if config['feature'] == 'ext':
         def feature_fn(x):
             return th.cat([x, x ** 2], dim=1)
+    elif config['feature'] == 'cross':
+        def feature_fn(x):
+            x1, x2, dx1, dx2 = th.split(x, 1, dim=-1)
+            return th.cat([x ** 2, x1 * x2, dx1 * dx2, x1 * dx1, x2 * dx2], dim=1)
     elif config['feature'] == 'no':
         def feature_fn(x):
             return x
@@ -99,7 +103,7 @@ def try_train(config, demo_dir):
 
         """ Learning """
         algo.learn(
-            total_iter=100,
+            total_iter=300,
             agent_learning_steps=5e3,
             n_episodes=len(expert_trajs),
             max_agent_iter=1,
@@ -130,12 +134,12 @@ def main(target):
     config = {
         'env_id': target,
         'gamma': tune.grid_search([1]),
-        'alpha': tune.grid_search([0.01]),
+        'alpha': tune.grid_search([0.005]),
         'use_action': tune.grid_search([False]),
         'expt': tune.grid_search(["sub07"]),
-        'actuation': tune.grid_search([1, 2, 3]),
-        'part': tune.grid_search([0, 1]),
+        'actuation': tune.grid_search([3]),
         'trial': tune.grid_search([1, 2, 3, 4, 5]),
+        'part': tune.grid_search([0, 1, 2, 3, 4, 5]),
         'rew_arch': tune.grid_search(['linear']),
         'feature': tune.grid_search(['ext']),
         'lr': tune.grid_search([1e-2]),
@@ -153,7 +157,7 @@ def main(target):
     irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     result = tune.run(
         partial(try_train, demo_dir=demo_dir),
-        name=target + '_' + expt,
+        name=target + '_' + expt + '_ext',
         resources_per_trial={"cpu": 1},
         config=config,
         num_samples=1,

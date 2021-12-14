@@ -5,7 +5,7 @@ from scipy import io
 import numpy as np
 
 if __name__ == '__main__':
-    env_type = "DiscretizedHuman"
+    env_type = "DiscretizedDoublePendulum"
     env_id = f"{env_type}-v2"
     env = make_env(env_id, h=[0.03, 0.03, 0.05, 0.08])
     act_coeff = 1

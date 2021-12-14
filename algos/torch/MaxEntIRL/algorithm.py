@@ -148,6 +148,9 @@ class MaxEntIRL:
         init_obs, _ = self.eval_env.get_vectorized()
         init_idx = self.eval_env.get_idx_from_obs(init_obs)
         D = np.zeros([self.agent.max_t, self.agent.policy.obs_size], dtype=np.float32)
+        # TODO: init_state가 굉장히 많을 때 성능을 올릴 수 있는 방법?
+        for i in range(len(init_idx)):
+            D[0, init_idx[i]] = ((init_idx == init_idx[i]) / len(init_idx)).sum()
         D[0, init_idx] = 1 / len(init_idx)
         for t in range(1, self.agent.max_t):
             for a in range(self.agent.policy.act_size):
@@ -173,7 +176,6 @@ class MaxEntIRL:
             raise NotImplementedError
 
     def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
-        self.reward_net.train()
         expected_expert_rewards, _ = self.mean_transition_reward(self.expert_trajectories)
         Dc = self.state_visitation()
         whole_reward_values = self.reward_net(self.whole_state)
@@ -181,6 +183,8 @@ class MaxEntIRL:
         self.reward_net.optimizer.zero_grad()
         loss.backward()
         self.reward_net.optimizer.step()
+        logger.record("expert_reward", expected_expert_rewards.item())
+        logger.record("agent_reward", th.dot(Dc, whole_reward_values.flatten()).item())
         logger.record("loss", loss.item())
         return loss.item()
 
@@ -209,8 +213,8 @@ class MaxEntIRL:
         self._reset_agent(**self.env_kwargs)
         call_num = 0
         while self.itr < total_iter:
-            self.reward_net.reset_optim()
             with logger.accumulate_means(f"reward"):
+                self.reward_net.train()
                 mean_loss = self.train_reward_fn(max_gradient_steps, min_gradient_steps)
                 weight_norm, grad_norm = 0.0, 0.0
                 for param in self.reward_net.parameters():

@@ -27,7 +27,6 @@ class Viter:
         self.env = env
         if not isinstance(env, VecEnv):
             self.env = DummyVecEnv([lambda: env])
-        assert self.env.num_envs == 1, "Multiple environments are not available"
         self._setup_model()
         self.set_env_mats()
 
@@ -107,10 +106,9 @@ class Viter:
 
     def set_env(self, env):
         self.env = env
-        self.policy.env = env.envs[0]
         if not isinstance(env, VecEnv):
             self.env = DummyVecEnv([lambda: env])
-        assert self.env.num_envs == 1, "Multiple environments are not available"
+        self.policy.env = self.env.envs[0]
         self.num_envs = 1
 
     def get_vec_normalize_env(self):

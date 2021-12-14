@@ -14,8 +14,8 @@ from common.util import make_env
 from common.wrappers import *
 
 env_op = 1
-subj = "sub03"
-env_name = "DiscretizedHuman"
+subj = "sub07"
+env_name = "DiscretizedDoublePendulum"
 env_id = f"{env_name}"
 
 
@@ -27,7 +27,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, f"{subj}_{env_op}.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, f"softqiter_{subj}_init.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -38,10 +38,10 @@ def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", f"{subj}_cropped", subj)
     init_states = []
     for i in range(5):
-        for j in range(5):
+        for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v2", subpath=subpath, h=[0.005, 0.015, 0.025, 0.03], bsp=bsp)
+    return make_env(f"{env_id}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08])
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def eval_env(demo_dir):
         for j in range(5):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v0", subpath=subpath, h=[0.005, 0.015, 0.025, 0.03], bsp=bsp, init_states=init_states)
+    return make_env(f"{env_id}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], init_states=init_states)
 
 
 @pytest.fixture
@@ -84,7 +84,7 @@ def learner(env, expert, eval_env):
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-3},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 
 
@@ -106,7 +106,7 @@ def test_callback(learner):
 
 def test_validity(learner, expert):
     learner.learn(
-        total_iter=2,
+        total_iter=10,
         agent_learning_steps=5000,
         n_episodes=len(expert),
         max_agent_iter=1,

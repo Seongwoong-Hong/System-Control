@@ -12,7 +12,7 @@ from RL.project_policies import def_policy
 
 
 if __name__ == "__main__":
-    env_type = "DiscretizedHuman"
+    env_type = "DiscretizedDoublePendulum"
     algo_type = "softqiter"
     # env_op = 0.1
     name = f"{env_type}"
@@ -20,18 +20,18 @@ if __name__ == "__main__":
     env_id = f"{name}-v2"
     # subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
     # env = make_env(env_id, use_vec_env=False, num_envs=1, subpath=subpath, wrapper=ActionWrapper, use_norm=False)
-    subj = "sub03"
-    expt = f"{subj}_1"
+    subj = "sub07"
+    expt = f"{subj}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "IRL"))
     subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
     init_states = []
-    for i in range(1):
-        for j in range(1):
+    for i in range(5):
+        for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    env = make_env(env_id, num_envs=1, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
+    env = make_env(env_id, num_envs=1, h=[0.03, 0.03, 0.05, 0.08])
     # env = make_env(env_id, use_vec_env=False)
-    name += f"_{expt}"
+    name += f"_{subj}_init"
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     os.makedirs(log_dir, exist_ok=True)

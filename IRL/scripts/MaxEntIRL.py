@@ -16,39 +16,47 @@ from algos.torch.MaxEntIRL import MaxEntIRL, APIRL
 from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
-    env_type = "DiscretizedHuman"
+    env_type = "DiscretizedDoublePendulum"
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}"
-    subj = "sub03"
-    actu, trial = 1, 1
-    expt = f"{subj}_{actu}_{trial}"
+    subj = "sub07"
+    actu = 1
+    expt = f"softqiter_sub07_mean"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
-    init_states = []
-    for part in range(6):
-        bsp = io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['bsp']
-        init_states += [io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['state'][0, :4]]
-    env = make_env(f"{name}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
-    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
-    # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
-    # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
     # Load data
     expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
+    init_states = [expert_trajs[0].obs[0]]
+    # init_states = []
+    # for trial in range(1, 2):
+    #     for part in range(6):
+    #         bsp = io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['bsp']
+    #         init_states += [io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['state'][0, :4]]
+
+    # Define environments
+    env = make_env(f"{name}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08])
+    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], init_states=init_states)
+    # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
+    # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{expt}_finite"
+    log_dir += f"/ext_{expt}_finite_init"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
     shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
+    model_dir = os.path.join(log_dir, "model")
+    if not os.path.isdir(model_dir):
+        os.mkdir(model_dir)
 
 
+    # Define feature function
     def feature_fn(x):
         # if len(x.shape) == 1:
         #     x = x.reshape(1, -1)
@@ -62,10 +70,6 @@ if __name__ == "__main__":
         # x1, x2, x3, x4 = th.split(x, 1, dim=1)
         # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, x**2, x**3), dim=1)
         return th.cat([x, x ** 2], dim=1)
-
-    model_dir = os.path.join(log_dir, "model")
-    if not os.path.isdir(model_dir):
-        os.mkdir(model_dir)
 
     # Setup callbacks
     save_net_callback = SaveCallback(cycle=1, dirpath=model_dir)
@@ -90,7 +94,7 @@ if __name__ == "__main__":
 
     # Run Learning
     learner.learn(
-        total_iter=100,
+        total_iter=300,
         agent_learning_steps=5e3,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
