@@ -11,18 +11,18 @@ from scipy import io
 
 from common.util import make_env
 from common.callbacks import SaveCallback
-from common.wrappers import RewardWrapper
+from common.wrappers import ActionRewardWrapper
 from algos.torch.MaxEntIRL import MaxEntIRL, APIRL
 from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
-    env_type = "DiscretizedDoublePendulum"
+    env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}"
     subj = "sub07"
     actu = 1
-    expt = f"softqiter_sub07_mean"
+    expt = f"{subj}_1_1"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
 
@@ -31,22 +31,22 @@ if __name__ == "__main__":
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
-    init_states = [expert_trajs[0].obs[0]]
-    # init_states = []
-    # for trial in range(1, 2):
-    #     for part in range(6):
-    #         bsp = io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['bsp']
-    #         init_states += [io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['state'][0, :4]]
+    # init_states = [expert_trajs[0].obs[0]]
+    init_states = []
+    for trial in range(1, 2):
+        for part in range(6):
+            bsp = io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['bsp']
+            init_states += [io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['state'][0, :4]]
 
     # Define environments
-    env = make_env(f"{name}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08])
-    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], init_states=init_states)
+    env = make_env(f"{name}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
+    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{expt}_finite_init"
+    log_dir += f"/ext_{expt}_finite_action"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -54,7 +54,6 @@ if __name__ == "__main__":
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
-
 
     # Define feature function
     def feature_fn(x):
@@ -85,10 +84,10 @@ if __name__ == "__main__":
         feature_fn=feature_fn,
         agent=agent,
         expert_trajectories=expert_trajs,
-        use_action_as_input=False,
+        use_action_as_input=True,
         rew_arch=[],
         device=device,
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper, 'num_envs': 1},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper, 'num_envs': 1},
         rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 

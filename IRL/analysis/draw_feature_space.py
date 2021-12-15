@@ -89,7 +89,7 @@ def draw_reward_weights():
     weights_stack, features_stack = [], []
     for subj in ["sub07"]:
         trial_weights_stack, trial_feature_stack = [], []
-        for pert in [1, 2]:
+        for pert in [1, 2, 3]:
             for trial in range(1, 6):
                 for part in range(6):
                     name = f"/DiscretizedHuman_{subj}_ext/{subj}_{pert}_{trial}_{part}/model/000"
@@ -110,15 +110,15 @@ def draw_reward_weights():
     # with open(log_dir + name + "/reward_net.pkl", "rb") as f:
     #     rwfn = pickle.load(f)
     # weights_stack = rwfn.layers[0].weight.detach().numpy().flatten()
-    subplot_name = [f"Pert_{i + 1}" for i in range(2)]
+    subplot_name = [f"Pert_{i + 1}" for i in range(3)]
     x1 = [f"weights_{i + 1}" for i in range(9)] * 6
     x2 = [f"features_{i + 1}" for i in range(9)] * 6
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
-    fig1 = plt.figure(figsize=[18, 6], dpi=150.0)
-    fig2 = plt.figure(figsize=[18, 6], dpi=150.0)
+    fig1 = plt.figure(figsize=[9, 18], dpi=150.0)
+    fig2 = plt.figure(figsize=[9, 18], dpi=150.0)
     for i in range(len(subplot_name)):
-        ax1 = fig1.add_subplot(1, 2, i + 1)
-        ax2 = fig2.add_subplot(1, 2, i + 1)
+        ax1 = fig1.add_subplot(3, 1, i + 1)
+        ax2 = fig2.add_subplot(3, 1, i + 1)
         for j in range(5):
             # ax.scatter(x * 5, weights_stack[i, j*5:(j+1)*5, :])
             # ax.scatter(x, weights_stack, color=(0.3, 0.3, 0.8))

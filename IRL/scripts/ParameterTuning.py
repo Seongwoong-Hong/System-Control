@@ -28,7 +28,7 @@ from common.rollouts import generate_trajectories_without_shuffle
 
 
 def trial_name_string(trial):
-    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_{trial.config['trial']}_{trial.config['part']}_" + trial.trial_id
+    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_{trial.config['trial']}_" + trial.trial_id
     return trialname
 
 
@@ -69,8 +69,9 @@ def try_train(config, demo_dir):
 
     init_states = []
     i = 5 * (config['actuation'] - 1) + config['trial']
-    bsp = io.loadmat(subpath + f"i{i}_{config['part']}.mat")['bsp']
-    init_states += [io.loadmat(subpath + f"i{i}_{config['part']}.mat")['state'][0, :4]]
+    for part in range(6):
+        bsp = io.loadmat(subpath + f"i{i}_{part}.mat")['bsp']
+        init_states += [io.loadmat(subpath + f"i{i}_{part}.mat")['state'][0, :4]]
 
     env = make_env(f"{config['env_id']}-v2", h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
     eval_env = make_env(f"{config['env_id']}-v0", h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
@@ -127,19 +128,19 @@ def try_train(config, demo_dir):
         tune.report(mean_obs_differ=mean_obs_differ)
 
 
-def main(target):
+def main(target, pert):
     metric = "mean_obs_differ"
-    expt = "sub07"
+    expt = "sub03"
     demo_dir = os.path.abspath(os.path.join("..", "demos", target))
     config = {
         'env_id': target,
         'gamma': tune.grid_search([1]),
         'alpha': tune.grid_search([0.005]),
         'use_action': tune.grid_search([False]),
-        'expt': tune.grid_search(["sub07"]),
-        'actuation': tune.grid_search([3]),
+        'expt': tune.grid_search([expt]),
+        'actuation': tune.grid_search([pert]),
         'trial': tune.grid_search([1, 2, 3, 4, 5]),
-        'part': tune.grid_search([0, 1, 2, 3, 4, 5]),
+        # 'part': tune.grid_search([0, 1, 2, 3, 4, 5]),
         'rew_arch': tune.grid_search(['linear']),
         'feature': tune.grid_search(['ext']),
         'lr': tune.grid_search([1e-2]),
@@ -157,7 +158,7 @@ def main(target):
     irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     result = tune.run(
         partial(try_train, demo_dir=demo_dir),
-        name=target + '_' + expt + '_ext',
+        name=target + '_' + expt,
         resources_per_trial={"cpu": 1},
         config=config,
         num_samples=1,
@@ -177,4 +178,5 @@ def main(target):
 
 
 if __name__ == "__main__":
-    main('DiscretizedHuman')
+    for pert in [1, 2, 3]:
+        main('DiscretizedHuman', pert)

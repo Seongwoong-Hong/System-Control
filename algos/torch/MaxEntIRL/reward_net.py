@@ -30,7 +30,7 @@ class RewardNet(nn.Module):
         self.in_features = inp
         self._build_args = [lr, norm_coeff, [self.in_features] + arch]
         self._build(lr, norm_coeff, [self.in_features] + arch)
-        self.trainmode = False
+        self.trainmode = True
 
     def _build(self, lr: float, norm_coeff: float, arch: List[int]):
         layers = []

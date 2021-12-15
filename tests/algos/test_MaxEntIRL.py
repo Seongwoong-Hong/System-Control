@@ -80,10 +80,10 @@ def learner(env, expert, eval_env):
         agent=agent,
         feature_fn=feature_fn,
         expert_trajectories=expert,
-        use_action_as_input=False,
+        use_action_as_input=True,
         rew_arch=[],
         device=agent.device,
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 
@@ -137,7 +137,7 @@ def test_GCL(env, expert, eval_env):
         rew_arch=[],
         device='cpu',
         eval_env=eval_env,
-        env_kwargs={'reward_wrapper': RewardWrapper, "num_envs": 10},
+        env_kwargs={'reward_wrapper': ActionRewardWrapper, "num_envs": 10},
         rew_kwargs={'type': 'ann'},
     )
 
