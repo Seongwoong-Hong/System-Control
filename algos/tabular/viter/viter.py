@@ -27,7 +27,6 @@ class Viter:
         self.env = env
         if not isinstance(env, VecEnv):
             self.env = DummyVecEnv([lambda: env])
-        assert self.env.num_envs == 1, "Multiple environments are not available"
         self._setup_model()
         self.set_env_mats()
 
@@ -47,8 +46,9 @@ class Viter:
 
     def set_env_mats(self):
         self.transition_mat = self.env.env_method('get_trans_mat')[0]
-        self.reward_vec = self.env.env_method('get_reward_vec')[0]
-        self.reward_mat = np.repeat(self.reward_vec.reshape(1, -1), self.policy.act_size, axis=0)
+        self.reward_mat = self.env.env_method('get_reward_mat')[0]
+        if self.reward_mat.shape != self.policy.q_table.shape[-2:]:
+            self.reward_mat = np.repeat(self.reward_mat.reshape(1, -1), self.policy.act_size, axis=0)
         self.done_mat = np.zeros([self.policy.act_size, self.policy.obs_size])
 
     def train(self):
@@ -65,8 +65,7 @@ class Viter:
             self.policy.reset()
         else:
             total_timesteps += self.num_timesteps
-        self.reward_vec = self.env.env_method('get_reward_vec')[0]
-        self.reward_mat = np.repeat(self.reward_vec.reshape(1, -1), self.policy.act_size, axis=0)
+        self.set_env_mats()
         while self.num_timesteps < total_timesteps:
             old_value = deepcopy(self.policy.v_table)
             self.train()
@@ -107,10 +106,9 @@ class Viter:
 
     def set_env(self, env):
         self.env = env
-        self.policy.env = env.envs[0]
         if not isinstance(env, VecEnv):
             self.env = DummyVecEnv([lambda: env])
-        assert self.env.num_envs == 1, "Multiple environments are not available"
+        self.policy.env = self.env.envs[0]
         self.num_envs = 1
 
     def get_vec_normalize_env(self):

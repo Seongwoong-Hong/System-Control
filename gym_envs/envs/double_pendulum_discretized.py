@@ -23,6 +23,11 @@ class DiscretizedDoublePendulum(gym.Env):
         self.min_speeds = np.array([-0.3, -0.3])
         self.max_angles = np.array([0.3, 0.3])
         self.min_angles = np.array([-0.3, -0.3])
+        # self.max_speeds = np.array([1, 1])
+        # self.min_speeds = np.array([-1, -1])
+        # self.max_angles = np.array([np.pi/3, np.pi/6])
+        # self.min_angles = np.array([-np.pi/3, -np.pi/6])
+
         self.dt = 0.05
         self.g = 9.81
         self.Is = [0.1, 0.1]
@@ -73,10 +78,10 @@ class DiscretizedDoublePendulum(gym.Env):
         self.state = state
 
     def get_torque(self, actions):
-        a0, a1 = np.split(actions, 2, axis=-1)
+        a0, a1 = np.split(actions.astype('i'), 2, axis=-1)
         t0_list, t1_list = self.torque_lists
 
-        return t0_list[a0], t1_list[a1]
+        return np.array([t0_list[a0], t1_list[a1]])
 
     def get_reward(self, state, action):
         if state.ndim == 1:
@@ -172,6 +177,9 @@ class DiscretizedDoublePendulum(gym.Env):
 
         return s_vec, a_vec
 
+    def get_init_vector(self):
+        return self.get_vectorized()
+
     def get_ind_from_state(self, state, h=None):
         if h is None:
             h = self.h
@@ -192,7 +200,7 @@ class DiscretizedDoublePendulum(gym.Env):
         return ind_vec
 
     def get_idx_from_obs(self, obs: np.ndarray):
-        dims = self.get_num_cells(self.h)
+        dims = self.get_num_cells()
         obs_sub = np.round((obs - np.concatenate([self.min_angles, self.min_speeds])) / np.array(self.h)).astype('i')
         tot_idx = np.ravel_multi_index(obs_sub.T, dims, order='C')
         return tot_idx.flatten()
@@ -215,6 +223,12 @@ class DiscretizedDoublePendulum(gym.Env):
                                      indexing='ij'),
                          -1).reshape(-1, 2)
         return a_vec[idx.flatten()]
+
+    def get_idx_from_act(self, act: np.ndarray):
+        dims = np.array(self.num_actions)
+        tot_idx = np.round((act + np.array(self.max_torques)) / (2 * np.array(self.max_torques) / (dims - 1))).astype(
+            'i')
+        return tot_idx.flatten()
 
     def get_trans_mat(self, h=None, verbose=False):
         if h is None:
@@ -241,7 +255,7 @@ class DiscretizedDoublePendulum(gym.Env):
         s_vec, _ = self.get_vectorized(h)
         return pi(s_vec)
 
-    def get_reward_vec(self, h=None):
+    def get_reward_mat(self, h=None):
         if h is None:
             h = self.h
         assert h is not None
@@ -322,8 +336,8 @@ class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
     def __init__(self, h=None, init_states=None):
         super(DiscretizedDoublePendulumDet, self).__init__(h=h)
         if init_states is None:
-            self.init_states, _ = super(DiscretizedDoublePendulumDet, self).get_vectorized()
-            self.init_states = self.init_states[0:len(self.init_states):100]
+            self.init_states, _ = self.get_vectorized()
+            self.init_states = self.init_states[0:len(self.init_states):1000]
         else:
             self.init_states = self.get_obs_from_idx(self.get_idx_from_obs(init_states))
         self.n = 0
@@ -334,7 +348,7 @@ class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
         self.last_a = None
         return self.get_obs()
 
-    def get_vectorized(self, h=None):
+    def get_init_vector(self):
         s_vec = deepcopy(self.init_states)
         a_vec = np.stack(np.meshgrid(np.arange(self.num_actions[0]),
                                      np.arange(self.num_actions[1]),

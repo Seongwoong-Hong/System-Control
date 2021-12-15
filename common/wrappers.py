@@ -17,6 +17,12 @@ class RewardWrapper(gym.RewardWrapper):
         self.rwfn = rwfn
         self.use_action_as_inp = self.rwfn.use_action_as_inp
 
+    def train(self, mode=True):
+        self.rwfn.train(mode)
+
+    def eval(self):
+        self.train(mode=False)
+
     def step(self, action: np.ndarray):
         next_ob, rew, done, info = self.env.step(action)
         inp = info['obs']
@@ -27,34 +33,34 @@ class RewardWrapper(gym.RewardWrapper):
             r -= 1000
         return next_ob, r, done, info
 
-    def get_reward_vec(self):
+    def get_reward_mat(self):
         inp, a_vec = self.env.get_vectorized()
         if self.use_action_as_inp:
-            inp = np.append(inp, a_vec, axie=1)
-        r = self.reward(inp)
-        return r.numpy().flatten()
+            acts = self.env.get_torque(a_vec).squeeze().T
+            if hasattr(self, "action") and callable(self.action):
+                acts = self.action(acts)
+            r = torch.zeros([len(acts), len(inp)])
+            for i, act in enumerate(acts):
+                r[i] = self.reward(np.append(inp, np.repeat(act[None, :], len(inp), axis=0), axis=1))
+        else:
+            r = self.reward(inp)
+        if self.rwfn.trainmode:
+            return r
+        else:
+            return r.numpy()
 
-    def reward(self, inp: np.ndarray) -> float:
+    def reward(self, inp: np.ndarray) -> torch.tensor:
         rwinp = torch.from_numpy(inp).float().to(self.rwfn.device)
-        return self.rwfn.forward(rwinp)
-
-
-class ObsRewardWrapper(RewardWrapper):
-    def step(self, action: np.ndarray):
-        next_ob, rew, done, info = self.env.step(action)
-        inp = info['obs']
-        if self.use_action_as_inp:
-            inp = np.append(inp, info['acts'], axis=1)
-        return next_ob, self.reward(inp), done, info
+        return self.rwfn.forward(rwinp).squeeze()
 
 
 class ActionRewardWrapper(RewardWrapper):
     def __init__(self, env, rwfn):
         super(ActionRewardWrapper, self).__init__(env, rwfn)
-        self.clip_coeff = 0.4
+        self.coeff = 0.005
 
     def action(self, action):
-        return self.clip_coeff * action
+        return self.coeff * action
 
     def step(self, action):
         return super(ActionRewardWrapper, self).step(self.action(action))

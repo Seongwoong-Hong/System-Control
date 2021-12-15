@@ -87,15 +87,15 @@ def draw_costfigure():
         d1, d2, d3, d4 = th.split(inp, 1, dim=-1)
         return -(d1 ** 2 + d2 ** 2)
 
-    env_type = "DiscretizedHuman"
+    env_type = "DiscretizedDoublePendulum"
     env_id = f"{env_type}"
     env_op = 1
-    subj = f"sub03"
+    subj = f"sub07"
     bsp = io.loadmat(f"../../IRL/demos/HPC/{subj}/{subj}i1.mat")['bsp']
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
-    env = make_env(f"{env_id}-v2", subpath=subpath + f"/{subj}", h=[0.01, 0.02, 0.025, 0.05], bsp=bsp)
+    env = make_env(f"{env_id}-v2", subpath=subpath + f"/{subj}", h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
     algo_type = "MaxEntIRL"
-    name = f"ext_{subj}_1_linear_finite"
+    name = f"ext_softqiter_{subj}_init_finite"
     # num = 99
     load_dir = os.path.abspath(f"../tmp/log/{env_id}/{algo_type}/{name}/model")
     # algo = PPO.load(load_dir + f"/{num:03d}/agent")

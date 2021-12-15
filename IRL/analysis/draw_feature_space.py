@@ -8,7 +8,6 @@ from common.util import make_env
 from common.verification import verify_policy
 
 from matplotlib import pyplot as plt
-import matplotlib.lines as lines
 
 irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -87,33 +86,57 @@ def draw_feature_reward():
 def draw_reward_weights():
     log_dir = os.path.join(irl_path, "tmp", "log", "ray_result")
     # get reward_weight and stack
-    weigths_stack = []
-    for subj in ["sub03", "sub07"]:
-        sub_stack = []
+    weights_stack, features_stack = [], []
+    for subj in ["sub07"]:
+        trial_weights_stack, trial_feature_stack = [], []
         for pert in [1, 2, 3]:
-            for trial in [1, 2, 3, 4, 5]:
-                name = f"/DiscretizedHuman_{subj}/{subj}_{pert}_{trial}/model/000"
-                with open(log_dir + name + "/reward_net.pkl", "rb") as f:
-                    rwfn = pickle.load(f)
-                sub_stack.append(rwfn.layers[0].weight.detach().numpy().flatten())
-        weigths_stack.append(sub_stack)
-    weigths_stack = np.array(weigths_stack)
-    subplot_name = [f"Feat_{i}" for i in range(8)]
-    x = [f"Pert_{i // 5 + 1}" for i in range(15)]
+            for trial in range(1, 6):
+                for part in range(6):
+                    name = f"/DiscretizedHuman_{subj}_ext/{subj}_{pert}_{trial}_{part}/model/000"
+                    with open(log_dir + name + "/reward_net.pkl", "rb") as f:
+                        rwfn = pickle.load(f)
+                    trial_weights_stack.append(
+                        np.append(rwfn.layers[0].weight.detach().numpy().flatten(),
+                                  rwfn.layers[0].bias.detach().numpy().flatten()))
+                    with open(f"{irl_path}/demos/DiscretizedHuman/{subj}_{pert}_{trial}_{part}.pkl", "rb") as f:
+                        traj = pickle.load(f)[0]
+                    ft = feature_fn(th.tensor(traj.obs))
+                    trial_feature_stack.append(np.append(ft.numpy().sum(axis=0), 1))
+        weights_stack.append(trial_weights_stack)
+        features_stack.append(trial_feature_stack)
+    weights_stack = np.array(weights_stack) / np.linalg.norm(np.array(weights_stack), axis=-1, keepdims=True)
+    features_stack = np.array(features_stack)
+    # name = f"/MaxEntIRL/ext_softqiter_sub07_init_finite/model"
+    # with open(log_dir + name + "/reward_net.pkl", "rb") as f:
+    #     rwfn = pickle.load(f)
+    # weights_stack = rwfn.layers[0].weight.detach().numpy().flatten()
+    subplot_name = [f"Pert_{i + 1}" for i in range(3)]
+    x1 = [f"weights_{i + 1}" for i in range(9)] * 6
+    x2 = [f"features_{i + 1}" for i in range(9)] * 6
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
-    fig = plt.figure(figsize=[36, 12], dpi=300.0)
+    fig1 = plt.figure(figsize=[9, 18], dpi=150.0)
+    fig2 = plt.figure(figsize=[9, 18], dpi=150.0)
     for i in range(len(subplot_name)):
-        ax = fig.add_subplot(2, 4, i + 1)
-        for j in range(len(subplot_name)):
-            # ax.scatter(x, weigths_stack[i, j*5:(j+1)*5, 4])
-            ax.scatter(x, weigths_stack[0, :, i], color=(0.3, 0.3, 0.8))
-            ax.scatter(x, weigths_stack[1, :, i], color=(0.8, 0.3, 0.3))
-        ax.legend(["sub03", "sub07"], ncol=1, columnspacing=0.1, fontsize=15)
-        ax.set_xlabel("Perturbation", labelpad=15.0, fontsize=28)
-        ax.set_ylabel("weight", labelpad=15.0, fontsize=28)
-        ax.set_title(subplot_name[i], fontsize=32)
-        ax.tick_params(axis='both', which='major', labelsize=15)
-    fig.tight_layout()
+        ax1 = fig1.add_subplot(3, 1, i + 1)
+        ax2 = fig2.add_subplot(3, 1, i + 1)
+        for j in range(5):
+            # ax.scatter(x * 5, weights_stack[i, j*5:(j+1)*5, :])
+            # ax.scatter(x, weights_stack, color=(0.3, 0.3, 0.8))
+            # ax.scatter(x, weights_stack[0, i, :], color=(0.8, 0.3, 0.3))
+            ax1.scatter(x1, weights_stack[0, i * 30 + j * 6:i * 30 + (j + 1) * 6, :].flatten())
+            ax2.scatter(x2, features_stack[0, i * 30 + j * 6:i * 30 + (j + 1) * 6, :].flatten())
+        ax1.legend([f"{i + 1}" for i in range(5)], ncol=1, columnspacing=0.1, fontsize=15)
+        ax2.legend([f"{i + 1}" for i in range(5)], ncol=1, columnspacing=0.1, fontsize=15)
+        ax1.set_xlabel("weight_type", labelpad=15.0, fontsize=28)
+        ax1.set_ylabel("weight", labelpad=15.0, fontsize=28)
+        ax1.set_title(subplot_name[i], fontsize=32)
+        ax1.tick_params(axis='both', which='major', labelsize=15)
+        ax2.set_xlabel("feature_type", labelpad=15.0, fontsize=28)
+        ax2.set_ylabel("feature", labelpad=15.0, fontsize=28)
+        ax2.set_title(subplot_name[i], fontsize=32)
+        ax2.tick_params(axis='both', which='major', labelsize=15)
+    fig1.tight_layout()
+    fig2.tight_layout()
     plt.show()
 
 

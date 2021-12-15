@@ -22,8 +22,9 @@ if __name__ == '__main__':
                     state = io.loadmat(file)['state'][:, :4]
                     # print(io.loadmat(file)['tq'].max(axis=0), io.loadmat(file)['tq'].min(axis=0))
                     state = env.get_obs_from_idx(env.get_idx_from_obs(state))
+                    T = env.get_act_from_idx(env.get_idx_from_act(io.loadmat(file)['tq']))
                     data = {'state': state,
-                            'T': io.loadmat(file)['tq'] / act_coeff,
+                            'T': T / act_coeff,
                             'pltq': io.loadmat(file)['pltq'] / act_coeff,
                             'bsp': io.loadmat(file)['bsp'],
                             }

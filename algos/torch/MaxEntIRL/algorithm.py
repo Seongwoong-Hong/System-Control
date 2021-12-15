@@ -132,28 +132,32 @@ class MaxEntIRL:
         """
         traj_len = len(trajectories[0].acts)
         trans = flatten_trajectories(trajectories)
-        obs = trans.obs
+        inp = trans.obs
         if self.use_action_as_input:
-            acts = trans.acts
+            acts = self.wrap_eval_env.get_torque(trans.acts).squeeze().T
             if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
                 acts = self.wrap_eval_env.action(acts)
-            inp = th.from_numpy(np.concatenate([obs, acts], axis=1)).to(self.device).float()
-        else:
-            inp = th.from_numpy(obs).to(self.device).float()
+            inp = np.concatenate([inp, acts], axis=1)
         gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(trans))]).to(self.device)
-        trans_rewards = gammas * self.reward_net(inp).flatten()
+        trans_rewards = gammas * self.wrap_eval_env.reward(inp)
         return th.sum(trans_rewards) / len(trajectories), None
 
     def state_visitation(self) -> th.Tensor:
-        init_obs, _ = self.eval_env.get_vectorized()
+        init_obs, _ = self.eval_env.get_init_vector()
         init_idx = self.eval_env.get_idx_from_obs(init_obs)
         D = np.zeros([self.agent.max_t, self.agent.policy.obs_size], dtype=np.float32)
-        D[0, init_idx] = 1 / len(init_idx)
+        # TODO: init_state가 굉장히 많을 때 성능을 올릴 수 있는 방법?
+        for i in range(len(init_idx)):
+            D[0, init_idx[i]] = ((init_idx == init_idx[i]) / len(init_idx)).sum()
         for t in range(1, self.agent.max_t):
             for a in range(self.agent.policy.act_size):
                 E = D[t - 1] * self.agent.policy.policy_table[t - 1, a, :]
                 D[t, :] += self.agent.transition_mat[a] @ E
-        Dc = np.sum(np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32) * D, axis=0)
+        gammas = np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32)
+        if self.use_action_as_input:
+            D = self.agent.policy.policy_table * D[:, None, :]
+            gammas = np.expand_dims(gammas, axis=-1)
+        Dc = np.sum(gammas * D, axis=0)
         return th.from_numpy(Dc).to(self.device)
 
     def get_whole_states_from_env(self):
@@ -167,20 +171,21 @@ class MaxEntIRL:
             self.whole_state = th.FloatTensor([data.flatten() for data in x]).t().to(self.device)
         elif isinstance(obs_space, gym.spaces.Box):
             assert hasattr(self.env, "get_vectorized") and callable(getattr(self.env, "get_vectorized"))
-            self.whole_state, _ = self.env.get_vectorized()
-            self.whole_state = th.from_numpy(self.whole_state).float().to(self.device)
+            s_vec, _ = self.env.get_vectorized()
+            self.whole_state = th.from_numpy(s_vec).float().to(self.device)
         else:
             raise NotImplementedError
 
     def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
-        self.reward_net.train()
         expected_expert_rewards, _ = self.mean_transition_reward(self.expert_trajectories)
         Dc = self.state_visitation()
-        whole_reward_values = self.reward_net(self.whole_state)
-        loss = th.dot(Dc, whole_reward_values.flatten()) - expected_expert_rewards
+        whole_reward_values = self.wrap_eval_env.get_reward_mat()
+        loss = th.sum(Dc * whole_reward_values) - expected_expert_rewards
         self.reward_net.optimizer.zero_grad()
         loss.backward()
         self.reward_net.optimizer.step()
+        logger.record("expert_reward", expected_expert_rewards.item())
+        logger.record("agent_reward", th.sum(Dc * whole_reward_values).item())
         logger.record("loss", loss.item())
         return loss.item()
 
@@ -209,8 +214,8 @@ class MaxEntIRL:
         self._reset_agent(**self.env_kwargs)
         call_num = 0
         while self.itr < total_iter:
-            self.reward_net.reset_optim()
             with logger.accumulate_means(f"reward"):
+                self.wrap_eval_env.train()
                 mean_loss = self.train_reward_fn(max_gradient_steps, min_gradient_steps)
                 weight_norm, grad_norm = 0.0, 0.0
                 for param in self.reward_net.parameters():

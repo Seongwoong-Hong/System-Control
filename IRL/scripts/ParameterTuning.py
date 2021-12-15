@@ -46,6 +46,10 @@ def try_train(config, demo_dir):
     if config['feature'] == 'ext':
         def feature_fn(x):
             return th.cat([x, x ** 2], dim=1)
+    elif config['feature'] == 'cross':
+        def feature_fn(x):
+            x1, x2, dx1, dx2 = th.split(x, 1, dim=-1)
+            return th.cat([x ** 2, x1 * x2, dx1 * dx2, x1 * dx1, x2 * dx2], dim=1)
     elif config['feature'] == 'no':
         def feature_fn(x):
             return x
@@ -65,8 +69,9 @@ def try_train(config, demo_dir):
 
     init_states = []
     i = 5 * (config['actuation'] - 1) + config['trial']
-    bsp = io.loadmat(subpath + f"i{i}_{config['part']}.mat")['bsp']
-    init_states += [io.loadmat(subpath + f"i{i}_{config['part']}.mat")['state'][0, :4]]
+    for part in range(6):
+        bsp = io.loadmat(subpath + f"i{i}_{part}.mat")['bsp']
+        init_states += [io.loadmat(subpath + f"i{i}_{part}.mat")['state'][0, :4]]
 
     env = make_env(f"{config['env_id']}-v2", h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
     eval_env = make_env(f"{config['env_id']}-v0", h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
@@ -99,7 +104,7 @@ def try_train(config, demo_dir):
 
         """ Learning """
         algo.learn(
-            total_iter=100,
+            total_iter=300,
             agent_learning_steps=5e3,
             n_episodes=len(expert_trajs),
             max_agent_iter=1,
@@ -123,19 +128,19 @@ def try_train(config, demo_dir):
         tune.report(mean_obs_differ=mean_obs_differ)
 
 
-def main(target):
+def main(target, pert):
     metric = "mean_obs_differ"
-    expt = "sub07"
+    expt = "sub03"
     demo_dir = os.path.abspath(os.path.join("..", "demos", target))
     config = {
         'env_id': target,
         'gamma': tune.grid_search([1]),
-        'alpha': tune.grid_search([0.01]),
+        'alpha': tune.grid_search([0.005]),
         'use_action': tune.grid_search([False]),
-        'expt': tune.grid_search(["sub07"]),
-        'actuation': tune.grid_search([1, 2, 3]),
-        'part': tune.grid_search([0, 1]),
+        'expt': tune.grid_search([expt]),
+        'actuation': tune.grid_search([pert]),
         'trial': tune.grid_search([1, 2, 3, 4, 5]),
+        # 'part': tune.grid_search([0, 1, 2, 3, 4, 5]),
         'rew_arch': tune.grid_search(['linear']),
         'feature': tune.grid_search(['ext']),
         'lr': tune.grid_search([1e-2]),
@@ -173,4 +178,5 @@ def main(target):
 
 
 if __name__ == "__main__":
-    main('DiscretizedHuman')
+    for pert in [1, 2, 3]:
+        main('DiscretizedHuman', pert)
