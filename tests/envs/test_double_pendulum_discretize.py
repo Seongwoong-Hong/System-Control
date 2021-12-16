@@ -11,7 +11,7 @@ import numpy as np
 
 def test_discretized_pendulum():
     """ 기본 환경 테스트 """
-    env = gym.make('DiscretizedDoublePendulum-v0', h=[0.06, 0.03, 0.1, 0.1])  # type: DiscretizedDoublePendulum
+    env = gym.make('DiscretizedDoublePendulum-v0', N=[21, 21, 11, 11])  # type: DiscretizedDoublePendulum
 
     # step test
     s = env.reset()
@@ -39,12 +39,12 @@ def test_calc_trans_mat():
     근사된 전환 행렬 P 에 대한 value iteration 수행
     계산 시간, 초기 상태에 대한 평균 에러 계산
     """
-    h = [0.05, 0.03, 0.5, 0.5]
-    env = gym.make('DiscretizedDoublePendulum-v2', h=h)  # type: DiscretizedDoublePendulum
+    N = [21, 21, 11, 11]
+    env = gym.make('DiscretizedDoublePendulum-v2', N=N)  # type: DiscretizedDoublePendulum
 
     # h = [0.1, 0.1, 0.1, 0.1]
     # h = [0.1, 0.1, 1.0, 1.0]
-    env.get_trans_mat(h=h, verbose=True)
+    env.get_trans_mat(h=None, verbose=True)
 
 
 # @pytest.mark.parametrize("soft", [True, False])
@@ -55,25 +55,17 @@ def test_value_itr(soft=True):
     """
     import time, os
     from scipy import io
-    subj = "sub03"
-    expt = f"{subj}_1"
-    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
-    subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
-    init_states = []
-    for i in range(1):
-        for j in range(1):
-            bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
-            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    h = [0.03, 0.03, 0.05, 0.08]
-    env = gym.make('DiscretizedHuman-v2', h=h, bsp=bsp)  # type: DiscretizedDoublePendulum
 
-    n_dim = np.prod(env.get_num_cells(h))
-    P = env.get_trans_mat(h)
+    N = [21, 21, 11, 11]
+    env = gym.make('DiscretizedDoublePendulum-v2', N=N)  # type: DiscretizedDoublePendulum
+
+    n_dim = np.prod(env.get_num_cells())
+    P = env.get_trans_mat()
     q_values = np.zeros([env.spec.max_episode_steps, np.prod(env.num_actions), n_dim])
 
     def greedy_pi(s_array, q):
         # s_array.shape = (-1, 2), q.shape = (|A|, |S|), a_prob.shape = (|A|, -1)
-        s_ind = env.get_ind_from_state(s_array, h=h)
+        s_ind = env.get_ind_from_state(s_array)
         q_of_s = q @ s_ind.T
         a_prob = np.zeros_like(q_of_s)
         a_prob[np.argmax(q_of_s, axis=0).astype('i'), np.arange(q_of_s.shape[1])] = 1.0
@@ -81,7 +73,7 @@ def test_value_itr(soft=True):
 
     def soft_pi(s_array, q):
         # s_array.shape = (-1, 2), q.shape = (|A|, |S|), a_prob.shape = (|A|, -1)
-        s_ind = env.get_ind_from_state(s_array, h=h)
+        s_ind = env.get_ind_from_state(s_array)
         q_of_s = q @ s_ind.T
         a_prob = softmax(q_of_s, axis=0)
         return a_prob
@@ -96,7 +88,7 @@ def test_value_itr(soft=True):
                 pi = partial(soft_pi, q=q_values[t_ind])
             else:
                 pi = partial(greedy_pi, q=q_values[t_ind])
-            R = env.get_reward_vec(h)
+            R = env.get_reward_mat()
 
             # q update
             if t_ind == env.spec.max_episode_steps - 1:
@@ -117,14 +109,14 @@ def test_value_itr(soft=True):
 
     # running with learned policy
     # todo: q-value 와 rollout value 의 갭 줄이는 방법
-    s_vec, a_vec = env.get_vectorized(h)
+    s_vec, a_vec = env.get_vectorized()
 
     for itr in range(5):
         s = env.reset()
         print(f'Try #{itr} @ initial state {s}')
         appx_v, v = 0., 0.
         for t_ind in range(env.spec.max_episode_steps):
-            s_ind = env.get_ind_from_state(s, h)
+            s_ind = env.get_ind_from_state(s)
             a = np.argmax(q_values[t_ind] @ s_ind)
             next_s, r, _, _ = env.step(a_vec[a])
             s = next_s

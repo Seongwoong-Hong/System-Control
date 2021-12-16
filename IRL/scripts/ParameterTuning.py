@@ -53,6 +53,9 @@ def try_train(config, demo_dir):
     elif config['feature'] == 'no':
         def feature_fn(x):
             return x
+    elif config['feature'] == 'sq':
+        def feature_fn(x):
+            return x ** 2
     # elif config['feature'] == '1hot':
     #     def feature_fn(x):
     #         if len(x.shape) == 1:
@@ -65,22 +68,18 @@ def try_train(config, demo_dir):
     else:
         raise NotImplementedError
 
-    subpath = os.path.join(demo_dir, "..", "HPC", f"{config['expt']}_cropped", config['expt'])
-
+    subpath = os.path.join(demo_dir, "..", "HPC", config['expt'], config['expt'])
+    with open(demo_dir + f"/{config['expt']}_{config['actuation']}_{config['trial']}.pkl", "rb") as f:
+        expert_trajs = pickle.load(f)
     init_states = []
-    i = 5 * (config['actuation'] - 1) + config['trial']
-    for part in range(6):
-        bsp = io.loadmat(subpath + f"i{i}_{part}.mat")['bsp']
-        init_states += [io.loadmat(subpath + f"i{i}_{part}.mat")['state'][0, :4]]
-
-    env = make_env(f"{config['env_id']}-v2", h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
-    eval_env = make_env(f"{config['env_id']}-v0", h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
+    for traj in expert_trajs:
+        init_states += [traj.obs[0]]
+    bsp = io.loadmat(subpath + f"i1.mat")['bsp']
+    env = make_env(f"{config['env_id']}-v2", N=[21, 21, 11, 11], bsp=bsp)
+    eval_env = make_env(f"{config['env_id']}-v0", N=[21, 21, 11, 11], bsp=bsp, init_states=init_states)
 
     agent = FiniteSoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cpu')
     eval_agent = SoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cpu')
-
-    with open(demo_dir + f"/{config['expt']}_{config['actuation']}_{config['trial']}.pkl", "rb") as f:
-        expert_trajs = pickle.load(f)
 
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=len(expert_trajs))
 
@@ -130,7 +129,7 @@ def try_train(config, demo_dir):
 
 def main(target, pert):
     metric = "mean_obs_differ"
-    expt = "sub03"
+    expt = "sub07"
     demo_dir = os.path.abspath(os.path.join("..", "demos", target))
     config = {
         'env_id': target,
@@ -142,7 +141,7 @@ def main(target, pert):
         'trial': tune.grid_search([1, 2, 3, 4, 5]),
         # 'part': tune.grid_search([0, 1, 2, 3, 4, 5]),
         'rew_arch': tune.grid_search(['linear']),
-        'feature': tune.grid_search(['ext']),
+        'feature': tune.grid_search(['sq']),
         'lr': tune.grid_search([1e-2]),
         'norm_coeff': tune.grid_search([0.0]),
     }
@@ -158,7 +157,7 @@ def main(target, pert):
     irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     result = tune.run(
         partial(try_train, demo_dir=demo_dir),
-        name=target + '_' + expt,
+        name=target + '_' + expt + "_sq",
         resources_per_trial={"cpu": 1},
         config=config,
         num_samples=1,
