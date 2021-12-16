@@ -41,7 +41,7 @@ def env(demo_dir):
         for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
+    return make_env(f"{env_id}-v2", subpath=subpath, N=[21, 21, 11, 11], bsp=bsp)
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def eval_env(demo_dir):
         for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
+    return make_env(f"{env_id}-v0", subpath=subpath, N=[21, 21, 11, 11], bsp=bsp, init_states=init_states)
 
 
 @pytest.fixture
