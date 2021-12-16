@@ -15,8 +15,8 @@ if __name__ == '__main__':
         for actuation in [1, 2, 3]:
             # actuation = 3
             sub = f"sub{subi:02d}"
+            trajectories = []
             for trial in range(5):
-                trajectories = []
                 for part in range(6):
                     file = f"HPC/{sub}_cropped/{sub}i{5 * (actuation - 1) + trial + 1}_{part}.mat"
                     state = io.loadmat(file)['state'][:, :4]
@@ -29,6 +29,6 @@ if __name__ == '__main__':
                             'bsp': io.loadmat(file)['bsp'],
                             }
                     trajectories += generate_trajectories_from_data(data, env)
-                save_name = f"{env_type}/{sub}_{actuation}_{trial + 1}.pkl"
-                types.save(save_name, trajectories)
-                print(f"Expert Trajectory {save_name} is saved")
+            save_name = f"{env_type}/{sub}_{actuation}.pkl"
+            types.save(save_name, trajectories)
+            print(f"Expert Trajectory {save_name} is saved")

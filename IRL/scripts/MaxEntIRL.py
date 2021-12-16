@@ -16,31 +16,29 @@ from algos.torch.MaxEntIRL import MaxEntIRL, APIRL
 from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
-    env_type = "DiscretizedHuman"
+    env_type = "DiscretizedDoublePendulum"
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}"
     subj = "sub07"
     actu = 1
-    expt = f"{subj}_1_1"
+    expt = f"softqiter_{subj}_init"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
+    subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
     # Load data
     expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
-    # init_states = [expert_trajs[0].obs[0]]
+    bsp = io.loadmat(subpath + f"i1.mat")['bsp']
     init_states = []
-    for trial in range(1, 2):
-        for part in range(6):
-            bsp = io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['bsp']
-            init_states += [io.loadmat(subpath + f"i{(actu - 1) * 5 + trial}_{part}.mat")['state'][0, :4]]
+    for traj in expert_trajs:
+        init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
-    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
+    env = make_env(f"{name}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08])
+    eval_env = make_env(f"{name}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], init_states=init_states)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 

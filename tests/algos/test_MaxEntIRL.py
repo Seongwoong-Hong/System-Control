@@ -15,7 +15,7 @@ from common.wrappers import *
 
 env_op = 1
 subj = "sub07"
-env_name = "DiscretizedDoublePendulum"
+env_name = "DiscretizedHuman"
 env_id = f"{env_name}"
 
 
@@ -27,7 +27,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, f"softqiter_{subj}_init.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, f"{subj}_1_1.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -37,22 +37,22 @@ def expert(demo_dir):
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", f"{subj}_cropped", subj)
     init_states = []
-    for i in range(5):
+    for i in range(1):
         for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08])
+    return make_env(f"{env_id}-v2", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
 
 
 @pytest.fixture
 def eval_env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", f"{subj}_cropped", subj)
     init_states = []
-    for i in range(5):
-        for j in range(5):
+    for i in range(1):
+        for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], init_states=init_states)
+    return make_env(f"{env_id}-v0", subpath=subpath, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
 
 
 @pytest.fixture
@@ -80,7 +80,7 @@ def learner(env, expert, eval_env):
         agent=agent,
         feature_fn=feature_fn,
         expert_trajectories=expert,
-        use_action_as_input=True,
+        use_action_as_input=False,
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper},
