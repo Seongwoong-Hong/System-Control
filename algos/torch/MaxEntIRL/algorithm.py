@@ -145,7 +145,7 @@ class MaxEntIRL:
     def state_visitation(self) -> th.Tensor:
         init_obs, _ = self.eval_env.get_init_vector()
         init_idx = self.eval_env.get_idx_from_obs(init_obs)
-        D = np.zeros([self.agent.max_t, self.agent.policy.obs_size], dtype=np.float32)
+        D = th.zeros([self.agent.max_t, self.agent.policy.obs_size], dtype=th.float32).to(self.device)
         # TODO: init_state가 굉장히 많을 때 성능을 올릴 수 있는 방법?
         for i in range(len(init_idx)):
             D[0, init_idx[i]] = ((init_idx == init_idx[i]) / len(init_idx)).sum()
@@ -157,8 +157,9 @@ class MaxEntIRL:
         if self.use_action_as_input:
             D = self.agent.policy.policy_table * D[:, None, :]
             gammas = np.expand_dims(gammas, axis=-1)
-        Dc = np.sum(gammas * D, axis=0)
-        return th.from_numpy(Dc).to(self.device)
+        gammas = th.from_numpy(gammas).to(self.device)
+        Dc = th.sum(gammas * D, dim=0)
+        return Dc
 
     def get_whole_states_from_env(self):
         """

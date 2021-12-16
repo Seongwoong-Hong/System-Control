@@ -199,8 +199,8 @@ class DiscretizedDoublePendulum(gym.Env):
     def get_idx_from_obs(self, obs: np.ndarray):
         if len(obs.shape) == 1:
             obs = obs[None, :]
-        assert (np.max(obs, axis=0) <= np.append(self.max_angles, self.max_speeds)).all() or \
-               (np.min(obs, axis=0) >= np.append(self.min_angles, self.max_speeds)).all()
+        assert (np.max(obs, axis=0) <= np.append(self.max_angles, self.max_speeds) + 1e-6).all() or \
+               (np.min(obs, axis=0) >= np.append(self.min_angles, self.min_speeds) - 1e-6).all()
         dims = self.get_num_cells()
         idx = []
         for i, whole_candi in enumerate(self.obs_shape):
@@ -224,8 +224,8 @@ class DiscretizedDoublePendulum(gym.Env):
     def get_idx_from_act(self, act: np.ndarray):
         if len(act.shape) == 1:
             act = act[None, :]
-        assert (np.max(act, axis=0) <= self.max_torques).all() or \
-               (np.min(act, axis=0) >= -self.max_torques).all()
+        assert (np.max(act, axis=0) <= self.max_torques + 1e-6).all() or \
+               (np.min(act, axis=0) >= -self.max_torques - 1e-6).all()
         dims = np.array(self.num_actions)
         idx = []
         for i, whole_candi in enumerate(self.torque_lists):
