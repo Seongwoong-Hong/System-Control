@@ -20,9 +20,9 @@ if __name__ == "__main__":
     algo_type = "MaxEntIRL"
     device = "cpu"
     name = f"{env_type}"
-    subj = "sub07"
-    actu = 1
-    expt = f"{subj}_{actu}_1"
+    subj = "sub01"
+    actu = 5
+    expt = f"{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -37,8 +37,8 @@ if __name__ == "__main__":
         init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", subpath=subpath, N=[21, 21, 11, 11])
-    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[21, 21, 11, 11], init_states=init_states)
+    env = make_env(f"{name}-v2", subpath=subpath, N=[11, 21, 21, 21])
+    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[11, 21, 21, 21], init_states=init_states)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 

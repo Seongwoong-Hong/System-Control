@@ -84,7 +84,7 @@ class TabularPolicy:
     def arg_max(self, x):
         arg = []
         for x_ in x:
-            arg.append(random.choice(np.flatnonzero((x_ == x_.max()).to('cpu').numpy())))
+            arg.append(random.choice(np.flatnonzero((x_ == x_.max()).cpu().numpy())))
         return np.array(arg)
 
     def choice_act(self, policy):

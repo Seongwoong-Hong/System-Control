@@ -28,7 +28,7 @@ from common.rollouts import generate_trajectories_without_shuffle
 
 
 def trial_name_string(trial):
-    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_{trial.config['trial']}_" + trial.trial_id
+    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_" + trial.trial_id
     return trialname
 
 
@@ -69,17 +69,17 @@ def try_train(config, demo_dir):
         raise NotImplementedError
 
     subpath = os.path.join(demo_dir, "..", "HPC", config['expt'], config['expt'])
-    with open(demo_dir + f"/{config['expt']}_{config['actuation']}_{config['trial']}.pkl", "rb") as f:
+    with open(demo_dir + f"/{config['expt']}_{config['actuation']}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
     for traj in expert_trajs:
         init_states += [traj.obs[0]]
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(f"{config['env_id']}-v2", N=[21, 21, 11, 11], bsp=bsp)
-    eval_env = make_env(f"{config['env_id']}-v0", N=[21, 21, 11, 11], bsp=bsp, init_states=init_states)
+    env = make_env(f"{config['env_id']}-v2", N=[11, 21, 21, 21], bsp=bsp)
+    eval_env = make_env(f"{config['env_id']}-v0", N=[11, 21, 21, 21], bsp=bsp, init_states=init_states)
 
-    agent = FiniteSoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cpu')
-    eval_agent = SoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cpu')
+    agent = FiniteSoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cuda')
+    eval_agent = SoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cuda')
 
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=len(expert_trajs))
 
@@ -91,7 +91,7 @@ def try_train(config, demo_dir):
         expert_trajectories=expert_trajs,
         use_action_as_input=config['use_action'],
         rew_arch=rew_arch,
-        device='cpu',
+        device='cuda',
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': config['norm_coeff'], 'lr': config['lr']},
     )
@@ -127,9 +127,8 @@ def try_train(config, demo_dir):
         tune.report(mean_obs_differ=mean_obs_differ)
 
 
-def main(target, pert):
+def main(target, expt):
     metric = "mean_obs_differ"
-    expt = "sub07"
     demo_dir = os.path.abspath(os.path.join("..", "demos", target))
     config = {
         'env_id': target,
@@ -137,8 +136,8 @@ def main(target, pert):
         'alpha': tune.grid_search([0.005]),
         'use_action': tune.grid_search([False]),
         'expt': tune.grid_search([expt]),
-        'actuation': tune.grid_search([pert]),
-        'trial': tune.grid_search([1, 2, 3, 4, 5]),
+        'actuation': tune.grid_search([1, 2, 3, 4, 5, 6, 7]),
+        # 'trial': tune.grid_search([]),
         # 'part': tune.grid_search([0, 1, 2, 3, 4, 5]),
         'rew_arch': tune.grid_search(['linear']),
         'feature': tune.grid_search(['sq']),
@@ -158,7 +157,7 @@ def main(target, pert):
     result = tune.run(
         partial(try_train, demo_dir=demo_dir),
         name=target + '_' + expt + "_sq",
-        resources_per_trial={"cpu": 1},
+        resources_per_trial={"gpu": 1},
         config=config,
         num_samples=1,
         scheduler=scheduler,
@@ -177,5 +176,5 @@ def main(target, pert):
 
 
 if __name__ == "__main__":
-    for pert in [1, 2, 3]:
-        main('DiscretizedHuman', pert)
+    for expt in [f"sub{i:02d}" for i in [1, 4, 5, 6, 7, 9, 10]]:
+        main('DiscretizedHuman', expt)

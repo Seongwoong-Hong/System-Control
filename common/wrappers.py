@@ -39,7 +39,7 @@ class RewardWrapper(gym.RewardWrapper):
             acts = self.env.get_torque(a_vec).squeeze().T
             if hasattr(self, "action") and callable(self.action):
                 acts = self.action(acts)
-            r = torch.zeros([len(acts), len(inp)])
+            r = torch.zeros([len(acts), len(inp)]).to(self.rwfn.device)
             for i, act in enumerate(acts):
                 r[i] = self.reward(np.append(inp, np.repeat(act[None, :], len(inp), axis=0), axis=1))
         else:
@@ -47,7 +47,7 @@ class RewardWrapper(gym.RewardWrapper):
         if self.rwfn.trainmode:
             return r
         else:
-            return r.numpy()
+            return r.cpu().numpy()
 
     def reward(self, inp: np.ndarray) -> torch.tensor:
         rwinp = torch.from_numpy(inp).float().to(self.rwfn.device)
@@ -57,7 +57,7 @@ class RewardWrapper(gym.RewardWrapper):
 class ActionRewardWrapper(RewardWrapper):
     def __init__(self, env, rwfn):
         super(ActionRewardWrapper, self).__init__(env, rwfn)
-        self.coeff = 0.05
+        self.coeff = 0.002
 
     def action(self, action):
         return self.coeff * action

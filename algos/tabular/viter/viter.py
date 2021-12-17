@@ -3,21 +3,21 @@ import gym
 import pickle
 import numpy as np
 import torch as th
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from copy import deepcopy
 from algos.tabular.policy import *
 from stable_baselines3.common.vec_env import VecEnv, DummyVecEnv
 from imitation.util import logger
 
 
-def backward_trans(P: th.tensor, v: th.tensor):
+def backward_trans(P: List[th.tensor], v: th.tensor):
     """
     모든 A 에 대해 전환 행렬 P 를 고려할 때 이전 스텝의 v 계산
     P.shape = (|A|, |S|, |S|)
     A.shape = (|A|, |S|)
     post_v.shape = (|A|, |S|)
     """
-    num_actions = P.shape[0]
+    num_actions = len(P)
 
     post_v = []
     for a_ind in range(num_actions):
@@ -64,14 +64,12 @@ class Viter:
 
     def set_env_mats(self):
         transition_mat = self.env.env_method('get_trans_mat')[0]
-        tm = []
+        self.transition_mat = []
         for csr in transition_mat:
             coo = csr.tocoo()
-            tm.append(th.sparse_coo_tensor(
+            self.transition_mat.append(th.sparse_coo_tensor(
                 th.LongTensor(np.vstack((coo.row, coo.col))), th.FloatTensor(coo.data), th.Size(coo.shape),
-            ).to(self.device)
-                      )
-        self.transition_mat = th.stack(tm)
+            ).to(self.device))
         self.reward_mat = th.from_numpy(self.env.env_method('get_reward_mat')[0]).float().to(self.device)
         if self.reward_mat.shape != self.policy.q_table.shape[-2:]:
             self.reward_mat = self.reward_mat.repeat(self.policy.act_size, 1)
