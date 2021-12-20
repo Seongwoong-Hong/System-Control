@@ -73,7 +73,7 @@ class Viter:
         self.reward_mat = th.from_numpy(self.env.env_method('get_reward_mat')[0]).float().to(self.device)
         if self.reward_mat.shape != self.policy.q_table.shape[-2:]:
             self.reward_mat = self.reward_mat.repeat(self.policy.act_size, 1)
-        self.done_mat = th.zeros([self.policy.act_size, self.policy.obs_size]).to(self.device)
+        self.done_mat = th.zeros([self.policy.act_size, self.policy.obs_size]).float().to(self.device)
 
     def train(self):
         self.policy.q_table = self.reward_mat + self.gamma * (1 - self.done_mat) * \
@@ -90,7 +90,7 @@ class Viter:
         else:
             total_timesteps += self.num_timesteps
         self.set_env_mats()
-        while self.num_timesteps < total_timesteps:
+        while True:
             old_value = deepcopy(self.policy.v_table)
             self.train()
             error = th.max(th.abs(old_value - self.policy.v_table)).item()
@@ -98,7 +98,7 @@ class Viter:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 logger.dump(self.num_timesteps)
-            if error < 1e-10:
+            if self.num_timesteps <= total_timesteps or error < 1e-10:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 self.policy.policy_table = th.round(self.policy.policy_table * 1e8) * 1e-8
@@ -212,11 +212,11 @@ class FiniteViter(Viter):
 
 class FiniteSoftQiter(FiniteViter):
     def train(self):
-        self.policy.q_table[self.max_t - 1, :, :] = self.reward_mat
-        self.policy.v_table[self.max_t - 1, :] = self.alpha * th.logsumexp(
-            self.policy.q_table[self.max_t - 1, :, :] / self.alpha, dim=0)
+        self.policy.q_table[self.max_t - 1] = self.reward_mat
+        self.policy.v_table[self.max_t - 1] = self.alpha * th.logsumexp(
+            self.policy.q_table[self.max_t - 1] / self.alpha, dim=0)
         for t in reversed(range(self.max_t - 1)):
-            self.policy.q_table[t, :, :] = self.reward_mat + self.gamma * \
-                                           backward_trans(self.transition_mat, self.policy.v_table[t + 1, :])
-            self.policy.v_table[t, :] = self.alpha * th.logsumexp(self.policy.q_table[t, :, :] / self.alpha, dim=0)
+            self.policy.q_table[t] = self.reward_mat + self.gamma * \
+                                     backward_trans(self.transition_mat, self.policy.v_table[t + 1])
+            self.policy.v_table[t] = self.alpha * th.logsumexp(self.policy.q_table[t] / self.alpha, dim=0)
         self.policy.policy_table = th.exp((self.policy.q_table - self.policy.v_table[:, None, :]) / self.alpha)

@@ -34,7 +34,7 @@ class DiscretizedDoublePendulum(gym.Env):
         self.ms = [1., 1.]
         self.lcs = [0.5, 0.5]
         self.ls = [1., 1.]
-        self.num_actions = [11, 11]
+        self.num_actions = [7, 7]
         self.Q = np.diag([1., 1., 0., 0.])
 
         self.np_random = None

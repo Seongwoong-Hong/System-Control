@@ -21,13 +21,13 @@ if __name__ == "__main__":
     device = "cuda:3"
     name = f"{env_type}"
     subj = "sub01"
-    actu, trial = 1, 2
+    actu, trial = 1, 3
     expt = f"{subj}_{actu}_{trial}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, "11192121", f"{expt}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
@@ -37,8 +37,8 @@ if __name__ == "__main__":
         init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", subpath=subpath, N=[11, 21, 21, 21])
-    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[11, 21, 21, 21], init_states=init_states)
+    env = make_env(f"{name}-v2", subpath=subpath, N=[11, 19, 21, 21])
+    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[11, 19, 21, 21], init_states=init_states)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     # Run Learning
     learner.learn(
         total_iter=300,
-        agent_learning_steps=5e3,
+        agent_learning_steps=0,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
         min_agent_iter=1,

@@ -27,7 +27,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, f"softqiter.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "11171717", f"softqiter.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -41,7 +41,7 @@ def env(demo_dir):
         for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v2", subpath=subpath, N=[11, 11, 11, 11])
+    return make_env(f"{env_id}-v2", subpath=subpath, N=[11, 17, 17, 17])
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def eval_env(demo_dir):
         for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v0", subpath=subpath, N=[11, 11, 11, 11])
+    return make_env(f"{env_id}-v0", subpath=subpath, N=[11, 17, 17, 17])
 
 
 @pytest.fixture
@@ -110,7 +110,7 @@ def test_validity(learner, expert):
         t1 = time.time()
         learner.learn(
             total_iter=1,
-            agent_learning_steps=5000,
+            agent_learning_steps=0,
             n_episodes=len(expert),
             max_agent_iter=1,
             min_agent_iter=1,
@@ -130,7 +130,7 @@ def test_GCL(env, expert, eval_env):
         # return x
         return th.cat([x, x**2], dim=1)
 
-    agent = def_policy("softqlearning", env, device='cpu', verbose=1)
+    agent = def_policy("softqlearning", env, device='cuda:1', verbose=1)
 
     learner = GuidedCostLearning(
         env,

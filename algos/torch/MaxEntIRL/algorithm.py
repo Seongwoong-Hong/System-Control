@@ -151,8 +151,7 @@ class MaxEntIRL:
             D[0, init_idx[i]] = ((init_idx == init_idx[i]) / len(init_idx)).sum()
         for t in range(1, self.agent.max_t):
             for a in range(self.agent.policy.act_size):
-                E = D[t - 1] * self.agent.policy.policy_table[t - 1, a, :]
-                D[t, :] += self.agent.transition_mat[a] @ E
+                D[t, :] += self.agent.transition_mat[a] @ (D[t - 1] * self.agent.policy.policy_table[t - 1, a, :])
         gammas = np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32)
         if self.use_action_as_input:
             D = self.agent.policy.policy_table * D[:, None, :]
