@@ -85,7 +85,7 @@ class DiscretizedDoublePendulum(gym.Env):
         return self.get_obs(), r, False, info
 
     def set_state(self, state):
-        assert state in self.observation_space
+        assert np.abs(state) - 1e-6 in self.observation_space
         self.state = state
 
     def get_torque(self, actions):

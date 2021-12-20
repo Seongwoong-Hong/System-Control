@@ -41,8 +41,8 @@ def test_finite_rl():
         for j in range(6):
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
     bsp = io.loadmat(subpath + f"i1_0.mat")['bsp']
-    env = make_env(f"DiscretizedHuman-v2", num_envs=1, N=[21, 21, 15, 15], bsp=bsp)
-    eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, N=[21, 21, 15, 15], bsp=bsp, init_states=init_states)
+    env = make_env(f"DiscretizedHuman-v2", num_envs=1, N=[11, 21, 21, 21], bsp=bsp)
+    eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, N=[11, 21, 21, 21], bsp=bsp, init_states=init_states)
     t1 = time.time()
     algo = def_policy("finitesoftqiter", env, device='cuda:1')
     algo.learn(2000)
