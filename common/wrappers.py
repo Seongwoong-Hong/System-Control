@@ -57,7 +57,7 @@ class RewardWrapper(gym.RewardWrapper):
 class ActionRewardWrapper(RewardWrapper):
     def __init__(self, env, rwfn):
         super(ActionRewardWrapper, self).__init__(env, rwfn)
-        self.coeff = 0.05
+        self.coeff = 1 / self.env.max_torques
 
     def action(self, action):
         return self.coeff * action

@@ -15,7 +15,7 @@ from common.wrappers import *
 
 env_op = 1
 subj = "sub07"
-env_name = "DiscretizedHuman"
+env_name = "DiscretizedDoublePendulum"
 env_id = f"{env_name}"
 
 
@@ -27,7 +27,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, f"{subj}_1_1.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "11171717", f"softqiter.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -41,7 +41,7 @@ def env(demo_dir):
         for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v2", subpath=subpath, N=[21, 21, 11, 11], bsp=bsp)
+    return make_env(f"{env_id}-v2", subpath=subpath, N=[11, 17, 17, 17])
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def eval_env(demo_dir):
         for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v0", subpath=subpath, N=[21, 21, 11, 11], bsp=bsp, init_states=init_states)
+    return make_env(f"{env_id}-v0", subpath=subpath, N=[11, 17, 17, 17])
 
 
 @pytest.fixture
@@ -80,7 +80,7 @@ def learner(env, expert, eval_env):
         agent=agent,
         feature_fn=feature_fn,
         expert_trajectories=expert,
-        use_action_as_input=False,
+        use_action_as_input=True,
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper},
@@ -105,16 +105,21 @@ def test_callback(learner):
 
 
 def test_validity(learner, expert):
-    learner.learn(
-        total_iter=10,
-        agent_learning_steps=5000,
-        n_episodes=len(expert),
-        max_agent_iter=1,
-        min_agent_iter=1,
-        max_gradient_steps=1,
-        min_gradient_steps=1,
-        early_stop=True,
-    )
+    import time
+    for _ in range(10):
+        t1 = time.time()
+        learner.learn(
+            total_iter=1,
+            agent_learning_steps=0,
+            n_episodes=len(expert),
+            max_agent_iter=1,
+            min_agent_iter=1,
+            max_gradient_steps=1,
+            min_gradient_steps=1,
+            early_stop=True,
+        )
+        t2 = time.time()
+        print(t2 - t1)
 
 
 def test_GCL(env, expert, eval_env):

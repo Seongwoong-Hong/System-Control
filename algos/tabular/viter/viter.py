@@ -66,7 +66,7 @@ class Viter:
         else:
             total_timesteps += self.num_timesteps
         self.set_env_mats()
-        while self.num_timesteps < total_timesteps:
+        while True:
             old_value = deepcopy(self.policy.v_table)
             self.train()
             error = np.max(np.abs(old_value - self.policy.v_table))
@@ -74,7 +74,7 @@ class Viter:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 logger.dump(self.num_timesteps)
-            if error < 1e-10:
+            if self.num_timesteps >= total_timesteps or error < 1e-10:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 self.policy.policy_table = np.round(self.policy.policy_table, 8)
@@ -150,19 +150,17 @@ class FiniteViter(Viter):
         )
 
     def train(self):
-        self.policy.q_table[self.max_t - 1, :, :] = self.reward_mat
-        self.policy.v_table[self.max_t - 1, :] = np.max(self.policy.q_table[self.max_t - 1, :, :], axis=0)
-        policy_t = np.zeros([self.policy.obs_size, self.policy.act_size])
-        policy_t[
-            self.policy.arg_max(self.policy.q_table[self.max_t - 1, :, :]).flatten(), range(self.policy.obs_size)] = 1
+        self.policy.q_table[self.max_t - 1] = self.reward_mat
+        self.policy.v_table[self.max_t - 1] = np.max(self.policy.q_table[self.max_t - 1], axis=0)
+        policy_t = np.zeros([self.policy.act_size, self.policy.obs_size])
+        policy_t[self.policy.arg_max(self.policy.q_table[self.max_t - 1]).flatten(), range(self.policy.obs_size)] = 1
         self.policy.policy_table[self.max_t - 1] = policy_t
         for t in reversed(range(self.max_t - 1)):
-            self.policy.q_table[t, :, :] = self.reward_mat + self.gamma * np.sum(
-                self.transition_mat * self.policy.v_table[t + 1, :][None, None, :], axis=-1)
-            self.policy.v_table[t, :] = np.max(self.policy.q_table[t, :, :], axis=0)
-            policy_t = np.zeros([self.policy.obs_size, self.policy.act_size])
-            policy_t[self.policy.arg_max(self.policy.q_table[self.max_t - 1, :, :]).flatten(), range(
-                self.policy.obs_size)] = 1
+            self.policy.q_table[t] = self.reward_mat + self.gamma * \
+                                     backward_trans(self.transition_mat, self.policy.v_table[t + 1])
+            self.policy.v_table[t] = np.max(self.policy.q_table[t], axis=0)
+            policy_t = np.zeros([self.policy.act_size, self.policy.obs_size])
+            policy_t[self.policy.arg_max(self.policy.q_table[t]).flatten(), range(self.policy.obs_size)] = 1
             self.policy.policy_table[t] = policy_t
 
     def predict(
@@ -191,11 +189,11 @@ class FiniteViter(Viter):
 
 class FiniteSoftQiter(FiniteViter):
     def train(self):
-        self.policy.q_table[self.max_t - 1, :, :] = self.reward_mat
-        self.policy.v_table[self.max_t - 1, :] = self.alpha * self.logsumexp(
-            self.policy.q_table[self.max_t - 1, :, :] / self.alpha, axis=0)
+        self.policy.q_table[self.max_t - 1] = self.reward_mat
+        self.policy.v_table[self.max_t - 1] = self.alpha * self.logsumexp(
+            self.policy.q_table[self.max_t - 1] / self.alpha, axis=0)
         for t in reversed(range(self.max_t - 1)):
-            self.policy.q_table[t, :, :] = self.reward_mat + self.gamma * \
-                                           backward_trans(self.transition_mat, self.policy.v_table[t + 1, :])
-            self.policy.v_table[t, :] = self.alpha * self.logsumexp(self.policy.q_table[t, :, :] / self.alpha, axis=0)
+            self.policy.q_table[t] = self.reward_mat + self.gamma * \
+                                     backward_trans(self.transition_mat, self.policy.v_table[t + 1])
+            self.policy.v_table[t] = self.alpha * self.logsumexp(self.policy.q_table[t] / self.alpha, axis=0)
         self.policy.policy_table = np.exp((self.policy.q_table - self.policy.v_table[:, None, :]) / self.alpha)

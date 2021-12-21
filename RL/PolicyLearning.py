@@ -29,7 +29,7 @@ if __name__ == "__main__":
         for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    env = make_env(env_id, num_envs=1, h=[0.03, 0.03, 0.05, 0.08])
+    env = make_env(env_id, num_envs=1, N=[11, 17, 17, 17])
     # env = make_env(env_id, use_vec_env=False)
     name += f"_{subj}_init"
     current_path = os.path.dirname(__file__)

@@ -18,9 +18,9 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def __init__(self, N=None):
         super(DiscretizedDoublePendulum, self).__init__()
-        self.max_torques = np.array([200., 100.])
-        self.max_speeds = np.array([0.5, 0.6])
-        self.max_angles = np.array([0.3, 0.3])
+        self.max_torques = np.array([620., 200.])
+        self.max_speeds = np.array([1.4, 3.2])
+        self.max_angles = np.array([0.25, 1.3])
         self.min_speeds = -self.max_speeds
         self.min_angles = -self.max_angles
         # self.max_speeds = np.array([1, 1])
@@ -85,7 +85,7 @@ class DiscretizedDoublePendulum(gym.Env):
         return self.get_obs(), r, False, info
 
     def set_state(self, state):
-        assert state in self.observation_space
+        assert np.abs(state) - 1e-6 in self.observation_space
         self.state = state
 
     def get_torque(self, actions):
@@ -199,8 +199,8 @@ class DiscretizedDoublePendulum(gym.Env):
     def get_idx_from_obs(self, obs: np.ndarray):
         if len(obs.shape) == 1:
             obs = obs[None, :]
-        assert (np.max(obs, axis=0) <= np.append(self.max_angles, self.max_speeds)).all() or \
-               (np.min(obs, axis=0) >= np.append(self.min_angles, self.max_speeds)).all()
+        assert (np.max(obs, axis=0) <= np.append(self.max_angles, self.max_speeds) + 1e-6).all() or \
+               (np.min(obs, axis=0) >= np.append(self.min_angles, self.min_speeds) - 1e-6).all()
         dims = self.get_num_cells()
         idx = []
         for i, whole_candi in enumerate(self.obs_shape):
@@ -224,8 +224,8 @@ class DiscretizedDoublePendulum(gym.Env):
     def get_idx_from_act(self, act: np.ndarray):
         if len(act.shape) == 1:
             act = act[None, :]
-        assert (np.max(act, axis=0) <= self.max_torques).all() or \
-               (np.min(act, axis=0) >= -self.max_torques).all()
+        assert (np.max(act, axis=0) <= self.max_torques + 1e-6).all() or \
+               (np.min(act, axis=0) >= -self.max_torques - 1e-6).all()
         dims = np.array(self.num_actions)
         idx = []
         for i, whole_candi in enumerate(self.torque_lists):
