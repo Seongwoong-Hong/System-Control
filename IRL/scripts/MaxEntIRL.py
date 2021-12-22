@@ -4,15 +4,13 @@ import pickle
 import shutil
 import torch as th
 
-from imitation.data import rollout
 from imitation.util import logger
-from stable_baselines3.common.vec_env import VecNormalize
 from scipy import io
 
 from common.util import make_env
 from common.callbacks import SaveCallback
 from common.wrappers import ActionRewardWrapper
-from algos.torch.MaxEntIRL import MaxEntIRL, APIRL
+from algos.torch.MaxEntIRL import MaxEntIRL
 from IRL.scripts.project_policies import def_policy
 
 if __name__ == "__main__":
@@ -20,14 +18,14 @@ if __name__ == "__main__":
     algo_type = "MaxEntIRL"
     device = "cuda:3"
     name = f"{env_type}"
-    subj = "sub01"
+    subj = "sub09"
     actu, trial = 1, 3
-    expt = f"{subj}_{actu}_{trial}"
+    expt = f"09191927/{subj}_{actu}_{trial}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
     # Load data
-    expert_dir = os.path.join(proj_path, "demos", env_type, "11192121", f"{expt}.pkl")
+    expert_dir = os.path.join(proj_path, "demos", env_type, f"{expt}.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     expt_traj_num = len(expert_trajs)
@@ -37,14 +35,14 @@ if __name__ == "__main__":
         init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", subpath=subpath, N=[11, 19, 21, 21])
-    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[11, 19, 21, 21], init_states=init_states)
+    env = make_env(f"{name}-v2", subpath=subpath, N=[9, 19, 19, 27])
+    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[9, 19, 19, 27], init_states=init_states)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{expt}_finite_action"
+    log_dir += f"/sq_{expt}_finite_action"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -63,10 +61,10 @@ if __name__ == "__main__":
         #     ft[i, idx] = 1
         # return ft
         # return x
-        # return x ** 2
+        return x ** 2
         # x1, x2, x3, x4 = th.split(x, 1, dim=1)
         # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, x**2, x**3), dim=1)
-        return th.cat([x, x ** 2], dim=1)
+        # return th.cat([x, x ** 2], dim=1)
 
     # Setup callbacks
     save_net_callback = SaveCallback(cycle=1, dirpath=model_dir)
@@ -91,14 +89,14 @@ if __name__ == "__main__":
 
     # Run Learning
     learner.learn(
-        total_iter=300,
+        total_iter=200,
         agent_learning_steps=0,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
         min_agent_iter=1,
         max_gradient_steps=1,
         min_gradient_steps=1,
-        callback=save_net_callback.net_save,
+        callback=save_net_callback.rew_save,
         callback_period=1000,
         early_stop=True,
     )

@@ -21,7 +21,7 @@ def backward_trans(P: List[th.tensor], v: th.tensor):
 
     post_v = []
     for a_ind in range(num_actions):
-        post_v.append((P[a_ind].t() @ v))
+        post_v.append(P[a_ind].t().matmul(v))
 
     post_v = th.stack(post_v)
 
@@ -45,8 +45,15 @@ class Viter:
         self.env = env
         if not isinstance(env, VecEnv):
             self.env = DummyVecEnv([lambda: env])
+        transition_mat = self.env.env_method('get_trans_mat')[0]
+        self.transition_mat = []
+        for csr in transition_mat:
+            coo = csr.tocoo()
+            self.transition_mat.append(th.sparse_coo_tensor(
+                th.LongTensor(np.vstack((coo.row, coo.col))), th.FloatTensor(coo.data), th.Size(coo.shape),
+            ).to(self.device))
         self._setup_model()
-        self.set_env_mats()
+        self.set_reward_mats()
 
     def _setup_model(self):
         self.observation_space = self.env.observation_space
@@ -62,14 +69,7 @@ class Viter:
             device=self.device,
         )
 
-    def set_env_mats(self):
-        transition_mat = self.env.env_method('get_trans_mat')[0]
-        self.transition_mat = []
-        for csr in transition_mat:
-            coo = csr.tocoo()
-            self.transition_mat.append(th.sparse_coo_tensor(
-                th.LongTensor(np.vstack((coo.row, coo.col))), th.FloatTensor(coo.data), th.Size(coo.shape),
-            ).to(self.device))
+    def set_reward_mats(self):
         self.reward_mat = th.from_numpy(self.env.env_method('get_reward_mat')[0]).float().to(self.device)
         if self.reward_mat.shape != self.policy.q_table.shape[-2:]:
             self.reward_mat = self.reward_mat.repeat(self.policy.act_size, 1)
@@ -89,7 +89,7 @@ class Viter:
             self.policy.reset()
         else:
             total_timesteps += self.num_timesteps
-        self.set_env_mats()
+        self.set_reward_mats()
         while True:
             old_value = deepcopy(self.policy.v_table)
             self.train()
@@ -130,6 +130,13 @@ class Viter:
             self.env = DummyVecEnv([lambda: env])
         self.policy.env = self.env.envs[0]
         self.num_envs = 1
+        transition_mat = self.env.env_method('get_trans_mat')[0]
+        self.transition_mat = []
+        for csr in transition_mat:
+            coo = csr.tocoo()
+            self.transition_mat.append(th.sparse_coo_tensor(
+                th.LongTensor(np.vstack((coo.row, coo.col))), th.FloatTensor(coo.data), th.Size(coo.shape),
+            ).to(self.device))
 
     def get_vec_normalize_env(self):
         return None

@@ -20,7 +20,7 @@ from algos.tabular.qlearning import *
 from algos.tabular.viter import *
 from common.util import make_env
 from common.verification import verify_policy
-from common.wrappers import RewardWrapper
+from common.wrappers import ActionRewardWrapper
 from common.rollouts import generate_trajectories_without_shuffle
 
 
@@ -28,7 +28,7 @@ from common.rollouts import generate_trajectories_without_shuffle
 
 
 def trial_name_string(trial):
-    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_" + trial.trial_id
+    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_{trial.config['trial']}_" + trial.trial_id
     return trialname
 
 
@@ -69,14 +69,14 @@ def try_train(config, demo_dir):
         raise NotImplementedError
 
     subpath = os.path.join(demo_dir, "..", "HPC", config['expt'], config['expt'])
-    with open(demo_dir + f"/{config['expt']}_{config['actuation']}.pkl", "rb") as f:
+    with open(demo_dir + f"/09191927/{config['expt']}_{config['actuation']}_{config['trial']}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
     for traj in expert_trajs:
         init_states += [traj.obs[0]]
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(f"{config['env_id']}-v2", N=[11, 21, 21, 21], bsp=bsp)
-    eval_env = make_env(f"{config['env_id']}-v0", N=[11, 21, 21, 21], bsp=bsp, init_states=init_states)
+    env = make_env(f"{config['env_id']}-v2", N=[9, 19, 19, 27], bsp=bsp)
+    eval_env = make_env(f"{config['env_id']}-v0", N=[9, 19, 19, 27], bsp=bsp, init_states=init_states)
 
     agent = FiniteSoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cuda')
     eval_agent = SoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cuda')
@@ -92,7 +92,7 @@ def try_train(config, demo_dir):
         use_action_as_input=config['use_action'],
         rew_arch=rew_arch,
         device='cuda',
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': config['norm_coeff'], 'lr': config['lr']},
     )
     trial_dir = tune.get_trial_dir()
@@ -103,8 +103,8 @@ def try_train(config, demo_dir):
 
         """ Learning """
         algo.learn(
-            total_iter=300,
-            agent_learning_steps=5e3,
+            total_iter=200,
+            agent_learning_steps=0,
             n_episodes=len(expert_trajs),
             max_agent_iter=1,
             min_agent_iter=1,
@@ -119,7 +119,7 @@ def try_train(config, demo_dir):
 
         agent_obs = rollout.flatten_trajectories(trajectories).obs
         mean_obs_differ = np.abs((expt_obs - agent_obs)).mean()
-        algo.agent.save(trial_dir + f"/model/{epoch:03d}/agent")
+        # algo.agent.save(trial_dir + f"/model/{epoch:03d}/agent")
         algo.reward_net.save(trial_dir + f"/model/{epoch:03d}/reward_net")
 
         algo.agent.set_env(env)
@@ -127,18 +127,18 @@ def try_train(config, demo_dir):
         tune.report(mean_obs_differ=mean_obs_differ)
 
 
-def main(target, expt):
+def main(target, sub):
     metric = "mean_obs_differ"
+    expt = sub
     demo_dir = os.path.abspath(os.path.join("..", "demos", target))
     config = {
         'env_id': target,
         'gamma': tune.grid_search([1]),
         'alpha': tune.grid_search([0.005]),
-        'use_action': tune.grid_search([False]),
+        'use_action': tune.grid_search([True]),
         'expt': tune.grid_search([expt]),
         'actuation': tune.grid_search([1, 2, 3, 4, 5, 6, 7]),
-        # 'trial': tune.grid_search([]),
-        # 'part': tune.grid_search([0, 1, 2, 3, 4, 5]),
+        'trial': tune.grid_search([1, 2, 3, 4, 5]),
         'rew_arch': tune.grid_search(['linear']),
         'feature': tune.grid_search(['sq']),
         'lr': tune.grid_search([1e-2]),
@@ -156,7 +156,7 @@ def main(target, expt):
     irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     result = tune.run(
         partial(try_train, demo_dir=demo_dir),
-        name=target + '_' + expt + "_sq",
+        name=target + '_sq_act_mT/' + expt,
         resources_per_trial={"gpu": 1},
         config=config,
         num_samples=1,
@@ -176,5 +176,5 @@ def main(target, expt):
 
 
 if __name__ == "__main__":
-    for expt in [f"sub{i:02d}" for i in [1, 4, 5, 6, 7, 9, 10]]:
-        main('DiscretizedHuman', expt)
+    for sub in [f"sub{i:02d}" for i in [9, 10]]:
+        main('DiscretizedHuman', sub)

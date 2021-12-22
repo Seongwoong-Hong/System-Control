@@ -72,7 +72,7 @@ def learner(env, expert, eval_env):
         # return x
         return th.cat([x, x ** 2], dim=1)
 
-    agent = def_policy("finitesoftqiter", env, device='cpu', verbose=1)
+    agent = def_policy("finitesoftqiter", env, device='cuda:0', verbose=1)
 
     return MaxEntIRL(
         env,
