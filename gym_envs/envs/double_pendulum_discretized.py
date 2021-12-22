@@ -18,9 +18,9 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def __init__(self, N=None):
         super(DiscretizedDoublePendulum, self).__init__()
-        self.max_torques = np.array([620., 200.])
-        self.max_speeds = np.array([1.4, 3.2])
-        self.max_angles = np.array([0.25, 1.3])
+        self.max_torques = np.array([120., 155.])
+        self.max_speeds = np.array([1.4, 2.55])
+        self.max_angles = np.array([0.22, 1.25])
         self.min_speeds = -self.max_speeds
         self.min_angles = -self.max_angles
         # self.max_speeds = np.array([1, 1])
@@ -34,7 +34,7 @@ class DiscretizedDoublePendulum(gym.Env):
         self.ms = [1., 1.]
         self.lcs = [0.5, 0.5]
         self.ls = [1., 1.]
-        self.num_actions = [11, 11]
+        self.num_actions = [9, 9]
         self.Q = np.diag([1., 1., 0., 0.])
 
         self.np_random = None

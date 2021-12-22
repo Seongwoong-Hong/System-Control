@@ -69,14 +69,14 @@ def try_train(config, demo_dir):
         raise NotImplementedError
 
     subpath = os.path.join(demo_dir, "..", "HPC", config['expt'], config['expt'])
-    with open(demo_dir + f"/11171717/{config['expt']}_{config['actuation']}_{config['trial']}.pkl", "rb") as f:
+    with open(demo_dir + f"/09191927/{config['expt']}_{config['actuation']}_{config['trial']}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
     for traj in expert_trajs:
         init_states += [traj.obs[0]]
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(f"{config['env_id']}-v2", N=[11, 17, 17, 17], bsp=bsp)
-    eval_env = make_env(f"{config['env_id']}-v0", N=[11, 17, 17, 17], bsp=bsp, init_states=init_states)
+    env = make_env(f"{config['env_id']}-v2", N=[9, 19, 19, 27], bsp=bsp)
+    eval_env = make_env(f"{config['env_id']}-v0", N=[9, 19, 19, 27], bsp=bsp, init_states=init_states)
 
     agent = FiniteSoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cpu')
     eval_agent = SoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cpu')
@@ -103,7 +103,7 @@ def try_train(config, demo_dir):
 
         """ Learning """
         algo.learn(
-            total_iter=300,
+            total_iter=200,
             agent_learning_steps=0,
             n_episodes=len(expert_trajs),
             max_agent_iter=1,
@@ -119,7 +119,7 @@ def try_train(config, demo_dir):
 
         agent_obs = rollout.flatten_trajectories(trajectories).obs
         mean_obs_differ = np.abs((expt_obs - agent_obs)).mean()
-        algo.agent.save(trial_dir + f"/model/{epoch:03d}/agent")
+        # algo.agent.save(trial_dir + f"/model/{epoch:03d}/agent")
         algo.reward_net.save(trial_dir + f"/model/{epoch:03d}/reward_net")
 
         algo.agent.set_env(env)
@@ -127,7 +127,7 @@ def try_train(config, demo_dir):
         tune.report(mean_obs_differ=mean_obs_differ)
 
 
-def main(target, sub):
+def main(target, sub, trial):
     metric = "mean_obs_differ"
     expt = sub
     demo_dir = os.path.abspath(os.path.join("..", "demos", target))
@@ -138,9 +138,9 @@ def main(target, sub):
         'use_action': tune.grid_search([True]),
         'expt': tune.grid_search([expt]),
         'actuation': tune.grid_search([1, 2, 3, 4, 5, 6, 7]),
-        'trial': tune.grid_search([1, 2, 3, 4, 5]),
+        'trial': tune.grid_search([trial]),
         'rew_arch': tune.grid_search(['linear']),
-        'feature': tune.grid_search(['ext']),
+        'feature': tune.grid_search(['sq']),
         'lr': tune.grid_search([1e-2]),
         'norm_coeff': tune.grid_search([0.0]),
     }
@@ -156,7 +156,7 @@ def main(target, sub):
     irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     result = tune.run(
         partial(try_train, demo_dir=demo_dir),
-        name=target + '_sq_act/' + expt,
+        name=target + '_sq_act_mT/' + expt,
         resources_per_trial={"cpu": 1},
         config=config,
         num_samples=1,
@@ -176,5 +176,6 @@ def main(target, sub):
 
 
 if __name__ == "__main__":
-    for sub in [f"sub{i:02d}" for i in [10, 9]]:
-        main('DiscretizedHuman', sub)
+    for sub in [f"sub{i:02d}" for i in [1, 3, 4]]:
+        for trial in range(1, 6):
+            main('DiscretizedHuman', sub, trial)

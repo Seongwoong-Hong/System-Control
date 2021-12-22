@@ -87,16 +87,16 @@ def draw_reward_weights():
     log_dir = os.path.join(irl_path, "tmp", "log", "ray_result")
     # get reward_weight and stack
     weights_stack, features_stack = [], []
-    for subj in ["sub01"]:
+    for subj in ["sub09", "sub10"]:
         trial_weights_stack, trial_feature_stack = [], []
         for pert in range(1, 8):
             weights, features = [], []
             for trial in range(1, 6):
-                name = f"/DiscretizedHuman_ext/{subj}/{subj}_{pert}_{trial}/model/000"
+                name = f"/DiscretizedHuman_sq_act/{subj}/{subj}_{pert}_{trial}/model/000"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
                     rwfn = pickle.load(f)
                 weights.append(
-                    np.append(rwfn.layers[0].weight.detach().numpy().flatten(),
+                    np.append(rwfn.layers[0].weight.detach().numpy().flatten()[6:],
                               rwfn.layers[0].bias.detach().numpy().flatten()))
                 with open(f"{irl_path}/demos/DiscretizedHuman/11171717/{subj}_{pert}_{trial}.pkl", "rb") as f:
                     traj = pickle.load(f)[0]
@@ -118,16 +118,16 @@ def draw_reward_weights():
     # with open(log_dir + name + "/reward_net.pkl", "rb") as f:
     #     rwfn = pickle.load(f)
     # weights_stack = rwfn.layers[0].weight.detach().numpy().flatten()
-    label_name = ["sub01"]
+    label_name = ["sub09", "sub10"]
     x1 = [f"Pert_{i + 1}" for i in range(7)]
-    subplot_name = [f"weights_{i + 1}" for i in range(9)]
+    subplot_name = [f"weights_{i + 1}" for i in range(7)]
     x2 = [f"features_{i + 1}" for i in range(9)]
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
     for weight, itm in enumerate(subplot_name):
-        fig1 = plt.figure(figsize=[18, 6], dpi=150.0)
+        fig1 = plt.figure(figsize=[9, 6], dpi=150.0)
         # fig2 = plt.figure(figsize=[9, 6], dpi=150.0)
-        ax1 = fig1.add_subplot(1, 2, 1)
-        ax2 = fig1.add_subplot(1, 2, 2)
+        ax1 = fig1.add_subplot(1, 1, 1)
+        # ax2 = fig1.add_subplot(1, 2, 2)
         for subj in range(len(label_name)):
             # ax.scatter(x * 5, weights_stack[i, j*5:(j+1)*5, :])
             # ax.scatter(x, weights_stack, color=(0.3, 0.3, 0.8))
@@ -135,18 +135,18 @@ def draw_reward_weights():
             # ax1.scatter(x1 * 5, weights_stack[i, j * 5:(j + 1) * 5, :].flatten())
             # ax2.scatter(x2 * 5, features_stack[i, j * 5:(j + 1) * 5, :].flatten())
             ax1.errorbar(x1, weights_stack[subj, :, 0, weight], yerr=weights_stack[subj, :, 1, weight], fmt='o')
-            ax2.errorbar(x1, features_stack[subj, :, 0, weight], yerr=features_stack[subj, :, 1, weight], fmt='o')
+            # ax2.errorbar(x1, features_stack[subj, :, 0, weight], yerr=features_stack[subj, :, 1, weight], fmt='o')
         ax1.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
-        ax2.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
+        # ax2.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
         ax1.set_xlabel("weight_type", labelpad=15.0, fontsize=28)
         ax1.set_ylabel("weight", labelpad=15.0, fontsize=28)
         ax1.set_ylim(-1.1, 0.7)
         ax1.set_title(itm, fontsize=32)
         ax1.tick_params(axis='both', which='major', labelsize=15)
-        ax2.set_xlabel("feature_type", labelpad=15.0, fontsize=28)
-        ax2.set_ylabel("feature", labelpad=15.0, fontsize=28)
-        ax2.set_title(itm, fontsize=32)
-        ax2.tick_params(axis='both', which='major', labelsize=15)
+        # ax2.set_xlabel("feature_type", labelpad=15.0, fontsize=28)
+        # ax2.set_ylabel("feature", labelpad=15.0, fontsize=28)
+        # ax2.set_title(itm, fontsize=32)
+        # ax2.tick_params(axis='both', which='major', labelsize=15)
         fig1.tight_layout()
         # fig2.tight_layout()
         plt.show()
@@ -155,6 +155,7 @@ def draw_reward_weights():
 if __name__ == "__main__":
     def feature_fn(x):
         # return x
+        # return x ** 2
         return th.cat([x, x ** 2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
 

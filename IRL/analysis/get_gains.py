@@ -12,7 +12,7 @@ def get_gains():
     log_dir = os.path.join(irl_path, "tmp", "log", "ray_result")
     # get reward_weight and stack
     weigths_stack = []
-    for subj in ["sub07"]:
+    for subj in ["sub09"]:
         bsp = io.loadmat(irl_path + f"/demos/HPC/{subj}/{subj}i1.mat")['bsp']
         m2, l_u, h2, I2 = bsp[6, :]
         m_s, l_s, com_s, I_s = bsp[2, :]
@@ -30,17 +30,18 @@ def get_gains():
                       [1 / I1, -1 / I1],
                       [0, 1 / I2]])
         sub_stack = []
-        for pert in [1, 2, 3]:
-            for trial in [1, 2, 3, 4, 5]:
-                for part in range(6):
-                    name = f"/DiscretizedHuman_{subj}_ext/{subj}_{pert}_{trial}_{part}/model/000"
-                    with open(log_dir + name + "/reward_net.pkl", "rb") as f:
-                        rwfn = pickle.load(f)
-                    Q = np.diag(rwfn.layers[0].weight.detach().numpy().flatten()[4:])
-                    R = np.diag([2e-2, 2e-2])
-                    X = linalg.solve_continuous_are(A, B, Q, R)
-                    K = (np.linalg.inv(R) @ (B.T @ X))
-                    sub_stack.append(K.flatten())
+        for pert in range(1, 8):
+            for trial in range(1, 6):
+                name = f"/DiscretizedHuman_sq_act/{subj}/{subj}_{pert}_{trial}/model/000"
+                with open(log_dir + name + "/reward_net.pkl", "rb") as f:
+                    rwfn = pickle.load(f)
+                weight = rwfn.layers[0].weight.detach().numpy().flatten()
+                weight = weight / np.linalg.norm(weight)
+                Q = np.diag(weight[6:10])
+                R = np.diag(weight[10:12])
+                X = linalg.solve_continuous_are(A, B, Q, R)
+                K = (np.linalg.inv(R) @ (B.T @ X))
+                sub_stack.append(K.flatten())
         weigths_stack.append(sub_stack)
     weigths_stack = np.array(weigths_stack)
     subplot_name = [
@@ -49,10 +50,10 @@ def get_gains():
         r"$T_{hip}/\theta_{ank}$", r"$T_{hip}/\theta_{hip}$", r"$T_{hip}/\dot\theta_{ank}$",
         r"$T_{hip}/\dot\theta_{ank}$"
     ]
-    x = [f"Pert_{i // 30 + 1}" for i in range(90)]
+    x = [f"Pert_{i // 5 + 1}" for i in range(35)]
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
     fig = plt.figure(figsize=[36, 12], dpi=150.0)
-    for i in range(len(subplot_name)):
+    for i, gain in enumerate(subplot_name):
         ax = fig.add_subplot(2, 4, i + 1)
         for j in range(1):
             # ax.scatter(x, weigths_stack[i, j*5:(j+1)*5, 4])
@@ -61,7 +62,7 @@ def get_gains():
         ax.legend(["sub01", "sub02"], ncol=1, columnspacing=0.1, fontsize=15)
         ax.set_xlabel("Perturbation", labelpad=15.0, fontsize=24)
         ax.set_ylabel("weight", labelpad=15.0, fontsize=24)
-        ax.set_title(subplot_name[i], fontsize=32)
+        ax.set_title(gain, fontsize=32)
         ax.tick_params(axis='both', which='major', labelsize=15)
     fig.tight_layout()
     plt.show()

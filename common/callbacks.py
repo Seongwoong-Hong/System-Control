@@ -175,7 +175,6 @@ class VideoCallback(BaseCallback):
 class SaveCallback:
     def __init__(self, cycle: int, dirpath: str):
         self.cycle = cycle
-        os.makedirs(dirpath, exist_ok=True)
         self.path = dirpath
 
     def net_save(self, network, itr):
@@ -192,6 +191,7 @@ class SaveCallback:
     def rew_save(self, network, itr):
         if itr % self.cycle == 0:
             log_dir = self.path + f"{itr:03d}"
+            os.makedirs(log_dir, exist_ok=True)
             with open(log_dir + "/reward_net.pkl.tmp", "wb") as f:
                 pickle.dump(network.reward_net, f)
             os.replace(log_dir + "/reward_net.pkl.tmp", log_dir + "/reward_net.pkl")
@@ -201,6 +201,7 @@ class SaveCallback:
     def agent_save(self, network, itr):
         if itr % self.cycle == 0:
             log_dir = self.path + f"/{itr:03d}"
+            os.makedirs(log_dir, exist_ok=True)
             network.agent.save(log_dir + "/agent")
             if network.agent.get_vec_normalize_env():
                 network.wrap_env.save(log_dir + "/normalization.pkl")
