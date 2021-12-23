@@ -127,18 +127,17 @@ def try_train(config, demo_dir):
         tune.report(mean_obs_differ=mean_obs_differ)
 
 
-def main(target, sub, trial):
+def main(target):
     metric = "mean_obs_differ"
-    expt = sub
     demo_dir = os.path.abspath(os.path.join("..", "demos", target))
     config = {
         'env_id': target,
         'gamma': tune.grid_search([1]),
         'alpha': tune.grid_search([0.005]),
         'use_action': tune.grid_search([True]),
-        'expt': tune.grid_search([expt]),
         'actuation': tune.grid_search([1, 2, 3, 4, 5, 6, 7]),
-        'trial': tune.grid_search([trial]),
+        'trial': tune.grid_search([1, 2, 3, 4, 5]),
+        'expt': tune.grid_search([f"sub{i:02d}" for i in [1, 3, 4, 5, 6, 7, 9, 10]]),
         'rew_arch': tune.grid_search(['linear']),
         'feature': tune.grid_search(['sq']),
         'lr': tune.grid_search([1e-2]),
@@ -156,8 +155,8 @@ def main(target, sub, trial):
     irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     result = tune.run(
         partial(try_train, demo_dir=demo_dir),
-        name=target + '_sq_act_mT/' + expt,
-        resources_per_trial={"cpu": 1},
+        name=target + '_sq_act',
+        resources_per_trial={"cpu": 2},
         config=config,
         num_samples=1,
         scheduler=scheduler,
@@ -176,6 +175,4 @@ def main(target, sub, trial):
 
 
 if __name__ == "__main__":
-    for sub in [f"sub{i:02d}" for i in [1, 3, 4]]:
-        for trial in range(1, 6):
-            main('DiscretizedHuman', sub, trial)
+    main('DiscretizedHuman')
