@@ -13,14 +13,13 @@ from common.wrappers import ActionRewardWrapper
 from algos.torch.MaxEntIRL import MaxEntIRL
 from IRL.scripts.project_policies import def_policy
 
-if __name__ == "__main__":
+
+def main(subj, actu):
     env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
+    device = "cuda:1"
     name = f"{env_type}"
-    subj = "sub09"
-    actu, trial = 1, 3
-    expt = f"09191927/{subj}_{actu}_{trial}"
+    expt = f"09191927/{subj}_{actu}_half"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -35,14 +34,14 @@ if __name__ == "__main__":
         init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", subpath=subpath, N=[9, 19, 19, 27])
-    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[9, 19, 19, 27], init_states=init_states)
+    env = make_env(f"{name}-v2", subpath=subpath, N=[9, 19, 19, 27], bsp=bsp)
+    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[9, 19, 19, 27], init_states=init_states, bsp=bsp)
     # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_{expt}_finite_action"
+    log_dir += f"/extcnn_{expt}_finite"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -61,10 +60,10 @@ if __name__ == "__main__":
         #     ft[i, idx] = 1
         # return ft
         # return x
-        return x ** 2
+        # return x ** 2
         # x1, x2, x3, x4 = th.split(x, 1, dim=1)
         # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, x**2, x**3), dim=1)
-        # return th.cat([x, x ** 2], dim=1)
+        return th.cat([x, x ** 2], dim=1)
 
     # Setup callbacks
     save_net_callback = SaveCallback(cycle=1, dirpath=model_dir)
@@ -81,15 +80,15 @@ if __name__ == "__main__":
         agent=agent,
         expert_trajectories=expert_trajs,
         use_action_as_input=True,
-        rew_arch=[],
+        rew_arch=[4, 4],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper, 'num_envs': 1},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'norm_coeff': 0.0, 'lr': 3e-3},
     )
 
     # Run Learning
     learner.learn(
-        total_iter=200,
+        total_iter=150,
         agent_learning_steps=0,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
@@ -102,12 +101,15 @@ if __name__ == "__main__":
     )
 
     # Save the result of learning
-    reward_path = model_dir + "/reward_net.pkl"
-    with open(reward_path + ".tmp", "wb") as f:
-        pickle.dump(learner.reward_net, f)
-    os.replace(reward_path + ".tmp", reward_path)
-    learner.agent.save(model_dir + "/agent")
+    reward_path = model_dir + "/reward_net"
+    learner.reward_net.save(reward_path)
+    # learner.agent.save(model_dir + "/agent")
     if learner.agent.get_vec_normalize_env():
         learner.wrap_env.save(model_dir + "/normalization.pkl")
     now = datetime.datetime.now()
     print(f"Endtime: {now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}")
+
+
+if __name__ == "__main__":
+    for actu in range(1, 7):
+        main("sub01", actu)

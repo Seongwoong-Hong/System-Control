@@ -41,7 +41,7 @@ class RewardWrapper(gym.RewardWrapper):
                 acts = self.action(acts)
             r = torch.zeros([len(acts), len(inp)]).to(self.rwfn.device)
             for i, act in enumerate(acts):
-                r[i] = self.reward(np.append(inp, np.repeat(act[None, :], len(inp), axis=0), axis=1))
+                r[i, :] = self.reward(np.append(inp, np.repeat(act[None, :], len(inp), axis=0), axis=1))
         else:
             r = self.reward(inp)
         if self.rwfn.trainmode:
@@ -57,7 +57,7 @@ class RewardWrapper(gym.RewardWrapper):
 class ActionRewardWrapper(RewardWrapper):
     def __init__(self, env, rwfn):
         super(ActionRewardWrapper, self).__init__(env, rwfn)
-        self.coeff = 0.002
+        self.coeff = 1 / self.env.max_torques
 
     def action(self, action):
         return self.coeff * action

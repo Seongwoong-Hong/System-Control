@@ -142,6 +142,6 @@ def def_policy(algo_type, env, device='cpu', log_dir=None, verbose=0, **kwargs):
         return SoftQiter(env=env, gamma=0.8, alpha=0.01, device=device)
     elif algo_type == "finitesoftqiter":
         from algos.tabular.viter import FiniteSoftQiter
-        return FiniteSoftQiter(env=env, gamma=1, alpha=0.005, device=device)
+        return FiniteSoftQiter(env=env, gamma=1, alpha=0.0001, device=device)
     else:
         raise NameError("Not implemented policy name")

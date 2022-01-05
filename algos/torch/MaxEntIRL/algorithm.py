@@ -205,13 +205,13 @@ class MaxEntIRL:
             reset_num_timesteps: bool = True,
             **kwargs
     ):
-        if reset_num_timesteps:
+        if reset_num_timesteps or self.itr == 0:
+            self.get_whole_states_from_env()
+            self.alpha = self.agent.alpha
             self.itr = 0
+            self._reset_agent(**self.env_kwargs)
         else:
             total_iter += self.itr
-        self.early_stop = early_stop
-        self.get_whole_states_from_env()
-        self._reset_agent(**self.env_kwargs)
         call_num = 0
         while self.itr < total_iter:
             with logger.accumulate_means(f"reward"):
@@ -224,10 +224,11 @@ class MaxEntIRL:
                 logger.record("weight norm", weight_norm)
                 logger.record("grad norm", grad_norm)
                 logger.dump(self.itr)
-                if mean_loss < -1e-2 and self.itr > 30 and np.abs(grad_norm) < 1e-4:
+                if np.abs(mean_loss) < 5e-2 and self.itr > 30 and np.abs(grad_norm) < 0.5 and early_stop:
                     break
             with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)
+                self.agent.alpha = weight_norm * self.alpha
                 for agent_steps in range(1, max_agent_iter + 1):
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
@@ -238,6 +239,7 @@ class MaxEntIRL:
             if callback and self.itr % callback_period == 0:
                 callback(self, call_num)
                 call_num += 1
+        return mean_loss
 
 
 class GuidedCostLearning(MaxEntIRL):

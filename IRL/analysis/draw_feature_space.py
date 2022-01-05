@@ -87,20 +87,19 @@ def draw_reward_weights():
     log_dir = os.path.join(irl_path, "tmp", "log", "ray_result")
     # get reward_weight and stack
     weights_stack, features_stack = [], []
-    for subj in ["sub01", "sub04", "sub10"]:
+    label_name = [f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]
+    for subj in label_name:
         trial_weights_stack, trial_feature_stack = [], []
-        for pert in range(1, 8):
+        for pert in range(1, 7):
             weights, features = [], []
-            for trial in range(1, 6):
-                name = f"/DiscretizedHuman_ext/{subj}/{subj}_{pert}_{trial}/model/000"
+            for trial in range(1):
+                name = f"/DiscretizedHuman_sq_09191927_half_1/{subj}_{pert}/model/000"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
-                    rwfn = pickle.load(f)
-                weights.append(
-                    np.append(rwfn.layers[0].weight.detach().numpy().flatten(),
-                              rwfn.layers[0].bias.detach().numpy().flatten()))
-                with open(f"{irl_path}/demos/DiscretizedHuman/11171717/{subj}_{pert}_{trial}.pkl", "rb") as f:
+                    rwfn = pickle.load(f).cpu()
+                weights.append(-rwfn.layers[0].weight.detach().numpy().flatten())
+                with open(f"{irl_path}/demos/DiscretizedHuman/09191927/{subj}_{pert}_half.pkl", "rb") as f:
                     traj = pickle.load(f)[0]
-                ft = feature_fn(th.tensor(traj.obs))
+                ft = feature_fn(th.tensor(np.append(traj.obs[:-1], traj.acts, axis=1)))
                 features.append(np.append(ft.numpy().sum(axis=0), 1))
             weights = np.array(weights) / np.linalg.norm(np.array(weights), axis=-1, keepdims=True)
             features = np.array(features) / np.linalg.norm(np.array(features), axis=-1, keepdims=True)
@@ -113,14 +112,15 @@ def draw_reward_weights():
         weights_stack.append(trial_weights_stack)
         features_stack.append(trial_feature_stack)
     weights_stack = np.array(weights_stack)
+    w_mean = weights_stack[:, :, 0, :].mean(axis=0)
+    w_std = weights_stack[:, :, 0, :].std(axis=0)
     features_stack = np.array(features_stack)
     # name = f"/MaxEntIRL/ext_softqiter_sub07_init_finite/model"
     # with open(log_dir + name + "/reward_net.pkl", "rb") as f:
     #     rwfn = pickle.load(f)
     # weights_stack = rwfn.layers[0].weight.detach().numpy().flatten()
-    label_name = ["sub01", "sub04", "sub10"]
-    x1 = [f"Pert_{i + 1}" for i in range(7)]
-    subplot_name = [f"weights_{i + 1}" for i in range(9)]
+    x1 = [f"{i}cm" for i in [3, 4.5, 6, 7.5, 9, 12]]
+    subplot_name = [rf"$\omega_{i + 1}$" for i in range(6)]
     x2 = [f"features_{i + 1}" for i in range(9)]
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
     for weight, itm in enumerate(subplot_name):
@@ -128,19 +128,20 @@ def draw_reward_weights():
         # fig2 = plt.figure(figsize=[9, 6], dpi=150.0)
         ax1 = fig1.add_subplot(1, 1, 1)
         # ax2 = fig1.add_subplot(1, 2, 2)
-        for subj in range(len(label_name)):
-            # ax.scatter(x * 5, weights_stack[i, j*5:(j+1)*5, :])
-            # ax.scatter(x, weights_stack, color=(0.3, 0.3, 0.8))
-            # ax.scatter(x, weights_stack[0, i, :], color=(0.8, 0.3, 0.3))
-            # ax1.scatter(x1 * 5, weights_stack[i, j * 5:(j + 1) * 5, :].flatten())
-            # ax2.scatter(x2 * 5, features_stack[i, j * 5:(j + 1) * 5, :].flatten())
-            ax1.errorbar(x1, weights_stack[subj, :, 0, weight], yerr=weights_stack[subj, :, 1, weight], fmt='o')
-            # ax2.errorbar(x1, features_stack[subj, :, 0, weight], yerr=features_stack[subj, :, 1, weight], fmt='o')
-        ax1.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
+        # for subj in range(len(label_name)):
+        # ax.scatter(x * 5, weights_stack[i, j*5:(j+1)*5, :])
+        # ax.scatter(x, weights_stack, color=(0.3, 0.3, 0.8))
+        # ax.scatter(x, weights_stack[0, i, :], color=(0.8, 0.3, 0.3))
+        # ax1.scatter(x1 * 5, weights_stack[i, j * 5:(j + 1) * 5, :].flatten())
+        # ax2.scatter(x2 * 5, features_stack[i, j * 5:(j + 1) * 5, :].flatten())
+        # ax1.errorbar(x1, weights_stack[subj, :, 0, weight], yerr=weights_stack[subj, :, 1, weight], fmt='o')
+        ax1.errorbar(x1, w_mean[:, weight], yerr=w_std[:, weight], fmt='o')
+        # ax2.errorbar(x1, features_stack[subj, :, 0, weight], yerr=features_stack[subj, :, 1, weight], fmt='o')
+        # ax1.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
         # ax2.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
-        ax1.set_xlabel("weight_type", labelpad=15.0, fontsize=28)
+        ax1.set_xlabel("perturbation", labelpad=15.0, fontsize=28)
         ax1.set_ylabel("weight", labelpad=15.0, fontsize=28)
-        ax1.set_ylim(-1.1, 0.7)
+        ax1.set_ylim(-0.8, 0.9)
         ax1.set_title(itm, fontsize=32)
         ax1.tick_params(axis='both', which='major', labelsize=15)
         # ax2.set_xlabel("feature_type", labelpad=15.0, fontsize=28)
@@ -155,7 +156,8 @@ def draw_reward_weights():
 if __name__ == "__main__":
     def feature_fn(x):
         # return x
-        return th.cat([x, x ** 2], dim=1)
+        return x ** 2
+        # return th.cat([x, x ** 2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
 
 
