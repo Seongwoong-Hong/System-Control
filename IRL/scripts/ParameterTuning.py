@@ -122,7 +122,7 @@ def try_train(config, demo_dir):
             eval_agent, eval_env, sample_until, deterministic_policy=False)
 
         agent_obs = rollout.flatten_trajectories(trajectories).obs
-        mean_obs_differ = np.abs((expt_obs - agent_obs)).mean()
+        mean_obs_differ = np.abs(expt_obs - agent_obs).mean()
         logger.record("mean_obs_differ", mean_obs_differ)
         logger.dump(epoch)
         # algo.agent.save(trial_dir + f"/model/{epoch:03d}/agent")

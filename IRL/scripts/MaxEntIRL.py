@@ -41,7 +41,7 @@ def main(subj, actu):
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/extcnn_{expt}_finite"
+    log_dir += f"/ext_{expt}_finite_noact"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -79,11 +79,11 @@ def main(subj, actu):
         feature_fn=feature_fn,
         agent=agent,
         expert_trajectories=expert_trajs,
-        use_action_as_input=True,
-        rew_arch=[4, 4],
+        use_action_as_input=False,
+        rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper, 'num_envs': 1},
-        rew_kwargs={'type': 'cnn', 'scale': 1, 'norm_coeff': 0.0, 'lr': 3e-3},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 
     # Run Learning
@@ -112,4 +112,4 @@ def main(subj, actu):
 
 if __name__ == "__main__":
     for actu in range(1, 7):
-        main("sub01", actu)
+        main("sub06", actu)

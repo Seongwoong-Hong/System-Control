@@ -36,6 +36,7 @@ class Viter:
             epsilon: float = 0.4,
             alpha: float = 4,
             device: str = 'cpu',
+            verbose: bool = True,
             **kwargs,
     ):
         self.gamma = gamma
@@ -43,6 +44,7 @@ class Viter:
         self.alpha = alpha
         self.device = device
         self.env = env
+        self.verbose = verbose
         if not isinstance(env, VecEnv):
             self.env = DummyVecEnv([lambda: env])
         transition_mat = self.env.env_method('get_trans_mat')[0]
@@ -94,13 +96,14 @@ class Viter:
             old_value = deepcopy(self.policy.v_table)
             self.train()
             error = th.max(th.abs(old_value - self.policy.v_table)).item()
-            if self.num_timesteps % 10 == 0:
+            if self.num_timesteps % 10 == 0 and self.verbose:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 logger.dump(self.num_timesteps)
             if self.num_timesteps <= total_timesteps or error < 1e-10:
-                logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
-                logger.record("Value Error", error, exclude="tensorboard")
+                if self.verbose:
+                    logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
+                    logger.record("Value Error", error, exclude="tensorboard")
                 self.policy.policy_table = th.round(self.policy.policy_table * 1e8) * 1e-8
                 break
             self.num_timesteps += 1
