@@ -35,11 +35,13 @@ def test_iter_predict():
 
 
 def test_finite_rl():
+    import pickle
     subpath = os.path.join("..", "..", "IRL", "demos", "HPC", f"sub03_cropped", "sub03")
+    with open("../../IRL/demos/DiscretizedHuman/09191927/sub03_7_5.pkl", "rb") as f:
+        expt = pickle.load(f)
     init_states = []
-    for i in range(5):
-        for j in range(6):
-            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
+    for traj in expt:
+        init_states += [traj.obs[0]]
     bsp = io.loadmat(subpath + f"i1_0.mat")['bsp']
     env = make_env(f"DiscretizedHuman-v2", num_envs=1, N=[9, 19, 19, 27], bsp=bsp)
     eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, N=[9, 19, 19, 27], bsp=bsp, init_states=init_states)

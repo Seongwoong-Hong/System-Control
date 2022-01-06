@@ -227,3 +227,4 @@ class FiniteSoftQiter(FiniteViter):
                                      backward_trans(self.transition_mat, self.policy.v_table[t + 1])
             self.policy.v_table[t] = self.alpha * th.logsumexp(self.policy.q_table[t] / self.alpha, dim=0)
         self.policy.policy_table = th.exp((self.policy.q_table - self.policy.v_table[:, None, :]) / self.alpha)
+

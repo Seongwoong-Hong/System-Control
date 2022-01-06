@@ -160,6 +160,5 @@ if __name__ == "__main__":
         # return th.cat([x, x ** 2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
 
-
     # draw_feature_reward()
     draw_reward_weights()
