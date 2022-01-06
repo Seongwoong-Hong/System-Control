@@ -31,7 +31,7 @@ if __name__ == "__main__":
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
     env = make_env(env_id, num_envs=1, N=[11, 17, 17, 17])
     # env = make_env(env_id, use_vec_env=False)
-    name += f"_{subj}_init"
+    name += f""
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     os.makedirs(log_dir, exist_ok=True)

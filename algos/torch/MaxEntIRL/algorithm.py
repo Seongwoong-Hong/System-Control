@@ -145,20 +145,20 @@ class MaxEntIRL:
     def state_visitation(self) -> th.Tensor:
         init_obs, _ = self.eval_env.get_init_vector()
         init_idx = self.eval_env.get_idx_from_obs(init_obs)
-        D = np.zeros([self.agent.max_t, self.agent.policy.obs_size], dtype=np.float32)
+        D = th.zeros([self.agent.max_t, self.agent.policy.obs_size], dtype=th.float32).to(self.device)
         # TODO: init_state가 굉장히 많을 때 성능을 올릴 수 있는 방법?
         for i in range(len(init_idx)):
             D[0, init_idx[i]] = ((init_idx == init_idx[i]) / len(init_idx)).sum()
         for t in range(1, self.agent.max_t):
             for a in range(self.agent.policy.act_size):
-                E = D[t - 1] * self.agent.policy.policy_table[t - 1, a, :]
-                D[t, :] += self.agent.transition_mat[a] @ E
+                D[t] += self.agent.transition_mat[a] @ (D[t - 1] * self.agent.policy.policy_table[t - 1, a])
         gammas = np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32)
         if self.use_action_as_input:
             D = self.agent.policy.policy_table * D[:, None, :]
             gammas = np.expand_dims(gammas, axis=-1)
-        Dc = np.sum(gammas * D, axis=0)
-        return th.from_numpy(Dc).to(self.device)
+        gammas = th.from_numpy(gammas).to(self.device)
+        Dc = th.sum(gammas * D, dim=0)
+        return Dc
 
     def get_whole_states_from_env(self):
         """
@@ -205,13 +205,13 @@ class MaxEntIRL:
             reset_num_timesteps: bool = True,
             **kwargs
     ):
-        if reset_num_timesteps:
+        if reset_num_timesteps or self.itr == 0:
+            self.get_whole_states_from_env()
+            self.alpha = self.agent.alpha
             self.itr = 0
+            self._reset_agent(**self.env_kwargs)
         else:
             total_iter += self.itr
-        self.early_stop = early_stop
-        self.get_whole_states_from_env()
-        self._reset_agent(**self.env_kwargs)
         call_num = 0
         while self.itr < total_iter:
             with logger.accumulate_means(f"reward"):
@@ -223,11 +223,13 @@ class MaxEntIRL:
                     grad_norm += param.grad.norm().item()
                 logger.record("weight norm", weight_norm)
                 logger.record("grad norm", grad_norm)
+                logger.record("num iteration", self.itr, exclude="tensorboard")
                 logger.dump(self.itr)
-                if mean_loss < -1e-2 and self.itr > 30 and np.abs(grad_norm) < 1e-4:
+                if np.abs(mean_loss) < 1e-2 and self.itr > 30 and np.abs(grad_norm) < 0.1 and early_stop:
                     break
             with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)
+                self.agent.alpha = weight_norm * self.alpha
                 for agent_steps in range(1, max_agent_iter + 1):
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
@@ -238,6 +240,7 @@ class MaxEntIRL:
             if callback and self.itr % callback_period == 0:
                 callback(self, call_num)
                 call_num += 1
+        return mean_loss
 
 
 class GuidedCostLearning(MaxEntIRL):

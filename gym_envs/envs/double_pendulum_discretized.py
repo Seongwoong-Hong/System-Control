@@ -18,9 +18,9 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def __init__(self, N=None):
         super(DiscretizedDoublePendulum, self).__init__()
-        self.max_torques = np.array([120., 155.])
-        self.max_speeds = np.array([1.4, 2.55])
-        self.max_angles = np.array([0.22, 1.25])
+        self.max_torques = np.array([100., 100.])
+        self.max_speeds = np.array([0.8, 2.4])
+        self.max_angles = np.array([0.16, 0.67])
         self.min_speeds = -self.max_speeds
         self.min_angles = -self.max_angles
         # self.max_speeds = np.array([1, 1])
@@ -78,7 +78,7 @@ class DiscretizedDoublePendulum(gym.Env):
         assert self.state is not None, "Can't step the environment before calling reset function"
         assert action in self.action_space, f"{action} is Out of action space"
         self.last_a = action
-        info = {'obs': self.state.reshape(1, -1), 'act': action.reshape(1, -1)}
+        info = {'obs': self.state.reshape(1, -1), 'acts': action.reshape(1, -1)}
         r = self.get_reward(self.state, action)
         self.state = self.get_next_state(self.state[None, ...], action[None, ...])[0, 0, ...]
 
@@ -224,8 +224,7 @@ class DiscretizedDoublePendulum(gym.Env):
     def get_idx_from_act(self, act: np.ndarray):
         if len(act.shape) == 1:
             act = act[None, :]
-        assert (np.max(act, axis=0) <= self.max_torques + 1e-6).all() or \
-               (np.min(act, axis=0) >= -self.max_torques - 1e-6).all()
+        assert (np.max(np.abs(act), axis=0) <= self.max_torques + 1e-6).all()
         dims = np.array(self.num_actions)
         idx = []
         for i, whole_candi in enumerate(self.torque_lists):

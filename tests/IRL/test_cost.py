@@ -25,7 +25,7 @@ def test_draw_costmap():
     fig = CostMap.draw_costmap(inputs)
 
 
-def test_cal_cost():
+def test_cal_cost(irl_path):
     from imitation.data.rollout import flatten_trajectories
     expert_dir = os.path.join(irl_path, "demos", "HPC", "lqrTest.pkl")
     with open(expert_dir, "rb") as f:
@@ -43,7 +43,7 @@ def test_cal_cost():
     CostMap.draw_costmap(inputs)
 
 
-def test_process_agent(tenv):
+def test_process_agent(tenv, irl_path):
     cost_dir = os.path.join(irl_path, "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model")
     with open(cost_dir + "/discrim.pkl", "rb") as f:
         disc = pickle.load(f)
@@ -55,7 +55,7 @@ def test_process_agent(tenv):
     CostMap.draw_costmap(inputs)
 
 
-def test_costmap(tenv):
+def test_costmap(tenv, irl_path):
     reward_dir = os.path.join(irl_path, "tmp", "log", "HPC", "ppo", "AIRL_test", "69", "model")
     with open(reward_dir + "/discrim.pkl", "rb") as f:
         disc = pickle.load(f).double()
@@ -87,29 +87,83 @@ def test_expt_reward(irl_path):
     plt.show()
 
 
-def test_agent_reward():
-    from common.wrappers import RewardWrapper
-    env_type = "IDP"
-    name = "IDP_custom"
-    rewards = []
-    for i in range(10):
-        env = make_env(f"{name}-v1", use_vec_env=False)
-        load_dir = f"../tmp/log/{env_type}/MaxEntIRL/{name}_test1/model/{i:03d}"
-        agent = SAC.load(load_dir + "/agent")
-        expt = PPO.load(f"../../RL/{env_type}/tmp/log/{name}/ppo/policies_1/ppo0")
-        with open(load_dir + "/reward_net.pkl", "rb") as f:
-            reward_fn = pickle.load(f).double()
-        env = RewardWrapper(env, reward_fn.eval())
-        done = False
-        reward = 0
-        obs = env.reset()
-        while not done:
-            act, _ = agent.predict(obs, deterministic=True)
-            obs, rew, done, _ = env.step(act)
-            reward += rew.item()
-        rewards.append(reward)
-    print(rewards)
-    plt.plot(rewards)
-    plt.show()
+def test_agent_reward(irl_path, subj="sub06", actu=1):
+    import time
+    from scipy import io
+    from common.wrappers import ActionRewardWrapper
+    from common.rollouts import generate_trajectories_without_shuffle
+    from algos.tabular.viter import FiniteSoftQiter, SoftQiter
+    from imitation.data.rollout import make_sample_until, flatten_trajectories
+
+    rendering = False
+    plotting = True
+
+    def feature_fn(x):
+        return th.cat([x, x ** 2], dim=1)
+
+    env_type = "DiscretizedHuman"
+    name = f"{env_type}"
+    expt = f"{subj}_{actu}_half"
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/ext_09191927/{expt}_finite_noact/model"
+    with open(load_dir + "/reward_net.pkl", "rb") as f:
+        reward_fn = pickle.load(f).cpu()
+    bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
+    with open(f"{irl_path}/demos/{env_type}/09191927/{expt}.pkl", "rb") as f:
+        expert_traj = pickle.load(f)
+    init_states = []
+    for traj in expert_traj:
+        init_states.append(traj.obs[0])
+    reward_fn.feature_fn = feature_fn
+    env = make_env(f"{name}-v2", num_envs=1, N=[9, 19, 19, 27], bsp=bsp,
+                   wrapper=ActionRewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
+    learned_agent = FiniteSoftQiter(env, gamma=1, alpha=0.0001, device='cpu', verbose=False)
+    learned_agent.learn(0)
+    agent = SoftQiter(env)
+    agent.policy.policy_table = learned_agent.policy.policy_table[0]
+    eval_env = make_env(f"{name}-v0", num_envs=1, N=[9, 19, 19, 27], bsp=bsp, init_states=init_states)
+    agent.set_env(eval_env)
+    sample_until = make_sample_until(n_timesteps=None, n_episodes=len(expert_traj))
+    agent_traj = generate_trajectories_without_shuffle(
+        agent, eval_env, sample_until, deterministic_policy=False)
+
+    expt_obs = flatten_trajectories(expert_traj).obs
+    expt_acts = flatten_trajectories(expert_traj).acts
+    agent_obs = flatten_trajectories(agent_traj).obs
+    agent_acts = flatten_trajectories(agent_traj).acts
+
+    print(f"Mean obs difference ({subj}_{actu}): {np.abs(expt_obs - agent_obs).mean()}")
+    print(f"Mean acts difference ({subj}_{actu}): {np.abs(expt_acts - agent_acts).mean()}")
+
+    if plotting:
+        x_value = range(1, 26)
+        obs_fig = plt.figure(figsize=[18, 12], dpi=150.0)
+        acts_fig = plt.figure(figsize=[18, 6], dpi=150.0)
+        for ob_idx in range(4):
+            ax = obs_fig.add_subplot(2, 2, ob_idx + 1)
+            for traj_idx in range(len(expert_traj)):
+                ax.plot(x_value, agent_traj[traj_idx].obs[:-1, ob_idx], color='k')
+                ax.plot(x_value, expert_traj[traj_idx].obs[:-1, ob_idx], color='b')
+        for act_idx in range(2):
+            ax = acts_fig.add_subplot(1, 2, act_idx + 1)
+            for traj_idx in range(len(expert_traj)):
+                ax.plot(x_value, agent_traj[traj_idx].acts[:, act_idx], color='k')
+                ax.plot(x_value, expert_traj[traj_idx].acts[:, act_idx], color='b')
+        obs_fig.tight_layout()
+        acts_fig.tight_layout()
+        plt.show()
+
+    if rendering:
+        for i in range(10):
+            done = False
+            obs = eval_env.reset()
+            while not done:
+                act, _ = agent.predict(obs, deterministic=True)
+                obs, rew, done, _ = eval_env.step(act)
+                eval_env.render()
+                time.sleep(env.get_attr("dt")[0])
 
 
+def test_learned_results(irl_path):
+    for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
+        for actu in range(1, 5):
+            test_agent_reward(irl_path, subj, actu)
