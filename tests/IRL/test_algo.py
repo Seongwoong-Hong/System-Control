@@ -15,7 +15,7 @@ from common.wrappers import *
 
 from imitation.algorithms import bc
 
-subj = "sub03"
+subj = "sub01"
 irl_path = os.path.abspath(os.path.join("..", "..", "IRL"))
 bsp = io.loadmat(f"{irl_path}/demos/HPC/{subj}/{subj}i1.mat")['bsp']
 
@@ -139,15 +139,17 @@ def test_discretized_env(init_states):
     from algos.tabular.viter import SoftQiter
     name = "DiscretizedHuman"
     env_id = f"{name}"
+    with open(f"{irl_path}/demos/DiscretizedHuman/{subj}_1.pkl", "rb") as f:
+        expert = pickle.load(f)
     init_states = []
-    i = 0
-    for j in range(1):
-        init_states += [io.loadmat(f"../../IRL/demos/HPC/{subj}_cropped/{subj}i{i + 1}_{j}.mat")['state'][0, :4]]
-    env = make_env(f"{env_id}-v0", num_envs=1, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
-    model_dir = os.path.join(irl_path, "tmp", "log", "ray_result", name + "_sub03", "sub03_1_1", "model", "000")
+    for traj in expert:
+        init_states += [traj.obs[0]]
+    env = make_env(f"{env_id}-v0", num_envs=1, N=[11, 21, 21, 21], bsp=bsp, init_states=init_states)
+    model_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", f"sq_{subj}_2_finite_action",
+                             "model")
     with open(model_dir + "/agent.pkl", "rb") as f:
         agent = pickle.load(f)
-    algo = SoftQiter(env, gamma=0.8, alpha=0.01)
+    algo = SoftQiter(env, gamma=1, alpha=0.01)
     algo.policy.policy_table = agent.policy.policy_table[0]
     for _ in range(5):
         obs_list = []
@@ -155,10 +157,10 @@ def test_discretized_env(init_states):
         done = False
         obs_list.append(obs)
         while not done:
-            a, _ = algo.predict(obs, deterministic=True)
+            a, _ = algo.predict(obs, deterministic=False)
             ns, _, done, _ = env.step(a)
             env.render()
-            time.sleep(0.05)
+            time.sleep(env.get_attr("dt")[0])
             obs = ns
             obs_list.append(obs)
         obs_list = np.array(obs_list).reshape(-1, 4)

@@ -24,11 +24,11 @@ from common.wrappers import ActionRewardWrapper
 from common.rollouts import generate_trajectories_without_shuffle
 
 
-# ray.init(local_mode=True)
+# ray.init(local_mode=True, num_gpus=1)
 
 
 def trial_name_string(trial):
-    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_{trial.config['trial']}_" + trial.trial_id
+    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_" + trial.trial_id
     return trialname
 
 
@@ -69,7 +69,7 @@ def try_train(config, demo_dir):
         raise NotImplementedError
 
     subpath = os.path.join(demo_dir, "..", "HPC", config['expt'], config['expt'])
-    with open(demo_dir + f"/09191927/{config['expt']}_{config['actuation']}_{config['trial']}.pkl", "rb") as f:
+    with open(demo_dir + f"/09191927/{config['expt']}_{config['actuation']}_half.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
     for traj in expert_trajs:
@@ -78,8 +78,12 @@ def try_train(config, demo_dir):
     env = make_env(f"{config['env_id']}-v2", N=[9, 19, 19, 27], bsp=bsp)
     eval_env = make_env(f"{config['env_id']}-v0", N=[9, 19, 19, 27], bsp=bsp, init_states=init_states)
 
-    agent = FiniteSoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cpu')
-    eval_agent = SoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device='cpu')
+    device = 'cpu'
+    if th.cuda.is_available():
+        device = 'cuda'
+
+    agent = FiniteSoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device=device)
+    eval_agent = SoftQiter(env, gamma=config['gamma'], alpha=config['alpha'], device=device)
 
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=len(expert_trajs))
 
@@ -91,25 +95,25 @@ def try_train(config, demo_dir):
         expert_trajectories=expert_trajs,
         use_action_as_input=config['use_action'],
         rew_arch=rew_arch,
-        device='cpu',
+        device=device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': config['norm_coeff'], 'lr': config['lr']},
     )
     trial_dir = tune.get_trial_dir()
     eval_env = DummyVecEnv([lambda: eval_env])
     expt_obs = rollout.flatten_trajectories(expert_trajs).obs
-    for epoch in range(1):
-        os.makedirs(trial_dir + f"/model/{epoch:03d}", exist_ok=False)
-
+    for epoch in range(1000):
         """ Learning """
         algo.learn(
-            total_iter=200,
+            total_iter=5,
             agent_learning_steps=0,
             n_episodes=len(expert_trajs),
             max_agent_iter=1,
             min_agent_iter=1,
             max_gradient_steps=1,
             min_gradient_steps=1,
+            reset_num_timesteps=False,
+            early_stop=False,
         )
 
         """ Testing """
@@ -119,26 +123,28 @@ def try_train(config, demo_dir):
 
         agent_obs = rollout.flatten_trajectories(trajectories).obs
         mean_obs_differ = np.abs((expt_obs - agent_obs)).mean()
+        logger.record("mean_obs_differ", mean_obs_differ)
+        logger.dump(epoch)
         # algo.agent.save(trial_dir + f"/model/{epoch:03d}/agent")
+        os.makedirs(trial_dir + f"/model/{epoch:03d}", exist_ok=False)
         algo.reward_net.save(trial_dir + f"/model/{epoch:03d}/reward_net")
-
         algo.agent.set_env(env)
         algo.reward_net.feature_fn = feature_fn
         tune.report(mean_obs_differ=mean_obs_differ)
 
 
-def main(target, sub, trial):
+def main(target, num):
     metric = "mean_obs_differ"
-    expt = sub
+    # expt = sub
     demo_dir = os.path.abspath(os.path.join("..", "demos", target))
     config = {
         'env_id': target,
         'gamma': tune.grid_search([1]),
-        'alpha': tune.grid_search([0.005]),
+        'alpha': tune.grid_search([0.01]),
         'use_action': tune.grid_search([True]),
-        'expt': tune.grid_search([expt]),
-        'actuation': tune.grid_search([1, 2, 3, 4, 5, 6, 7]),
-        'trial': tune.grid_search([trial]),
+        'expt': tune.grid_search([f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]),
+        'actuation': tune.grid_search([1, 2, 3, 4, 5, 6]),
+        # 'trial': tune.grid_search([1, 2, 3, 4, 5]),
         'rew_arch': tune.grid_search(['linear']),
         'feature': tune.grid_search(['sq']),
         'lr': tune.grid_search([1e-2]),
@@ -148,16 +154,17 @@ def main(target, sub, trial):
     scheduler = ASHAScheduler(
         metric=metric,
         mode="min",
-        max_t=1,
-        grace_period=1,
-        reduction_factor=2,
+        max_t=30,
+        grace_period=18,
+        reduction_factor=4,
     )
     reporter = CLIReporter(metric_columns=[metric, "training_iteration"])
     irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    # assert th.cuda.is_available()
     result = tune.run(
         partial(try_train, demo_dir=demo_dir),
-        name=target + '_sq_act_mT/' + expt,
-        resources_per_trial={"cpu": 1},
+        name=target + f'_sq_09191927_half_{num}/',
+        resources_per_trial={"gpu": 0.5},
         config=config,
         num_samples=1,
         scheduler=scheduler,
@@ -176,6 +183,5 @@ def main(target, sub, trial):
 
 
 if __name__ == "__main__":
-    for sub in [f"sub{i:02d}" for i in [1, 3, 4]]:
-        for trial in range(1, 6):
-            main('DiscretizedHuman', sub, trial)
+    for num in range(2, 6):
+        main('DiscretizedHuman', num)

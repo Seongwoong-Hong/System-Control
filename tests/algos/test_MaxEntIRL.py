@@ -14,8 +14,8 @@ from common.util import make_env
 from common.wrappers import *
 
 env_op = 1
-subj = "sub07"
-env_name = "DiscretizedDoublePendulum"
+subj = "sub04"
+env_name = "DiscretizedHuman"
 env_id = f"{env_name}"
 
 
@@ -27,7 +27,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "11171717", f"softqiter.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "09191927", f"{subj}_4_half.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -37,22 +37,22 @@ def expert(demo_dir):
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", f"{subj}_cropped", subj)
     init_states = []
-    for i in range(1):
+    for i in [3]:
         for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v2", subpath=subpath, N=[11, 17, 17, 17])
+    return make_env(f"{env_id}-v2", subpath=subpath, N=[9, 19, 19, 27])
 
 
 @pytest.fixture
 def eval_env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", f"{subj}_cropped", subj)
     init_states = []
-    for i in range(1):
+    for i in [4]:
         for j in range(6):
             bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
             init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    return make_env(f"{env_id}-v0", subpath=subpath, N=[11, 17, 17, 17])
+    return make_env(f"{env_id}-v0", subpath=subpath, N=[9, 19, 19, 27])
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ def learner(env, expert, eval_env):
         # return x
         return th.cat([x, x ** 2], dim=1)
 
-    agent = def_policy("finitesoftqiter", env, device='cpu', verbose=1)
+    agent = def_policy("finitesoftqiter", env, device='cuda:2', verbose=1)
 
     return MaxEntIRL(
         env,
@@ -81,26 +81,29 @@ def learner(env, expert, eval_env):
         feature_fn=feature_fn,
         expert_trajectories=expert,
         use_action_as_input=True,
-        rew_arch=[],
+        rew_arch=[4, 4],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 
 
-def test_callback(learner):
+def test_callback(expert, learner):
     from stable_baselines3.common import callbacks
     from imitation.policies import serialize
     save_policy_callback = serialize.SavePolicyCallback(f"tmp/log", None)
     save_policy_callback = callbacks.EveryNTimesteps(int(1e3), save_policy_callback)
     save_reward_callback = SaveCallback(cycle=1, dirpath=f"tmp/log")
     learner.learn(
-        total_iter=10,
-        agent_learning_steps=10000,
-        gradient_steps=1,
-        n_episodes=8,
+        total_iter=3,
+        agent_learning_steps=0,
+        n_episodes=len(expert),
         max_agent_iter=1,
-        callback=save_reward_callback.net_save
+        min_agent_iter=1,
+        max_gradient_steps=1,
+        min_gradient_steps=1,
+        early_stop=True,
+        callback=save_reward_callback.rew_save,
     )
 
 
@@ -109,7 +112,7 @@ def test_validity(learner, expert):
     for _ in range(10):
         t1 = time.time()
         learner.learn(
-            total_iter=1,
+            total_iter=200,
             agent_learning_steps=0,
             n_episodes=len(expert),
             max_agent_iter=1,
@@ -118,8 +121,7 @@ def test_validity(learner, expert):
             min_gradient_steps=1,
             early_stop=True,
         )
-        t2 = time.time()
-        print(t2 - t1)
+        print(time.time() - t1)
 
 
 def test_GCL(env, expert, eval_env):
@@ -131,7 +133,7 @@ def test_GCL(env, expert, eval_env):
         # return x
         return th.cat([x, x**2], dim=1)
 
-    agent = def_policy("softqlearning", env, device='cpu', verbose=1)
+    agent = def_policy("softqlearning", env, device='cuda:1', verbose=1)
 
     learner = GuidedCostLearning(
         env,

@@ -45,9 +45,9 @@ class TabularPolicy:
             self.dim = self.observation_space.shape[0]
             self.obs_size = len(s_vec)
             self.act_size = len(a_vec)
-        self.q_table = np.zeros([self.act_size, self.obs_size], dtype=np.float32)
-        self.v_table = np.full([self.obs_size], -np.inf, dtype=np.float32)
-        self.policy_table = np.full([self.act_size, self.obs_size], 1 / self.act_size, dtype=np.float32)
+        self.q_table = th.zeros([self.act_size, self.obs_size], dtype=th.float32).to(self.device)
+        self.v_table = th.full([self.obs_size], -np.inf, dtype=th.float32).to(self.device)
+        self.policy_table = th.full([self.act_size, self.obs_size], 1 / self.act_size, dtype=th.float32).to(self.device)
 
     def predict(
             self,
@@ -84,13 +84,13 @@ class TabularPolicy:
     def arg_max(self, x):
         arg = []
         for x_ in x:
-            arg.append(random.choice(np.flatnonzero(x_ == x_.max())))
+            arg.append(random.choice(np.flatnonzero((x_ == x_.max()).cpu().numpy())))
         return np.array(arg)
 
     def choice_act(self, policy):
         arg = []
         for prob in policy:
-            arg.append([random.choices(range(self.act_size), weights=prob)[0]])
+            arg.append(random.choices(range(self.act_size), weights=prob)[0])
         return np.array(arg, dtype=int)
 
 
@@ -98,9 +98,9 @@ class FiniteTabularPolicy(TabularPolicy):
     def _setup_table(self, **kwargs):
         max_t = kwargs.pop('max_t')
         super(FiniteTabularPolicy, self)._setup_table(**kwargs)
-        self.policy_table = np.repeat(self.policy_table[None, :], max_t, axis=0)
-        self.q_table = np.repeat(self.q_table[None, :], max_t, axis=0)
-        self.v_table = np.repeat(self.v_table[None, :], max_t, axis=0)
+        self.policy_table = self.policy_table.repeat(max_t, 1, 1)
+        self.q_table = self.q_table.repeat(max_t, 1, 1)
+        self.v_table = self.v_table.repeat(max_t, 1)
 
     def predict(
             self,

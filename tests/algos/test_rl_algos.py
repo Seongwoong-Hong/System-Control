@@ -46,13 +46,13 @@ def test_finite_rl():
     env = make_env(f"DiscretizedHuman-v2", num_envs=1, N=[9, 19, 19, 27], bsp=bsp)
     eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, N=[9, 19, 19, 27], bsp=bsp, init_states=init_states)
     t1 = time.time()
-    algo = def_policy("finitesoftqiter", env)
-    algo.learn(0)
-    algo2 = def_policy("softqiter", env)
+    algo = def_policy("finitesoftqiter", env, device='cpu')
+    algo.learn(2000)
+    algo2 = def_policy("softqiter", env, device='cpu')
     # algo2.learn(2000)
     algo2.policy.policy_table = algo.policy.policy_table[0]
     print(time.time() - t1)
-    for _ in range(6):
+    for _ in range(1):
         obs = eval_env.reset()
         done = False
         while not done:
