@@ -92,7 +92,7 @@ class DiscretizedDoublePendulum(gym.Env):
         a0, a1 = np.split(actions.astype('i'), 2, axis=-1)
         t0_list, t1_list = self.torque_lists
 
-        return np.array([t0_list[a0], t1_list[a1]])
+        return np.array([t0_list[a0], t1_list[a1]]).squeeze()
 
     def get_reward(self, state, action):
         if state.ndim == 1:
@@ -108,7 +108,7 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def get_next_state(self, state, action):
         th0, th1, thd0, thd1 = np.split(np.copy(state), (1, 2, 3), axis=-1)
-        T0, T1 = self.get_torque(np.expand_dims(action, axis=1))
+        T0, T1 = self.get_torque(np.expand_dims(action, axis=1))[..., None, None]
         g, (I0, I1), (m0, m1), (lc0, lc1), (l0, l1), dt = \
             self.g, self.Is, self.ms, self.lcs, self.ls, self.dt
 
@@ -180,18 +180,14 @@ class DiscretizedDoublePendulum(gym.Env):
         if len(state.shape) == 1:
             state = state[None, :]
         dims = self.get_num_cells()
-        idx = []
-        for i, whole_candi in enumerate(self.obs_shape):
-            idx.append(
-                np.argmin(np.abs(np.repeat(whole_candi[None, :], state.shape[0], axis=0) - state[:, [i]]), axis=1))
-        tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
+        tot_idx = self.get_idx_from_obs(state)
 
         if state_backup.ndim == 1:
             ind_vec = np.zeros(np.prod(dims)).astype('i')
-            ind_vec[tot_idx.ravel()] = 1
+            ind_vec[tot_idx] = 1
         else:
             batch_size = state.shape[0]
-            ind_vec = csc_matrix((np.ones(batch_size), (np.arange(batch_size), tot_idx.astype('i'))),
+            ind_vec = csc_matrix((np.ones(batch_size), (np.arange(batch_size), tot_idx)),
                                  shape=[batch_size, np.prod(dims)])
 
         return ind_vec
@@ -234,6 +230,7 @@ class DiscretizedDoublePendulum(gym.Env):
         return tot_idx.flatten()
 
     def get_trans_mat(self, h=None, verbose=False):
+        # Transition Matrix shape: (|A|, |Next S|, |S|)
         s_vec, a_vec = self.get_vectorized()
         next_s_vec_list = self.get_next_state(s_vec, a_vec)
 

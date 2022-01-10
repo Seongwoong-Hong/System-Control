@@ -9,17 +9,17 @@ from scipy import io
 
 from common.util import make_env
 from common.callbacks import SaveCallback
-from common.wrappers import ActionRewardWrapper
+from common.wrappers import RewardWrapper
 from algos.torch.MaxEntIRL import MaxEntIRL
 from IRL.scripts.project_policies import def_policy
 
 
 def main(subj, actu):
-    env_type = "DiscretizedHuman"
+    env_type = "2DTarget_disc"
     algo_type = "MaxEntIRL"
-    device = "cuda:1"
+    device = "cpu"
     name = f"{env_type}"
-    expt = f"09191927/{subj}_{actu}_half"
+    expt = f"50/softqiter_more_random"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -34,14 +34,14 @@ def main(subj, actu):
         init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", subpath=subpath, N=[9, 19, 19, 27], bsp=bsp)
-    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[9, 19, 19, 27], init_states=init_states, bsp=bsp)
-    # env = make_env(f"{name}-v1", pltqs=pltqs, init_states=init_states)
-    # eval_env = make_env(f"{name}-v0", pltqs=pltqs, init_states=init_states)
+    # env = make_env(f"{name}-v2", subpath=subpath, N=[9, 19, 19, 27], bsp=bsp)
+    # eval_env = make_env(f"{name}-v0", subpath=subpath, N=[9, 19, 19, 27], init_states=init_states, bsp=bsp)
+    env = make_env(f"{name}-v2")
+    eval_env = make_env(f"{name}-v0", init_states=init_states)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_{expt}_finite_noact"
+    log_dir += f"/cnn_{expt}_finite4"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -59,11 +59,11 @@ def main(subj, actu):
         #     idx = int(row.item())
         #     ft[i, idx] = 1
         # return ft
-        # return x
+        return x
         # return x ** 2
         # x1, x2, x3, x4 = th.split(x, 1, dim=1)
         # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, x**2, x**3), dim=1)
-        return th.cat([x, x ** 2], dim=1)
+        # return th.cat([x, x ** 2], dim=1)
 
     # Setup callbacks
     save_net_callback = SaveCallback(cycle=1, dirpath=model_dir)
@@ -79,16 +79,16 @@ def main(subj, actu):
         feature_fn=feature_fn,
         agent=agent,
         expert_trajectories=expert_trajs,
-        use_action_as_input=False,
-        rew_arch=[],
+        use_action_as_input=True,
+        rew_arch=[4, 4],
         device=device,
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper, 'num_envs': 1},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper, 'num_envs': 1},
         rew_kwargs={'type': 'cnn', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 
     # Run Learning
     learner.learn(
-        total_iter=150,
+        total_iter=1000,
         agent_learning_steps=0,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
@@ -96,14 +96,14 @@ def main(subj, actu):
         max_gradient_steps=1,
         min_gradient_steps=1,
         callback=save_net_callback.rew_save,
-        callback_period=1000,
+        callback_period=10000,
         early_stop=True,
     )
 
     # Save the result of learning
     reward_path = model_dir + "/reward_net"
     learner.reward_net.save(reward_path)
-    # learner.agent.save(model_dir + "/agent")
+    learner.agent.save(model_dir + "/agent")
     if learner.agent.get_vec_normalize_env():
         learner.wrap_env.save(model_dir + "/normalization.pkl")
     now = datetime.datetime.now()
@@ -111,5 +111,5 @@ def main(subj, actu):
 
 
 if __name__ == "__main__":
-    for actu in range(1, 7):
-        main("sub06", actu)
+    for actu in range(1, 2):
+        main("sub01", actu)

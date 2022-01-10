@@ -1,6 +1,7 @@
 import os
 import pickle
 import torch as th
+from copy import deepcopy
 
 from torch import nn
 from typing import List
@@ -69,14 +70,13 @@ class RewardNet(nn.Module):
         return self.train(False)
 
     def save(self, log_dir):
-        state = self.__dict__.copy()
-        del state['feature_fn']
-        self.__dict__.update(state)
+        feature_fn = deepcopy(self.feature_fn)
         self.feature_fn = None
         with open(log_dir + ".tmp", "wb") as f:
             pickle.dump(self.cpu(), f)
-        self.to(self._device)
         os.replace(log_dir + ".tmp", log_dir + ".pkl")
+        self.to(self._device)
+        self.feature_fn = feature_fn
 
     @property
     def device(self):

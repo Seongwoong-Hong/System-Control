@@ -4,9 +4,11 @@ import numpy as np
 import pickle
 from common.util import make_env
 from common.wrappers import RewardWrapper
+from imitation.data.rollout import generate_trajectories, make_sample_until
 from imitation.util import logger
 from algos.tabular.qlearning import *
 from algos.tabular.viter import *
+from matplotlib import pyplot as plt
 
 logger.configure(".", format_strs=['stdout'])
 
@@ -42,24 +44,27 @@ def test_viter():
 
 
 def test_softiter():
-    env = make_env("2DTarget_disc-v2", map_size=10, num_envs=1)
+    env = make_env("2DTarget_disc-v2", num_envs=1, map_size=50)
     logger.configure(".", format_strs=['stdout'])
-    algo = SoftQiter(env, gamma=0.8, epsilon=0.2, alpha=0.01, device='cpu')
+    algo = SoftQiter(env, gamma=0.9, epsilon=0.2, alpha=1, device='cpu')
     algo.learn(2000)
-    algo2 = FiniteSoftQiter(env, gamma=0.8, alpha=0.01, device='cpu')
-    algo2.learn(2000)
-
+    algo2 = FiniteSoftQiter(env, gamma=0.9, alpha=1, device='cpu')
+    algo2.learn(0)
+    sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
+    trajectories = generate_trajectories(algo, env, sample_until, deterministic_policy=True)
     print('env')
 
 
 def test_finite_iter():
-    env = make_env("2DTarget_disc-v2", map_size=10, num_envs=1)
+    env = make_env("1DTarget_disc-v2", map_size=50, num_envs=1)
     logger.configure(".", format_strs=['stdout'])
     algo = FiniteSoftQiter(env, gamma=0.8, alpha=0.01, device='cpu')
-    algo.learn(2000)
-    algo2 = FiniteViter(env, gamma=0.8, device='cpu')
-    algo2.learn(2000)
-    print(np.abs(algo.policy.policy_table - algo2.policy.policy_table).max())
+    algo.learn(0)
+
+    print('end')
+    # algo2 = FiniteViter(env, gamma=0.8, device='cpu')
+    # algo2.learn(2000)
+    # print(np.abs(algo.policy.policy_table - algo2.policy.policy_table).max())
 
 
 def test_wrapped_reward():

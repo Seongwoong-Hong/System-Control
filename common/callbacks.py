@@ -178,26 +178,23 @@ class SaveCallback:
         self.path = dirpath
 
     def net_save(self, network, itr):
-        if itr % self.cycle == 0:
-            log_dir = self.path + f"/{itr:03d}"
-            os.makedirs(log_dir, exist_ok=True)
-            if network.agent.get_vec_normalize_env():
-                network.wrap_env.save(log_dir + "/normalization.pkl")
-            network.reward_net.save(log_dir + "/reward_net")
-            network.agent.save(log_dir + "/agent")
+        log_dir = self.path + f"/{itr:03d}"
+        os.makedirs(log_dir, exist_ok=True)
+        if network.agent.get_vec_normalize_env():
+            network.wrap_env.save(log_dir + "/normalization.pkl")
+        network.reward_net.save(log_dir + "/reward_net")
+        network.agent.save(log_dir + "/agent")
 
     def rew_save(self, network, itr):
-        if itr % self.cycle == 0:
-            log_dir = self.path + f"{itr:03d}"
-            os.makedirs(log_dir, exist_ok=True)
-            network.reward_net.save(log_dir + "/reward_net")
-            if network.agent.get_vecnormalize_env():
-                network.wrap_env.save(log_dir + "/normalization.pkl")
+        log_dir = self.path + f"/{itr:03d}"
+        os.makedirs(log_dir, exist_ok=True)
+        network.reward_net.save(log_dir + "/reward_net")
+        if network.agent.get_vec_normalize_env():
+            network.wrap_env.save(log_dir + "/normalization.pkl")
 
     def agent_save(self, network, itr):
-        if itr % self.cycle == 0:
-            log_dir = self.path + f"/{itr:03d}"
-            os.makedirs(log_dir, exist_ok=True)
-            network.agent.save(log_dir + "/agent")
-            if network.agent.get_vec_normalize_env():
-                network.wrap_env.save(log_dir + "/normalization.pkl")
+        log_dir = self.path + f"/{itr:03d}"
+        os.makedirs(log_dir, exist_ok=True)
+        network.agent.save(log_dir + "/agent")
+        if network.agent.get_vec_normalize_env():
+            network.wrap_env.save(log_dir + "/normalization.pkl")

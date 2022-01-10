@@ -84,19 +84,19 @@ def draw_feature_reward():
 
 
 def draw_reward_weights():
-    log_dir = os.path.join(irl_path, "tmp", "log", "ray_result")
+    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "ext_09191927")
     # get reward_weight and stack
     weights_stack, features_stack = [], []
-    label_name = [f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]
+    label_name = [f"sub{i:02d}" for i in [6]]
     for subj in label_name:
         trial_weights_stack, trial_feature_stack = [], []
         for pert in range(1, 7):
             weights, features = [], []
             for trial in range(1):
-                name = f"/DiscretizedHuman_sq_09191927_half_1/{subj}_{pert}/model/000"
+                name = f"/{subj}_{pert}_half_finite_noact/model"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
-                    rwfn = pickle.load(f).cpu()
-                weights.append(-rwfn.layers[0].weight.detach().numpy().flatten())
+                    reward_weight = pickle.load(f).cpu().fcnn.weight
+                weights.append(-reward_weight.detach().numpy().flatten())
                 with open(f"{irl_path}/demos/DiscretizedHuman/09191927/{subj}_{pert}_half.pkl", "rb") as f:
                     traj = pickle.load(f)[0]
                 ft = feature_fn(th.tensor(np.append(traj.obs[:-1], traj.acts, axis=1)))
@@ -120,7 +120,7 @@ def draw_reward_weights():
     #     rwfn = pickle.load(f)
     # weights_stack = rwfn.layers[0].weight.detach().numpy().flatten()
     x1 = [f"{i}cm" for i in [3, 4.5, 6, 7.5, 9, 12]]
-    subplot_name = [rf"$\omega_{i + 1}$" for i in range(6)]
+    subplot_name = [rf"$\omega_{i + 1}$" for i in range(8)]
     x2 = [f"features_{i + 1}" for i in range(9)]
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
     for weight, itm in enumerate(subplot_name):
@@ -156,8 +156,8 @@ def draw_reward_weights():
 if __name__ == "__main__":
     def feature_fn(x):
         # return x
-        return x ** 2
-        # return th.cat([x, x ** 2], dim=1)
+        # return x ** 2
+        return th.cat([x, x ** 2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
 
     # draw_feature_reward()

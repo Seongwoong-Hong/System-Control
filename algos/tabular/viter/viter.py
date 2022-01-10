@@ -13,15 +13,15 @@ from imitation.util import logger
 def backward_trans(P: List[th.tensor], v: th.tensor):
     """
     모든 A 에 대해 전환 행렬 P 를 고려할 때 이전 스텝의 v 계산
-    P.shape = (|A|, |S|, |S|)
+    P.shape = (|A|, |Next S|, |S|)
     A.shape = (|A|, |S|)
     post_v.shape = (|A|, |S|)
     """
     num_actions = len(P)
 
     post_v = []
-    for a_ind in range(num_actions):
-        post_v.append(P[a_ind].t().matmul(v))
+    for Pa in P:
+        post_v.append(Pa.t().matmul(v))
 
     post_v = th.stack(post_v)
 
@@ -100,7 +100,7 @@ class Viter:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 logger.dump(self.num_timesteps)
-            if self.num_timesteps <= total_timesteps or error < 1e-10:
+            if self.num_timesteps >= total_timesteps or error < 1e-10:
                 if self.verbose:
                     logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                     logger.record("Value Error", error, exclude="tensorboard")
@@ -145,14 +145,15 @@ class Viter:
         return None
 
     def save(self, log_dir):
-        state = self.__dict__.copy()
-        del state['env']
-        self.__dict__.update(state)
+        env = deepcopy(self.env)
+        policy_env = deepcopy(self.policy.env)
         self.env = None
         self.policy.env = None
         with open(log_dir + ".tmp", "wb") as f:
             pickle.dump(self, f)
         os.replace(log_dir + ".tmp", log_dir + ".pkl")
+        self.env = env
+        self.policy.env = policy_env
 
 
 class SoftQiter(Viter):

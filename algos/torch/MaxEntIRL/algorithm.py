@@ -134,7 +134,7 @@ class MaxEntIRL:
         trans = flatten_trajectories(trajectories)
         inp = trans.obs
         if self.use_action_as_input:
-            acts = self.wrap_eval_env.get_torque(trans.acts).squeeze().T
+            acts = self.wrap_eval_env.get_torque(trans.acts).T
             if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
                 acts = self.wrap_eval_env.action(acts)
             inp = np.concatenate([inp, acts], axis=1)
@@ -207,7 +207,6 @@ class MaxEntIRL:
     ):
         if reset_num_timesteps or self.itr == 0:
             self.get_whole_states_from_env()
-            self.alpha = self.agent.alpha
             self.itr = 0
             self._reset_agent(**self.env_kwargs)
         else:
@@ -229,7 +228,6 @@ class MaxEntIRL:
                     break
             with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)
-                self.agent.alpha = weight_norm * self.alpha
                 for agent_steps in range(1, max_agent_iter + 1):
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)

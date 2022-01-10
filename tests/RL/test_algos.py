@@ -10,6 +10,7 @@ from common.util import make_env
 from common.verification import verify_policy
 from common.wrappers import ActionWrapper
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 
@@ -69,37 +70,30 @@ def test_rl_learned_policy(rl_path):
 
 
 def test_2d(rl_path):
-    name = "2DTarget"
-    env_id = f"{name}_disc"
+    name = "2DTarget_disc"
+    env_id = f"{name}"
     env = make_env(f"{env_id}-v0")
-    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "softqlearning", "policies_1")
+    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id + "_more_random", "softqiter", "policies_1")
     with open(model_dir + "/agent.pkl", "rb") as f:
         algo = pickle.load(f)
-    # algo = PPO.load(model_dir + f"/agent")
-    trajs = []
-    for i in range(10):
-        st = env.reset()
-        done = False
-        sts, rs = [], []
-        while not done:
-            action, _ = algo.predict(st, deterministic=False)
-            st, r, done, _ = env.step(action)
-            sts.append(st)
-            rs.append(r)
-        trajs.append(np.append(np.array(sts), np.array(rs).reshape(-1, 1), axis=1))
-    env.draw(trajs)
+    policy = []
+    for i in range(5):
+        policy.append(algo.policy.policy_table[:, 500 * i:500 * (i + 1)])
+    plt.imshow(np.vstack(policy), cmap=cm.rainbow)
+    plt.show()
 
 
 def test_1d(rl_path):
-    name = "2DTarget"
-    env_id = f"{name}_disc"
-    map_size = 10
+    name = "1DTarget_disc"
+    env_id = f"{name}"
+    map_size = 50
     env = make_env(f"{env_id}-v2", map_size=map_size, num_envs=1)
-    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id + f"_{map_size}", "softqiter", "policies_1")
+    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "softqiter", "policies_1")
     with open(model_dir + "/agent.pkl", "rb") as f:
         algo = pickle.load(f)
     # algo = PPO.load(model_dir + "/agent")
-    a_list, o_list, _ = verify_policy(env, algo, render="None", repeat_num=20, deterministic=False)
+    plt.imshow(algo.policy.policy_table, cmap=cm.rainbow)
+    plt.show()
     print('end')
 
 
