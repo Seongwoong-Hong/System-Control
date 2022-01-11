@@ -88,7 +88,7 @@ def test_expt_reward(irl_path):
     plt.show()
 
 
-def test_agent_reward(irl_path, subj="sub06", actu=1):
+def test_agent_reward(irl_path, subj="sub06", actuation=1, learned_trial=1):
     import time
     from scipy import io
     from common.rollouts import generate_trajectories_without_shuffle
@@ -103,10 +103,10 @@ def test_agent_reward(irl_path, subj="sub06", actu=1):
         # return x ** 2
         return th.cat([x, x ** 2], dim=1)
 
-    env_type = "2DTarget_disc"
+    env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"50/softqiter_more_random"
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/ext_{expt}_finite2/model"
+    expt = f"09191927/{subj}_{actuation}_half"
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/ext_{expt}_finite_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = pickle.load(f).cpu()
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
@@ -116,15 +116,15 @@ def test_agent_reward(irl_path, subj="sub06", actu=1):
     for traj in expert_traj:
         init_states.append(traj.obs[0])
     reward_fn.feature_fn = feature_fn
-    env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    # env = make_env(f"{name}-v2", num_envs=1, N=[9, 19, 19, 27], bsp=bsp,
-    #                wrapper=ActionRewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
+    # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
+    env = make_env(f"{name}-v2", num_envs=1, N=[9, 19, 19, 27], bsp=bsp,
+                   wrapper=ActionRewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     learned_agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu', verbose=False)
     learned_agent.learn(0)
     agent = SoftQiter(env)
     agent.policy.policy_table = learned_agent.policy.policy_table[0]
-    # eval_env = make_env(f"{name}-v0", num_envs=1, N=[9, 19, 19, 27], bsp=bsp, init_states=init_states)
-    eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
+    eval_env = make_env(f"{name}-v0", num_envs=1, N=[9, 19, 19, 27], bsp=bsp, init_states=init_states)
+    # eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
     agent.set_env(eval_env)
     sample_until = make_sample_until(n_timesteps=None, n_episodes=len(expert_traj))
     agent_traj = generate_trajectories_without_shuffle(
@@ -135,20 +135,20 @@ def test_agent_reward(irl_path, subj="sub06", actu=1):
     agent_obs = flatten_trajectories(agent_traj).obs
     agent_acts = flatten_trajectories(agent_traj).acts
 
-    print(f"Mean obs difference ({subj}_{actu}): {np.abs(expt_obs - agent_obs).mean()}")
-    print(f"Mean acts difference ({subj}_{actu}): {np.abs(expt_acts - agent_acts).mean()}")
+    print(f"Mean obs difference ({subj}_{actuation}): {np.abs(expt_obs - agent_obs).mean()}")
+    print(f"Mean acts difference ({subj}_{actuation}): {np.abs(expt_acts - agent_acts).mean()}")
 
     if plotting:
-        x_value = range(1, 201)
+        x_value = range(1, 51)
         obs_fig = plt.figure(figsize=[18, 12], dpi=150.0)
-        acts_fig = plt.figure(figsize=[18, 12], dpi=150.0)
-        for ob_idx in range(2):
-            ax = obs_fig.add_subplot(2, 1, ob_idx + 1)
+        acts_fig = plt.figure(figsize=[18, 6], dpi=150.0)
+        for ob_idx in range(4):
+            ax = obs_fig.add_subplot(2, 2, ob_idx + 1)
             for traj_idx in range(len(expert_traj)):
                 ax.plot(x_value, agent_traj[traj_idx].obs[:-1, ob_idx], color='k')
                 ax.plot(x_value, expert_traj[traj_idx].obs[:-1, ob_idx], color='b')
         for act_idx in range(2):
-            ax = acts_fig.add_subplot(2, 1, act_idx + 1)
+            ax = acts_fig.add_subplot(1, 2, act_idx + 1)
             for traj_idx in range(len(expert_traj)):
                 ax.plot(x_value, agent_traj[traj_idx].acts[:, act_idx], color='k')
                 ax.plot(x_value, expert_traj[traj_idx].acts[:, act_idx], color='b')
@@ -168,9 +168,10 @@ def test_agent_reward(irl_path, subj="sub06", actu=1):
 
 
 def test_learned_results(irl_path):
-    for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
-        for actu in range(1, 7):
-            test_agent_reward(irl_path, subj, actu)
+    # for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
+    for actuation in range(1, 5):
+        for learn_trial in range(1, 3):
+            test_agent_reward(irl_path, "sub06", actuation, learn_trial)
 
 
 def test_learned_reward_mat(irl_path):
@@ -184,12 +185,14 @@ def test_learned_reward_mat(irl_path):
     def normalized(x):
         return (x - x.min()) / (x.max() - x.min())
 
-    expt_env = make_env("2DTarget_disc-v2")
-    with open(irl_path + f"/tmp/log/2DTarget_disc/MaxEntIRL/cnn_50/softqiter_more_random_finite2/model/reward_net.pkl",
+    env_name = "DiscretizedHuman"
+    expt_env = make_env(f"{env_name}-v2", N=[9, 19, 19, 27])
+    with open(f"{irl_path}/tmp/log/{env_name}/MaxEntIRL/cnn_09191927/sub01_1_half_finite2/model/reward_net.pkl",
               "rb") as f:
         rwfn = pickle.load(f)
     rwfn.feature_fn = feature_fn
-    agent_env = make_env("2DTarget_disc-v2", wrapper=RewardWrapper, wrapper_kwrags={'rwfn': rwfn.eval()})
+    agent_env = make_env(f"{env_name}-v2", N=[9, 19, 19, 27], wrapper=ActionRewardWrapper,
+                         wrapper_kwrags={'rwfn': rwfn.eval()})
     expt_reward_mat = normalized(expt_env.get_reward_mat())
     agent_reward_mat = normalized(agent_env.get_reward_mat())
     fig = plt.figure()

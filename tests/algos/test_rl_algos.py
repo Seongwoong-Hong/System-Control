@@ -37,7 +37,7 @@ def test_iter_predict():
 def test_finite_rl():
     import pickle
     subpath = os.path.join("..", "..", "IRL", "demos", "HPC", f"sub03_cropped", "sub03")
-    with open("../../IRL/demos/DiscretizedHuman/09191927/sub03_7_5.pkl", "rb") as f:
+    with open("../../IRL/demos/DiscretizedHuman/09191927_25Hz/sub03_7_5.pkl", "rb") as f:
         expt = pickle.load(f)
     init_states = []
     for traj in expt:

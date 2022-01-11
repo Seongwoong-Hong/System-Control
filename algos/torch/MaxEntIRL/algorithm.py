@@ -238,7 +238,6 @@ class MaxEntIRL:
             if callback and self.itr % callback_period == 0:
                 callback(self, call_num)
                 call_num += 1
-        return mean_loss
 
 
 class GuidedCostLearning(MaxEntIRL):

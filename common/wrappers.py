@@ -35,6 +35,7 @@ class RewardWrapper(gym.RewardWrapper):
 
     def get_reward_mat(self):
         inp, a_vec = self.env.get_vectorized()
+        inp = inp / self.observation_space.high[None, ...]
         if self.use_action_as_inp:
             acts = self.env.get_torque(a_vec).T
             if hasattr(self, "action") and callable(self.action):
@@ -50,7 +51,7 @@ class RewardWrapper(gym.RewardWrapper):
             return r.cpu().numpy()
 
     def reward(self, inp: np.ndarray) -> torch.tensor:
-        rwinp = torch.from_numpy(inp / 20).float().to(self.rwfn.device)
+        rwinp = torch.from_numpy(inp).float().to(self.rwfn.device)
         return self.rwfn.forward(rwinp).squeeze()
 
 

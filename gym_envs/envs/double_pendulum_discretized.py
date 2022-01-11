@@ -28,7 +28,7 @@ class DiscretizedDoublePendulum(gym.Env):
         # self.max_angles = np.array([np.pi/3, np.pi/6])
         # self.min_angles = np.array([-np.pi/3, -np.pi/6])
 
-        self.dt = 0.05
+        self.dt = 0.025
         self.g = 9.81
         self.Is = [0.1, 0.1]
         self.ms = [1., 1.]
@@ -92,7 +92,7 @@ class DiscretizedDoublePendulum(gym.Env):
         a0, a1 = np.split(actions.astype('i'), 2, axis=-1)
         t0_list, t1_list = self.torque_lists
 
-        return np.array([t0_list[a0], t1_list[a1]]).squeeze()
+        return np.array([t0_list[a0], t1_list[a1]]).squeeze(axis=-1)
 
     def get_reward(self, state, action):
         if state.ndim == 1:
@@ -108,7 +108,7 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def get_next_state(self, state, action):
         th0, th1, thd0, thd1 = np.split(np.copy(state), (1, 2, 3), axis=-1)
-        T0, T1 = self.get_torque(np.expand_dims(action, axis=1))[..., None, None]
+        T0, T1 = self.get_torque(action)[..., None, None]
         g, (I0, I1), (m0, m1), (lc0, lc1), (l0, l1), dt = \
             self.g, self.Is, self.ms, self.lcs, self.ls, self.dt
 
@@ -251,8 +251,10 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def get_reward_mat(self):
         s_vec, a_vec = self.get_vectorized()
-        R = self.get_reward(s_vec, a_vec)
-        return R
+        R = []
+        for a in a_vec:
+            R.append(self.get_reward(s_vec, a).flatten())
+        return np.stack(R)
 
     def render(self, mode="human"):
         if self.viewer is None:

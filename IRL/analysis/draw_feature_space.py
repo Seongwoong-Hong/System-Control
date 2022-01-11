@@ -84,7 +84,7 @@ def draw_feature_reward():
 
 
 def draw_reward_weights():
-    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "ext_09191927")
+    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "ext_09191927_25Hz")
     # get reward_weight and stack
     weights_stack, features_stack = [], []
     label_name = [f"sub{i:02d}" for i in [6]]

@@ -99,7 +99,7 @@ def test_value_itr(soft=True):
                 else:
                     # row-major 이기 때문에 action 선택  전치 수행
                     next_pi = partial(greedy_pi, q=q_values[t_ind + 1])
-                    next_A = env.get_action_mat(next_pi, h)
+                    next_A = env.get_action_mat(next_pi)
                     next_values = q_values[t_ind + 1].T[next_A.T == 1]
 
                 q_values[t_ind] = R + backward_trans(P, v=next_values)

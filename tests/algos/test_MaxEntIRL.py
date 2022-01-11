@@ -13,9 +13,8 @@ from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
 
-env_op = 1
-subj = "sub04"
-env_name = "2DTarget_disc"
+subj = "sub06"
+env_name = "DiscretizedHuman"
 env_id = f"{env_name}"
 
 
@@ -27,7 +26,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "50", f"softqiter_more_random.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "09191927", f"{subj}_4_half.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -37,15 +36,17 @@ def expert(demo_dir):
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    return make_env(f"{env_id}-v2")
+    return make_env(f"{env_id}-v2", bsp=bsp, N=[9, 19, 19, 27])
 
 
 @pytest.fixture
 def eval_env(expert, demo_dir):
+    subpath = os.path.join(demo_dir, "HPC", subj, subj)
+    bsp = io.loadmat(subpath + f"i1.mat")['bsp']
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    return make_env(f"{env_id}-v0", init_states=init_states)
+    return make_env(f"{env_id}-v0", bsp=bsp, N=[9, 19, 19, 27], init_states=init_states)
 
 
 @pytest.fixture
@@ -63,10 +64,10 @@ def learner(env, expert, eval_env):
         #     ft[i, idx] = 1
         # return ft
         # return x
-        return x ** 2
-        # return th.cat([x, x ** 2], dim=1)
+        # return x ** 2
+        return th.cat([x, x ** 2], dim=1)
 
-    agent = def_policy("finitesoftqiter", env, device='cpu', verbose=1)
+    agent = def_policy("finitesoftqiter", env, device='cuda:1', verbose=1)
 
     return MaxEntIRL(
         env,
@@ -77,8 +78,8 @@ def learner(env, expert, eval_env):
         use_action_as_input=True,
         rew_arch=[],
         device=agent.device,
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 
 
@@ -103,11 +104,9 @@ def test_callback(expert, learner):
 
 
 def test_validity(learner, expert):
-    import time
-    for _ in range(10):
-        t1 = time.time()
+    for t in range(10):
         learner.learn(
-            total_iter=200,
+            total_iter=1,
             agent_learning_steps=0,
             n_episodes=len(expert),
             max_agent_iter=1,
@@ -116,7 +115,7 @@ def test_validity(learner, expert):
             min_gradient_steps=1,
             early_stop=True,
         )
-        print(time.time() - t1)
+        print('end')
 
 
 def test_GCL(env, expert, eval_env):
