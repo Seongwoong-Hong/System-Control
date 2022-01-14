@@ -210,11 +210,11 @@ class FiniteViter(Viter):
             choose_method = self.policy.arg_max
         obs_list, act_list = [], []
         self.env.reset()
-        self.env.env_method("set_state", observation[0])
+        self.env.env_method("set_state", observation.squeeze())
         for t in range(self.max_t):
             obs_list.append(observation.flatten())
             obs_idx = self.env.envs[0].get_idx_from_obs(observation)
-            act_idx = choose_method(self.policy.policy_table[t, :, obs_idx])
+            act_idx = choose_method(self.policy.policy_table[t, :, obs_idx].T)
             act = self.env.envs[0].get_act_from_idx(act_idx)
             observation, _, _, _ = self.env.step(act)
             act_list.append(act.flatten())

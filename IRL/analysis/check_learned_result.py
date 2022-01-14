@@ -1,4 +1,5 @@
 import os
+import time
 import pickle
 import numpy as np
 import torch as th
@@ -7,138 +8,91 @@ from matplotlib import pyplot as plt
 from imitation.data.rollout import flatten_trajectories, make_sample_until, generate_trajectories
 from stable_baselines3.common.vec_env import DummyVecEnv
 from scipy import io
+from io import BytesIO
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
-from common.util import make_env
-from common.verification import verify_policy
-from common.wrappers import ActionWrapper
+from algos.tabular.viter import FiniteSoftQiter, SoftQiter
+from common.util import make_env, CPU_Unpickler
+from common.rollouts import generate_trajectories_without_shuffle
+from common.wrappers import *
 from IRL.scripts.project_policies import def_policy
 
+irl_path = os.path.abspath("..")
 
-def learned_cost():
-    env_type = "1DTarget"
-    env_id = f"{env_type}_disc"
-    subj = "softqiter_disc_20"
-    name = f"1hot_{subj}_linear_finite"
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
-    print(proj_path)
-    with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
+
+def compare_obs(subj="sub06", actuation=1, learned_trial=1):
+    rendering = False
+    plotting = True
+
+    def feature_fn(x):
+        # return x
+        return x ** 2
+        # return th.cat([x, x ** 2], dim=1)
+
+    env_type = "DiscretizedHuman"
+    name = f"{env_type}"
+    expt = f"11171927_quadcost/{subj}_{actuation}"
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_{expt}_finite_diffalpha_{learned_trial}/model"
+    with open(load_dir + "/reward_net.pkl", "rb") as f:
+        reward_fn = CPU_Unpickler(f).load().cpu()
+    bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
+    with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
-    expt_trans = flatten_trajectories(expert_trajs)
-    test_len = len(expert_trajs)
-    subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
-    wrapper = ActionWrapper if env_type == "HPC" else None
-    env = make_env(f"{env_id}-v0", wrapper=wrapper, subpath=subpath)
-    sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
-    i = 0
-    cost_list = []
-    # expt_input = th.from_numpy(np.concatenate([expt_trans.obs, env.action(expt_trans.acts)], axis=1)).double()
-    while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        env = make_env(f"{env_id}-v0", wrapper=wrapper, subpath=subpath)
-        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"))
-        if os.path.isfile(os.path.abspath(proj_path + f"/model/{i:03d}/normalization.pkl")):
-            stats_path = os.path.abspath(proj_path + f"/model/{i:03d}/normalization.pkl")
-            venv = make_env(f"{env_id}-v0", num_envs=1, use_norm=stats_path, wrapper=wrapper)
-            expt_input = th.from_numpy(
-                np.concatenate([venv.normalize_obs(expt_trans.obs), expt_trans.acts], axis=1)).double()
-        agent_trajs = generate_trajectories(agent, DummyVecEnv([lambda: env]), sample_until=sample_until, deterministic_policy=False)
-        agent_trans = flatten_trajectories(agent_trajs)
-        agent_input = th.from_numpy(np.concatenate([agent_trans.obs, env.action(agent_trans.acts)], axis=1)).double()
-        with open(os.path.join(proj_path, "model", f"{i:03d}", "reward_net.pkl"), "rb") as f:
-            reward_fn = pickle.load(f).double()
-        agent_cost = -reward_fn(agent_input).sum().item() / test_len
-        expt_cost = -reward_fn(expt_input).sum().item() / test_len
-        print(f"{i:03d} Agent Cost:", agent_cost, "Expert Cost:", expt_cost)
-        cost_list.append([expt_cost, agent_cost])
-        i += 1
-    # plt.plot(cost_list)
-    # plt.savefig(f"figures/IDP/MaxEntIRL/agent_cost_each_iter/expt_{name}.png")
-    # plt.show()
+    init_states = []
+    for traj in expert_trajs:
+        init_states.append(traj.obs[0])
+    reward_fn.feature_fn = feature_fn
+    # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
+    env = make_env(f"{name}-v2", num_envs=1, N=[11, 17, 19, 27], bsp=bsp,
+                   wrapper=ActionNormalizeRewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
+    learned_agent = FiniteSoftQiter(env, gamma=1, alpha=0.001, device='cpu', verbose=False)
+    learned_agent.learn(0)
+    agent = SoftQiter(env)
+    agent.policy.policy_table = learned_agent.policy.policy_table[0]
+    eval_env = make_env(f"{name}-v0", num_envs=1, N=[11, 17, 19, 27], bsp=bsp, init_states=init_states)
+    # eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
+    agent.set_env(eval_env)
+    sample_until = make_sample_until(n_timesteps=None, n_episodes=len(expert_trajs))
+    agent_trajs = generate_trajectories_without_shuffle(
+        agent, eval_env, sample_until, deterministic_policy=False)
 
+    expt_obs = flatten_trajectories(expert_trajs).obs
+    expt_acts = flatten_trajectories(expert_trajs).acts
+    agent_obs = flatten_trajectories(agent_trajs).obs
+    agent_acts = flatten_trajectories(agent_trajs).acts
 
-def expt_cost():
-    def expt_fn(inp):
-        return inp[:, :2].square().sum() + 0.1 * inp[:, 2:4].square().sum() + 1e-6 * (300 * inp[:, -2:]).square().sum()
-    env_type = "HPC"
-    env_id = f"{env_type}_pybullet"
-    subj = "ppo"
-    name = f"ext_{subj}_linear_noreset"
-    print(name)
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "BC", name))
-    with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
-        expert_trajs = pickle.load(f)
-    expt_trans = flatten_trajectories(expert_trajs)
-    test_len = len(expert_trajs)
-    subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
-    wrapper = ActionWrapper if env_type == "HPC" else None
-    venv = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, subpath=subpath)
-    th_input = th.from_numpy(np.concatenate([expt_trans.obs, expt_trans.acts], axis=1))
-    print(f"expt_cost: {expt_fn(th_input).item() / test_len}")
-    sample_until = make_sample_until(n_timesteps=None, n_episodes=test_len)
-    i = 0
-    cost_list = []
-    while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        agent = SAC.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
-        if os.path.isfile(proj_path + f"/{i:03d}/normalization.pkl"):
-            stats_path = proj_path + f"/model/{i:03d}/normalization.pkl"
-            venv = make_env(f"{env_id}-v0", num_envs=1, use_norm=True,
-                            wrapper=wrapper, stats_path=stats_path, subpath=subpath)
-        venv.render(mode="None")
-        agent_trajs = generate_trajectories(agent, venv, sample_until=sample_until, deterministic_policy=True)
-        agent_trans = flatten_trajectories(agent_trajs)
-        th_input = th.from_numpy(np.concatenate([agent_trans.obs, agent_trans.acts], axis=1))
-        print(f"{i:03d} Cost:", expt_fn(th_input).item() / test_len)
-        cost_list.append(expt_fn(th_input).item() / test_len)
-        i += 1
-    # plt.plot(cost_list)
-    # plt.savefig(f"figures/IDP/MaxEntIRL/expt_cost_each_iter/{name}.png")
-    # plt.show()
-    print(f"minimum cost index: {np.argmin(cost_list)}")
+    print(f"Mean obs difference ({subj}_{actuation}): {np.abs(expt_obs - agent_obs).mean()}")
+    print(f"Mean acts difference ({subj}_{actuation}): {np.abs(expt_acts - agent_acts).mean()}")
 
+    if plotting:
+        x_value = range(1, 51)
+        obs_fig = plt.figure(figsize=[18, 12], dpi=150.0)
+        acts_fig = plt.figure(figsize=[18, 6], dpi=150.0)
+        for ob_idx in range(4):
+            ax = obs_fig.add_subplot(2, 2, ob_idx + 1)
+            for traj_idx in range(len(expert_trajs)):
+                ax.plot(x_value, agent_trajs[traj_idx].obs[:-1, ob_idx], color='k')
+                ax.plot(x_value, expert_trajs[traj_idx].obs[:-1, ob_idx], color='b')
+        for act_idx in range(2):
+            ax = acts_fig.add_subplot(1, 2, act_idx + 1)
+            for traj_idx in range(len(expert_trajs)):
+                ax.plot(x_value, agent_trajs[traj_idx].acts[:, act_idx], color='k')
+                ax.plot(x_value, expert_trajs[traj_idx].acts[:, act_idx], color='b')
+        obs_fig.tight_layout()
+        acts_fig.tight_layout()
+        plt.show()
 
-def compare_obs():
-    env_type = "1DTarget"
-    env_id = f"{env_type}_disc"
-    map_size = 20
-    subj = f"softqiter_disc_{map_size}"
-    name = f"1hot_{subj}_linear_finite"
-    print(name)
-    proj_path = os.path.abspath(os.path.join("..", "tmp", "log", env_id, "MaxEntIRL", name))
-    assert os.path.isdir(proj_path)
-    subpath = os.path.abspath(os.path.join("..", "demos", env_type, "sub01", "sub01"))
-    # pltqs, init_states = [], []
-    # for i in range(5, 10):
-    #     pltqs += [io.loadmat(subpath + f"i{i+1}.mat")['pltq']]
-    #     init_states += [io.loadmat(subpath + f"i{i+1}.mat")['state'][0, :4]]
-    with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
-        expert_trajs = pickle.load(f)
-    lnum = len(expert_trajs)
-    # wrapper = ActionWrapper if env_type == "HPC" else None
-    error_list, max_list = [], []
-    i = 0
-    while os.path.isdir(os.path.join(proj_path, "model", f"{i:03d}")):
-        with open(os.path.join(proj_path, "model", f"{i:03d}", "agent.pkl"), "rb") as f:
-            agent = pickle.load(f)
-        # agent = PPO.load(os.path.join(proj_path, "model", f"{i:03d}", "agent"), device='cpu')
-        stats_path = None
-        if os.path.isfile(os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")):
-            stats_path = os.path.join(proj_path, "model", f"{i:03d}", "normalization.pkl")
-        env = make_env(f"{env_id}-v0", num_envs=1,
-                       wrapper=None, subpath=subpath, use_norm=stats_path, map_size=map_size)
-        # env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, pltqs=pltqs, init_states=init_states)
-        agent_acts, agent_obs, _ = verify_policy(env, agent, deterministic=False, render="None", repeat_num=lnum)
-        if stats_path is not None:
-            agent_obs = env.unnormalize_obs(agent_obs)
-        errors, maximums = [], []
-        for k in range(lnum):
-            errors += [abs(expert_trajs[k].obs[:-1, :] - agent_obs[k]).mean(axis=0)]
-            maximums += [abs(expert_trajs[k].obs[:-1, :] - agent_obs[k]).max()]
-        error_list.append(np.array(errors).sum(axis=0) / len(errors))
-        max_list.append(sum(maximums) / len(maximums))
-        print(f"{i:03d} Error: {error_list[-1]}, {error_list[-1].mean()}, Max: {max_list[-1]}")
-        i += 1
-    print(f"minimum error index: {np.argmin(np.array(error_list).mean(axis=1))}, minimum max index: {np.argmin(max_list)}")
+    if rendering:
+        for i in range(len(expert_trajs)):
+            done = False
+            obs = eval_env.reset()
+            while not done:
+                act, _ = agent.predict(obs, deterministic=False)
+                obs, rew, done, _ = eval_env.step(act)
+                eval_env.render()
+                time.sleep(eval_env.get_attr("dt")[0])
+        eval_env.close()
 
 
 def feature():
@@ -169,20 +123,73 @@ def feature():
     print("env")
 
 
-if __name__ == "__main__":
+def compare_handresult_and_irlresult(subj="sub06", actuation=1, learn_trial=1):
     def feature_fn(x):
-        if len(x.shape) == 1:
-            x = x.reshape(1, -1)
-        ft = th.zeros([x.shape[0], 20], dtype=th.float32)
-        for i, row in enumerate(x):
-            idx = int((row).item())
-            ft[i, idx] = 1
-        return ft
-        # return x
-        # return x.square()
-        # return th.cat([(x/10), (x/10)**2], dim=1)
-        # return th.cat([x, x**2, x**3, x**4], dim=1)
+        return x ** 2
+
+    plotting = True
+
+    env_type = "DiscretizedHuman"
+    name = f"{env_type}"
+    expt = f"11171927_quadcost/{subj}_{actuation}"
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_{expt}_finite_{learn_trial}/model"
+    with open(load_dir + "/reward_net.pkl", "rb") as f:
+        reward_fn = CPU_Unpickler(f).load()
+    bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
+    with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
+        expert_trajs = pickle.load(f)
+    init_states = []
+    for traj in expert_trajs:
+        init_states.append(traj.obs[0])
+    reward_fn.feature_fn = feature_fn
+    irl_env = make_env(f"{name}-v2", num_envs=1, N=[11, 17, 19, 27], bsp=bsp,
+                       wrapper=ActionNormalizeRewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
+    irl_agent = FiniteSoftQiter(irl_env, gamma=1, alpha=0.001, device='cpu', verbose=False)
+    irl_agent.learn(0)
+
+    hand_env = make_env(f"{name}-v2", num_envs=1, N=[11, 17, 19, 27], bsp=bsp)
+    hand_agent = FiniteSoftQiter(hand_env, gamma=1, alpha=0.001, device='cpu', verbose=False)
+    hand_agent.learn(0)
+
+    irl_obs, irl_acts = [], []
+    hand_obs, hand_acts = [], []
+    for init_state in init_states:
+        i_ob, i_act = irl_agent.predict(init_state, deterministic=False)
+        h_ob, h_act = hand_agent.predict(init_state, deterministic=False)
+        irl_obs.append(i_ob)
+        irl_acts.append(i_act)
+        hand_obs.append(h_ob)
+        hand_acts.append(h_act)
+
+    irl_reward_mat = irl_env.env_method("get_reward_mat")[0]
+    hand_reward_mat = hand_env.env_method("get_reward_mat")[0]
+    print(f"Mean reward difference: {np.abs(irl_reward_mat - hand_reward_mat).mean()}")
+    print(f"Mean & std of reward: {irl_reward_mat.mean()}, {irl_reward_mat.std()}")
+    print(f"Mean obs difference ({subj}_{actuation}): {np.abs(np.vstack(irl_obs) - np.vstack(hand_obs)).mean()}")
+    print(f"Mean acts difference ({subj}_{actuation}): {np.abs(np.vstack(irl_acts) - np.vstack(hand_acts)).mean()}")
+
+    if plotting:
+        x_value = range(1, 51)
+        obs_fig = plt.figure(figsize=[18, 12], dpi=150.0)
+        acts_fig = plt.figure(figsize=[18, 6], dpi=150.0)
+        for ob_idx in range(4):
+            ax = obs_fig.add_subplot(2, 2, ob_idx + 1)
+            for traj_idx in range(len(expert_trajs)):
+                ax.plot(x_value, hand_obs[traj_idx][:, ob_idx], color='k')
+                ax.plot(x_value, irl_obs[traj_idx][:, ob_idx], color='b')
+        for act_idx in range(2):
+            ax = acts_fig.add_subplot(1, 2, act_idx + 1)
+            for traj_idx in range(len(expert_trajs)):
+                ax.plot(x_value, hand_acts[traj_idx][:, act_idx], color='k')
+                ax.plot(x_value, irl_acts[traj_idx][:, act_idx], color='b')
+        obs_fig.tight_layout()
+        acts_fig.tight_layout()
+        plt.show()
 
 
-    # compare_obs()
-    learned_cost()
+if __name__ == "__main__":
+    # for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
+    # for actuation in range(3, 6):
+    #     for learn_trial in range(1, 2):
+    #         compare_obs("sub06", actuation, learn_trial)
+    compare_obs()

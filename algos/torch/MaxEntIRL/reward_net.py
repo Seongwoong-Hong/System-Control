@@ -45,17 +45,17 @@ class RewardNet(nn.Module):
         layers.append(nn.Linear(arch[-1], 1, bias=False))
         self.layers = nn.Sequential(*layers)
         self.optimizer = self.optim_cls(self.parameters(), lr, weight_decay=norm_coeff)
+        self.to(self._device)
 
     def reset_optim(self):
         self.optimizer = self.optim_cls(self.parameters(), self._build_args[0], weight_decay=self._build_args[1])
-        self.to(self.device)
+        self.to(self._device)
 
     def reset(self):
         self._build(*self._build_args)
-        self.to(self.device)
 
     def forward(self, x: th.Tensor) -> th.Tensor:
-        x = self.feature_fn(x).to(self.device)
+        x = self.feature_fn(x).to(self._device)
         if self.trainmode:
             return self.scale * self.layers(x)
         else:
@@ -73,7 +73,7 @@ class RewardNet(nn.Module):
         feature_fn = deepcopy(self.feature_fn)
         self.feature_fn = None
         with open(log_dir + ".tmp", "wb") as f:
-            pickle.dump(self.cpu(), f)
+            pickle.dump(self.to('cpu'), f)
         os.replace(log_dir + ".tmp", log_dir + ".pkl")
         self.to(self._device)
         self.feature_fn = feature_fn

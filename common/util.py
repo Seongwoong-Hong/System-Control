@@ -1,15 +1,26 @@
 import os
+import torch
+import pickle
 import warnings
 import os.path as p
 import gym
 import gym_envs  # needs for custom environments
 from copy import deepcopy
+from io import BytesIO
 
 from scipy import io
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3.common.monitor import Monitor
 
 from common.wrappers import ActionWrapper
+
+
+class CPU_Unpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: torch.load(BytesIO(b), map_location='cpu')
+        else:
+            return super().find_class(module, name)
 
 
 def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):

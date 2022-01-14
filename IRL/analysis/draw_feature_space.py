@@ -4,7 +4,7 @@ import torch as th
 import numpy as np
 
 from algos.torch.ppo import PPO
-from common.util import make_env
+from common.util import make_env, CPU_Unpickler
 from common.verification import verify_policy
 
 from matplotlib import pyplot as plt
@@ -84,20 +84,20 @@ def draw_feature_reward():
 
 
 def draw_reward_weights():
-    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "ext_09191927_25Hz")
+    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "sq_11171927_quadcost")
     # get reward_weight and stack
     weights_stack, features_stack = [], []
     label_name = [f"sub{i:02d}" for i in [6]]
     for subj in label_name:
         trial_weights_stack, trial_feature_stack = [], []
-        for pert in range(1, 7):
+        for pert in range(1, 2):
             weights, features = [], []
-            for trial in range(1):
-                name = f"/{subj}_{pert}_half_finite_noact/model"
+            for trial in range(1, 5):
+                name = f"/{subj}_{pert}_finite_diffalpha_{trial}/model"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
-                    reward_weight = pickle.load(f).cpu().fcnn.weight
+                    reward_weight = CPU_Unpickler(f).load().layers[0].weight
                 weights.append(-reward_weight.detach().numpy().flatten())
-                with open(f"{irl_path}/demos/DiscretizedHuman/09191927/{subj}_{pert}_half.pkl", "rb") as f:
+                with open(f"{irl_path}/demos/DiscretizedHuman/09191927_quadcost/{subj}_{pert}.pkl", "rb") as f:
                     traj = pickle.load(f)[0]
                 ft = feature_fn(th.tensor(np.append(traj.obs[:-1], traj.acts, axis=1)))
                 features.append(np.append(ft.numpy().sum(axis=0), 1))
@@ -112,8 +112,8 @@ def draw_reward_weights():
         weights_stack.append(trial_weights_stack)
         features_stack.append(trial_feature_stack)
     weights_stack = np.array(weights_stack)
-    w_mean = weights_stack[:, :, 0, :].mean(axis=0)
-    w_std = weights_stack[:, :, 0, :].std(axis=0)
+    w_mean = weights_stack[:, :, 0, :]
+    w_std = weights_stack[:, :, 1, :]
     features_stack = np.array(features_stack)
     # name = f"/MaxEntIRL/ext_softqiter_sub07_init_finite/model"
     # with open(log_dir + name + "/reward_net.pkl", "rb") as f:
@@ -123,7 +123,7 @@ def draw_reward_weights():
     subplot_name = [rf"$\omega_{i + 1}$" for i in range(8)]
     x2 = [f"features_{i + 1}" for i in range(9)]
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
-    for weight, itm in enumerate(subplot_name):
+    for weight_idx, weight_name in enumerate(subplot_name):
         fig1 = plt.figure(figsize=[9, 6], dpi=150.0)
         # fig2 = plt.figure(figsize=[9, 6], dpi=150.0)
         ax1 = fig1.add_subplot(1, 1, 1)
@@ -135,14 +135,14 @@ def draw_reward_weights():
         # ax1.scatter(x1 * 5, weights_stack[i, j * 5:(j + 1) * 5, :].flatten())
         # ax2.scatter(x2 * 5, features_stack[i, j * 5:(j + 1) * 5, :].flatten())
         # ax1.errorbar(x1, weights_stack[subj, :, 0, weight], yerr=weights_stack[subj, :, 1, weight], fmt='o')
-        ax1.errorbar(x1, w_mean[:, weight], yerr=w_std[:, weight], fmt='o')
+        ax1.errorbar(x1, w_mean[0, :, weight_idx], yerr=w_std[0, :, weight_idx], fmt='o')
         # ax2.errorbar(x1, features_stack[subj, :, 0, weight], yerr=features_stack[subj, :, 1, weight], fmt='o')
         # ax1.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
         # ax2.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
         ax1.set_xlabel("perturbation", labelpad=15.0, fontsize=28)
         ax1.set_ylabel("weight", labelpad=15.0, fontsize=28)
-        ax1.set_ylim(-0.8, 0.9)
-        ax1.set_title(itm, fontsize=32)
+        ax1.set_ylim(-0.1, 1.1)
+        ax1.set_title(weight_name, fontsize=32)
         ax1.tick_params(axis='both', which='major', labelsize=15)
         # ax2.set_xlabel("feature_type", labelpad=15.0, fontsize=28)
         # ax2.set_ylabel("feature", labelpad=15.0, fontsize=28)
@@ -156,8 +156,8 @@ def draw_reward_weights():
 if __name__ == "__main__":
     def feature_fn(x):
         # return x
-        # return x ** 2
-        return th.cat([x, x ** 2], dim=1)
+        return x ** 2
+        # return th.cat([x, x ** 2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
 
     # draw_feature_reward()

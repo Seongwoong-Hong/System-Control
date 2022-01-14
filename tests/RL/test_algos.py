@@ -31,22 +31,22 @@ def test_mujoco_envs_learned_policy():
 def test_rl_learned_policy(rl_path):
     env_type = "DiscretizedDoublePendulum"
     name = f"{env_type}"
-    subj = "sub07"
-    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name + f"_{subj}_init", "softqiter", "policies_1")
+    subj = "sub06"
+    irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
+    subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
+    bsp = io.loadmat(subpath + f"i1.mat")['bsp']
+    with open(f"{irl_dir}/demos/DiscretizedHuman/09191927/{subj}_half.pkl", "rb") as f:
+        expt_trajs = pickle.load(f)
+    init_states = []
+    for traj in expt_trajs:
+        init_states += [traj.obs[0]]
+    env = make_env(f"{name}-v2", num_envs=1, N=[9, 9, 9, 9], bsp=bsp)
+    name += "_09090909"
+    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "softqiter", "policies_2")
     # model_dir = os.path.join("..", "..", "IRL", "tmp", "log")
     stats_path = None
     if os.path.isfile(model_dir + "normalization.pkl"):
         stats_path = model_dir + "normalization.pkl"
-    wrapper = ActionWrapper if env_type == "HPC" else None
-    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
-    subpath = os.path.join(proj_path, "demos", "HPC", f"{subj}_cropped", subj)
-    init_states = []
-    for i in range(5):
-        for j in range(6):
-            bsp = io.loadmat(subpath + f"i{i + 1}_{j}.mat")['bsp']
-            init_states += [io.loadmat(subpath + f"i{i + 1}_{j}.mat")['state'][0, :4]]
-    env = make_env(f"{name}-v2", num_envs=1, h=[0.03, 0.03, 0.05, 0.08])
-    # env = make_env(f"{name}-v2", subpath="../../IRL/demos/HPC/sub01/sub01", wrapper=wrapper, use_norm=stats_path)
     with open(model_dir + "/agent.pkl", "rb") as f:
         algo = pickle.load(f)
     algo.set_env(env)
@@ -55,7 +55,7 @@ def test_rl_learned_policy(rl_path):
         obs = env.reset()
         done = False
         while not done:
-            a, _ = algo.predict(obs, deterministic=False)
+            a, _ = algo.predict(obs, deterministic=True)
             ns, _, done, _ = env.step(a)
             env.render()
             time.sleep(env.get_attr("dt")[0])

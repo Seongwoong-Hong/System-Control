@@ -16,7 +16,7 @@ from stable_baselines3.common.type_aliases import GymEnv
 from stable_baselines3.common.monitor import Monitor
 
 from algos.torch.MaxEntIRL import RewardNet, CNNRewardNet
-from common.wrappers import ActionRewardWrapper
+from common.wrappers import RewardInputNormalizeWrapper
 from common.rollouts import get_trajectories_probs, generate_trajectories_without_shuffle
 
 
@@ -79,7 +79,7 @@ class MaxEntIRL:
                 use_action_as_inp=self.use_action_as_input,
                 device=self.device,
                 **self.rew_kwargs
-            ).to(self.device)
+            )
         elif RNet_type is "cnn":
             self.reward_net = CNNRewardNet(
                 inp=inp.shape[1] * num_timesteps,
@@ -88,12 +88,12 @@ class MaxEntIRL:
                 use_action_as_inp=self.use_action_as_input,
                 device=self.device,
                 **self.rew_kwargs
-            ).to(self.device)
+            )
         else:
             raise NotImplementedError("Not implemented reward net type")
 
     def _reset_agent(self, **kwargs):
-        reward_wrapper = kwargs.pop("reward_wrapper", ActionRewardWrapper)
+        reward_wrapper = kwargs.pop("reward_wrapper", RewardInputNormalizeWrapper)
         norm_wrapper = kwargs.pop("vec_normalizer", None)
         num_envs = kwargs.pop("num_envs", 1)
         self.wrap_env = reward_wrapper(self.env, self.reward_net.eval())
@@ -135,8 +135,6 @@ class MaxEntIRL:
         inp = trans.obs
         if self.use_action_as_input:
             acts = self.wrap_eval_env.get_torque(trans.acts).T
-            if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
-                acts = self.wrap_eval_env.action(acts)
             inp = np.concatenate([inp, acts], axis=1)
         gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(trans))]).to(self.device)
         trans_rewards = gammas * self.wrap_eval_env.reward(inp)

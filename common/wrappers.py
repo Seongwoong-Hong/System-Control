@@ -35,11 +35,8 @@ class RewardWrapper(gym.RewardWrapper):
 
     def get_reward_mat(self):
         inp, a_vec = self.env.get_vectorized()
-        inp = inp / self.observation_space.high[None, ...]
         if self.use_action_as_inp:
             acts = self.env.get_torque(a_vec).T
-            if hasattr(self, "action") and callable(self.action):
-                acts = self.action(acts)
             r = torch.zeros([len(acts), len(inp)]).to(self.rwfn.device)
             for i, act in enumerate(acts):
                 r[i, :] = self.reward(np.append(inp, np.repeat(act[None, :], len(inp), axis=0), axis=1))
@@ -55,16 +52,34 @@ class RewardWrapper(gym.RewardWrapper):
         return self.rwfn.forward(rwinp).squeeze()
 
 
-class ActionRewardWrapper(RewardWrapper):
+class RewardInputNormalizeWrapper(RewardWrapper):
+    def reward(self, inp: np.ndarray) -> torch.tensor:
+        if isinstance(self.observation_space, gym.spaces.MultiDiscrete):
+            high = (self.observation_space.nvec[None, ...] - 1) / 2
+            offset = 1
+        else:
+            high = self.observation_space.high[None, ...]
+            offset = 0
+        # TODO:
+        #  Should change as `acts_high = self.env.action_space.high[None, ...]`.
+        #  To do this, environments action return should be true torques, not torque indexes
+        acts_high = self.max_torques[None, ...]
+        if self.use_action_as_inp:
+            high = np.append(high, acts_high, axis=-1)
+        inp = inp / high - offset
+        return super().reward(inp)
+
+
+class ActionNormalizeRewardWrapper(RewardWrapper):
     def __init__(self, env, rwfn):
-        super(ActionRewardWrapper, self).__init__(env, rwfn)
+        super(ActionNormalizeRewardWrapper, self).__init__(env, rwfn)
         self.coeff = 1 / self.env.max_torques
 
-    def action(self, action):
-        return self.coeff * action
-
-    def step(self, action):
-        return super(ActionRewardWrapper, self).step(self.action(action))
+    def reward(self, inp: np.ndarray) -> torch.tensor:
+        if self.use_action_as_inp:
+            n_acts = self.action_space.shape[0]
+            inp[:, -n_acts:] = self.coeff * inp[:, -n_acts:]
+        return super().reward(inp)
 
 
 class CostWrapper(gym.RewardWrapper):

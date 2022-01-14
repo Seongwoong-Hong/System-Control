@@ -5,6 +5,7 @@ import numpy as np
 from scipy import io
 from common.util import make_env
 from RL.project_policies import def_policy
+from matplotlib import pyplot as plt
 
 
 def test_ppo_log():
@@ -34,32 +35,54 @@ def test_iter_predict():
     print('end')
 
 
-def test_finite_rl():
+def test_finite_softqiter_at_discretized_env():
     import pickle
-    subpath = os.path.join("..", "..", "IRL", "demos", "HPC", f"sub03_cropped", "sub03")
-    with open("../../IRL/demos/DiscretizedHuman/09191927_25Hz/sub03_7_5.pkl", "rb") as f:
+    subj = "sub06"
+    subpath = os.path.join("..", "..", "IRL", "demos", "HPC", subj, subj)
+    with open("../../IRL/demos/DiscretizedHuman/09191927/sub06_6_half.pkl", "rb") as f:
         expt = pickle.load(f)
     init_states = []
     for traj in expt:
         init_states += [traj.obs[0]]
-    bsp = io.loadmat(subpath + f"i1_0.mat")['bsp']
-    env = make_env(f"DiscretizedHuman-v2", num_envs=1, N=[9, 19, 19, 27], bsp=bsp)
-    eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, N=[9, 19, 19, 27], bsp=bsp, init_states=init_states)
+    bsp = io.loadmat(subpath + f"i1.mat")['bsp']
+    env = make_env(f"DiscretizedHuman-v2", num_envs=1, N=[11, 17, 19, 27], bsp=bsp)
+    eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, N=[11, 17, 19, 27], bsp=bsp, init_states=init_states)
     t1 = time.time()
     algo = def_policy("finitesoftqiter", env, device='cpu')
-    algo.learn(2000)
-    algo2 = def_policy("softqiter", env, device='cpu')
+    algo.learn(0)
+    eval_algo = def_policy("softqiter", env, device='cpu')
     # algo2.learn(2000)
-    algo2.policy.policy_table = algo.policy.policy_table[0]
+    eval_algo.policy.policy_table = algo.policy.policy_table[0].cpu()
     print(time.time() - t1)
-    for _ in range(1):
-        obs = eval_env.reset()
+    whole_acts, whole_obs = [], []
+    for _ in range(0, 15, 3):
+        acts, obs = [], []
+        ob = eval_env.reset()
         done = False
         while not done:
-            a, _ = algo2.predict(obs, deterministic=True)
+            a, _ = eval_algo.predict(ob, deterministic=False)
             next_obs, r, done, _ = eval_env.step(a)
-            obs = next_obs
-            time.sleep(env.envs[0].env.dt)
-            eval_env.render()
+            acts.append(a)
+            obs.append(ob)
+            ob = next_obs
+            time.sleep(env.get_attr("dt")[0])
+            eval_env.render("None")
+        whole_acts.append(np.vstack(acts))
+        whole_obs.append(np.vstack(obs))
     eval_env.close()
+
+    x_value = range(1, 51)
+    obs_fig = plt.figure(figsize=[18, 12], dpi=150.0)
+    acts_fig = plt.figure(figsize=[18, 6], dpi=150.0)
+    for ob_idx in range(4):
+        ax = obs_fig.add_subplot(2, 2, ob_idx + 1)
+        for traj_idx in range(5):
+            ax.plot(x_value, whole_obs[traj_idx][:, ob_idx], color='k')
+    for act_idx in range(2):
+        ax = acts_fig.add_subplot(1, 2, act_idx + 1)
+        for traj_idx in range(5):
+            ax.plot(x_value, whole_acts[traj_idx][:, act_idx], color='k')
+    obs_fig.tight_layout()
+    acts_fig.tight_layout()
+    plt.show()
     # assert np.abs(algo.policy.policy_table[0] - algo2.policy.policy_table).mean() <= 1e-4

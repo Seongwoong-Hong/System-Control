@@ -9,9 +9,19 @@ from common.rollouts import generate_trajectories_without_shuffle
 from common.util import make_env
 
 
+def test_saving_rewardnet():
+    def feature_fn(x):
+        return x
+
+    reward_net = RewardNet(inp=8, arch=[], feature_fn=feature_fn, use_action_as_inp=True, device='cuda:1')
+    log_dir = "tmp/log/reward_net.pkl"
+    reward_net.save(log_dir)
+
+
 if __name__ == "__main__":
     def feature_fn(x):
         return x
+
 
     vec_env = make_env("HPC_pybullet-v0", subpath="../../IRL/demos/HPC/sub01/sub01", use_vec_env=True, num_envs=1,
                        wrapper="ActionWrapper")
