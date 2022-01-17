@@ -26,7 +26,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "07070909_quadcost", f"many_trajs.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "11171927", f"{subj}_6.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -36,7 +36,7 @@ def expert(demo_dir):
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    return make_env(f"{env_id}-v2", bsp=bsp, N=[7, 7, 9, 9])
+    return make_env(f"{env_id}-v2", bsp=bsp, N=[11, 17, 19, 27])
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def eval_env(expert, demo_dir):
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    return make_env(f"{env_id}-v0", bsp=bsp, N=[7, 7, 9, 9], init_states=init_states)
+    return make_env(f"{env_id}-v0", bsp=bsp, N=[11, 17, 19, 27], init_states=init_states)
 
 
 @pytest.fixture
@@ -64,10 +64,10 @@ def learner(env, expert, eval_env):
         #     ft[i, idx] = 1
         # return ft
         # return x
-        # return x ** 2
-        return th.cat([x, x ** 2], dim=1)
+        return x ** 2
+        # return th.cat([x, x ** 2], dim=1)
 
-    agent = def_policy("finitesoftqiter", env, device='cuda:0', verbose=1)
+    agent = def_policy("finitesoftqiter", env, device='cuda:1', verbose=1)
 
     return MaxEntIRL(
         env,
@@ -78,7 +78,7 @@ def learner(env, expert, eval_env):
         use_action_as_input=True,
         rew_arch=[],
         device=agent.device,
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionNormalizeRewardWrapper},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardInputNormalizeWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 

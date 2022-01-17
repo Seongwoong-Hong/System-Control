@@ -215,7 +215,7 @@ class FiniteViter(Viter):
             obs_list.append(observation.flatten())
             obs_idx = self.env.envs[0].get_idx_from_obs(observation)
             act_idx = choose_method(self.policy.policy_table[t, :, obs_idx].T)
-            act = self.env.envs[0].get_act_from_idx(act_idx)
+            act = self.env.envs[0].get_acts_from_idx(act_idx)
             observation, _, _, _ = self.env.step(act)
             act_list.append(act.flatten())
         return np.array(obs_list), np.array(act_list)

@@ -17,9 +17,9 @@ from IRL.scripts.project_policies import def_policy
 def main(subj, actu, trial):
     env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
+    device = "cuda:0"
     name = f"{env_type}"
-    expt = f"11171927/{subj}_{actu}"
+    expt = f"19171717_quadcost/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -34,14 +34,14 @@ def main(subj, actu, trial):
         init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", subpath=subpath, N=[11, 17, 19, 27], bsp=bsp)
-    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[11, 17, 19, 27], init_states=init_states, bsp=bsp)
+    env = make_env(f"{name}-v2", subpath=subpath, N=[19, 17, 17, 17], bsp=bsp)
+    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[19, 17, 17, 17], init_states=init_states, bsp=bsp)
     # env = make_env(f"{name}-v2")
     # eval_env = make_env(f"{name}-v0", init_states=init_states)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_{expt}_finite_{trial}"
+    log_dir += f"/sq_{expt}_finite_normalize_{trial}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -66,7 +66,7 @@ def main(subj, actu, trial):
         # return th.cat([x, x ** 2], dim=1)
 
     # Setup callbacks
-    save_net_callback = SaveCallback(cycle=1, dirpath=model_dir)
+    save_net_callback = SaveCallback(cycle=10, dirpath=model_dir)
 
     # Setup Logger
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
@@ -82,7 +82,7 @@ def main(subj, actu, trial):
         use_action_as_input=True,
         rew_arch=[],
         device=device,
-        env_kwargs={'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': ActionNormalizeRewardWrapper},
+        env_kwargs={'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardInputNormalizeWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 
@@ -95,8 +95,7 @@ def main(subj, actu, trial):
         min_agent_iter=1,
         max_gradient_steps=1,
         min_gradient_steps=1,
-        callback=save_net_callback.rew_save,
-        callback_period=10000,
+        callback=None,
         early_stop=True,
     )
 
@@ -114,7 +113,7 @@ def main(subj, actu, trial):
 
 
 if __name__ == "__main__":
-    for trial in [7, 8, 9, 10]:
-        for subj in [f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]:
-            for actu in range(1, 7):
-                main("sub06", actu, trial)
+    for trial in [1, 2, 3]:
+        # for subj in [f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]:
+        for actu in range(1, 7):
+            main("sub06", actu, trial)

@@ -29,20 +29,20 @@ def test_mujoco_envs_learned_policy():
 
 
 def test_rl_learned_policy(rl_path):
-    env_type = "DiscretizedDoublePendulum"
+    env_type = "DiscretizedHuman"
     name = f"{env_type}"
     subj = "sub06"
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    with open(f"{irl_dir}/demos/DiscretizedHuman/09191927/{subj}_half.pkl", "rb") as f:
+    with open(f"{irl_dir}/demos/DiscretizedHuman/19171717/{subj}.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
     init_states = []
     for traj in expt_trajs:
         init_states += [traj.obs[0]]
-    env = make_env(f"{name}-v2", num_envs=1, N=[9, 9, 9, 9], bsp=bsp)
-    name += "_09090909"
-    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "softqiter", "policies_2")
+    env = make_env(f"{name}-v0", num_envs=1, N=[19, 17, 17, 17], bsp=bsp, init_states=init_states)
+    name += f"_{subj}_19171717"
+    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "softqiter", "policies_1")
     # model_dir = os.path.join("..", "..", "IRL", "tmp", "log")
     stats_path = None
     if os.path.isfile(model_dir + "normalization.pkl"):
@@ -55,7 +55,7 @@ def test_rl_learned_policy(rl_path):
         obs = env.reset()
         done = False
         while not done:
-            a, _ = algo.predict(obs, deterministic=True)
+            a, _ = algo.predict(obs, deterministic=False)
             ns, _, done, _ = env.step(a)
             env.render()
             time.sleep(env.get_attr("dt")[0])

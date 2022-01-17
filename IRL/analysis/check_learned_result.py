@@ -21,7 +21,7 @@ from IRL.scripts.project_policies import def_policy
 irl_path = os.path.abspath("..")
 
 
-def compare_obs(subj="sub06", actuation=1, learned_trial=1):
+def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     rendering = False
     plotting = True
 
@@ -32,8 +32,8 @@ def compare_obs(subj="sub06", actuation=1, learned_trial=1):
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"11171927_quadcost/{subj}_{actuation}"
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_{expt}_finite_diffalpha_{learned_trial}/model"
+    expt = f"19171717/{subj}_{actuation}"
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_{expt}_finite_normalize_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load().cpu()
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
@@ -44,18 +44,18 @@ def compare_obs(subj="sub06", actuation=1, learned_trial=1):
         init_states.append(traj.obs[0])
     reward_fn.feature_fn = feature_fn
     # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    env = make_env(f"{name}-v2", num_envs=1, N=[11, 17, 19, 27], bsp=bsp,
-                   wrapper=ActionNormalizeRewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    learned_agent = FiniteSoftQiter(env, gamma=1, alpha=0.001, device='cpu', verbose=False)
+    env = make_env(f"{name}-v2", num_envs=1, N=[19, 17, 17, 17], bsp=bsp,
+                   wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
+    learned_agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu', verbose=False)
     learned_agent.learn(0)
     agent = SoftQiter(env)
     agent.policy.policy_table = learned_agent.policy.policy_table[0]
-    eval_env = make_env(f"{name}-v0", num_envs=1, N=[11, 17, 19, 27], bsp=bsp, init_states=init_states)
+    eval_env = make_env(f"{name}-v0", num_envs=1, N=[19, 17, 17, 17], bsp=bsp, init_states=init_states)
     # eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
     agent.set_env(eval_env)
     sample_until = make_sample_until(n_timesteps=None, n_episodes=len(expert_trajs))
     agent_trajs = generate_trajectories_without_shuffle(
-        agent, eval_env, sample_until, deterministic_policy=False)
+        agent, eval_env, sample_until, deterministic_policy=True)
 
     expt_obs = flatten_trajectories(expert_trajs).obs
     expt_acts = flatten_trajectories(expert_trajs).acts
@@ -67,8 +67,8 @@ def compare_obs(subj="sub06", actuation=1, learned_trial=1):
 
     if plotting:
         x_value = range(1, 51)
-        obs_fig = plt.figure(figsize=[18, 12], dpi=150.0)
-        acts_fig = plt.figure(figsize=[18, 6], dpi=150.0)
+        obs_fig = plt.figure(figsize=[27, 18], dpi=100.0)
+        acts_fig = plt.figure(figsize=[27, 9], dpi=100.0)
         for ob_idx in range(4):
             ax = obs_fig.add_subplot(2, 2, ob_idx + 1)
             for traj_idx in range(len(expert_trajs)):
@@ -192,4 +192,5 @@ if __name__ == "__main__":
     # for actuation in range(3, 6):
     #     for learn_trial in range(1, 2):
     #         compare_obs("sub06", actuation, learn_trial)
-    compare_obs()
+    for learned_trial in [1, 4, 7]:
+        compare_obs(learned_trial=learned_trial)

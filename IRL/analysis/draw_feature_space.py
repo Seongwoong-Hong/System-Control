@@ -84,16 +84,16 @@ def draw_feature_reward():
 
 
 def draw_reward_weights():
-    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "sq_11171927_quadcost")
+    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "sq_11171927")
     # get reward_weight and stack
     weights_stack, features_stack = [], []
     label_name = [f"sub{i:02d}" for i in [6]]
     for subj in label_name:
         trial_weights_stack, trial_feature_stack = [], []
-        for pert in range(1, 2):
+        for pert in range(4, 5):
             weights, features = [], []
-            for trial in range(1, 5):
-                name = f"/{subj}_{pert}_finite_diffalpha_{trial}/model"
+            for trial in range(1, 4):
+                name = f"/{subj}_{pert}_finite_normalize_{trial}/model"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
                     reward_weight = CPU_Unpickler(f).load().layers[0].weight
                 weights.append(-reward_weight.detach().numpy().flatten())

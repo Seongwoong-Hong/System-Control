@@ -14,7 +14,7 @@ if __name__ == "__main__":
     algo_type = "softqiter"
     # env_op = 0.1
     name = f"{env_type}"
-    device = "cpu"
+    device = "cuda:0"
     env_id = f"{name}-v2"
     # subpath = os.path.abspath(os.path.join("..", "IRL", "demos", env_type, "sub01", "sub01"))
     # env = make_env(env_id, num_envs=1, map_size=50)
@@ -22,9 +22,9 @@ if __name__ == "__main__":
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(env_id, num_envs=1, N=[11, 17, 19, 27], bsp=bsp)
+    env = make_env(env_id, num_envs=1, N=[19, 17, 17, 17], bsp=bsp)
     # env = make_env(env_id, use_vec_env=False)
-    name += f"_{subj}_11171927"
+    name += f"_{subj}_19171717"
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     os.makedirs(log_dir, exist_ok=True)

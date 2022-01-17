@@ -34,9 +34,8 @@ class RewardWrapper(gym.RewardWrapper):
         return next_ob, r, done, info
 
     def get_reward_mat(self):
-        inp, a_vec = self.env.get_vectorized()
+        inp, acts = self.env.get_vectorized()
         if self.use_action_as_inp:
-            acts = self.env.get_torque(a_vec).T
             r = torch.zeros([len(acts), len(inp)]).to(self.rwfn.device)
             for i, act in enumerate(acts):
                 r[i, :] = self.reward(np.append(inp, np.repeat(act[None, :], len(inp), axis=0), axis=1))
@@ -55,17 +54,22 @@ class RewardWrapper(gym.RewardWrapper):
 class RewardInputNormalizeWrapper(RewardWrapper):
     def reward(self, inp: np.ndarray) -> torch.tensor:
         if isinstance(self.observation_space, gym.spaces.MultiDiscrete):
-            high = (self.observation_space.nvec[None, ...] - 1) / 2
-            offset = 1
+            high = (self.observation_space.nvec[None, :] - 1) / 2
+            offset = np.ones(self.observation_space.shape)
+        elif isinstance(self.observation_space, gym.spaces.Box):
+            high = self.observation_space.high[None, :]
+            offset = np.zeros(self.observation_space.shape)[None, :]
         else:
-            high = self.observation_space.high[None, ...]
-            offset = 0
-        # TODO:
-        #  Should change as `acts_high = self.env.action_space.high[None, ...]`.
-        #  To do this, environments action return should be true torques, not torque indexes
-        acts_high = self.max_torques[None, ...]
+            raise NotImplementedError
         if self.use_action_as_inp:
-            high = np.append(high, acts_high, axis=-1)
+            if isinstance(self.action_space, gym.spaces.MultiDiscrete):
+                high = np.append(high, (self.action_space.nvec[None, :] - 1) / 2)
+                offset = np.append(offset, np.ones(self.action_space.shape)[None, :], axis=1)
+            elif isinstance(self.observation_space, gym.spaces.Box):
+                high = np.append(high, self.action_space.high[None, :], axis=-1)
+                offset = np.append(offset, np.zeros(self.action_space.shape)[None, :], axis=1)
+            else:
+                raise NotImplementedError
         inp = inp / high - offset
         return super().reward(inp)
 
@@ -78,7 +82,15 @@ class ActionNormalizeRewardWrapper(RewardWrapper):
     def reward(self, inp: np.ndarray) -> torch.tensor:
         if self.use_action_as_inp:
             n_acts = self.action_space.shape[0]
-            inp[:, -n_acts:] = self.coeff * inp[:, -n_acts:]
+            if isinstance(self.action_space, gym.spaces.MultiDiscrete):
+                high = (self.action_space.nvec[None, :] - 1) / 2
+                offset = np.ones(self.action_space.shape)[None, :]
+            elif isinstance(self.observation_space, gym.spaces.Box):
+                high = self.action_space.high[None, :]
+                offset = np.zeros(self.action_space.shape)[None, :]
+            else:
+                raise NotImplementedError
+            inp[:, -n_acts:] = inp[:, -n_acts:] / high - offset
         return super().reward(inp)
 
 

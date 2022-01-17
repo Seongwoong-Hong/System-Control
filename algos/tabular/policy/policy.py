@@ -63,7 +63,7 @@ class TabularPolicy:
             act_idx = self.choice_act(self.policy_table.T[obs_idx])
         else:
             act_idx = self.arg_max(self.policy_table.T[obs_idx])
-        action = self.env.get_act_from_idx(act_idx)
+        action = self.env.get_acts_from_idx(act_idx)
         return action, None
 
     def forward(self, observation, deterministic=False):

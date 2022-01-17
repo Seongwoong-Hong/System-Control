@@ -66,11 +66,11 @@ class TwoDTargetDisc(gym.Env):
         s_vec, _ = self.get_vectorized()
         return s_vec[idx.flatten()]
 
-    def get_idx_from_act(self, act: np.ndarray):
+    def get_idx_from_acts(self, act: np.ndarray):
         tot_idx = np.ravel_multi_index(act.T, [self.act_size, self.act_size], order='C')
         return tot_idx.flatten()
 
-    def get_act_from_idx(self, idx: np.ndarray):
+    def get_acts_from_idx(self, idx: np.ndarray):
         _, a_vec = self.get_vectorized()
         return a_vec[idx.flatten()]
 

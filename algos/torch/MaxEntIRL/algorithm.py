@@ -134,8 +134,7 @@ class MaxEntIRL:
         trans = flatten_trajectories(trajectories)
         inp = trans.obs
         if self.use_action_as_input:
-            acts = self.wrap_eval_env.get_torque(trans.acts).T
-            inp = np.concatenate([inp, acts], axis=1)
+            inp = np.concatenate([inp, trans.acts], axis=1)
         gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(trans))]).to(self.device)
         trans_rewards = gammas * self.wrap_eval_env.reward(inp)
         return th.sum(trans_rewards) / len(trajectories), None
@@ -197,7 +196,6 @@ class MaxEntIRL:
             min_agent_iter: int = 3,
             agent_callback=None,
             callback=None,
-            callback_period=1,
             early_stop=True,
             n_episodes: int = 10,
             reset_num_timesteps: bool = True,
@@ -233,7 +231,7 @@ class MaxEntIRL:
                     logger.record("agent_steps", agent_steps, exclude="tensorboard")
                     logger.dump(self.itr)
             self.itr += 1
-            if callback and self.itr % callback_period == 0:
+            if callback:
                 callback(self, call_num)
                 call_num += 1
 

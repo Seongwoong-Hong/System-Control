@@ -2,6 +2,7 @@ import os
 import time
 import pytest
 import numpy as np
+import torch as th
 from scipy import io
 from common.util import make_env
 from RL.project_policies import def_policy
@@ -39,20 +40,21 @@ def test_finite_softqiter_at_discretized_env():
     import pickle
     subj = "sub06"
     subpath = os.path.join("..", "..", "IRL", "demos", "HPC", subj, subj)
-    with open("../../IRL/demos/DiscretizedHuman/09191927/sub06_6_half.pkl", "rb") as f:
+    with open(f"../../IRL/demos/DiscretizedHuman/19171717/{subj}.pkl", "rb") as f:
         expt = pickle.load(f)
     init_states = []
     for traj in expt:
         init_states += [traj.obs[0]]
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(f"DiscretizedHuman-v2", num_envs=1, N=[11, 17, 19, 27], bsp=bsp)
-    eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, N=[11, 17, 19, 27], bsp=bsp, init_states=init_states)
+    env = make_env(f"DiscretizedHuman-v2", num_envs=1, N=[19, 17, 17, 17], bsp=bsp)
+    eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, N=[19, 17, 17, 17], bsp=bsp, init_states=init_states)
     t1 = time.time()
-    algo = def_policy("finitesoftqiter", env, device='cpu')
+    algo = def_policy("finitesoftqiter", env, device='cuda:0')
     algo.learn(0)
-    eval_algo = def_policy("softqiter", env, device='cpu')
-    # algo2.learn(2000)
-    eval_algo.policy.policy_table = algo.policy.policy_table[0].cpu()
+    eval_algo = def_policy("softqiter", env, device='cuda:0')
+    eval_algo.learn(2000)
+    assert th.abs(algo.policy.policy_table[0] - eval_algo.policy.policy_table).mean().item() <= 1e-4
+    eval_algo.policy.policy_table = algo.policy.policy_table[0]
     print(time.time() - t1)
     whole_acts, whole_obs = [], []
     for _ in range(0, 15, 3):
@@ -85,4 +87,3 @@ def test_finite_softqiter_at_discretized_env():
     obs_fig.tight_layout()
     acts_fig.tight_layout()
     plt.show()
-    # assert np.abs(algo.policy.policy_table[0] - algo2.policy.policy_table).mean() <= 1e-4
