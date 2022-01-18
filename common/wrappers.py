@@ -41,10 +41,7 @@ class RewardWrapper(gym.RewardWrapper):
                 r[i, :] = self.reward(np.append(inp, np.repeat(act[None, :], len(inp), axis=0), axis=1))
         else:
             r = self.reward(inp)
-        if self.rwfn.trainmode:
-            return r
-        else:
-            return r.cpu().numpy()
+        return r
 
     def reward(self, inp: np.ndarray) -> torch.tensor:
         rwinp = torch.from_numpy(inp).float().to(self.rwfn.device)

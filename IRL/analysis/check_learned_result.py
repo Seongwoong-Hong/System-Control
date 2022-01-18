@@ -5,10 +5,8 @@ import numpy as np
 import torch as th
 
 from matplotlib import pyplot as plt
-from imitation.data.rollout import flatten_trajectories, make_sample_until, generate_trajectories
-from stable_baselines3.common.vec_env import DummyVecEnv
+from imitation.data.rollout import flatten_trajectories, make_sample_until
 from scipy import io
-from io import BytesIO
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
@@ -26,14 +24,14 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     plotting = True
 
     def feature_fn(x):
-        # return x
-        return x ** 2
+        return x
+        # return x ** 2
         # return th.cat([x, x ** 2], dim=1)
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"19171717/{subj}_{actuation}"
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_{expt}_finite_normalize_{learned_trial}/model"
+    expt = f"19171717_quadcost/{subj}_{actuation}"
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/cnn_{expt}_finite_normalize_forget_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load().cpu()
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
@@ -46,7 +44,7 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     env = make_env(f"{name}-v2", num_envs=1, N=[19, 17, 17, 17], bsp=bsp,
                    wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    learned_agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu', verbose=False)
+    learned_agent = FiniteSoftQiter(env, gamma=0.8, alpha=0.01, device='cpu', verbose=False)
     learned_agent.learn(0)
     agent = SoftQiter(env)
     agent.policy.policy_table = learned_agent.policy.policy_table[0]
@@ -62,8 +60,8 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     agent_obs = flatten_trajectories(agent_trajs).obs
     agent_acts = flatten_trajectories(agent_trajs).acts
 
-    print(f"Mean obs difference ({subj}_{actuation}): {np.abs(expt_obs - agent_obs).mean()}")
-    print(f"Mean acts difference ({subj}_{actuation}): {np.abs(expt_acts - agent_acts).mean()}")
+    print(f"Mean obs difference ({subj}_{actuation}): {np.abs(expt_obs - agent_obs).mean(axis=0)}")
+    print(f"Mean acts difference ({subj}_{actuation}): {np.abs(expt_acts - agent_acts).mean(axis=0)}")
 
     if plotting:
         x_value = range(1, 51)
@@ -74,11 +72,13 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
             for traj_idx in range(len(expert_trajs)):
                 ax.plot(x_value, agent_trajs[traj_idx].obs[:-1, ob_idx], color='k')
                 ax.plot(x_value, expert_trajs[traj_idx].obs[:-1, ob_idx], color='b')
+            ax.legend(['agent', 'expert'])
         for act_idx in range(2):
             ax = acts_fig.add_subplot(1, 2, act_idx + 1)
             for traj_idx in range(len(expert_trajs)):
                 ax.plot(x_value, agent_trajs[traj_idx].acts[:, act_idx], color='k')
                 ax.plot(x_value, expert_trajs[traj_idx].acts[:, act_idx], color='b')
+            ax.legend(['agent', 'expert'])
         obs_fig.tight_layout()
         acts_fig.tight_layout()
         plt.show()
@@ -123,7 +123,7 @@ def feature():
     print("env")
 
 
-def compare_handresult_and_irlresult(subj="sub06", actuation=1, learn_trial=1):
+def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_trial=1):
     def feature_fn(x):
         return x ** 2
 
@@ -131,8 +131,8 @@ def compare_handresult_and_irlresult(subj="sub06", actuation=1, learn_trial=1):
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"11171927_quadcost/{subj}_{actuation}"
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_{expt}_finite_{learn_trial}/model"
+    expt = f"19171717_quadcost/{subj}_{actuation}"
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_{expt}_finite_normalize_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load()
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
@@ -142,13 +142,13 @@ def compare_handresult_and_irlresult(subj="sub06", actuation=1, learn_trial=1):
     for traj in expert_trajs:
         init_states.append(traj.obs[0])
     reward_fn.feature_fn = feature_fn
-    irl_env = make_env(f"{name}-v2", num_envs=1, N=[11, 17, 19, 27], bsp=bsp,
-                       wrapper=ActionNormalizeRewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    irl_agent = FiniteSoftQiter(irl_env, gamma=1, alpha=0.001, device='cpu', verbose=False)
+    irl_env = make_env(f"{name}-v2", num_envs=1, N=[19, 17, 17, 17], bsp=bsp,
+                       wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
+    irl_agent = FiniteSoftQiter(irl_env, gamma=1, alpha=0.01, device='cpu', verbose=False)
     irl_agent.learn(0)
 
-    hand_env = make_env(f"{name}-v2", num_envs=1, N=[11, 17, 19, 27], bsp=bsp)
-    hand_agent = FiniteSoftQiter(hand_env, gamma=1, alpha=0.001, device='cpu', verbose=False)
+    hand_env = make_env(f"{name}-v2", num_envs=1, N=[19, 17, 17, 17], bsp=bsp)
+    hand_agent = FiniteSoftQiter(hand_env, gamma=1, alpha=0.0001, device='cpu', verbose=False)
     hand_agent.learn(0)
 
     irl_obs, irl_acts = [], []
@@ -189,8 +189,8 @@ def compare_handresult_and_irlresult(subj="sub06", actuation=1, learn_trial=1):
 
 if __name__ == "__main__":
     # for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
-    # for actuation in range(3, 6):
-    #     for learn_trial in range(1, 2):
-    #         compare_obs("sub06", actuation, learn_trial)
-    for learned_trial in [1, 4, 7]:
-        compare_obs(learned_trial=learned_trial)
+    for actuation in range(1, 2):
+        for learn_trial in range(1, 2):
+            compare_obs("sub06", actuation, learn_trial)
+    # for learned_trial in [1]:
+    #     compare_obs(learned_trial=learned_trial)

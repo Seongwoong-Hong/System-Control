@@ -1,18 +1,22 @@
 import numpy as np
 
 
-def calc_trans_mat_error(env, P, s_vec, a_vec, h, m, sampler):
-    test_s = sampler(int(m))
-    next_s = env.get_next_state(test_s, a_vec)
-    test_s_ind = env.get_ind_from_state(test_s, h).T
+def calc_trans_mat_error(env, P, s_vec, a_vec, h, t, sampler):
+    test_s = sampler()
+    test_s_pred = test_s
+    err_list = []
 
-    err = 0.
-    for a_ind in range(len(a_vec)):
-        next_s_pred = s_vec.T @ P[a_ind] @ test_s_ind
-        err += np.mean(np.abs(next_s[a_ind] - next_s_pred.T))
-    err /= len(a_vec)
+    for _ in range(t):
+        a_ind = np.random.choice(range(len(a_vec)))
+        next_s = env.get_next_state(test_s, a_vec[[a_ind]])
+        test_s_ind = env.get_ind_from_state(test_s_pred, h)
+        next_s_pred = test_s_ind @ P[a_ind].T @ s_vec
+        err = np.mean(np.abs(next_s - next_s_pred))
+        err_list.append(err)
+        test_s = next_s.squeeze()
+        test_s_pred = next_s_pred.squeeze()
 
-    return err
+    return np.array(err_list)
 
 
 def angle_normalize(x):

@@ -14,7 +14,7 @@ from algos.torch.MaxEntIRL import RewardNet
 from algos.torch.sac import SAC
 from common.callbacks import VideoCallback
 from common.util import make_env
-from common.wrappers import ActionRewardWrapper
+from common.wrappers import ActionNormalizeRewardWrapper
 from common.rollouts import generate_trajectories_without_shuffle
 from scipy import io
 
@@ -36,7 +36,8 @@ def learning_specific_one():
         reward_net = pickle.load(f).double()
 
     env = make_env(f"{env_id}-v1", subpath="../demos/HPC/sub01/sub01", num_envs=1,
-                   wrapper=ActionRewardWrapper, wrapper_kwrags={'rwfn': reward_net.eval()}, use_norm=stats_path)
+                   wrapper=ActionNormalizeRewardWrapper, wrapper_kwrags={'rwfn': reward_net.eval()},
+                   use_norm=stats_path)
 
     device = "cpu"
     log_dir = os.path.join(load_dir, "add_rew_learning")
@@ -74,7 +75,7 @@ def learning_whole_iter():
         with open(filename, "rb") as f:
             reward_net = pickle.load(f).double()
         env = make_env(f"{env_id}-v1", use_vec_env=False, pltqs=pltqs,
-                       wrapper=ActionRewardWrapper, wrapper_kwrags={'rwfn': reward_net.eval()})
+                       wrapper=ActionNormalizeRewardWrapper, wrapper_kwrags={'rwfn': reward_net.eval()})
 
         proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         log_dir = os.path.join(proj_path, "tmp", "log", env_id, algo_type, name, "add_rew_learning")

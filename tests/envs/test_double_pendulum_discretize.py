@@ -39,12 +39,17 @@ def test_calc_trans_mat():
     근사된 전환 행렬 P 에 대한 value iteration 수행
     계산 시간, 초기 상태에 대한 평균 에러 계산
     """
-    N = [21, 21, 11, 11]
-    env = gym.make('DiscretizedDoublePendulum-v2', N=N)  # type: DiscretizedDoublePendulum
+    from scipy import io
+    bsp = io.loadmat("../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
+    N = [29, 29, 29, 29]
+    NT = [17, 17]
+
+    env = gym.make('DiscretizedHuman-v2', N=N, NT=NT, bsp=bsp)  # type: DiscretizedDoublePendulum
 
     # h = [0.1, 0.1, 0.1, 0.1]
     # h = [0.1, 0.1, 1.0, 1.0]
-    env.get_trans_mat(h=None, verbose=True)
+    for _ in range(3):
+        env.get_trans_mat(h=None, verbose=True)
 
 
 # @pytest.mark.parametrize("soft", [True, False])

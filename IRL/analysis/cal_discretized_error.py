@@ -26,7 +26,7 @@ class TestDiscretization(DiscretizedDoublePendulum):
 
 
 def main(dobs, dacts, plot_state=False, plot_act=False):
-    disc_env = TestDiscretization(N=[19, 17, 17, 17], NT=[11, 11], dobs=dobs, dacts=dacts)
+    disc_env = TestDiscretization(N=[29, 29, 29, 29], NT=[17, 17], dobs=dobs, dacts=dacts)
     states_error_accum, acts_error_accum = [], []
     for actuation in range(1, 7):
         for subj in [f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]:
@@ -63,8 +63,8 @@ def main(dobs, dacts, plot_state=False, plot_act=False):
 if __name__ == "__main__":
     st_fig = plt.figure(figsize=[27, 18])
     act_fig = plt.figure(figsize=[27, 9])
-    for dobs in [10, 12, 15, 18, 20]:
-        main(dobs=dobs, dacts=10)
+    # for dobs in [10, 12, 15, 18, 20]:
+    main(dobs=15, dacts=10)
     st_fig.tight_layout()
     act_fig.tight_layout()
     plt.show()

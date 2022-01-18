@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 from common.util import make_env
 from common.wrappers import RewardWrapper
-from imitation.data.rollout import generate_trajectories, make_sample_until
+from imitation.data.rollout import generate_trajectories, make_sample_until, flatten_trajectories
 from imitation.util import logger
 from algos.tabular.qlearning import *
 from algos.tabular.viter import *
@@ -44,15 +44,22 @@ def test_viter():
 
 
 def test_softiter():
-    env = make_env("2DTarget_disc-v2", num_envs=1, map_size=50)
+    env = make_env("DiscretizedDoublePendulum-v2", num_envs=1, N=[19, 17, 17, 17])
     logger.configure(".", format_strs=['stdout'])
-    algo = SoftQiter(env, gamma=0.9, epsilon=0.2, alpha=1, device='cpu')
+    algo = SoftQiter(env, gamma=0.8, alpha=0.001, device='cuda:2')
     algo.learn(2000)
-    algo2 = FiniteSoftQiter(env, gamma=0.9, alpha=1, device='cpu')
+    algo2 = FiniteSoftQiter(env, gamma=0.8, alpha=0.001, device='cuda:2')
     algo2.learn(0)
     sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
-    trajectories = generate_trajectories(algo, env, sample_until, deterministic_policy=True)
-    print('env')
+    infinite_trajs = generate_trajectories(algo, env, sample_until, deterministic_policy=True)
+
+    obs_differs, acts_differs = [], []
+    for traj in infinite_trajs:
+        f_obs, f_acts = algo2.predict(traj.obs[0], deterministic=True)
+        obs_differs.append(np.abs(traj.obs[:-1, :] - f_obs))
+        acts_differs.append(np.abs(traj.acts - f_acts))
+
+    assert np.array(obs_differs).mean() < 1e-2 and np.array(acts_differs).mean() < 0.1
 
 
 def test_finite_iter():

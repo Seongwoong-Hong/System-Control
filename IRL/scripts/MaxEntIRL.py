@@ -17,7 +17,7 @@ from IRL.scripts.project_policies import def_policy
 def main(subj, actu, trial):
     env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cuda:0"
+    device = "cuda:3"
     name = f"{env_type}"
     expt = f"19171717_quadcost/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -41,7 +41,7 @@ def main(subj, actu, trial):
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_{expt}_finite_normalize_{trial}"
+    log_dir += f"/cnn_{expt}_finite_normalize_forget_{trial}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -59,8 +59,8 @@ def main(subj, actu, trial):
         #     idx = int(row.item())
         #     ft[i, idx] = 1
         # return ft
-        # return x
-        return x ** 2
+        return x
+        # return x ** 2
         # x1, x2, x3, x4 = th.split(x, 1, dim=1)
         # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, x**2, x**3), dim=1)
         # return th.cat([x, x ** 2], dim=1)
@@ -80,10 +80,10 @@ def main(subj, actu, trial):
         agent=agent,
         expert_trajectories=expert_trajs,
         use_action_as_input=True,
-        rew_arch=[],
+        rew_arch=[8, 8],
         device=device,
         env_kwargs={'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardInputNormalizeWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
+        rew_kwargs={'type': 'cnn', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-3},
     )
 
     # Run Learning
@@ -114,6 +114,6 @@ def main(subj, actu, trial):
 
 if __name__ == "__main__":
     for trial in [1, 2, 3]:
-        # for subj in [f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]:
-        for actu in range(1, 7):
-            main("sub06", actu, trial)
+        for subj in [f"sub{i:02d}" for i in [6]]:
+            for actu in range(1, 7):
+                main(subj, actu, trial)

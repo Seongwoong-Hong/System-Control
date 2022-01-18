@@ -20,7 +20,7 @@ from algos.tabular.qlearning import *
 from algos.tabular.viter import *
 from common.util import make_env
 from common.verification import verify_policy
-from common.wrappers import ActionRewardWrapper
+from common.wrappers import ActionNormalizeRewardWrapper
 from common.rollouts import generate_trajectories_without_shuffle
 
 
@@ -96,7 +96,7 @@ def try_train(config, demo_dir):
         use_action_as_input=config['use_action'],
         rew_arch=rew_arch,
         device=device,
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionRewardWrapper},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionNormalizeRewardWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': config['norm_coeff'], 'lr': config['lr']},
     )
     trial_dir = tune.get_trial_dir()

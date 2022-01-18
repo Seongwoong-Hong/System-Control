@@ -17,8 +17,6 @@ def backward_trans(P: List[th.tensor], v: th.tensor):
     A.shape = (|A|, |S|)
     post_v.shape = (|A|, |S|)
     """
-    num_actions = len(P)
-
     post_v = []
     for Pa in P:
         post_v.append(Pa.t().matmul(v))
@@ -72,7 +70,9 @@ class Viter:
         )
 
     def set_reward_mats(self):
-        self.reward_mat = th.from_numpy(self.env.env_method('get_reward_mat')[0]).float().to(self.device)
+        self.reward_mat = self.env.env_method('get_reward_mat')[0]
+        if isinstance(self.reward_mat, np.ndarray):
+            self.reward_mat = th.from_numpy(self.reward_mat).float().to(self.device)
         if self.reward_mat.shape != self.policy.q_table.shape[-2:]:
             self.reward_mat = self.reward_mat.repeat(self.policy.act_size, 1)
         self.done_mat = th.zeros([self.policy.act_size, self.policy.obs_size]).float().to(self.device)
@@ -100,7 +100,7 @@ class Viter:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 logger.dump(self.num_timesteps)
-            if self.num_timesteps >= total_timesteps or error < 1e-10:
+            if self.num_timesteps >= total_timesteps or error < 1e-8:
                 if self.verbose:
                     logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                     logger.record("Value Error", error, exclude="tensorboard")

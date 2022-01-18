@@ -1,18 +1,14 @@
-import os
 from copy import deepcopy
 from typing import List, Dict, Optional, Union, Tuple, Sequence
-
-import random
 
 import gym
 import numpy as np
 import cvxpy as cp
 import torch as th
 from imitation.data.rollout import make_sample_until, flatten_trajectories
-from imitation.data.types import Trajectory, Transitions, TrajectoryWithRew
+from imitation.data.types import Trajectory
 from imitation.util import logger
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnvWrapper
-from stable_baselines3.common.type_aliases import GymEnv
 from stable_baselines3.common.monitor import Monitor
 
 from algos.torch.MaxEntIRL import RewardNet, CNNRewardNet
@@ -48,6 +44,21 @@ class MaxEntIRL:
         self.eval_env = eval_env
         self.expert_trajectories = expert_trajectories
         self.expert_transitions = flatten_trajectories(expert_trajectories)
+
+        traj_len = len(self.expert_trajectories[0].acts)
+        trans = flatten_trajectories(self.expert_trajectories)
+        self.expert_reward_inp = trans.obs
+        self.expert_gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(trans))]).to(
+            self.device)
+        if self.use_action_as_input:
+            self.expert_reward_inp = np.concatenate([self.expert_reward_inp, trans.acts], axis=1)
+
+        self.init_D = th.zeros([self.agent.policy.obs_size], dtype=th.float32).to(self.device)
+        init_obs, _ = self.eval_env.get_init_vector()
+        init_idx = self.eval_env.get_idx_from_obs(init_obs)
+        for i in range(len(init_idx)):
+            self.init_D[init_idx[i]] = (init_idx == init_idx[i]).sum() / len(init_idx)
+
         self.agent_trajectories = []
         self.expand_ratio = 20
         self.itr = 0
@@ -59,10 +70,6 @@ class MaxEntIRL:
         if self.rew_kwargs is None:
             self.rew_kwargs = {}
 
-        num_timesteps = 1
-        if hasattr(self.env, "num_timesteps"):
-            num_timesteps = self.env.num_timesteps
-
         self.env.reset()
         _, _, _, info = self.env.step(self.env.action_space.sample())
         inp = info['obs']
@@ -73,7 +80,7 @@ class MaxEntIRL:
         RNet_type = rew_kwargs.pop("type", None)
         if RNet_type is None or RNet_type is "ann":
             self.reward_net = RewardNet(
-                inp=inp.shape[1] * num_timesteps,
+                inp=inp.shape[1],
                 arch=rew_arch,
                 feature_fn=feature_fn,
                 use_action_as_inp=self.use_action_as_input,
@@ -82,7 +89,7 @@ class MaxEntIRL:
             )
         elif RNet_type is "cnn":
             self.reward_net = CNNRewardNet(
-                inp=inp.shape[1] * num_timesteps,
+                inp=inp.shape[1],
                 arch=rew_arch,
                 feature_fn=feature_fn,
                 use_action_as_inp=self.use_action_as_input,
@@ -121,40 +128,26 @@ class MaxEntIRL:
             self.agent, self.vec_eval_env, sample_until, deterministic_policy=False)
         self.agent.set_env(self.wrap_env)
 
-    def mean_transition_reward(
-            self,
-            trajectories: Sequence[Trajectory],
-    ) -> Tuple[th.Tensor, None]:
+    def cal_expert_mean_reward(self) -> th.Tensor:
         """
-        Calculate rewards of every transitions using current reward function from trajectories
-        :param trajectories: List of trajectories for reward calculation
-        :return: (transition rewards, None)
+        Calculate mean reward of expert transitions using current reward function
+        :return: (transition mean rewards, None)
         """
-        traj_len = len(trajectories[0].acts)
-        trans = flatten_trajectories(trajectories)
-        inp = trans.obs
-        if self.use_action_as_input:
-            inp = np.concatenate([inp, trans.acts], axis=1)
-        gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(trans))]).to(self.device)
-        trans_rewards = gammas * self.wrap_eval_env.reward(inp)
-        return th.sum(trans_rewards) / len(trajectories), None
+        trans_rewards = self.expert_gammas * self.wrap_eval_env.reward(self.expert_reward_inp)
+        return th.sum(trans_rewards) / len(self.expert_trajectories)
 
-    def state_visitation(self) -> th.Tensor:
-        init_obs, _ = self.eval_env.get_init_vector()
-        init_idx = self.eval_env.get_idx_from_obs(init_obs)
+    def cal_state_visitation(self) -> th.Tensor:
         D = th.zeros([self.agent.max_t, self.agent.policy.obs_size], dtype=th.float32).to(self.device)
-        # TODO: init_state가 굉장히 많을 때 성능을 올릴 수 있는 방법?
-        for i in range(len(init_idx)):
-            D[0, init_idx[i]] = ((init_idx == init_idx[i]) / len(init_idx)).sum()
+        D[0] = self.init_D
         for t in range(1, self.agent.max_t):
             for a in range(self.agent.policy.act_size):
                 D[t] += self.agent.transition_mat[a] @ (D[t - 1] * self.agent.policy.policy_table[t - 1, a])
-        gammas = np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32)
+        agent_gammas = np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32)
         if self.use_action_as_input:
+            agent_gammas = np.expand_dims(agent_gammas, axis=-1)
             D = self.agent.policy.policy_table * D[:, None, :]
-            gammas = np.expand_dims(gammas, axis=-1)
-        gammas = th.from_numpy(gammas).to(self.device)
-        Dc = th.sum(gammas * D, dim=0)
+        agent_gammas = th.from_numpy(agent_gammas).to(self.device)
+        Dc = th.sum(agent_gammas * D, dim=0)
         return Dc
 
     def get_whole_states_from_env(self):
@@ -163,25 +156,24 @@ class MaxEntIRL:
         :return: Set whole_state attribute
         """
         obs_space = self.env.observation_space
-        if isinstance(obs_space, gym.spaces.MultiDiscrete):
-            x = np.meshgrid(*[range(nvec) for nvec in obs_space.nvec])
-            self.whole_state = th.FloatTensor([data.flatten() for data in x]).t().to(self.device)
-        elif isinstance(obs_space, gym.spaces.Box):
-            assert hasattr(self.env, "get_vectorized") and callable(getattr(self.env, "get_vectorized"))
+        if hasattr(self.env, "get_vectorized") and callable(getattr(self.env, "get_vectorized")):
             s_vec, _ = self.env.get_vectorized()
             self.whole_state = th.from_numpy(s_vec).float().to(self.device)
+        elif isinstance(obs_space, gym.spaces.MultiDiscrete):
+            x = np.meshgrid(*[range(nvec) for nvec in obs_space.nvec])
+            self.whole_state = th.FloatTensor([data.flatten() for data in x]).t().to(self.device)
         else:
             raise NotImplementedError
 
     def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
-        expected_expert_rewards, _ = self.mean_transition_reward(self.expert_trajectories)
-        Dc = self.state_visitation()
+        mean_expert_rewards = self.cal_expert_mean_reward()
+        Dc = self.cal_state_visitation()
         whole_reward_values = self.wrap_eval_env.get_reward_mat()
-        loss = th.sum(Dc * whole_reward_values) - expected_expert_rewards
+        loss = th.sum(Dc * whole_reward_values) - mean_expert_rewards
         self.reward_net.optimizer.zero_grad()
         loss.backward()
         self.reward_net.optimizer.step()
-        logger.record("expert_reward", expected_expert_rewards.item())
+        logger.record("expert_reward", mean_expert_rewards.item())
         logger.record("agent_reward", th.sum(Dc * whole_reward_values).item())
         logger.record("loss", loss.item())
         return loss.item()

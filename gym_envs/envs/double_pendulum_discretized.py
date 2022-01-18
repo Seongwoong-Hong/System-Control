@@ -60,7 +60,7 @@ class DiscretizedDoublePendulum(gym.Env):
         for h, n in zip(self.max_torques, self.num_actions):
             x = (np.logspace(0, np.log10(10), n // 2 + 1) - 1) * (h / (10 - 1))
             self.torque_lists.append(np.append(-np.flip(x[1:]), x))
-        self.observation_space = gym.spaces.Box(low=-obs_high, high=obs_high, dtype=np.float32)
+        self.observation_space = gym.spaces.Box(low=-obs_high, high=obs_high, dtype=np.float64)
         self.action_space = gym.spaces.MultiDiscrete(self.num_actions)
         self.seed()
 
@@ -73,7 +73,7 @@ class DiscretizedDoublePendulum(gym.Env):
         low = np.array([*self.min_angles, *self.min_speeds])
         self.state = self.np_random.uniform(low=low, high=high)
 
-        return self.get_obs()
+        return self._get_obs()
 
     def step(self, action: np.ndarray):
         assert self.state is not None, "Can't step the environment before calling reset function"
@@ -83,7 +83,7 @@ class DiscretizedDoublePendulum(gym.Env):
         r = self.get_reward(self.state, action)
         self.state = self.get_next_state(self.state[None, ...], action[None, ...])[0, 0, ...]
 
-        return self.get_obs(), r, False, info
+        return self._get_obs(), r, False, info
 
     def set_state(self, state):
         assert np.abs(state) - 1e-6 in self.observation_space
@@ -158,8 +158,9 @@ class DiscretizedDoublePendulum(gym.Env):
 
         return np.concatenate([th0, th1, thd0, thd1], axis=-1)
 
-    def get_obs(self):
-        return self.state
+    def _get_obs(self):
+        discretized_state = self.get_obs_from_idx(self.get_idx_from_obs(self.state)).squeeze()
+        return discretized_state
 
     def get_num_cells(self):
         return self.num_cells
@@ -242,9 +243,9 @@ class DiscretizedDoublePendulum(gym.Env):
         if verbose:
             high = np.array([*self.max_angles, *self.max_speeds])
             low = np.array([*self.min_angles, *self.min_speeds])
-            err = calc_trans_mat_error(self, P, s_vec, a_vec, h, 10 ** 3,
-                                       sampler=lambda m: np.random.uniform(low=low, high=high, size=[m, 4]))
-            print(f'(h={h}) 1 step prediction error: {err:.4f}')
+            err = calc_trans_mat_error(self, P, s_vec, a_vec, h, 50,
+                                       sampler=lambda: np.random.uniform(low=low, high=high, size=[10 ** 3, 4]))
+            print(f'1 step prediction error: {err}')
 
         return P
 
@@ -342,7 +343,7 @@ class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
         self.set_state(self.init_states[self.n])
         self.n = (self.n + 1) % len(self.init_states)
         self.last_a = None
-        return self.get_obs()
+        return self._get_obs()
 
     def get_init_vector(self):
         s_vec = deepcopy(self.init_states)

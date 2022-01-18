@@ -55,7 +55,7 @@ class RewardNet(nn.Module):
         self._build(*self._build_args)
 
     def forward(self, x: th.Tensor) -> th.Tensor:
-        x = self.feature_fn(x).to(self._device)
+        x = self.feature_fn(x)
         if self.trainmode:
             return self.scale * self.layers(x)
         else:
@@ -96,6 +96,7 @@ class CNNRewardNet(RewardNet):
         self.conv_layers = nn.Sequential(*layers)
         self.fcnn = nn.Linear(arch[-1] * self.in_features, 1, bias=False)
         self.optimizer = self.optim_cls(self.parameters(), lr, weight_decay=norm_coeff)
+        self.to(self._device)
 
     def forward(self, x: th.Tensor) -> th.Tensor:
         x = self.feature_fn(x)
