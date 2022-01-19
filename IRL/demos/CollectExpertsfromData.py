@@ -14,6 +14,7 @@ if __name__ == '__main__':
         # subi = 3
         sub = f"sub{subi:02d}"
         trajectories = []
+
         for actuation in range(1, 7):
             # actuation = 3
             for trial in range(1, 6):
@@ -27,6 +28,6 @@ if __name__ == '__main__':
                             'bsp': io.loadmat(file)['bsp'],
                             }
                     trajectories += generate_trajectories_from_data(data, env)
-        save_name = f"{env_type}/19171717/{sub}.pkl"
+        save_name = f"{env_type}/19171717_done/{sub}.pkl"
         types.save(save_name, trajectories)
         print(f"Expert Trajectory {save_name} is saved")

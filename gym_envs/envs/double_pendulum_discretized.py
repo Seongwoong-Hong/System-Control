@@ -23,8 +23,8 @@ class DiscretizedDoublePendulum(gym.Env):
         # self.max_angles = np.array([0.16, 0.67])
         # self.min_speeds = -self.max_speeds
         # self.min_angles = -self.max_angles
-        self.max_speeds = np.array([0.9, 2.5])
-        self.max_angles = np.array([0.21, 0.72])
+        self.max_speeds = np.array([1.1, 3.4])
+        self.max_angles = np.array([0.21, 0.96])
         self.min_speeds = -self.max_speeds
         self.min_angles = -self.max_angles
 
@@ -46,19 +46,21 @@ class DiscretizedDoublePendulum(gym.Env):
         obs_high = np.array([*self.max_angles, *self.max_speeds])
         obs_low = np.array([*self.min_angles, *self.min_speeds])
         if N is int:
+            assert N % 2, "N should be a odd number"
             N = N * np.ones_like(obs_high, dtype=int)
         else:
             N = np.array(N)
             assert N is not None, "The number of discretization should be defined"
             assert N.shape == obs_high.shape
+            assert (N % 2).all(), "N should be consist of odd numbers"
         self.num_cells = N
         self.obs_shape = []
-        for h, n in zip(obs_high, self.num_cells):
-            x = (np.logspace(0, np.log10(15), n // 2 + 1) - 1) * (h / (15 - 1))
+        for high, n in zip(obs_high, self.num_cells):
+            x = (np.logspace(0, np.log10(15), n // 2 + 1) - 1) * (high / (15 - 1))
             self.obs_shape.append(np.append(-np.flip(x[1:]), x))
         self.torque_lists = []
-        for h, n in zip(self.max_torques, self.num_actions):
-            x = (np.logspace(0, np.log10(10), n // 2 + 1) - 1) * (h / (10 - 1))
+        for high, n in zip(self.max_torques, self.num_actions):
+            x = (np.logspace(0, np.log10(10), n // 2 + 1) - 1) * (high / (10 - 1))
             self.torque_lists.append(np.append(-np.flip(x[1:]), x))
         self.observation_space = gym.spaces.Box(low=-obs_high, high=obs_high, dtype=np.float64)
         self.action_space = gym.spaces.MultiDiscrete(self.num_actions)
@@ -259,6 +261,13 @@ class DiscretizedDoublePendulum(gym.Env):
         for a in a_vec:
             R.append(self.get_reward(s_vec, a).flatten())
         return np.stack(R)
+
+    def get_done_mat(self):
+        s_vec, a_vec = self.get_vectorized()
+        d_vec = np.zeros(len(s_vec))
+        d_vec[np.abs(s_vec[:, 0]) >= (self.max_angles[0] - 1e-6)] = 1
+        d_vec[np.abs(s_vec[:, 1]) >= (self.max_angles[1] - 1e-6)] = 1
+        return np.repeat(d_vec[None, :], len(a_vec), axis=0)
 
     def render(self, mode="human"):
         if self.viewer is None:

@@ -33,7 +33,7 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     expt = f"19171717_quadcost/{subj}_{actuation}"
     load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/cnn_{expt}_finite_normalize_forget_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
-        reward_fn = CPU_Unpickler(f).load().cpu()
+        reward_fn = CPU_Unpickler(f).load().cpu().to('cuda:0')
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
@@ -44,7 +44,7 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     env = make_env(f"{name}-v2", num_envs=1, N=[19, 17, 17, 17], bsp=bsp,
                    wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    learned_agent = FiniteSoftQiter(env, gamma=0.8, alpha=0.01, device='cpu', verbose=False)
+    learned_agent = FiniteSoftQiter(env, gamma=0.8, alpha=0.01, device='cuda:0', verbose=False)
     learned_agent.learn(0)
     agent = SoftQiter(env)
     agent.policy.policy_table = learned_agent.policy.policy_table[0]
@@ -189,8 +189,8 @@ def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_tr
 
 if __name__ == "__main__":
     # for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
-    for actuation in range(1, 2):
-        for learn_trial in range(1, 2):
+    for actuation in range(1, 3):
+        for learn_trial in range(1, 4):
             compare_obs("sub06", actuation, learn_trial)
     # for learned_trial in [1]:
     #     compare_obs(learned_trial=learned_trial)

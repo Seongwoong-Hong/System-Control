@@ -24,7 +24,7 @@ if __name__ == "__main__":
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
     env = make_env(env_id, num_envs=1, N=[19, 17, 17, 17], bsp=bsp)
     # env = make_env(env_id, use_vec_env=False)
-    name += f"_{subj}_19171717"
+    name += f"_{subj}_19171717_done"
     current_path = os.path.dirname(__file__)
     log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
     os.makedirs(log_dir, exist_ok=True)

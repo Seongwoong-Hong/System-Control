@@ -41,6 +41,8 @@ class RewardWrapper(gym.RewardWrapper):
                 r[i, :] = self.reward(np.append(inp, np.repeat(act[None, :], len(inp), axis=0), axis=1))
         else:
             r = self.reward(inp)
+        if hasattr(self.env, 'get_done_mat'):
+            r -= torch.from_numpy(self.env.get_done_mat() * 50).float().to(self.rwfn.device)
         return r
 
     def reward(self, inp: np.ndarray) -> torch.tensor:

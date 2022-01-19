@@ -63,9 +63,9 @@ def learner(env, expert, eval_env):
         #     idx = int(row.item())
         #     ft[i, idx] = 1
         # return ft
-        return x
+        # return x
         # return x ** 2
-        # return th.cat([x, x ** 2], dim=1)
+        return th.cat([x, x ** 2], dim=1)
 
     agent = def_policy("finitesoftqiter", env, device='cuda:0', verbose=1)
 
@@ -76,10 +76,10 @@ def learner(env, expert, eval_env):
         feature_fn=feature_fn,
         expert_trajectories=expert,
         use_action_as_input=True,
-        rew_arch=[8, 8],
+        rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardInputNormalizeWrapper},
-        rew_kwargs={'type': 'cnn', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
     )
 
 
