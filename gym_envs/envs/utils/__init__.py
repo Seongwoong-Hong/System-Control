@@ -1,17 +1,18 @@
 import numpy as np
 
 
-def calc_trans_mat_error(env, P, s_vec, a_vec, h, t, sampler):
-    test_s = sampler()
+def calc_trans_mat_error(env, s_vec, a_vec, test_s, P=None):
+    if P is None:
+        P = env.get_trans_mat()
     test_s_pred = test_s
     err_list = []
 
-    for _ in range(t):
+    for _ in range(50):
         a_ind = np.random.choice(range(len(a_vec)))
         next_s = env.get_next_state(test_s, a_vec[[a_ind]])
-        test_s_ind = env.get_ind_from_state(test_s_pred, h)
+        test_s_ind = env.get_ind_from_state(test_s_pred)
         next_s_pred = test_s_ind @ P[a_ind].T @ s_vec
-        err = np.mean(np.abs(next_s - next_s_pred))
+        err = np.abs(next_s - next_s_pred).squeeze().mean(axis=0)
         err_list.append(err)
         test_s = next_s.squeeze()
         test_s_pred = next_s_pred.squeeze()

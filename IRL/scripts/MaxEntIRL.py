@@ -17,9 +17,9 @@ from IRL.scripts.project_policies import def_policy
 def main(subj, actu, trial):
     env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cuda:0"
+    device = "cuda:1"
     name = f"{env_type}"
-    expt = f"19171717_done_quadcost/{subj}_{actu}"
+    expt = f"19171717_done/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -34,14 +34,15 @@ def main(subj, actu, trial):
         init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", subpath=subpath, N=[19, 17, 17, 17], bsp=bsp)
-    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[19, 17, 17, 17], init_states=init_states, bsp=bsp)
+    env = make_env(f"{name}-v2", subpath=subpath, N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp)
+    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[19, 17, 17, 17], NT=[11, 11], init_states=init_states,
+                        bsp=bsp)
     # env = make_env(f"{name}-v2")
     # eval_env = make_env(f"{name}-v0", init_states=init_states)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_normalize_finite_{expt}_{trial}"
+    log_dir += f"/sq_normalize_{expt}_{trial}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -72,7 +73,7 @@ def main(subj, actu, trial):
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("finitesoftqiter", env, device=device, verbose=1)
+    agent = def_policy("softqiter", env, device=device, verbose=1)
     learner = MaxEntIRL(
         env,
         eval_env=eval_env,
@@ -89,7 +90,7 @@ def main(subj, actu, trial):
     # Run Learning
     learner.learn(
         total_iter=120,
-        agent_learning_steps=0,
+        agent_learning_steps=2000,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
         min_agent_iter=1,
@@ -114,6 +115,6 @@ def main(subj, actu, trial):
 
 if __name__ == "__main__":
     for trial in [1, 2, 3]:
-        for subj in [f"sub{i:02d}" for i in [6]]:
+        for subj in [f"sub{i:02d}" for i in [1]]:
             for actu in range(1, 7):
                 main(subj, actu, trial)

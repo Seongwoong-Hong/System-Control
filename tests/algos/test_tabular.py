@@ -1,3 +1,5 @@
+import os.path
+
 import pytest
 import torch as th
 import numpy as np
@@ -9,8 +11,19 @@ from imitation.util import logger
 from algos.tabular.qlearning import *
 from algos.tabular.viter import *
 from matplotlib import pyplot as plt
+from scipy import io
 
 logger.configure(".", format_strs=['stdout'])
+
+
+@pytest.fixture
+def irl_path():
+    return os.path.abspath("../../IRL")
+
+
+@pytest.fixture
+def bsp(irl_path):
+    return io.loadmat(f"{irl_path}/demos/HPC/sub06/sub06i1.mat")['bsp']
 
 
 def test_qlearning():
@@ -55,23 +68,39 @@ def test_softiter():
 
     obs_differs, acts_differs = [], []
     for traj in infinite_trajs:
-        f_obs, f_acts = algo2.predict(traj.obs[0], deterministic=True)
+        f_obs, f_acts, _ = algo2.predict(traj.obs[0], deterministic=True)
         obs_differs.append(np.abs(traj.obs[:-1, :] - f_obs))
         acts_differs.append(np.abs(traj.acts - f_acts))
 
     assert np.array(obs_differs).mean() < 1e-2 and np.array(acts_differs).mean() < 0.1
 
 
-def test_finite_iter():
-    env = make_env("1DTarget_disc-v2", map_size=50, num_envs=1)
+def test_finite_iter(bsp):
+    env = make_env("DiscretizedHuman-v2", N=[19, 17, 17, 17], NT=[11, 11], num_envs=1, bsp=bsp)
     logger.configure(".", format_strs=['stdout'])
-    algo = FiniteSoftQiter(env, gamma=0.8, alpha=0.01, device='cpu')
+    algo = FiniteViter(env, gamma=0.8, alpha=0.00001, device='cpu')
     algo.learn(0)
+    algo2 = FiniteSoftQiter(env, gamma=0.8, alpha=0.00001, device='cpu')
+    algo2.learn(0)
+    init_obs = env.reset()
+    print(init_obs)
+    obs1, acts1, rews1 = algo.predict(init_obs, deterministic=True)
+    print(init_obs)
+    obs2, acts2, rews2 = algo2.predict(init_obs, deterministic=True)
+    assert np.abs(algo.policy.v_table - algo2.policy.v_table).mean() <= 1e-3
+    assert np.abs(obs1 - obs2).mean() <= 1e-3
+    assert np.abs(acts1 - acts2).mean() <= 1e-3
+    assert np.abs(rews1 - rews2).mean() <= 1e-3
 
-    print('end')
-    # algo2 = FiniteViter(env, gamma=0.8, device='cpu')
-    # algo2.learn(2000)
-    # print(np.abs(algo.policy.policy_table - algo2.policy.policy_table).max())
+
+def test_infinite_iter(bsp):
+    env = make_env("DiscretizedHuman-v2", N=[19, 17, 17, 17], NT=[11, 11], num_envs=1, bsp=bsp)
+    algo = Viter(env, gamma=0.8, alpha=0.0001, device='cpu')
+    algo.learn(300)
+    algo2 = SoftQiter(env, gamma=0.8, alpha=0.001, device='cpu')
+    algo2.learn(300)
+    assert np.abs(algo.policy.v_table - algo2.policy.v_table).mean() <= 1e-3
+    print(f"Value: {np.abs(algo.policy.v_table - algo2.policy.v_table).mean()}")
 
 
 def test_wrapped_reward():

@@ -26,7 +26,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "19171717", f"{subj}_6.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "21232129_done", f"{subj}_1.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -36,7 +36,7 @@ def expert(demo_dir):
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    return make_env(f"{env_id}-v2", bsp=bsp, N=[19, 17, 17, 17])
+    return make_env(f"{env_id}-v2", bsp=bsp, N=[21, 23, 21, 29])
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def eval_env(expert, demo_dir):
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    return make_env(f"{env_id}-v0", bsp=bsp, N=[19, 17, 17, 17], init_states=init_states)
+    return make_env(f"{env_id}-v0", bsp=bsp, N=[21, 23, 21, 29], init_states=init_states)
 
 
 @pytest.fixture
@@ -64,10 +64,10 @@ def learner(env, expert, eval_env):
         #     ft[i, idx] = 1
         # return ft
         # return x
-        # return x ** 2
-        return th.cat([x, x ** 2], dim=1)
+        return x ** 2
+        # return th.cat([x, x ** 2], dim=1)
 
-    agent = def_policy("finitesoftqiter", env, device='cuda:0', verbose=1)
+    agent = def_policy("finiteviter", env, device='cpu', verbose=1)
 
     return MaxEntIRL(
         env,
@@ -106,8 +106,8 @@ def test_callback(expert, learner):
 def test_validity(learner, expert):
     for t in range(10):
         learner.learn(
-            total_iter=1,
-            agent_learning_steps=0,
+            total_iter=10,
+            agent_learning_steps=2000,
             n_episodes=len(expert),
             max_agent_iter=1,
             min_agent_iter=1,

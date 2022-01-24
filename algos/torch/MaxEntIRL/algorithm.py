@@ -137,17 +137,16 @@ class MaxEntIRL:
         return th.sum(trans_rewards) / len(self.expert_trajectories)
 
     def cal_state_visitation(self) -> th.Tensor:
-        D = th.zeros([self.agent.max_t, self.agent.policy.obs_size], dtype=th.float32).to(self.device)
-        D[0] = self.init_D
-        for t in range(1, self.agent.max_t):
+        D_prev = self.init_D
+        for t in range(300):
+            Dc = th.zeros_like(self.init_D).to(self.device)
             for a in range(self.agent.policy.act_size):
-                D[t] += self.agent.transition_mat[a] @ (D[t - 1] * self.agent.policy.policy_table[t - 1, a])
-        agent_gammas = np.array([[self.agent.gamma ** i] for i in range(self.agent.max_t)], dtype=np.float32)
+                Dc += self.agent.transition_mat[a] @ (D_prev * self.agent.policy.policy_table[a])
+            if th.abs(Dc - D_prev).max().item() < 1e-6:
+                break
+            D_prev = deepcopy(Dc)
         if self.use_action_as_input:
-            agent_gammas = np.expand_dims(agent_gammas, axis=-1)
-            D = self.agent.policy.policy_table * D[:, None, :]
-        agent_gammas = th.from_numpy(agent_gammas).to(self.device)
-        Dc = th.sum(agent_gammas * D, dim=0)
+            Dc = self.agent.policy.policy_table * Dc[None, :]
         return Dc
 
     def get_whole_states_from_env(self):

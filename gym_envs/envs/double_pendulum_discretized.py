@@ -23,8 +23,8 @@ class DiscretizedDoublePendulum(gym.Env):
         # self.max_angles = np.array([0.16, 0.67])
         # self.min_speeds = -self.max_speeds
         # self.min_angles = -self.max_angles
-        self.max_speeds = np.array([1.1, 3.4])
-        self.max_angles = np.array([0.21, 0.96])
+        self.max_speeds = np.array([1.0369735292212519, 3.110920587663755])
+        self.max_angles = np.array([0.19851002092963618, 0.8684653307227984])
         self.min_speeds = -self.max_speeds
         self.min_angles = -self.max_angles
 
@@ -56,11 +56,11 @@ class DiscretizedDoublePendulum(gym.Env):
         self.num_cells = N
         self.obs_shape = []
         for high, n in zip(obs_high, self.num_cells):
-            x = (np.logspace(0, np.log10(15), n // 2 + 1) - 1) * (high / (15 - 1))
+            x = (np.logspace(0, np.log10(10), n // 2 + 1) - 1) * (high / (10 - 1))
             self.obs_shape.append(np.append(-np.flip(x[1:]), x))
         self.torque_lists = []
         for high, n in zip(self.max_torques, self.num_actions):
-            x = (np.logspace(0, np.log10(10), n // 2 + 1) - 1) * (high / (10 - 1))
+            x = (np.logspace(0, np.log10(17), n // 2 + 1) - 1) * (high / (17 - 1))
             self.torque_lists.append(np.append(-np.flip(x[1:]), x))
         self.observation_space = gym.spaces.Box(low=-obs_high, high=obs_high, dtype=np.float64)
         self.action_space = gym.spaces.MultiDiscrete(self.num_actions)
@@ -109,7 +109,7 @@ class DiscretizedDoublePendulum(gym.Env):
             state[:, 1] = angle_normalize(state[:, 1])
             r = - np.sum((state @ self.Q) * state, axis=-1)
         r -= np.sum((torques @ self.R) * torques, axis=-1)
-        return r
+        return r * 100
 
     def get_next_state(self, state, action):
         th0, th1, thd0, thd1 = np.split(np.copy(state), (1, 2, 3), axis=-1)
@@ -245,9 +245,9 @@ class DiscretizedDoublePendulum(gym.Env):
         if verbose:
             high = np.array([*self.max_angles, *self.max_speeds])
             low = np.array([*self.min_angles, *self.min_speeds])
-            err = calc_trans_mat_error(self, P, s_vec, a_vec, h, 50,
-                                       sampler=lambda: np.random.uniform(low=low, high=high, size=[10 ** 3, 4]))
-            print(f'1 step prediction error: {err}')
+            err = calc_trans_mat_error(self, s_vec, a_vec, np.random.uniform(low=low, high=high, size=[1000, 4]),
+                                       P) / high[None, :]
+            print(f'1 step prediction error: {err.mean(axis=0)}')
 
         return P
 
@@ -364,7 +364,7 @@ class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
 
 
 class DiscretizedHuman(DiscretizedDoublePendulum):
-    def __init__(self, bsp=None, N=None, NT=np.array([11, 11])):
+    def __init__(self, bsp=None, N=None, NT=np.array([19, 19])):
         super(DiscretizedHuman, self).__init__(N=N, NT=NT)
         if bsp is not None:
             m_u, l_u, com_u, I_u = bsp[6, :]
@@ -381,7 +381,7 @@ class DiscretizedHuman(DiscretizedDoublePendulum):
 
 
 class DiscretizedHumanDet(DiscretizedDoublePendulumDet):
-    def __init__(self, bsp=None, N=None, init_states=None, NT=np.array([11, 11])):
+    def __init__(self, bsp=None, N=None, init_states=None, NT=np.array([19, 19])):
         super(DiscretizedHumanDet, self).__init__(N=N, init_states=init_states, NT=NT)
         if bsp is not None:
             m_u, l_u, com_u, I_u = bsp[6, :]

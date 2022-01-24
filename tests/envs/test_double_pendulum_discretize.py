@@ -41,15 +41,14 @@ def test_calc_trans_mat():
     """
     from scipy import io
     bsp = io.loadmat("../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
-    N = [29, 29, 29, 29]
-    NT = [17, 17]
+    N = [23, 25, 21, 29]
+    NT = [19, 19]
 
     env = gym.make('DiscretizedHuman-v2', N=N, NT=NT, bsp=bsp)  # type: DiscretizedDoublePendulum
 
     # h = [0.1, 0.1, 0.1, 0.1]
     # h = [0.1, 0.1, 1.0, 1.0]
-    for _ in range(3):
-        env.get_trans_mat(h=None, verbose=True)
+    env.get_trans_mat(h=None, verbose=True)
 
 
 # @pytest.mark.parametrize("soft", [True, False])

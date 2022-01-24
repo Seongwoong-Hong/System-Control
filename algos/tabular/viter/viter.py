@@ -78,11 +78,11 @@ class Viter:
         self.done_mat = th.zeros([self.policy.act_size, self.policy.obs_size]).float().to(self.device)
 
     def train(self):
+        self.policy.v_table, max_idx = th.max(self.policy.q_table, dim=0)
         self.policy.q_table = self.reward_mat + self.gamma * (1 - self.done_mat) * \
-                              backward_trans(self.transition_mat, th.max(self.policy.q_table, dim=0))
-        self.policy.v_table = np.max(self.policy.q_table, axis=0)
-        state_policy = self.policy.q_table == self.policy.q_table.max(dim=0, keepdim=True)
-        self.policy.policy_table = state_policy / th.sum(state_policy, dim=0, keepdim=True)
+                              backward_trans(self.transition_mat, self.policy.v_table)
+        self.policy.policy_table = th.zeros([self.policy.act_size, self.policy.obs_size])
+        self.policy.policy_table[max_idx, range(self.policy.obs_size)] = 1
 
     def learn(self, total_timesteps, reset_num_timesteps=True, **kwargs):
         min_timesteps = kwargs.pop("min_timesteps", 10)
@@ -115,8 +115,12 @@ class Viter:
             mask: Optional[np.ndarray] = None,
             deterministic: bool = False
     ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-
-        return self.policy.predict(observation, state, mask, deterministic)
+        action, _ = self.policy.predict(observation, state, mask, deterministic)
+        if not deterministic:
+            eps = np.random.random()
+            if eps < self.epsilon:
+                action = self.action_space.sample()
+        return action, None
 
     def reset(self, env: None):
         if env is None:
@@ -163,6 +167,15 @@ class SoftQiter(Viter):
                               backward_trans(self.transition_mat, self.policy.v_table)
         self.policy.policy_table = th.exp((self.policy.q_table - self.policy.v_table[None, :]) / self.alpha)
 
+    def predict(
+            self,
+            observation: np.ndarray,
+            state: Optional[np.ndarray] = None,
+            mask: Optional[np.ndarray] = None,
+            deterministic: bool = False
+    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        return self.policy.predict(observation, state, mask, deterministic)
+
 
 class FiniteViter(Viter):
     def _setup_model(self):
@@ -182,20 +195,16 @@ class FiniteViter(Viter):
 
     # TODO: 검증이 필요함
     def train(self):
-        self.policy.q_table[self.max_t - 1, :, :] = self.reward_mat
-        self.policy.v_table[self.max_t - 1, :] = th.max(self.policy.q_table[self.max_t - 1, :, :], dim=0)
-        policy_t = th.zeros([self.policy.obs_size, self.policy.act_size])
-        policy_t[
-            self.policy.arg_max(self.policy.q_table[self.max_t - 1, :, :]).flatten(), range(self.policy.obs_size)] = 1
-        self.policy.policy_table[self.max_t - 1] = policy_t
+        self.policy.q_table[-1] = self.reward_mat
+        self.policy.v_table[-1], max_idx = th.max(self.policy.q_table[-1], dim=0)
+        self.policy.policy_table[-1] = th.zeros([self.policy.act_size, self.policy.obs_size])
+        self.policy.policy_table[-1, max_idx, range(self.policy.obs_size)] = 1
         for t in reversed(range(self.max_t - 1)):
-            self.policy.q_table[t, :, :] = self.reward_mat + self.gamma * \
-                                           backward_trans(self.transition_mat, self.policy.v_table)
-            self.policy.v_table[t, :] = th.max(self.policy.q_table[t, :, :], dim=0)
-            policy_t = th.zeros([self.policy.obs_size, self.policy.act_size])
-            policy_t[self.policy.arg_max(self.policy.q_table[self.max_t - 1, :, :]).flatten(), range(
-                self.policy.obs_size)] = 1
-            self.policy.policy_table[t] = policy_t
+            self.policy.q_table[t] = self.reward_mat + self.gamma * \
+                                     backward_trans(self.transition_mat, self.policy.v_table[t + 1])
+            self.policy.v_table[t], max_idx = th.max(self.policy.q_table[t], dim=0)
+            self.policy.policy_table[t] = th.zeros([self.policy.act_size, self.policy.obs_size])
+            self.policy.policy_table[t, max_idx, range(self.policy.obs_size)] = 1
 
     def predict(
             self,
@@ -203,12 +212,47 @@ class FiniteViter(Viter):
             state: Optional[np.ndarray] = None,
             mask: Optional[np.ndarray] = None,
             deterministic: bool = False
-    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    ) -> Tuple[np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
+        obs_list, act_list, rew_list = [], [], []
+        self.env.reset()
+        self.env.env_method("set_state", observation.squeeze())
+        for t in range(self.max_t):
+            obs_list.append(observation.flatten())
+            obs_idx = self.env.envs[0].get_idx_from_obs(observation)
+            act_idx = self.policy.arg_max(self.policy.policy_table[t, :, obs_idx].T)
+            act = self.env.envs[0].get_acts_from_idx(act_idx)
+            if not deterministic:
+                eps = np.random.random()
+                if eps < self.epsilon:
+                    act = self.action_space.sample()[None, :]
+            observation, reward, _, _ = self.env.step(act)
+            rew_list.append(reward.flatten())
+            act_list.append(act.flatten())
+        return np.array(obs_list), np.array(act_list), np.array(rew_list)
+
+
+class FiniteSoftQiter(FiniteViter):
+    def train(self):
+        self.policy.q_table[-1] = self.reward_mat
+        self.policy.v_table[-1] = self.alpha * th.logsumexp(self.policy.q_table[-1] / self.alpha, dim=0)
+        for t in reversed(range(self.max_t - 1)):
+            self.policy.q_table[t] = self.reward_mat + self.gamma * \
+                                     backward_trans(self.transition_mat, self.policy.v_table[t + 1])
+            self.policy.v_table[t] = self.alpha * th.logsumexp(self.policy.q_table[t] / self.alpha, dim=0)
+        self.policy.policy_table = th.exp((self.policy.q_table - self.policy.v_table[:, None, :]) / self.alpha)
+
+    def predict(
+            self,
+            observation: np.ndarray,
+            state: Optional[np.ndarray] = None,
+            mask: Optional[np.ndarray] = None,
+            deterministic: bool = False
+    ) -> Tuple[np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
         if not deterministic:
             choose_method = self.policy.choice_act
         else:
             choose_method = self.policy.arg_max
-        obs_list, act_list = [], []
+        obs_list, act_list, rew_list = [], [], []
         self.env.reset()
         self.env.env_method("set_state", observation.squeeze())
         for t in range(self.max_t):
@@ -216,18 +260,7 @@ class FiniteViter(Viter):
             obs_idx = self.env.envs[0].get_idx_from_obs(observation)
             act_idx = choose_method(self.policy.policy_table[t, :, obs_idx].T)
             act = self.env.envs[0].get_acts_from_idx(act_idx)
-            observation, _, _, _ = self.env.step(act)
+            observation, reward, _, _ = self.env.step(act)
+            rew_list.append(reward.flatten())
             act_list.append(act.flatten())
-        return np.array(obs_list), np.array(act_list)
-
-
-class FiniteSoftQiter(FiniteViter):
-    def train(self):
-        self.policy.q_table[self.max_t - 1] = self.reward_mat
-        self.policy.v_table[self.max_t - 1] = self.alpha * th.logsumexp(
-            self.policy.q_table[self.max_t - 1] / self.alpha, dim=0)
-        for t in reversed(range(self.max_t - 1)):
-            self.policy.q_table[t] = self.reward_mat + self.gamma * \
-                                     backward_trans(self.transition_mat, self.policy.v_table[t + 1])
-            self.policy.v_table[t] = self.alpha * th.logsumexp(self.policy.q_table[t] / self.alpha, dim=0)
-        self.policy.policy_table = th.exp((self.policy.q_table - self.policy.v_table[:, None, :]) / self.alpha)
+        return np.array(obs_list), np.array(act_list), np.array(rew_list)
