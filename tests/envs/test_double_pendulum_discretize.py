@@ -41,8 +41,8 @@ def test_calc_trans_mat():
     """
     from scipy import io
     bsp = io.loadmat("../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
-    N = [23, 25, 21, 29]
-    NT = [19, 19]
+    N = [9, 19, 19, 27]
+    NT = [11, 11]
 
     env = gym.make('DiscretizedHuman-v2', N=N, NT=NT, bsp=bsp)  # type: DiscretizedDoublePendulum
 
@@ -140,3 +140,31 @@ def test_value_itr(soft=True):
 
         print(f'{float(appx_v):.2f} (Q table) vs. {float(v):.2f} (rollout)')
     env.close()
+
+
+def test_update_discretization():
+    from common.util import make_env
+    from algos.tabular.viter import SoftQiter
+
+    venv = make_env("DiscretizedDoublePendulum-v2", N=[19, 19, 19, 19], NT=[11, 11], num_envs=1)
+    agent = SoftQiter(env=venv, gamma=0.8, alpha=0.001, device='cuda:3')
+    agent.learn(2000)
+
+    observation_space = gym.spaces.Box(
+        low=np.array([-0.2, -0.6, -0.8, -2.4]), high=np.array([0.2, 0.6, 0.8, 2.4]), dtype=np.float64)
+    obs = []
+    for _ in range(64600):
+        obs.append(observation_space.sample())
+    obs = np.array(obs)
+    acts, _ = agent.predict(obs)
+    n_obs = []
+    for idx in range(len(obs)):
+        n_obs.append(venv.env_method("get_next_state", obs[[idx]], acts[[idx]])[0].flatten())
+    sorted_n_obs = np.sort(np.array(n_obs), axis=0)
+
+    obs_shape = venv.get_attr("obs_shape")[0]
+    for i, n in enumerate([19, 19, 19, 19]):
+        for t in range(1, n):
+            obs_shape[i][t] = sorted_n_obs[t * 64600 // n - 1, i]
+
+    print(obs_shape)

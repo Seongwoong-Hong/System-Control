@@ -36,13 +36,13 @@ def get_trajectories_from_approx_dyn(env, agent, init_state, n_episodes, determi
 
 def cal_trajectory_value():
     bsp = io.loadmat(f"{irl_path}/demos/HPC/{subj}/{subj}i1.mat")['bsp']
-    env = make_env("DiscretizedHuman-v2", num_envs=1, N=[21, 23, 21, 29], NT=[19, 19], bsp=bsp)
-    init_state = env.observation_space.sample()
-    agent = SoftQiter(env, gamma=0.8, alpha=0.0001, device='cuda:0')
+    env = make_env("DiscretizedHuman-v2", num_envs=1, N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp)
+    init_state = env.reset()[0]
+    agent = SoftQiter(env, gamma=0.8, alpha=0.0001, device='cuda:3')
     agent.learn(1000)
 
-    eval_env = make_env("DiscretizedHuman-v0", num_envs=1, N=[21, 23, 21, 29], NT=[19, 19], bsp=bsp,
-                        init_states=init_state)
+    eval_env = make_env("DiscretizedHuman-v0", num_envs=1,
+                        N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp, init_states=init_state)
     n_episodes = 50
 
     sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
@@ -54,8 +54,8 @@ def cal_trajectory_value():
     #     obs, _, rews = agent.predict(init_state, deterministic=True)
     #     traj_rews.append(rews)
 
-    obs_approx, rews_approx = get_trajectories_from_approx_dyn(eval_env, agent, init_state, n_episodes,
-                                                               deterministic=False)
+    obs_approx, rews_approx = \
+        get_trajectories_from_approx_dyn(eval_env, agent, init_state, n_episodes, deterministic=False)
 
     gammas = np.array([agent.gamma ** i for i in range(50)])
     value_from_sample, value_from_approx = [], []
@@ -69,10 +69,10 @@ def cal_trajectory_value():
 
     print(f"init_state: {init_state}")
     print(f"mean of values: {np.mean(value_from_sample)}, std of values: {np.std(value_from_sample)}")
-    print(f"value error: {error}")
+    print(f"value error: {error}, {np.abs(error / value_from_algo) * 100:.2f}%")
 
-    print(f"mean approx. obs differ: {np.abs(obs_approx[0] - trajectories[0].obs).mean()}")
     print(f"mean approx. value differ: {np.abs(np.array(value_from_approx) - np.array(value_from_sample)).mean()}")
+    print(f"mean approx. obs differ: {np.abs(obs_approx[0] - trajectories[0].obs).mean()}")
 
 
 if __name__ == "__main__":

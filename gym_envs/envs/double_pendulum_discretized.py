@@ -19,12 +19,10 @@ class DiscretizedDoublePendulum(gym.Env):
     def __init__(self, N=None, NT=np.array([11, 11])):
         super(DiscretizedDoublePendulum, self).__init__()
         self.max_torques = np.array([100., 100.])
-        # self.max_speeds = np.array([0.8, 2.4])
-        # self.max_angles = np.array([0.16, 0.67])
-        # self.min_speeds = -self.max_speeds
-        # self.min_angles = -self.max_angles
-        self.max_speeds = np.array([1.0369735292212519, 3.110920587663755])
-        self.max_angles = np.array([0.19851002092963618, 0.8684653307227984])
+        self.max_speeds = np.array([2.2, 4.8])
+        self.max_angles = np.array([0.4, 1.0])
+        # self.max_speeds = np.array([1.0369735292212519, 3.110920587663755])
+        # self.max_angles = np.array([0.19851002092963618, 0.8684653307227984])
         self.min_speeds = -self.max_speeds
         self.min_angles = -self.max_angles
 
@@ -43,26 +41,24 @@ class DiscretizedDoublePendulum(gym.Env):
         self.viewer = None
         self.last_a = None
 
-        obs_high = np.array([*self.max_angles, *self.max_speeds])
-        obs_low = np.array([*self.min_angles, *self.min_speeds])
+        self.obs_high = np.array([*self.max_angles, *self.max_speeds])
+        self.obs_low = np.array([*self.min_angles, *self.min_speeds])
         if N is int:
             assert N % 2, "N should be a odd number"
-            N = N * np.ones_like(obs_high, dtype=int)
+            N = N * np.ones_like(self.obs_high, dtype=int)
         else:
             N = np.array(N)
             assert N is not None, "The number of discretization should be defined"
-            assert N.shape == obs_high.shape
+            assert N.shape == self.obs_high.shape
             assert (N % 2).all(), "N should be consist of odd numbers"
         self.num_cells = N
         self.obs_shape = []
-        for high, n in zip(obs_high, self.num_cells):
-            x = (np.logspace(0, np.log10(10), n // 2 + 1) - 1) * (high / (10 - 1))
-            self.obs_shape.append(np.append(-np.flip(x[1:]), x))
+        for high, low, n in zip(self.obs_high, self.obs_low, self.num_cells):
+            self.obs_shape.append(np.linspace(low, high, n + 1))
         self.torque_lists = []
         for high, n in zip(self.max_torques, self.num_actions):
-            x = (np.logspace(0, np.log10(17), n // 2 + 1) - 1) * (high / (17 - 1))
-            self.torque_lists.append(np.append(-np.flip(x[1:]), x))
-        self.observation_space = gym.spaces.Box(low=-obs_high, high=obs_high, dtype=np.float64)
+            self.torque_lists.append(np.linspace(-high, high, n + 1))
+        self.observation_space = gym.spaces.Box(low=self.obs_low, high=self.obs_high, dtype=np.float64)
         self.action_space = gym.spaces.MultiDiscrete(self.num_actions)
         self.seed()
 
@@ -86,6 +82,10 @@ class DiscretizedDoublePendulum(gym.Env):
         self.state = self.get_next_state(self.state[None, ...], action[None, ...])[0, 0, ...]
 
         return self._get_obs(), r, False, info
+
+    @property
+    def disc_states(self):
+        return [(os[1:] + os[:-1]) / 2 for os in self.obs_shape]
 
     def set_state(self, state):
         assert np.abs(state) - 1e-6 in self.observation_space
@@ -161,14 +161,13 @@ class DiscretizedDoublePendulum(gym.Env):
         return np.concatenate([th0, th1, thd0, thd1], axis=-1)
 
     def _get_obs(self):
-        discretized_state = self.get_obs_from_idx(self.get_idx_from_obs(self.state)).squeeze()
-        return discretized_state
+        return self.state
 
     def get_num_cells(self):
         return self.num_cells
 
     def get_vectorized(self):
-        s_vec = np.stack(np.meshgrid(*self.obs_shape,
+        s_vec = np.stack(np.meshgrid(*self.disc_states,
                                      indexing='ij'),
                          -1).reshape(-1, 4)
         a_vec = np.stack(np.meshgrid(np.arange(self.num_actions[0]),
@@ -206,31 +205,33 @@ class DiscretizedDoublePendulum(gym.Env):
         dims = self.get_num_cells()
         idx = []
         for i, whole_candi in enumerate(self.obs_shape):
-            idx.append(np.argmin(np.abs(np.repeat(whole_candi[None, :], obs.shape[0], axis=0) - obs[:, [i]]), axis=1))
+            idx.append((obs[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
         tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
         return tot_idx.flatten()
 
     def get_obs_from_idx(self, idx: np.ndarray):
-        s_vec = np.stack(np.meshgrid(*self.obs_shape,
+        assert len(idx.shape) == 1
+        s_vec = np.stack(np.meshgrid(*self.disc_states,
                                      indexing='ij'),
                          -1).reshape(-1, 4)
-        return s_vec[idx.flatten()]
+        return s_vec[idx]
 
     def get_acts_from_idx(self, idx: np.ndarray):
+        assert len(idx.shape) == 1
         a_vec = np.stack(np.meshgrid(np.arange(self.num_actions[0]),
                                      np.arange(self.num_actions[1]),
                                      indexing='ij'),
                          -1).reshape(-1, 2)
-        return a_vec[idx.flatten()]
+        return a_vec[idx]
 
-    def get_idx_from_acts(self, act: np.ndarray):
-        if len(act.shape) == 1:
-            act = act[None, :]
-        assert (np.max(np.abs(act), axis=0) <= self.max_torques + 1e-6).all()
+    def get_idx_from_acts(self, acts: np.ndarray):
+        if len(acts.shape) == 1:
+            acts = acts[None, :]
+        assert (np.max(np.abs(acts), axis=0) <= self.max_torques + 1e-6).all()
         dims = np.array(self.num_actions)
         idx = []
         for i, whole_candi in enumerate(self.torque_lists):
-            idx.append(np.argmin(np.abs(np.repeat(whole_candi[None, :], act.shape[0], axis=0) - act[:, [i]]), axis=1))
+            idx.append((acts[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
         tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
 
         return tot_idx.flatten()
@@ -345,7 +346,7 @@ class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
             self.init_states, _ = self.get_vectorized()
             self.init_states = self.init_states[0:len(self.init_states):100]
         else:
-            self.init_states = self.get_obs_from_idx(self.get_idx_from_obs(np.array(init_states)))
+            self.init_states = np.array(init_states).reshape(-1, 4)
         self.n = 0
 
     def reset(self):

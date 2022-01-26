@@ -81,7 +81,7 @@ class Viter:
         self.policy.v_table, max_idx = th.max(self.policy.q_table, dim=0)
         self.policy.q_table = self.reward_mat + self.gamma * (1 - self.done_mat) * \
                               backward_trans(self.transition_mat, self.policy.v_table)
-        self.policy.policy_table = th.zeros([self.policy.act_size, self.policy.obs_size])
+        self.policy.policy_table[...] = th.zeros([self.policy.act_size, self.policy.obs_size])
         self.policy.policy_table[max_idx, range(self.policy.obs_size)] = 1
 
     def learn(self, total_timesteps, reset_num_timesteps=True, **kwargs):
@@ -104,6 +104,7 @@ class Viter:
                 if self.verbose:
                     logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                     logger.record("Value Error", error, exclude="tensorboard")
+                    logger.dump(self.num_timesteps)
                 self.policy.policy_table = th.round(self.policy.policy_table * 1e8) * 1e-8
                 break
             self.num_timesteps += 1
@@ -193,7 +194,6 @@ class FiniteViter(Viter):
             max_t=self.max_t,
         )
 
-    # TODO: 검증이 필요함
     def train(self):
         self.policy.q_table[-1] = self.reward_mat
         self.policy.v_table[-1], max_idx = th.max(self.policy.q_table[-1], dim=0)
