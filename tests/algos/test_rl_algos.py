@@ -38,24 +38,27 @@ def test_iter_predict():
 
 def test_finite_softqiter_at_discretized_env():
     import pickle
+    from algos.tabular.viter import SoftQiter
     subj = "sub06"
     subpath = os.path.join("..", "..", "IRL", "demos", "HPC", subj, subj)
-    with open(f"../../IRL/demos/DiscretizedHuman/19171717/{subj}.pkl", "rb") as f:
-        expt = pickle.load(f)
-    init_states = []
-    for traj in expt:
-        init_states += [traj.obs[0]]
+    # with open(f"../../IRL/demos/DiscretizedHuman/19171717/{subj}.pkl", "rb") as f:
+    #     expt = pickle.load(f)
+    # init_states = []
+    # for traj in expt:
+    #     init_states += [traj.obs[0]]
+    init_states = np.array([-0.14329, 0.32951, -0.52652, -0.11540])
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(f"DiscretizedHuman-v2", num_envs=1, N=[19, 17, 17, 17], bsp=bsp)
-    eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, N=[19, 17, 17, 17], bsp=bsp, init_states=init_states)
-    t1 = time.time()
-    algo = def_policy("finitesoftqiter", env, device='cuda:0')
-    algo.learn(0)
-    eval_algo = def_policy("softqiter", env, device='cuda:0')
+    env = make_env(f"DiscretizedHuman-v2", num_envs=1, N=[21, 21, 21, 21], NT=[19, 19], bsp=bsp)
+    eval_env = make_env(f"DiscretizedHuman-v0", num_envs=1, N=[21, 21, 21, 21], NT=[19, 19], bsp=bsp,
+                        init_states=init_states)
+    # t1 = time.time()
+    # algo = def_policy("finitesoftqiter", env, device='cuda:2')
+    # algo.learn(0)
+    eval_algo = SoftQiter(env, gamma=0.95, alpha=0.001, device='cuda:2')
     eval_algo.learn(2000)
-    assert th.abs(algo.policy.policy_table[0] - eval_algo.policy.policy_table).mean().item() <= 1e-4
-    eval_algo.policy.policy_table = algo.policy.policy_table[0]
-    print(time.time() - t1)
+    # assert th.abs(algo.policy.policy_table[0] - eval_algo.policy.policy_table).mean().item() <= 1e-4
+    # eval_algo.policy.policy_table = algo.policy.policy_table[0]
+    # print(time.time() - t1)
     whole_acts, whole_obs = [], []
     for _ in range(0, 15, 3):
         acts, obs = [], []
