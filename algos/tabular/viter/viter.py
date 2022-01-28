@@ -104,6 +104,7 @@ class Viter:
                 if self.verbose:
                     logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                     logger.record("Value Error", error, exclude="tensorboard")
+                    logger.dump(self.num_timesteps)
                 self.policy.policy_table = th.round(self.policy.policy_table * 1e8) * 1e-8
                 break
             self.num_timesteps += 1
@@ -193,7 +194,6 @@ class FiniteViter(Viter):
             max_t=self.max_t,
         )
 
-    # TODO: 검증이 필요함
     def train(self):
         self.policy.q_table[-1] = self.reward_mat
         self.policy.v_table[-1], max_idx = th.max(self.policy.q_table[-1], dim=0)

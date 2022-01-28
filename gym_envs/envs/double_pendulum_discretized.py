@@ -19,12 +19,12 @@ class DiscretizedDoublePendulum(gym.Env):
     def __init__(self, N=None, NT=np.array([11, 11])):
         super(DiscretizedDoublePendulum, self).__init__()
         self.max_torques = np.array([100., 100.])
-        # self.max_speeds = np.array([0.8, 2.4])
-        # self.max_angles = np.array([0.16, 0.67])
-        # self.min_speeds = -self.max_speeds
-        # self.min_angles = -self.max_angles
-        self.max_speeds = np.array([1.0369735292212519, 3.110920587663755])
-        self.max_angles = np.array([0.19851002092963618, 0.8684653307227984])
+        # self.max_speeds = np.array([1.6, 4.8])
+        # self.max_angles = np.array([0.4, 1.2])
+        self.max_speeds = np.array([0.8, 2.4])
+        self.max_angles = np.array([0.16, 0.67])
+        # self.max_speeds = np.array([1.4414868928104354, 4.324460678431305])
+        # self.max_angles = np.array([0.28829737856208704, 1.20724527272873974])
         self.min_speeds = -self.max_speeds
         self.min_angles = -self.max_angles
 
@@ -161,8 +161,9 @@ class DiscretizedDoublePendulum(gym.Env):
         return np.concatenate([th0, th1, thd0, thd1], axis=-1)
 
     def _get_obs(self):
-        discretized_state = self.get_obs_from_idx(self.get_idx_from_obs(self.state)).squeeze()
-        return discretized_state
+        return self.state
+        # discretized_state = self.get_obs_from_idx(self.get_idx_from_obs(self.state)).squeeze()
+        # return discretized_state
 
     def get_num_cells(self):
         return self.num_cells
@@ -345,7 +346,7 @@ class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
             self.init_states, _ = self.get_vectorized()
             self.init_states = self.init_states[0:len(self.init_states):100]
         else:
-            self.init_states = self.get_obs_from_idx(self.get_idx_from_obs(np.array(init_states)))
+            self.init_states = np.array(init_states).reshape(-1, 4)
         self.n = 0
 
     def reset(self):
