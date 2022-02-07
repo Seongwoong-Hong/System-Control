@@ -174,7 +174,7 @@ def test_update_discretization():
         print(venv.get_attr("obs_shape")[0])
 
 
-def test_adaptive_disc_value_error():
+def test_adaptive_disc_value_error(init_state):
     from common.util import make_env
     from algos.tabular.viter import SoftQiter
     from imitation.data.rollout import make_sample_until, generate_trajectories
@@ -183,7 +183,7 @@ def test_adaptive_disc_value_error():
     env = make_env("DiscretizedHuman-v2", num_envs=1, N=[21, 21, 21, 21], NT=[19, 19], bsp=bsp)
     # observation_space = gym.spaces.Box(
     #     low=np.array([-0.2, -0.6, -0.8, -2.4]), high=np.array([0.2, 0.6, 0.8, 2.4]), dtype=np.float64)
-    init_state = env.observation_space.sample()
+    # init_state = env.observation_space.sample()
     first_agent = SoftQiter(env, gamma=0.95, alpha=0.0001, device='cuda:3', verbose=False)
     first_agent.learn(1000)
 
@@ -199,7 +199,7 @@ def test_adaptive_disc_value_error():
     for _ in range(84000):
         obs.append(env.observation_space.sample())
     obs = np.array(obs)
-    for _ in range(10):
+    for _ in range(1):
         acts, _ = first_agent.predict(obs)
         n_obs = []
         for idx in range(len(obs)):
@@ -238,5 +238,10 @@ def test_adaptive_disc_value_error():
 
 
 def test_adaptive_disc_value_error_multiple_times():
-    for _ in range(10):
-        test_adaptive_disc_value_error()
+    init_states = np.array([[0.10507719, -0.0052011, -0.12850532, 1.20797222],
+                            [-0.15293185, 0.47734205, 0.57158603, -0.06335646],
+                            [0.02607121, -0.18795271, -0.26519679, 1.59183143],
+                            [0.12611365, -0.61667806, -0.70179518, -1.57989637],
+                            [-0.08158507, 0.27749209, -0.72402817, 0.50911538]])
+    for init_state in init_states:
+        test_adaptive_disc_value_error(init_state)

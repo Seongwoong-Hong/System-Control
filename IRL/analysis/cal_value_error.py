@@ -6,6 +6,7 @@ from common.util import make_env
 from common.rollouts import get_trajectories_from_approx_dyn
 
 from imitation.data.rollout import make_sample_until, generate_trajectories
+from matplotlib import pyplot as plt
 
 subj = "sub06"
 irl_path = os.path.abspath("..")
@@ -21,7 +22,7 @@ def cal_value_error(n):
 
     eval_env = make_env("DiscretizedHuman-v0", num_envs=1, bsp=bsp,
                         N=[n, n, n, n], NT=[19, 19], init_states=init_state)
-    n_episodes = 100
+    n_episodes = 10
 
     sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
     trajectories = generate_trajectories(agent, eval_env, sample_until, deterministic_policy=False)
@@ -41,8 +42,10 @@ def cal_value_error(n):
         value_from_approx.append(np.sum(approx_trajs[i].rews * gammas))
 
     init_state_idx = env.env_method("get_idx_from_obs", init_state[None, :])[0]
-    value_from_algo = agent.policy.v_table[init_state_idx].item()
+    # value_from_algo = agent.policy.v_table[init_state_idx].item()
+    value_from_algo = np.mean(value_from_approx)
     error = value_from_algo - np.mean(value_from_sample)
+    errors.append(error)
 
     # print(f"init_state: {init_state}")
     print(f"Expected value: {value_from_algo}")
@@ -54,6 +57,20 @@ def cal_value_error(n):
 
 
 if __name__ == "__main__":
-    for n in [19]:
-        print(f"Number of discretized state: {n}")
-        cal_value_error(n)
+    init_states = np.array([[0.10507719, -0.0052011, -0.12850532, 1.20797222],
+                            [-0.05293185, 0.47734205, 0.57158603, -0.06335646],
+                            [0.02607121, -0.18795271, -0.26519679, 1.59183143],
+                            [0.12611365, -0.61667806, -0.70179518, -0.57989637],
+                            [-0.08158507, 0.27749209, -0.72402817, 0.50911538]])
+    x = np.array([5, 7, 9, 11, 13, 15, 17, 19, 21])
+    cum_errors = []
+    for init_state in init_states:
+        errors = []
+        for n in x:
+            cal_value_error(n)
+        cum_errors.append(errors)
+    cum_errors = np.array(cum_errors)
+    mean = cum_errors.mean(axis=0)
+    std = np.std(cum_errors, axis=0)
+    plt.errorbar(x, mean, std)
+    plt.show()
