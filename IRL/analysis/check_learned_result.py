@@ -12,9 +12,8 @@ from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from algos.tabular.viter import FiniteSoftQiter, SoftQiter
 from common.util import make_env, CPU_Unpickler
-from common.rollouts import generate_trajectories_without_shuffle
+from common.rollouts import DiscEnvTrajectories
 from common.wrappers import *
-from IRL.scripts.project_policies import def_policy
 
 irl_path = os.path.abspath("..")
 
@@ -24,16 +23,16 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     plotting = True
 
     def feature_fn(x):
-        return x
+        # return x
         # return x ** 2
-        # return th.cat([x, x ** 2], dim=1)
+        return th.cat([x, x ** 2], dim=1)
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"19171717_quadcost/{subj}_{actuation}"
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/cnn_{expt}_finite_normalize_forget_{learned_trial}/model"
+    expt = f"19171717_done/{subj}_{actuation}"
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/ext_normalize_finite_{expt}_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
-        reward_fn = CPU_Unpickler(f).load().cpu().to('cuda:0')
+        reward_fn = CPU_Unpickler(f).load().to('cpu')
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
@@ -42,26 +41,34 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
         init_states.append(traj.obs[0])
     reward_fn.feature_fn = feature_fn
     # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    env = make_env(f"{name}-v2", num_envs=1, N=[19, 17, 17, 17], bsp=bsp,
+    env = make_env(f"{name}-v2", N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp,
                    wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    learned_agent = FiniteSoftQiter(env, gamma=0.8, alpha=0.01, device='cuda:0', verbose=False)
-    learned_agent.learn(0)
-    agent = SoftQiter(env)
-    agent.policy.policy_table = learned_agent.policy.policy_table[0]
-    eval_env = make_env(f"{name}-v0", num_envs=1, N=[19, 17, 17, 17], bsp=bsp, init_states=init_states)
+    d_env = make_env(env, num_envs=1, wrapper=DiscretizeWrapper)
+
+    agent = FiniteSoftQiter(d_env, gamma=0.995, alpha=0.01, device='cpu', verbose=False)
+    agent.learn(0)
+
+    eval_env = make_env(f"{name}-v0", N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp, init_states=init_states,
+                        wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     # eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
-    agent.set_env(eval_env)
-    sample_until = make_sample_until(n_timesteps=None, n_episodes=len(expert_trajs))
-    agent_trajs = generate_trajectories_without_shuffle(
-        agent, eval_env, sample_until, deterministic_policy=True)
 
-    expt_obs = flatten_trajectories(expert_trajs).obs
-    expt_acts = flatten_trajectories(expert_trajs).acts
-    agent_obs = flatten_trajectories(agent_trajs).obs
-    agent_acts = flatten_trajectories(agent_trajs).acts
+    agent_trajs = []
+    for _ in range(15):
+        traj = DiscEnvTrajectories()
+        init_state = eval_env.reset()
+        obs, acts, rews = agent.predict(init_state, deterministic=False)
+        traj.obs = obs
+        traj.acts = acts
+        traj.rews = rews
+        agent_trajs.append(traj)
 
-    print(f"Mean obs difference ({subj}_{actuation}): {np.abs(expt_obs - agent_obs).mean(axis=0)}")
-    print(f"Mean acts difference ({subj}_{actuation}): {np.abs(expt_acts - agent_acts).mean(axis=0)}")
+    # expt_obs = flatten_trajectories(expert_trajs).obs
+    # expt_acts = flatten_trajectories(expert_trajs).acts
+    # agent_obs = flatten_trajectories(agent_trajs).obs
+    # agent_acts = flatten_trajectories(agent_trajs).acts
+    #
+    # print(f"Mean obs difference ({subj}_{actuation}): {np.abs(expt_obs - agent_obs).mean(axis=0)}")
+    # print(f"Mean acts difference ({subj}_{actuation}): {np.abs(expt_acts - agent_acts).mean(axis=0)}")
 
     if plotting:
         x_value = range(1, 51)
@@ -73,12 +80,14 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
                 ax.plot(x_value, agent_trajs[traj_idx].obs[:-1, ob_idx], color='k')
                 ax.plot(x_value, expert_trajs[traj_idx].obs[:-1, ob_idx], color='b')
             ax.legend(['agent', 'expert'])
+            ax.tick_params(axis='both', which='major', labelsize=15)
         for act_idx in range(2):
             ax = acts_fig.add_subplot(1, 2, act_idx + 1)
             for traj_idx in range(len(expert_trajs)):
                 ax.plot(x_value, agent_trajs[traj_idx].acts[:, act_idx], color='k')
                 ax.plot(x_value, expert_trajs[traj_idx].acts[:, act_idx], color='b')
             ax.legend(['agent', 'expert'])
+            ax.tick_params(axis='both', which='major', labelsize=15)
         obs_fig.tight_layout()
         acts_fig.tight_layout()
         plt.show()
@@ -154,8 +163,8 @@ def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_tr
     irl_obs, irl_acts = [], []
     hand_obs, hand_acts = [], []
     for init_state in init_states:
-        i_ob, i_act = irl_agent.predict(init_state, deterministic=False)
-        h_ob, h_act = hand_agent.predict(init_state, deterministic=False)
+        i_ob, i_act, i_rew = irl_agent.predict(init_state, deterministic=False)
+        h_ob, h_act, h_rew = hand_agent.predict(init_state, deterministic=False)
         irl_obs.append(i_ob)
         irl_acts.append(i_act)
         hand_obs.append(h_ob)
@@ -189,8 +198,8 @@ def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_tr
 
 if __name__ == "__main__":
     # for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
-    for actuation in range(1, 3):
+    for actuation in range(1, 4):
         for learn_trial in range(1, 4):
-            compare_obs("sub06", actuation, learn_trial)
+            compare_obs("sub01", actuation, learn_trial)
     # for learned_trial in [1]:
     #     compare_obs(learned_trial=learned_trial)

@@ -11,15 +11,15 @@ from common.util import make_env
 from common.callbacks import SaveCallback
 from common.wrappers import *
 from algos.torch.MaxEntIRL import MaxEntIRL
-from IRL.scripts.project_policies import def_policy
+from algos.tabular.viter import *
 
 
 def main(subj, actu, trial):
     env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cuda:0"
+    device = "cuda:3"
     name = f"{env_type}"
-    expt = f"19171717_done_quadcost/{subj}_{actu}"
+    expt = f"19171717_disc_quadcost/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -34,14 +34,14 @@ def main(subj, actu, trial):
         init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", subpath=subpath, N=[19, 17, 17, 17], bsp=bsp)
-    eval_env = make_env(f"{name}-v0", subpath=subpath, N=[19, 17, 17, 17], init_states=init_states, bsp=bsp)
+    env = make_env(f"{name}-v2", N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp)
+    eval_env = make_env(f"{name}-v0", N=[19, 17, 17, 17], NT=[11, 11], init_states=init_states, bsp=bsp)
     # env = make_env(f"{name}-v2")
     # eval_env = make_env(f"{name}-v0", init_states=init_states)
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_normalize_finite_{expt}_{trial}"
+    log_dir += f"/ext_normalize_finite_{expt}_{trial}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -60,10 +60,10 @@ def main(subj, actu, trial):
         #     ft[i, idx] = 1
         # return ft
         # return x
-        return x ** 2
+        # return x ** 2
         # x1, x2, x3, x4 = th.split(x, 1, dim=1)
         # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, x**2, x**3), dim=1)
-        # return th.cat([x, x ** 2], dim=1)
+        return th.cat([x, x ** 2], dim=1)
 
     # Setup callbacks
     save_net_callback = SaveCallback(cycle=10, dirpath=model_dir)
@@ -72,7 +72,7 @@ def main(subj, actu, trial):
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = def_policy("finitesoftqiter", env, device=device, verbose=1)
+    agent = FiniteSoftQiter(env=env, gamma=1, alpha=0.01, device=device)
     learner = MaxEntIRL(
         env,
         eval_env=eval_env,
@@ -88,7 +88,7 @@ def main(subj, actu, trial):
 
     # Run Learning
     learner.learn(
-        total_iter=120,
+        total_iter=80,
         agent_learning_steps=0,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
@@ -113,7 +113,7 @@ def main(subj, actu, trial):
 
 
 if __name__ == "__main__":
-    for trial in [1, 2, 3]:
-        for subj in [f"sub{i:02d}" for i in [6]]:
-            for actu in range(1, 7):
+    for subj in [f"sub{i:02d}" for i in [6]]:
+        for actu in range(1, 7):
+            for trial in [1, 2, 3]:
                 main(subj, actu, trial)
