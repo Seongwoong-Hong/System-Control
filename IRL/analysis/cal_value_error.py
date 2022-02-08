@@ -3,7 +3,7 @@ from scipy import io
 
 from algos.tabular.viter import *
 from common.util import make_env
-from common.rollouts import get_trajectories_from_approx_dyn
+from common.rollouts import generate_trajectories_from_approx_dyn
 
 from imitation.data.rollout import make_sample_until, generate_trajectories
 from matplotlib import pyplot as plt
@@ -14,14 +14,14 @@ irl_path = os.path.abspath("..")
 
 def cal_value_error(n):
     bsp = io.loadmat(f"{irl_path}/demos/HPC/{subj}/{subj}i1.mat")['bsp']
-    env = make_env("DiscretizedHuman-v2", num_envs=1, N=[n, n, n, n], NT=[19, 19], bsp=bsp)
+    env = make_env("DiscretizedHuman-v2", num_envs=1, N=[n, n, n, n], NT=[11, 11], bsp=bsp)
     # init_state = np.array([-0.07723441,  0.38298573, -0.70412399,  1.00609718])
     init_state = env.reset()[0]
     agent = SoftQiter(env, gamma=0.95, alpha=0.001, device='cuda:2', verbose=False)
     agent.learn(1000)
 
     eval_env = make_env("DiscretizedHuman-v0", num_envs=1, bsp=bsp,
-                        N=[n, n, n, n], NT=[19, 19], init_states=init_state)
+                        N=[n, n, n, n], NT=[11, 11], init_states=init_state)
     n_episodes = 10
 
     sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
@@ -33,7 +33,7 @@ def cal_value_error(n):
     #     obs, _, rews = agent.predict(init_state, deterministic=True)
     #     traj_rews.append(rews)
 
-    approx_trajs = get_trajectories_from_approx_dyn(eval_env, agent, n_episodes, deterministic=False)
+    approx_trajs = generate_trajectories_from_approx_dyn(agent, eval_env, n_episodes, deterministic_policy=False)
 
     gammas = np.array([agent.gamma ** i for i in range(50)])
     value_from_sample, value_from_approx = [], []
@@ -62,7 +62,7 @@ if __name__ == "__main__":
                             [0.02607121, -0.18795271, -0.26519679, 1.59183143],
                             [0.12611365, -0.61667806, -0.70179518, -0.57989637],
                             [-0.08158507, 0.27749209, -0.72402817, 0.50911538]])
-    x = np.array([5, 7, 9, 11, 13, 15, 17, 19, 21])
+    x = np.array([15, 17, 19, 21])
     cum_errors = []
     for init_state in init_states:
         errors = []

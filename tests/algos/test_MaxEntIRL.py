@@ -26,7 +26,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "21232129_done", f"{subj}_1.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "19171717_done", f"{subj}_1.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -36,7 +36,7 @@ def expert(demo_dir):
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    return make_env(f"{env_id}-v2", bsp=bsp, N=[21, 23, 21, 29])
+    return make_env(f"{env_id}-v2", bsp=bsp, N=[19, 17, 17, 17], NT=[11, 11])
 
 
 @pytest.fixture
@@ -46,13 +46,13 @@ def eval_env(expert, demo_dir):
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    return make_env(f"{env_id}-v0", bsp=bsp, N=[21, 23, 21, 29], init_states=init_states)
+    return make_env(f"{env_id}-v0", bsp=bsp, N=[19, 17, 17, 17], NT=[11, 11], init_states=init_states)
 
 
 @pytest.fixture
 def learner(env, expert, eval_env):
     from imitation.util import logger
-    from IRL.scripts.project_policies import def_policy
+    from algos.tabular.viter import FiniteSoftQiter
     logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
@@ -67,7 +67,7 @@ def learner(env, expert, eval_env):
         return x ** 2
         # return th.cat([x, x ** 2], dim=1)
 
-    agent = def_policy("finiteviter", env, device='cpu', verbose=1)
+    agent = FiniteSoftQiter(env, gamma=0.9, alpha=0.01, device='cpu')
 
     return MaxEntIRL(
         env,

@@ -255,12 +255,13 @@ class FiniteSoftQiter(FiniteViter):
         obs_list, act_list, rew_list = [], [], []
         self.env.reset()
         self.env.env_method("set_state", observation.squeeze())
+        obs_list.append(observation.flatten())
         for t in range(self.max_t):
-            obs_list.append(observation.flatten())
             obs_idx = self.env.envs[0].get_idx_from_obs(observation)
             act_idx = choose_method(self.policy.policy_table[t, :, obs_idx].T)
             act = self.env.envs[0].get_acts_from_idx(act_idx)
             observation, reward, _, _ = self.env.step(act)
+            obs_list.append(observation.flatten())
             rew_list.append(reward.flatten())
             act_list.append(act.flatten())
         return np.array(obs_list), np.array(act_list), np.array(rew_list)

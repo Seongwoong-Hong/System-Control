@@ -149,24 +149,24 @@ def generate_trajectories_without_shuffle(
     return trajectories
 
 
-class TrajectoriesDiscEnv:
+class DiscEnvTrajectories:
     def __init__(self):
         self.rews = None
         self.obs = None
         self.acts = None
 
 
-def get_trajectories_from_approx_dyn(env, agent, n_episodes, deterministic=False):
+def generate_trajectories_from_approx_dyn(agent, env, n_episodes, deterministic_policy=False):
     trajs = []
     P = env.env_method("get_trans_mat")[0]
     for _ in range(n_episodes):
-        traj = TrajectoriesDiscEnv
+        traj = DiscEnvTrajectories()
         obs_approx, rews_approx, acts_approx = [], [], []
         s_vec, _ = env.env_method("get_vectorized")[0]
         current_obs = env.reset()[0]
         obs_approx.append(current_obs)
         for _ in range(env.get_attr("spec")[0].max_episode_steps):
-            act, _ = agent.predict(current_obs, deterministic=deterministic)
+            act, _ = agent.predict(current_obs, deterministic=deterministic_policy)
             rews_approx.append(env.env_method("get_reward", current_obs, act)[0])
             acts_approx.append(act)
             torque = env.env_method("get_torque", act)[0].T
