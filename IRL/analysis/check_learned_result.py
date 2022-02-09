@@ -29,7 +29,7 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"19171717_done/{subj}_{actuation}"
+    expt = f"19171717/{subj}_{actuation}"
     load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/ext_normalize_finite_{expt}_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load().to('cpu')
@@ -53,9 +53,8 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     # eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
 
     agent_trajs = []
-    for _ in range(15):
+    for init_state in init_states:
         traj = DiscEnvTrajectories()
-        init_state = eval_env.reset()
         obs, acts, rews = agent.predict(init_state, deterministic=False)
         traj.obs = obs
         traj.acts = acts
