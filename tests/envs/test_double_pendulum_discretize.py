@@ -41,8 +41,8 @@ def test_calc_trans_mat():
     """
     from scipy import io
     bsp = io.loadmat("../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
-    N = [23, 25, 21, 29]
-    NT = [19, 19]
+    N = [9, 19, 19, 27]
+    NT = [11, 11]
 
     env = gym.make('DiscretizedHuman-v2', N=N, NT=NT, bsp=bsp)  # type: DiscretizedDoublePendulum
 
@@ -140,3 +140,108 @@ def test_value_itr(soft=True):
 
         print(f'{float(appx_v):.2f} (Q table) vs. {float(v):.2f} (rollout)')
     env.close()
+
+
+def test_update_discretization():
+    from common.util import make_env
+    from algos.tabular.viter import SoftQiter
+
+    venv = make_env("DiscretizedDoublePendulum-v2", N=[19, 19, 19, 19], NT=[11, 11], num_envs=1)
+    print(venv.get_attr("obs_shape")[0])
+    for _ in range(10):
+        agent = SoftQiter(env=venv, gamma=0.8, alpha=0.001, device='cuda:3', verbose=False)
+        agent.learn(2000)
+
+        observation_space = gym.spaces.Box(
+            low=np.array([-0.2, -0.6, -0.8, -2.4]), high=np.array([0.2, 0.6, 0.8, 2.4]), dtype=np.float64)
+        obs = []
+        for _ in range(64600):
+            obs.append(observation_space.sample())
+        obs = np.array(obs)
+        acts, _ = agent.predict(obs)
+        n_obs = []
+        for idx in range(len(obs)):
+            n_obs.append(venv.env_method("get_next_state", obs[[idx]], acts[[idx]])[0].flatten())
+        sorted_n_obs = np.sort(np.array(n_obs), axis=0)
+
+        obs_shape = venv.get_attr("obs_shape")[0]
+        for i, n in enumerate([19, 19, 19, 19]):
+            for t in range(1, n):
+                obs_shape[i][t] = sorted_n_obs[t * 64600 // n - 1, i]
+
+        venv.envs[0].env.obs_shape = obs_shape
+
+        print(venv.get_attr("obs_shape")[0])
+
+
+def test_adaptive_disc_value_error(init_state):
+    from common.util import make_env
+    from algos.tabular.viter import SoftQiter
+    from imitation.data.rollout import make_sample_until, generate_trajectories
+    from scipy import io
+    bsp = io.loadmat(f"../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
+    env = make_env("DiscretizedHuman-v2", num_envs=1, N=[21, 21, 21, 21], NT=[19, 19], bsp=bsp)
+    # observation_space = gym.spaces.Box(
+    #     low=np.array([-0.2, -0.6, -0.8, -2.4]), high=np.array([0.2, 0.6, 0.8, 2.4]), dtype=np.float64)
+    # init_state = env.observation_space.sample()
+    first_agent = SoftQiter(env, gamma=0.95, alpha=0.0001, device='cuda:3', verbose=False)
+    first_agent.learn(1000)
+
+    eval_env = make_env("DiscretizedHuman-v0", num_envs=1, bsp=bsp,
+                        N=[21, 21, 21, 21], NT=[19, 19], init_states=init_state)
+    n_episodes = 50
+
+    init_state_first_idx = env.env_method("get_idx_from_obs", init_state[None, :])[0]
+    sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
+    first_trajectories = generate_trajectories(first_agent, eval_env, sample_until, deterministic_policy=False)
+
+    obs = []
+    for _ in range(84000):
+        obs.append(env.observation_space.sample())
+    obs = np.array(obs)
+    for _ in range(1):
+        acts, _ = first_agent.predict(obs)
+        n_obs = []
+        for idx in range(len(obs)):
+            n_obs.append(env.env_method("get_next_state", obs[[idx]], acts[[idx]])[0].flatten())
+        obs = np.array(n_obs)
+
+    sorted_n_obs = np.sort(obs, axis=0)
+
+    obs_shape = env.get_attr("obs_shape")[0]
+    for i, n in enumerate([21, 21, 21, 21]):
+        for t in range(1, n):
+            obs_shape[i][t] = sorted_n_obs[t * 84000 // n - 1, i]
+
+    env.envs[0].env.obs_shape = obs_shape
+    eval_env.envs[0].env.obs_shape = obs_shape
+
+    print(env.get_attr("obs_shape")[0])
+
+    second_agent = SoftQiter(env, gamma=0.95, alpha=0.0001, device='cuda:3', verbose=False)
+    second_agent.learn(1000)
+
+    init_state_second_idx = env.env_method("get_idx_from_obs", init_state[None, :])[0]
+    second_trajectories = generate_trajectories(second_agent, eval_env, sample_until, deterministic_policy=False)
+
+    gammas = np.array([first_agent.gamma ** i for i in range(50)])
+    value_from_first_trajs, value_from_second_trajs = [], []
+    for i in range(n_episodes):
+        value_from_first_trajs.append(np.sum(first_trajectories[i].rews * gammas))
+        value_from_second_trajs.append(np.sum(second_trajectories[i].rews * gammas))
+
+    value_from_first_algo = first_agent.policy.v_table[init_state_first_idx].item()
+    value_from_second_algo = second_agent.policy.v_table[init_state_second_idx].item()
+
+    print(value_from_first_algo, value_from_second_algo, np.mean(value_from_first_trajs),
+          np.mean(value_from_second_trajs))
+
+
+def test_adaptive_disc_value_error_multiple_times():
+    init_states = np.array([[0.10507719, -0.0052011, -0.12850532, 1.20797222],
+                            [-0.15293185, 0.47734205, 0.57158603, -0.06335646],
+                            [0.02607121, -0.18795271, -0.26519679, 1.59183143],
+                            [0.12611365, -0.61667806, -0.70179518, -1.57989637],
+                            [-0.08158507, 0.27749209, -0.72402817, 0.50911538]])
+    for init_state in init_states:
+        test_adaptive_disc_value_error(init_state)

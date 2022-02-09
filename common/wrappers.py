@@ -93,59 +93,15 @@ class ActionNormalizeRewardWrapper(RewardWrapper):
         return super().reward(inp)
 
 
-class CostWrapper(gym.RewardWrapper):
-    def __init__(self, env, costfn):
-        super(CostWrapper, self).__init__(env)
-        self.costfn = costfn
-
-    def step(self, action: np.ndarray):
-        observation, reward, done, info = self.env.step(action)
-        return observation, self.reward(np.append(observation, action)), done, info
-
-    def reward(self, obs):
-        cost_inp = torch.from_numpy(obs).reshape(1, -1).to(self.costfn.device)
-        return -self.costfn.forward(cost_inp)
-
-
-class ActionCostWrapper(gym.RewardWrapper):
-    def __init__(self, env, costfn):
-        super(ActionCostWrapper, self).__init__(env)
-        self.gear = env.model.actuator_gear[0, 0]
-        self.costfn = costfn
-
-    def step(self, action: np.ndarray):
-        observation, reward, done, info = self.env.step(self.action(action))
-        return observation, self.reward(np.append(observation, action)), done, info
-
-    def action(self, action: np.ndarray):
-        return self.gear * action
-
-    def reverse_action(self, action: np.ndarray):
-        return action / self.gear
-
-    def reward(self, obs):
-        cost_inp = torch.from_numpy(obs).reshape(1, -1).to(self.costfn.device)
-        return -self.costfn.forward(cost_inp)
-
-
-class ObsConcatWrapper(gym.Wrapper):
-    def __init__(self, env, num_timesteps):
-        super(ObsConcatWrapper, self).__init__(env)
-        self.num_timesteps = num_timesteps
-        self.obs_list = np.zeros([self.num_timesteps, self.observation_space.shape[0]])
-        self.acts_list = np.zeros([self.num_timesteps, self.action_space.shape[0]])
-
-    def step(self, action: np.ndarray):
-        ob, rew, done, info = self.env.step(action)
-        self.acts_list = np.append([action], self.acts_list[:-1], axis=0)
-        info['obs'] = self.obs_list
-        info['acts'] = self.acts_list
-        self.obs_list = np.append([ob], self.obs_list[:-1], axis=0)
-        return ob, rew, done, info
+class DiscretizeWrapper(gym.Wrapper):
+    def step(self, action):
+        n_obs, reward, done, info = self.env.step(action)
+        d_n_obs = self.env.get_obs_from_idx(self.env.get_idx_from_obs(n_obs)).squeeze()
+        self.env.set_state(d_n_obs)
+        return d_n_obs, reward, done, info
 
     def reset(self):
-        ob = super(ObsConcatWrapper, self).reset()
-        self.obs_list = np.zeros([self.num_timesteps, self.observation_space.shape[0]])
-        self.acts_list = np.zeros([self.num_timesteps, self.action_space.shape[0]])
-        self.obs_list[0, :] = ob
-        return ob
+        state = self.env.reset()
+        d_state = self.env.get_obs_from_idx(self.env.get_idx_from_obs(state)).squeeze()
+        self.env.set_state(d_state)
+        return d_state

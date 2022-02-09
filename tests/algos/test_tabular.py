@@ -48,20 +48,10 @@ def test_soft_q_learning():
 
 
 def test_viter():
-    env = make_env("2DTarget_disc-v2", map_size=10, num_envs=1)
-    logger.configure(".", format_strs=['stdout'])
-    algo = Viter(env, gamma=0.8, epsilon=0.2, device='cpu')
-    algo.learn(2000)
-
-    print('env')
-
-
-def test_softiter():
     env = make_env("DiscretizedDoublePendulum-v2", num_envs=1, N=[19, 17, 17, 17])
-    logger.configure(".", format_strs=['stdout'])
-    algo = SoftQiter(env, gamma=0.8, alpha=0.001, device='cuda:2')
+    algo = Viter(env, gamma=0.7, epsilon=0.2, device='cpu')
     algo.learn(2000)
-    algo2 = FiniteSoftQiter(env, gamma=0.8, alpha=0.001, device='cuda:2')
+    algo2 = FiniteViter(env, gamma=0.7, epsilon=0.2, device='cpu')
     algo2.learn(0)
     sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
     infinite_trajs = generate_trajectories(algo, env, sample_until, deterministic_policy=True)
@@ -69,10 +59,31 @@ def test_softiter():
     obs_differs, acts_differs = [], []
     for traj in infinite_trajs:
         f_obs, f_acts, _ = algo2.predict(traj.obs[0], deterministic=True)
-        obs_differs.append(np.abs(traj.obs[:-1, :] - f_obs))
-        acts_differs.append(np.abs(traj.acts - f_acts))
+        obs_differs.append(np.abs(traj.obs[:-1] - f_obs).mean())
+        acts_differs.append(np.abs(traj.acts - f_acts).mean())
 
     assert np.array(obs_differs).mean() < 1e-2 and np.array(acts_differs).mean() < 0.1
+    print(f"{np.array(obs_differs).mean()} < 1e-2 and {np.array(acts_differs).mean()} < 0.1")
+
+
+def test_softiter():
+    env = make_env("DiscretizedDoublePendulum-v2", num_envs=1, N=[19, 17, 17, 17])
+    logger.configure(".", format_strs=['stdout'])
+    algo = SoftQiter(env, gamma=0.8, alpha=0.001, device='cuda:3')
+    algo.learn(2000)
+    algo2 = FiniteSoftQiter(env, gamma=0.8, alpha=0.001, device='cuda:3')
+    algo2.learn(0)
+    sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
+    infinite_trajs = generate_trajectories(algo, env, sample_until, deterministic_policy=True)
+
+    obs_differs, acts_differs = [], []
+    for traj in infinite_trajs:
+        f_obs, f_acts, _ = algo2.predict(traj.obs[0], deterministic=True)
+        obs_differs.append(np.abs(traj.obs[:-1, :] - f_obs).mean())
+        acts_differs.append(np.abs(traj.acts - f_acts).mean())
+
+    assert np.array(obs_differs).mean() < 1e-2 and np.array(acts_differs).mean() < 0.1
+    print(f"{np.array(obs_differs).mean()} < 1e-2 and {np.array(acts_differs).mean()} < 0.1")
 
 
 def test_finite_iter(bsp):

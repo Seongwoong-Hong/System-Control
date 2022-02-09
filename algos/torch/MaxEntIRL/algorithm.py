@@ -48,8 +48,7 @@ class MaxEntIRL:
         traj_len = len(self.expert_trajectories[0].acts)
         trans = flatten_trajectories(self.expert_trajectories)
         self.expert_reward_inp = trans.obs
-        self.expert_gammas = th.FloatTensor([self.agent.gamma ** (i % traj_len) for i in range(len(trans))]).to(
-            self.device)
+        self.expert_gammas = th.Tensor([self.agent.gamma ** (i % traj_len) for i in range(len(trans))]).to(self.device)
         if self.use_action_as_input:
             self.expert_reward_inp = np.concatenate([self.expert_reward_inp, trans.acts], axis=1)
 
@@ -137,16 +136,19 @@ class MaxEntIRL:
         return th.sum(trans_rewards) / len(self.expert_trajectories)
 
     def cal_state_visitation(self) -> th.Tensor:
-        D_prev = self.init_D
-        for t in range(300):
-            Dc = th.zeros_like(self.init_D).to(self.device)
-            for a in range(self.agent.policy.act_size):
-                Dc += self.agent.transition_mat[a] @ (D_prev * self.agent.policy.policy_table[a])
-            if th.abs(Dc - D_prev).max().item() < 1e-6:
-                break
-            D_prev = deepcopy(Dc)
+        D_prev = deepcopy(self.init_D)
+        Dc = D_prev
         if self.use_action_as_input:
-            Dc = self.agent.policy.policy_table * Dc[None, :]
+            Dc = Dc[None, :] * self.agent.policy.policy_table[0]
+        for t in range(1, self.env.spec.max_episode_steps):
+            D = th.zeros_like(self.init_D).to(self.device)
+            for a in range(self.agent.policy.act_size):
+                D += self.agent.transition_mat[a] @ (D_prev * self.agent.policy.policy_table[t - 1, a])
+            if self.use_action_as_input:
+                Dc += self.agent.policy.policy_table[t] * D[None, :] * self.agent.gamma ** t
+            else:
+                Dc += D * self.agent.gamma ** t
+            D_prev = deepcopy(D)
         return Dc
 
     def get_whole_states_from_env(self):
@@ -218,7 +220,6 @@ class MaxEntIRL:
                 for agent_steps in range(1, max_agent_iter + 1):
                     self.agent.learn(
                         total_timesteps=int(agent_learning_steps), reset_num_timesteps=False, callback=agent_callback)
-                    logger.dump(step=self.agent.num_timesteps)
                     logger.record("agent_steps", agent_steps, exclude="tensorboard")
                     logger.dump(self.itr)
             self.itr += 1

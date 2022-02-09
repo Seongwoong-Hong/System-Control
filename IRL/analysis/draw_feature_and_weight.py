@@ -53,7 +53,7 @@ def draw_feature_reward():
         mini2, maxi2 = mu2.min().item(), mu2.max().item()
         ax = fig.add_subplot()
         ax.scatter(mu1, mu2, marker='^', color='r')
-        with open(model_dir+f"/{i-1:03d}/agent.pkl", "rb") as f:
+        with open(model_dir + f"/{i - 1:03d}/agent.pkl", "rb") as f:
             algo = pickle.load(f)
         # algo = PPO.load(model_dir + f"/{i - 1:03d}/agent")
         agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=False, render="None", repeat_num=lnum)
@@ -63,7 +63,7 @@ def draw_feature_reward():
         mini1, maxi1 = min([mini1, mu1.min().item()]), max([maxi1, mu1.max().item()])
         mini2, maxi2 = min([mini2, mu2.min().item()]), max([maxi2, mu2.max().item()])
         ax.scatter(mu1, mu2, marker='o', color='c')
-        with open(model_dir+f"/{i:03d}/agent.pkl", "rb") as f:
+        with open(model_dir + f"/{i:03d}/agent.pkl", "rb") as f:
             algo = pickle.load(f)
         # algo = PPO.load(model_dir + f"/{i:03d}/agent")
         agent_acts, agent_obs, _ = verify_policy(env, algo, deterministic=False, render="None", repeat_num=lnum)
@@ -84,16 +84,16 @@ def draw_feature_reward():
 
 
 def draw_reward_weights():
-    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "sq_19171717")
+    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "ext_normalize_finite_")
     # get reward_weight and stack
     weights_stack = []
-    label_name = [f"sub{i:02d}" for i in [1]]
+    label_name = [f"sub{i:02d}" for i in [6]]
     for subj in label_name:
         trial_weights_stack = []
-        for pert in range(1, 2):
+        for actuation in range(1, 4):
             weights = []
-            for trial in range(1, 2):
-                name = f"/{subj}_{pert}_finite_normalize_forget_{trial}/model"
+            for trial in range(1, 4):
+                name = f"19171717_done_quadcost/{subj}_{actuation}_{trial}/model"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
                     reward_weight = CPU_Unpickler(f).load().layers[0].weight
                 weights.append(-reward_weight.detach().numpy().flatten())
@@ -106,11 +106,11 @@ def draw_reward_weights():
     w_mean = weights_stack[:, :, 0, :]
     w_std = weights_stack[:, :, 1, :]
 
-    x1 = [f"{i}cm" for i in [3, 4.5, 6, 7.5, 9, 12]]
-    subplot_name = [rf"$\omega_{i + 1}$" for i in range(8)]
+    x1 = [f"{i}cm" for i in [3, 4.5, 6]]  # , 7.5, 9, 12]]
+    subplot_name = [rf"$\omega_{i + 1}$" for i in range(12)]
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
     for weight_idx, weight_name in enumerate(subplot_name):
-        weight_fig = plt.figure(figsize=[9, 6], dpi=150.0)
+        weight_fig = plt.figure(figsize=[12, 8], dpi=100.0)
         ax = weight_fig.add_subplot(1, 1, 1)
         ax.errorbar(x1, w_mean[0, :, weight_idx], yerr=w_std[0, :, weight_idx], fmt='o')
         # ax.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
@@ -126,9 +126,10 @@ def draw_reward_weights():
 if __name__ == "__main__":
     def feature_fn(x):
         # return x
-        return x ** 2
-        # return th.cat([x, x ** 2], dim=1)
+        # return x ** 2
+        return th.cat([x, x ** 2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
+
 
     # draw_feature_reward()
     draw_reward_weights()

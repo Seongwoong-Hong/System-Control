@@ -4,6 +4,7 @@ import numpy as np
 
 from IRL.scripts.project_policies import def_policy
 from common.util import make_env
+from common.wrappers import *
 
 from imitation.data import rollout
 from matplotlib import pyplot as plt
@@ -37,11 +38,30 @@ def test_hpc_data():
     print(data['state'][0, :4])
 
 
-def test_pkl_data():
-    expert_dir = os.path.join("../../IRL", "demos", "DiscretizedDoublePendulum", "softqiter_0.1.pkl")
+def test_drawing_pkl_data():
+    expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "19171717_done_quadcost", "sub06_1.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
-    for i in range(0, len(expert_trajs), 500):
-        transitions = rollout.flatten_trajectories([expert_trajs[i]])
-        plt.plot(transitions.obs[:, :2])
-        plt.show()
+    for traj in expert_trajs:
+        plt.plot(traj.obs[:, 3])
+    plt.show()
+
+
+def test_stepping_pkl_data():
+    expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "19171717_done", "sub06_1.pkl")
+    with open(expert_dir, "rb") as f:
+        expert_trajs = pickle.load(f)
+    bsp = io.loadmat("../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
+    env = make_env("DiscretizedHuman-v2", bsp=bsp, N=[19, 17, 17, 17], NT=[11, 11], wrapper=DiscretizeWrapper)
+    for traj in expert_trajs:
+        obs_list = []
+        env.reset()
+        env.set_state(traj.obs[0])
+        obs_list.append(traj.obs[0])
+        for act in traj.acts:
+            ob, _, _, _ = env.step(act)
+            obs_list.append(ob)
+        print(f"obs difference: {np.mean(np.abs(traj.obs - np.array(obs_list)))}")
+        plt.plot(traj.obs[:, 1], color='k')
+        plt.plot(np.array(obs_list)[:, 1], color='b')
+    plt.show()
