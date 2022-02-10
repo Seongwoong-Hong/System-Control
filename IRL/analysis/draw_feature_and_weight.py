@@ -87,39 +87,41 @@ def draw_reward_weights():
     log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "ext_normalize_finite_")
     # get reward_weight and stack
     weights_stack = []
-    label_name = [f"sub{i:02d}" for i in [6]]
+    label_name = [f"sub{i:02d}" for i in [1, 2, 4, 6]]
     for subj in label_name:
-        trial_weights_stack = []
-        for actuation in range(1, 4):
+        weights_per_actuation = []
+        for actuation in range(1, 7):
             weights = []
             for trial in range(1, 4):
-                name = f"19171717_done_quadcost/{subj}_{actuation}_{trial}/model"
+                name = f"17171719/{subj}_{actuation}_{trial}/model"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
                     reward_weight = CPU_Unpickler(f).load().layers[0].weight
                 weights.append(-reward_weight.detach().numpy().flatten())
-            weights = np.array(weights) / np.linalg.norm(np.array(weights), axis=-1, keepdims=True)
-            trial_weights_stack.append(
+            weights = np.array(weights) / np.linalg.norm(np.array(weights), axis=-1, keepdims=True)  # normalize
+            weights_per_actuation.append(
                 np.append(weights.mean(axis=0, keepdims=True), weights.std(axis=0, keepdims=True), axis=0)
             )
-        weights_stack.append(trial_weights_stack)
+        weights_stack.append(weights_per_actuation)
     weights_stack = np.array(weights_stack)
     w_mean = weights_stack[:, :, 0, :]
     w_std = weights_stack[:, :, 1, :]
 
-    x1 = [f"{i}cm" for i in [3, 4.5, 6]]  # , 7.5, 9, 12]]
-    subplot_name = [rf"$\omega_{i + 1}$" for i in range(12)]
+    x1 = [f"{i}cm" for i in [3, 4.5, 6, 7.5, 9, 12]]
+    subplot_name = [f"$\omega_{{{i + 1}}}$" for i in range(12)]
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
     for weight_idx, weight_name in enumerate(subplot_name):
         weight_fig = plt.figure(figsize=[12, 8], dpi=100.0)
         ax = weight_fig.add_subplot(1, 1, 1)
-        ax.errorbar(x1, w_mean[0, :, weight_idx], yerr=w_std[0, :, weight_idx], fmt='o')
-        # ax.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
+        for subj_idx in range(len(label_name)):
+            ax.errorbar(x1, w_mean[subj_idx, :, weight_idx], yerr=w_std[subj_idx, :, weight_idx], fmt='o')
+        ax.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
         ax.set_xlabel("perturbation", labelpad=15.0, fontsize=28)
         ax.set_ylabel("weight", labelpad=15.0, fontsize=28)
-        ax.set_ylim(-0.1, 1.1)
+        ax.set_ylim(-0.3, .9)
         ax.set_title(weight_name, fontsize=32)
         ax.tick_params(axis='both', which='major', labelsize=15)
         weight_fig.tight_layout()
+        plt.savefig(f"figures/disc_reward_weights/linspace_disc/weight_{weight_idx + 1}.png")
         plt.show()
 
 
