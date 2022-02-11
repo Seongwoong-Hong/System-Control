@@ -19,3 +19,5 @@ def test_collecting_from_data():
     file = "../../IRL/demos/HPC/sub06_half/sub06i1_0.mat"
     init_state = env.get_obs_from_idx(env.get_idx_from_obs(-io.loadmat(file)['state'][0][:4]))
     print(init_state)
+    init_action = env.get_acts_from_idx(env.get_idx_from_acts(-io.loadmat(file)['tq'][0]))
+    print(init_action)

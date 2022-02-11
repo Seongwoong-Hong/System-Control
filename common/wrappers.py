@@ -53,23 +53,19 @@ class RewardWrapper(gym.RewardWrapper):
 class RewardInputNormalizeWrapper(RewardWrapper):
     def reward(self, inp: np.ndarray) -> torch.tensor:
         if isinstance(self.observation_space, gym.spaces.MultiDiscrete):
-            high = (self.observation_space.nvec[None, :] - 1) / 2
-            offset = np.ones(self.observation_space.shape)
+            high = (self.observation_space.nvec[None, :] - 1)
         elif isinstance(self.observation_space, gym.spaces.Box):
             high = self.observation_space.high[None, :]
-            offset = np.zeros(self.observation_space.shape)[None, :]
         else:
             raise NotImplementedError
         if self.use_action_as_inp:
             if isinstance(self.action_space, gym.spaces.MultiDiscrete):
-                high = np.append(high, (self.action_space.nvec[None, :] - 1) / 2)
-                offset = np.append(offset, np.ones(self.action_space.shape)[None, :], axis=1)
+                high = np.append(high, (self.action_space.nvec[None, :] - 1))
             elif isinstance(self.observation_space, gym.spaces.Box):
                 high = np.append(high, self.action_space.high[None, :], axis=-1)
-                offset = np.append(offset, np.zeros(self.action_space.shape)[None, :], axis=1)
             else:
                 raise NotImplementedError
-        inp = inp / high - offset
+        inp = inp / high
         return super().reward(inp)
 
 
@@ -82,14 +78,12 @@ class ActionNormalizeRewardWrapper(RewardWrapper):
         if self.use_action_as_inp:
             n_acts = self.action_space.shape[0]
             if isinstance(self.action_space, gym.spaces.MultiDiscrete):
-                high = (self.action_space.nvec[None, :] - 1) / 2
-                offset = np.ones(self.action_space.shape)[None, :]
+                high = (self.action_space.nvec[None, :] - 1)
             elif isinstance(self.observation_space, gym.spaces.Box):
                 high = self.action_space.high[None, :]
-                offset = np.zeros(self.action_space.shape)[None, :]
             else:
                 raise NotImplementedError
-            inp[:, -n_acts:] = inp[:, -n_acts:] / high - offset
+            inp[:, -n_acts:] = inp[:, -n_acts:] / high
         return super().reward(inp)
 
 

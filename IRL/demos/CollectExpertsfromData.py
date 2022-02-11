@@ -16,9 +16,9 @@ if __name__ == '__main__':
         for actuation in range(1, 7):
             trajectories = []
             # actuation = 3
-            for trial in range(1, 6):
+            for exp_trial in range(1, 6):
                 for part in range(3):
-                    file = f"HPC/{sub}_half/{sub}i{5 * (actuation - 1) + trial}_{part}.mat"
+                    file = f"HPC/{sub}_half/{sub}i{5 * (actuation - 1) + exp_trial}_{part}.mat"
                     state = env.get_obs_from_idx(env.get_idx_from_obs(-io.loadmat(file)['state'][:, :4]))
                     T = env.get_acts_from_idx(env.get_idx_from_acts(-io.loadmat(file)['tq'] / act_coeff))
                     data = {'state': state,
