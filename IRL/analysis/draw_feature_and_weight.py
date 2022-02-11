@@ -84,10 +84,11 @@ def draw_feature_reward():
 
 
 def draw_reward_weights():
+    unnormalize = True
     log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "ext_normalize_finite_")
     # get reward_weight and stack
     weights_stack = []
-    label_name = [f"sub{i:02d}" for i in [1, 2, 4, 6]]
+    label_name = [f"sub{i:02d}" for i in [6]]
     for subj in label_name:
         weights_per_actuation = []
         for actuation in range(1, 7):
@@ -95,8 +96,11 @@ def draw_reward_weights():
             for trial in range(1, 4):
                 name = f"17171719_log1017/{subj}_{actuation}_{trial}/model"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
-                    reward_weight = CPU_Unpickler(f).load().layers[0].weight
-                weights.append(-reward_weight.detach().numpy().flatten())
+                    cost_weight = -CPU_Unpickler(f).load().layers[0].weight.detach()
+                if unnormalize:
+                    gains = feature_fn(th.Tensor([[0.16, 0.67, 0.8, 2.4, 100., 100.]]))
+                    cost_weight /= gains
+                weights.append(cost_weight.numpy().flatten())
             weights = np.array(weights) / np.linalg.norm(np.array(weights), axis=-1, keepdims=True)  # normalize
             weights_per_actuation.append(
                 np.append(weights.mean(axis=0, keepdims=True), weights.std(axis=0, keepdims=True), axis=0)
@@ -117,12 +121,12 @@ def draw_reward_weights():
         ax.legend(label_name, ncol=1, columnspacing=0.1, fontsize=15)
         ax.set_xlabel("perturbation", labelpad=15.0, fontsize=28)
         ax.set_ylabel("weight", labelpad=15.0, fontsize=28)
-        ax.set_ylim(-0.3, .9)
+        # ax.set_ylim(-0.1, 1.1)
         ax.set_title(weight_name, fontsize=32)
         ax.tick_params(axis='both', which='major', labelsize=15)
         weight_fig.tight_layout()
-        plt.savefig(f"figures/disc_reward_weights/logspace_disc/weight_{weight_idx + 1}.png")
-        # plt.show()
+        # plt.savefig(f"figures/disc_reward_weights/logspace_disc/weight_{weight_idx + 1}.png")
+        plt.show()
 
 
 if __name__ == "__main__":
