@@ -39,11 +39,11 @@ def test_hpc_data():
 
 
 def test_drawing_pkl_data():
-    expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "19171717_done_quadcost", "sub06_1.pkl")
+    expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "17171719_log1017", "sub06_6.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     for traj in expert_trajs:
-        plt.plot(traj.obs[:, 3])
+        plt.plot(traj.acts[:, 0])
     plt.show()
 
 

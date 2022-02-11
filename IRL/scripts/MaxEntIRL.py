@@ -19,7 +19,7 @@ def main(subj, actu, trial):
     algo_type = "MaxEntIRL"
     device = "cuda:3"
     name = f"{env_type}"
-    expt = f"19171717_disc_quadcost/{subj}_{actu}"
+    expt = f"17171719_log1017/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -34,8 +34,8 @@ def main(subj, actu, trial):
         init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp)
-    eval_env = make_env(f"{name}-v0", N=[19, 17, 17, 17], NT=[11, 11], init_states=init_states, bsp=bsp)
+    env = make_env(f"{name}-v2", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp)
+    eval_env = make_env(f"{name}-v0", N=[17, 17, 17, 19], NT=[11, 11], init_states=init_states, bsp=bsp)
     # env = make_env(f"{name}-v2")
     # eval_env = make_env(f"{name}-v0", init_states=init_states)
 
