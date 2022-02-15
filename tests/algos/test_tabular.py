@@ -59,7 +59,7 @@ def test_viter():
     obs_differs, acts_differs = [], []
     for traj in infinite_trajs:
         f_obs, f_acts, _ = algo2.predict(traj.obs[0], deterministic=True)
-        obs_differs.append(np.abs(traj.obs[:-1] - f_obs).mean())
+        obs_differs.append(np.abs(traj.obs - f_obs).mean())
         acts_differs.append(np.abs(traj.acts - f_acts).mean())
 
     assert np.array(obs_differs).mean() < 1e-2 and np.array(acts_differs).mean() < 0.1
@@ -79,7 +79,7 @@ def test_softiter():
     obs_differs, acts_differs = [], []
     for traj in infinite_trajs:
         f_obs, f_acts, _ = algo2.predict(traj.obs[0], deterministic=True)
-        obs_differs.append(np.abs(traj.obs[:-1, :] - f_obs).mean())
+        obs_differs.append(np.abs(traj.obs - f_obs).mean())
         acts_differs.append(np.abs(traj.acts - f_acts).mean())
 
     assert np.array(obs_differs).mean() < 1e-2 and np.array(acts_differs).mean() < 0.1

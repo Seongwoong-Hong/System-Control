@@ -29,33 +29,40 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"19171717_done/{subj}_{actuation}"
+    expt = f"17171719/{subj}_{actuation}"
     load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/ext_normalize_finite_{expt}_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load().to('cpu')
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
-    with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
-        expert_trajs = pickle.load(f)
+    # with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
+    #     expert_trajs = pickle.load(f)
+    expert_trajs = []
+    for lt in range((learned_trial - 1) * 5, learned_trial * 5):
+        for t in range(3):
+            traj = DiscEnvTrajectories()
+            mat = io.loadmat(f"{irl_path}/demos/HPC/{subj}_half/{subj}i{lt + 1}_{t}.mat")
+            traj.obs = -mat['state'][:, :4]
+            traj.acts = -mat['tq']
+            expert_trajs.append(traj)
     init_states = []
     for traj in expert_trajs:
         init_states.append(traj.obs[0])
     reward_fn.feature_fn = feature_fn
     # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    env = make_env(f"{name}-v2", N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp,
+    env = make_env(f"{name}-v2", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp,
                    wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    d_env = make_env(env, num_envs=1, wrapper=DiscretizeWrapper)
+    d_env = make_env(env, num_envs=1)#, wrapper=DiscretizeWrapper)
 
-    agent = FiniteSoftQiter(d_env, gamma=0.995, alpha=0.01, device='cpu', verbose=False)
+    agent = FiniteSoftQiter(d_env, gamma=1., alpha=0.01, device='cpu', verbose=False)
     agent.learn(0)
 
-    eval_env = make_env(f"{name}-v0", N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp, init_states=init_states,
+    eval_env = make_env(f"{name}-v0", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp, init_states=init_states,
                         wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     # eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
 
     agent_trajs = []
-    for _ in range(15):
+    for init_state in init_states:
         traj = DiscEnvTrajectories()
-        init_state = eval_env.reset()
         obs, acts, rews = agent.predict(init_state, deterministic=False)
         traj.obs = obs
         traj.acts = acts
@@ -78,16 +85,16 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
             ax = obs_fig.add_subplot(2, 2, ob_idx + 1)
             for traj_idx in range(len(expert_trajs)):
                 ax.plot(x_value, agent_trajs[traj_idx].obs[:-1, ob_idx], color='k')
-                ax.plot(x_value, expert_trajs[traj_idx].obs[:-1, ob_idx], color='b')
-            ax.legend(['agent', 'expert'])
-            ax.tick_params(axis='both', which='major', labelsize=15)
+                ax.plot(x_value, expert_trajs[traj_idx].obs[:, ob_idx], color='b')
+            ax.legend(['agent', 'expert'], fontsize=28)
+            ax.tick_params(axis='both', which='major', labelsize=24)
         for act_idx in range(2):
             ax = acts_fig.add_subplot(1, 2, act_idx + 1)
             for traj_idx in range(len(expert_trajs)):
                 ax.plot(x_value, agent_trajs[traj_idx].acts[:, act_idx], color='k')
                 ax.plot(x_value, expert_trajs[traj_idx].acts[:, act_idx], color='b')
-            ax.legend(['agent', 'expert'])
-            ax.tick_params(axis='both', which='major', labelsize=15)
+            ax.legend(['agent', 'expert'], fontsize=28)
+            ax.tick_params(axis='both', which='major', labelsize=24)
         obs_fig.tight_layout()
         acts_fig.tight_layout()
         plt.show()
@@ -198,8 +205,8 @@ def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_tr
 
 if __name__ == "__main__":
     # for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
-    for actuation in range(1, 4):
-        for learn_trial in range(1, 4):
+    for actuation in range(3, 4):
+        for learn_trial in range(3, 4):
             compare_obs("sub01", actuation, learn_trial)
     # for learned_trial in [1]:
     #     compare_obs(learned_trial=learned_trial)

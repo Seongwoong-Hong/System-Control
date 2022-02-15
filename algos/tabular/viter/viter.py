@@ -59,7 +59,6 @@ class Viter:
         self.observation_space = self.env.observation_space
         self.action_space = self.env.action_space
         self.num_timesteps = 0
-        assert isinstance(self.action_space, gym.spaces.MultiDiscrete)
         self.policy = TabularPolicy(
             observation_space=self.observation_space,
             action_space=self.action_space,
@@ -185,7 +184,6 @@ class FiniteViter(Viter):
         self.action_space = self.env.action_space
         assert hasattr(self.env.get_attr("spec")[0], "max_episode_steps"), "Need to be specified the maximum timestep"
         self.max_t = self.env.get_attr("spec")[0].max_episode_steps
-        assert isinstance(self.action_space, gym.spaces.MultiDiscrete)
         self.policy = FiniteTabularPolicy(
             observation_space=self.observation_space,
             action_space=self.action_space,
@@ -216,8 +214,8 @@ class FiniteViter(Viter):
         obs_list, act_list, rew_list = [], [], []
         self.env.reset()
         self.env.env_method("set_state", observation.squeeze())
+        obs_list.append(observation.squeeze())
         for t in range(self.max_t):
-            obs_list.append(observation.flatten())
             obs_idx = self.env.envs[0].get_idx_from_obs(observation)
             act_idx = self.policy.arg_max(self.policy.policy_table[t, :, obs_idx].T)
             act = self.env.envs[0].get_acts_from_idx(act_idx)
@@ -226,6 +224,7 @@ class FiniteViter(Viter):
                 if eps < self.epsilon:
                     act = self.action_space.sample()[None, :]
             observation, reward, _, _ = self.env.step(act)
+            obs_list.append(observation.flatten())
             rew_list.append(reward.flatten())
             act_list.append(act.flatten())
         return np.array(obs_list), np.array(act_list), np.array(rew_list)

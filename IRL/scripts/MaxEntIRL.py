@@ -17,9 +17,9 @@ from algos.tabular.viter import *
 def main(subj, actu, trial):
     env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
+    device = "cuda:1"
     name = f"{env_type}"
-    expt = f"19171717_disc_quadcost/{subj}_{actu}"
+    expt = f"17171719/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -34,8 +34,8 @@ def main(subj, actu, trial):
         init_states += [traj.obs[0]]
 
     # Define environments
-    env = make_env(f"{name}-v2", N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp)
-    eval_env = make_env(f"{name}-v0", N=[19, 17, 17, 17], NT=[11, 11], init_states=init_states, bsp=bsp)
+    env = make_env(f"{name}-v2", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp)
+    eval_env = make_env(f"{name}-v0", N=[17, 17, 17, 19], NT=[11, 11], init_states=init_states, bsp=bsp)
     # env = make_env(f"{name}-v2")
     # eval_env = make_env(f"{name}-v0", init_states=init_states)
 
@@ -113,7 +113,7 @@ def main(subj, actu, trial):
 
 
 if __name__ == "__main__":
-    for subj in [f"sub{i:02d}" for i in [6]]:
+    for subj in [f"sub{i:02d}" for i in [1, 2, 4, 5, 7, 9, 10]]:
         for actu in range(1, 7):
-            for trial in [1, 2, 3]:
+            for trial in [1, 2, 3, 4, 5]:
                 main(subj, actu, trial)

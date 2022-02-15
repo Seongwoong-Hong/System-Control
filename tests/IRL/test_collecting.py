@@ -1,6 +1,8 @@
+import pickle
 from common.util import make_env
 from imitation.data import rollout
 from IRL.scripts.project_policies import def_policy
+from scipy import io
 
 
 def test_collect_hpc():
@@ -10,3 +12,12 @@ def test_collect_hpc():
     trajectories = rollout.generate_trajectories(ExpertPolicy, env, sample_until, deterministic_policy=False)
     print(trajectories[0].obs[-1, :])
     assert len(trajectories[0]) == 600
+
+
+def test_collecting_from_data():
+    env = make_env("DiscretizedHuman-v2", N=[17, 17, 17, 19], NT=[11, 11])
+    file = "../../IRL/demos/HPC/sub06_half/sub06i1_0.mat"
+    init_state = env.get_obs_from_idx(env.get_idx_from_obs(-io.loadmat(file)['state'][0][:4]))
+    print(init_state)
+    init_action = env.get_acts_from_idx(env.get_idx_from_acts(-io.loadmat(file)['tq'][0]))
+    print(init_action)

@@ -40,7 +40,7 @@ def cal_human_data_error(disc_env):
             acts = io.loadmat(target_data_dir)['tq']
 
             disc_states = disc_env.get_obs_from_idx(disc_env.get_idx_from_obs(states))
-            disc_acts = disc_env.get_torque(disc_env.get_acts_from_idx(disc_env.get_idx_from_acts(acts))).T
+            disc_acts = disc_env.get_acts_from_idx(disc_env.get_idx_from_acts(acts))
 
             states_error = np.abs(states - disc_states).mean(axis=0) / disc_env.obs_high
             acts_error = np.abs(acts - disc_acts).mean(axis=0) / disc_env.max_torques

@@ -38,12 +38,24 @@ def test_hpc_data():
     print(data['state'][0, :4])
 
 
+def test_drawing_human_data():
+    for subj in [f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]:
+        for actu in range(1, 7):
+            for exp_trial in range(1, 6):
+                for part in range(3):
+                    file = f"../../IRL/demos/HPC/{subj}_half/{subj}i{5 * (actu - 1) + exp_trial}_{part}.mat"
+                    plt.plot(-io.loadmat(file)['state'][:, 4])
+    plt.show()
+
+
 def test_drawing_pkl_data():
-    expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "19171717_done_quadcost", "sub06_1.pkl")
-    with open(expert_dir, "rb") as f:
-        expert_trajs = pickle.load(f)
-    for traj in expert_trajs:
-        plt.plot(traj.obs[:, 3])
+    for subj in [f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]:
+        for actu in range(1, 7):
+            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "17171719", f"{subj}_{actu}.pkl")
+            with open(expert_dir, "rb") as f:
+                expert_trajs = pickle.load(f)
+            for traj in expert_trajs:
+                plt.plot(traj.obs[:, 1])
     plt.show()
 
 

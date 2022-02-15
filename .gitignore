@@ -1,0 +1,5 @@
+/gym_envs/__pycache__
+/gym_envs/envs/__pychache__
+/gym_envs.egg-info/
+/.pytest_cache
+/.idea
