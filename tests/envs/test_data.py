@@ -49,13 +49,13 @@ def test_drawing_human_data():
 
 
 def test_drawing_pkl_data():
-    for subj in [f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]:
+    for subj in [f"sub{i:02d}" for i in [6]]:
         for actu in range(1, 7):
-            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "17171719", f"{subj}_{actu}.pkl")
+            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "17171719_quadcost_cont", f"{subj}_{actu}.pkl")
             with open(expert_dir, "rb") as f:
                 expert_trajs = pickle.load(f)
             for traj in expert_trajs:
-                plt.plot(traj.obs[:, 1])
+                plt.plot(traj.acts[:, 1])
     plt.show()
 
 
