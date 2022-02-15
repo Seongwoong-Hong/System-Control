@@ -59,7 +59,6 @@ class Viter:
         self.observation_space = self.env.observation_space
         self.action_space = self.env.action_space
         self.num_timesteps = 0
-        assert isinstance(self.action_space, gym.spaces.MultiDiscrete)
         self.policy = TabularPolicy(
             observation_space=self.observation_space,
             action_space=self.action_space,
@@ -185,7 +184,6 @@ class FiniteViter(Viter):
         self.action_space = self.env.action_space
         assert hasattr(self.env.get_attr("spec")[0], "max_episode_steps"), "Need to be specified the maximum timestep"
         self.max_t = self.env.get_attr("spec")[0].max_episode_steps
-        assert isinstance(self.action_space, gym.spaces.MultiDiscrete)
         self.policy = FiniteTabularPolicy(
             observation_space=self.observation_space,
             action_space=self.action_space,

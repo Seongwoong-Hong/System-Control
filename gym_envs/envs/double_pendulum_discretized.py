@@ -19,12 +19,12 @@ class DiscretizedDoublePendulum(gym.Env):
     def __init__(self, N=None, NT=np.array([11, 11])):
         super(DiscretizedDoublePendulum, self).__init__()
         self.max_torques = np.array([100., 100.])
-        # self.max_speeds = np.array([2.2, 4.8])
-        # self.max_angles = np.array([0.4, 1.0])
+        # self.max_speeds = np.array([1.6, 4.8])
+        # self.max_angles = np.array([0.4, 1.2])
         self.max_speeds = np.array([0.8, 2.4])
         self.max_angles = np.array([0.16, 0.67])
-        # self.max_speeds = np.array([1.0369735292212519, 3.110920587663755])
-        # self.max_angles = np.array([0.19851002092963618, 0.8684653307227984])
+        # self.max_speeds = np.array([1.4414868928104354, 4.324460678431305])
+        # self.max_angles = np.array([0.28829737856208704, 1.20724527272873974])
         self.min_speeds = -self.max_speeds
         self.min_angles = -self.max_angles
 
@@ -54,14 +54,16 @@ class DiscretizedDoublePendulum(gym.Env):
             assert N.shape == self.obs_high.shape
             assert (N % 2).all(), "N should be consist of odd numbers"
         self.num_cells = N
-        self.obs_shape = []
-        for high, low, n in zip(self.obs_high, self.obs_low, self.num_cells):
-            self.obs_shape.append(np.linspace(low, high, n + 1))
-        self.torque_lists = []
+        self.obs_list = []
+        for high, n in zip(self.obs_high, self.num_cells):
+            x = (np.logspace(0, np.log10(10), n // 2 + 1) - 1) * (high / (10 - 1))
+            self.obs_list.append(np.append(-np.flip(x[1:]), x))
+        self.torques_list = []
         for high, n in zip(self.max_torques, self.num_actions):
-            self.torque_lists.append(np.linspace(-high, high, n + 1))
-        self.observation_space = gym.spaces.Box(low=self.obs_low, high=self.obs_high, dtype=np.float64)
-        self.action_space = gym.spaces.MultiDiscrete(self.num_actions)
+            x = (np.logspace(0, np.log10(17), n // 2 + 1) - 1) * (high / (17 - 1))
+            self.torques_list.append(np.append(-np.flip(x[1:]), x))
+        self.observation_space = gym.spaces.Box(low=-self.obs_high, high=self.obs_high, dtype=np.float64)
+        self.action_space = gym.spaces.Box(low=-self.max_torques, high=self.max_torques, dtype=np.float64)
         self.seed()
 
     def seed(self, seed=None):
@@ -87,21 +89,15 @@ class DiscretizedDoublePendulum(gym.Env):
 
     @property
     def disc_states(self):
-        return [(os[1:] + os[:-1]) / 2 for os in self.obs_shape]
+        return [(os[1:] + os[:-1]) / 2 for os in self.obs_list]
 
     def set_state(self, state):
         assert np.abs(state) - 1e-6 in self.observation_space
         self.state = state
 
-    def get_torque(self, actions):
-        a0, a1 = np.split(actions.astype('i'), 2, axis=-1)
-        t0_list, t1_list = self.torque_lists
-
-        return np.array([t0_list[a0], t1_list[a1]]).squeeze(axis=-1)
-
     def get_reward(self, state, action):
         state = deepcopy(state)
-        torques = self.get_torque(action.reshape(-1, 2)).T / self.max_torques[None, ...]
+        norm_torques = action / self.max_torques[None, ...]
         if state.ndim == 1:
             state[0] = angle_normalize(state[0])
             state[1] = angle_normalize(state[1])
@@ -110,12 +106,12 @@ class DiscretizedDoublePendulum(gym.Env):
             state[:, 0] = angle_normalize(state[:, 0])
             state[:, 1] = angle_normalize(state[:, 1])
             r = - np.sum((state @ self.Q) * state, axis=-1)
-        r -= np.sum((torques @ self.R) * torques, axis=-1)
+        r -= np.sum((norm_torques @ self.R) * norm_torques, axis=-1)
         return r * 100
 
     def get_next_state(self, state, action):
         th0, th1, thd0, thd1 = np.split(np.copy(state), (1, 2, 3), axis=-1)
-        T0, T1 = self.get_torque(action)[..., None, None]
+        T0, T1 = action.T[..., None, None]
         g, (I0, I1), (m0, m1), (lc0, lc1), (l0, l1), dt = \
             self.g, self.Is, self.ms, self.lcs, self.ls, self.dt
 
@@ -125,7 +121,7 @@ class DiscretizedDoublePendulum(gym.Env):
         A11 = np.array(I1 + m1 * lc1 ** 2) * np.ones_like(th0)
 
         b0 = T0 + m1 * l0 * lc1 * thd1 * (2 * thd0 + thd1) * np.sin(th1) + \
-             (m0 * lc0 + m1 * l0) * g * np.sin(th0) + m1 * g * lc1 * np.sin(th0 + th1)
+            (m0 * lc0 + m1 * l0) * g * np.sin(th0) + m1 * g * lc1 * np.sin(th0 + th1)
         b1 = T1 - m1 * l0 * lc1 * thd0 ** 2 * np.sin(th1) + m1 * g * lc1 * np.sin(th0 + th1)
 
         A_det = A00 * A11 - A01 * A10
@@ -147,8 +143,8 @@ class DiscretizedDoublePendulum(gym.Env):
         T1 = np.tile(T1, (1, state.shape[0], 1))
 
         thd1[nc_ind] = thd1[nc_ind] + (-A10[nc_ind] * b0[nc_ind] + A00[nc_ind] * b1[nc_ind]) / A_det[nc_ind] * dt
-        thd1[c_ind] = thd1[c_ind] + \
-                      (T1[c_ind] + m1 * g * lc1 * np.sin(th0_before[c_ind] + th1[c_ind])) / A11[c_ind] * dt
+        thd1[c_ind] = thd1[c_ind] + (
+                T1[c_ind] + m1 * g * lc1 * np.sin(th0_before[c_ind] + th1[c_ind])) / A11[c_ind] * dt
         th1 = th1 + thd1 * dt
 
         # 완전 비탄성 충돌
@@ -169,11 +165,10 @@ class DiscretizedDoublePendulum(gym.Env):
         return self.num_cells
 
     def get_vectorized(self):
-        s_vec = np.stack(np.meshgrid(*self.disc_states,
+        s_vec = np.stack(np.meshgrid(*self.obs_list,
                                      indexing='ij'),
                          -1).reshape(-1, 4)
-        a_vec = np.stack(np.meshgrid(np.arange(self.num_actions[0]),
-                                     np.arange(self.num_actions[1]),
+        a_vec = np.stack(np.meshgrid(*self.torques_list,
                                      indexing='ij'),
                          -1).reshape(-1, 2)
 
@@ -182,7 +177,7 @@ class DiscretizedDoublePendulum(gym.Env):
     def get_init_vector(self):
         return self.get_vectorized()
 
-    def get_ind_from_state(self, state, h=None):
+    def get_ind_from_state(self, state):
         state_backup = deepcopy(state)
         if len(state.shape) == 1:
             state = state[None, :]
@@ -206,22 +201,21 @@ class DiscretizedDoublePendulum(gym.Env):
                (np.min(obs, axis=0) >= np.append(self.min_angles, self.min_speeds) - 1e-6).all()
         dims = self.get_num_cells()
         idx = []
-        for i, whole_candi in enumerate(self.obs_shape):
-            idx.append((obs[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
+        for i, whole_candi in enumerate(self.obs_list):
+            idx.append(np.argmin(np.abs(np.repeat(whole_candi[None, :], obs.shape[0], axis=0) - obs[:, [i]]), axis=1))
         tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
         return tot_idx.flatten()
 
     def get_obs_from_idx(self, idx: np.ndarray):
         assert len(idx.shape) == 1
-        s_vec = np.stack(np.meshgrid(*self.disc_states,
+        s_vec = np.stack(np.meshgrid(*self.obs_list,
                                      indexing='ij'),
                          -1).reshape(-1, 4)
         return s_vec[idx]
 
     def get_acts_from_idx(self, idx: np.ndarray):
         assert len(idx.shape) == 1
-        a_vec = np.stack(np.meshgrid(np.arange(self.num_actions[0]),
-                                     np.arange(self.num_actions[1]),
+        a_vec = np.stack(np.meshgrid(*self.torques_list,
                                      indexing='ij'),
                          -1).reshape(-1, 2)
         return a_vec[idx]
@@ -232,8 +226,8 @@ class DiscretizedDoublePendulum(gym.Env):
         assert (np.max(np.abs(acts), axis=0) <= self.max_torques + 1e-6).all()
         dims = np.array(self.num_actions)
         idx = []
-        for i, whole_candi in enumerate(self.torque_lists):
-            idx.append((acts[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
+        for i, whole_candi in enumerate(self.torques_list):
+            idx.append(np.argmin(np.abs(np.repeat(whole_candi[None, :], acts.shape[0], axis=0) - acts[:, [i]]), axis=1))
         tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
 
         return tot_idx.flatten()
@@ -243,7 +237,7 @@ class DiscretizedDoublePendulum(gym.Env):
         s_vec, a_vec = self.get_vectorized()
         next_s_vec_list = self.get_next_state(s_vec, a_vec)
 
-        P = np.stack([self.get_ind_from_state(next_s_vec, h).T for next_s_vec in next_s_vec_list], 0)
+        P = np.stack([self.get_ind_from_state(next_s_vec).T for next_s_vec in next_s_vec_list], 0)
 
         if verbose:
             high = np.array([*self.max_angles, *self.max_speeds])
@@ -254,7 +248,7 @@ class DiscretizedDoublePendulum(gym.Env):
 
         return P
 
-    def get_action_mat(self, pi, h=None):
+    def get_action_mat(self, pi):
         s_vec, _ = self.get_vectorized()
         return pi(s_vec)
 
@@ -268,8 +262,8 @@ class DiscretizedDoublePendulum(gym.Env):
     def get_done_mat(self):
         s_vec, a_vec = self.get_vectorized()
         d_vec = np.zeros(len(s_vec))
-        d_vec[np.abs(s_vec[:, 0]) >= (self.max_angles[0] - 1e-6)] = 1
-        d_vec[np.abs(s_vec[:, 1]) >= (self.max_angles[1] - 1e-6)] = 1
+        # d_vec[np.abs(s_vec[:, 0]) >= (self.max_angles[0] - 1e-6)] = 1
+        # d_vec[np.abs(s_vec[:, 1]) >= (self.max_angles[1] - 1e-6)] = 1
         return np.repeat(d_vec[None, :], len(a_vec), axis=0)
 
     def render(self, mode="human"):
@@ -328,7 +322,7 @@ class DiscretizedDoublePendulum(gym.Env):
             self.rod1.set_color(0.3, 0.8, 0.3)
 
         if self.last_a is not None:
-            torques = self.get_torque(self.last_a)
+            torques = self.last_a.T
             self.imgtrans0.scale = (- torques[0] / self.max_torques[0], np.abs(torques[0]) / self.max_torques[0])
             self.imgtrans1.scale = (- torques[1] / self.max_torques[1], np.abs(torques[1]) / self.max_torques[1])
             self.imgtrans1.set_translation(hinge_x, hinge_y)

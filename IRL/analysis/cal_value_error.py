@@ -1,4 +1,5 @@
 import os
+import gym
 from scipy import io
 
 from algos.tabular.viter import *

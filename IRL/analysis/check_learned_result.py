@@ -29,7 +29,7 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"19171717_done/{subj}_{actuation}"
+    expt = f"17171719_log1017/{subj}_{actuation}"
     load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/ext_normalize_finite_{expt}_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load().to('cpu')
@@ -41,14 +41,14 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
         init_states.append(traj.obs[0])
     reward_fn.feature_fn = feature_fn
     # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    env = make_env(f"{name}-v2", N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp,
+    env = make_env(f"{name}-v2", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp,
                    wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     d_env = make_env(env, num_envs=1, wrapper=DiscretizeWrapper)
 
-    agent = FiniteSoftQiter(d_env, gamma=0.995, alpha=0.01, device='cpu', verbose=False)
+    agent = FiniteSoftQiter(d_env, gamma=1, alpha=0.01, device='cpu', verbose=False)
     agent.learn(0)
 
-    eval_env = make_env(f"{name}-v0", N=[19, 17, 17, 17], NT=[11, 11], bsp=bsp, init_states=init_states,
+    eval_env = make_env(f"{name}-v0", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp, init_states=init_states,
                         wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     # eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
 
@@ -198,8 +198,8 @@ def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_tr
 
 if __name__ == "__main__":
     # for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
-    for actuation in range(1, 4):
+    for actuation in range(1, 3):
         for learn_trial in range(1, 4):
-            compare_obs("sub01", actuation, learn_trial)
+            compare_obs("sub06", actuation, learn_trial)
     # for learned_trial in [1]:
     #     compare_obs(learned_trial=learned_trial)

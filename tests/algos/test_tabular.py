@@ -59,7 +59,7 @@ def test_viter():
     obs_differs, acts_differs = [], []
     for traj in infinite_trajs:
         f_obs, f_acts, _ = algo2.predict(traj.obs[0], deterministic=True)
-        obs_differs.append(np.abs(traj.obs[:-1] - f_obs).mean())
+        obs_differs.append(np.abs(traj.obs - f_obs).mean())
         acts_differs.append(np.abs(traj.acts - f_acts).mean())
 
     assert np.array(obs_differs).mean() < 1e-2 and np.array(acts_differs).mean() < 0.1
@@ -69,9 +69,9 @@ def test_viter():
 def test_softiter():
     env = make_env("DiscretizedDoublePendulum-v2", num_envs=1, N=[19, 17, 17, 17])
     logger.configure(".", format_strs=['stdout'])
-    algo = SoftQiter(env, gamma=0.8, alpha=0.001, device='cuda:3')
+    algo = SoftQiter(env, gamma=0.6, alpha=0.001, device='cuda:3')
     algo.learn(2000)
-    algo2 = FiniteSoftQiter(env, gamma=0.8, alpha=0.001, device='cuda:3')
+    algo2 = FiniteSoftQiter(env, gamma=0.6, alpha=0.001, device='cuda:3')
     algo2.learn(0)
     sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
     infinite_trajs = generate_trajectories(algo, env, sample_until, deterministic_policy=True)
@@ -79,7 +79,7 @@ def test_softiter():
     obs_differs, acts_differs = [], []
     for traj in infinite_trajs:
         f_obs, f_acts, _ = algo2.predict(traj.obs[0], deterministic=True)
-        obs_differs.append(np.abs(traj.obs[:-1, :] - f_obs).mean())
+        obs_differs.append(np.abs(traj.obs - f_obs).mean())
         acts_differs.append(np.abs(traj.acts - f_acts).mean())
 
     assert np.array(obs_differs).mean() < 1e-2 and np.array(acts_differs).mean() < 0.1
