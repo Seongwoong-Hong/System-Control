@@ -17,7 +17,7 @@ from algos.tabular.viter import *
 def main(subj, actu, trial):
     env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
+    device = "cuda:1"
     name = f"{env_type}"
     expt = f"17171719/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -113,7 +113,7 @@ def main(subj, actu, trial):
 
 
 if __name__ == "__main__":
-    for subj in [f"sub{i:02d}" for i in [6]]:
+    for subj in [f"sub{i:02d}" for i in [1, 2, 4, 5, 7, 9, 10]]:
         for actu in range(1, 7):
-            for trial in [1, 2, 3]:
+            for trial in [1, 2, 3, 4, 5]:
                 main(subj, actu, trial)
