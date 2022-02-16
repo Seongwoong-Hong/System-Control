@@ -94,7 +94,7 @@ def draw_reward_weights():
         for actuation in range(1, 2):
             weights = []
             for trial in range(1, 6):
-                name = f"17171719_quadcost/{subj}_{actuation}_{trial}/model"
+                name = f"17171719_quadcost_many/{subj}_{actuation}_{trial}/model"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
                     reward_weight = CPU_Unpickler(f).load().layers[0].weight.detach()
                 if unnormalize:

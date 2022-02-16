@@ -24,18 +24,18 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
 
     def feature_fn(x):
         # return x
-        # return x ** 2
-        return th.cat([x, x ** 2], dim=1)
+        return x ** 2
+        # return th.cat([x, x ** 2], dim=1)
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"17171719_quadcost/{subj}_{actuation}"
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/ext_normalize_finite_{expt}_{learned_trial}/model"
+    expt = f"17171719_quadcost_many/{subj}_{actuation}"
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_normalize_finite_{expt}_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load().to('cpu')
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
-        expert_trajs = pickle.load(f)
+        expert_trajs = pickle.load(f)[:10]
     # expert_trajs = []
     # for lt in range((learned_trial - 1) * 5, learned_trial * 5):
     #     for t in range(3):
@@ -206,7 +206,7 @@ def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_tr
 if __name__ == "__main__":
     # for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
     for actuation in range(1, 2):
-        for learn_trial in range(1, 5):
+        for learn_trial in range(1, 6):
             compare_obs("sub06", actuation, learn_trial)
     # for learned_trial in [1]:
     #     compare_obs(learned_trial=learned_trial)

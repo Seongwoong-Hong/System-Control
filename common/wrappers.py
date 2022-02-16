@@ -45,13 +45,13 @@ class RewardWrapper(gym.RewardWrapper):
             r -= torch.from_numpy(self.env.get_done_mat() * 50).float().to(self.rwfn.device)
         return r
 
-    def reward(self, inp: np.ndarray) -> torch.tensor:
+    def reward(self, inp: np.ndarray) -> torch.Tensor:
         rwinp = torch.from_numpy(inp).float().to(self.rwfn.device)
         return self.rwfn.forward(rwinp).squeeze()
 
 
 class RewardInputNormalizeWrapper(RewardWrapper):
-    def reward(self, inp: np.ndarray) -> torch.tensor:
+    def reward(self, inp: np.ndarray) -> torch.Tensor:
         if isinstance(self.observation_space, gym.spaces.MultiDiscrete):
             high = (self.observation_space.nvec[None, :] - 1)
         elif isinstance(self.observation_space, gym.spaces.Box):
