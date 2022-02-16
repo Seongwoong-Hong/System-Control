@@ -154,12 +154,12 @@ def test_GCL(env, expert, eval_env):
 
 def test_state_visitation(env, expert, learner):
     from algos.tabular.viter import FiniteSoftQiter
-    policy = FiniteSoftQiter(env, gamma=0.8, alpha=0.01, device='cpu')
-    policy.learn(1000)
+    policy = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu')
+    policy.learn(0)
     learner.agent = policy
-    Ds = learner.state_visitation()
+    Ds = learner.cal_state_visitation()
     learner.get_whole_states_from_env()
-    d1 = th.dot(Ds, learner.reward_net(learner.whole_state).flatten())
-    d2, _ = learner.mean_transition_reward(expert)
-    assert th.abs((d2 - d1) / d2).item() < 0.1
-    print(th.abs((d2 - d1) / d2).item())
+    r1 = th.sum(Ds * env.get_reward_mat())
+    r2 = learner.cal_expert_mean_reward()
+    assert th.abs((r2 - r1) / r1).item() < 0.1
+    print(th.abs((r2 - r1) / r1).item())

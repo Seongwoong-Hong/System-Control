@@ -162,7 +162,7 @@ class MaxEntIRL:
             self.whole_state = th.from_numpy(s_vec).float().to(self.device)
         elif isinstance(obs_space, gym.spaces.MultiDiscrete):
             x = np.meshgrid(*[range(nvec) for nvec in obs_space.nvec])
-            self.whole_state = th.FloatTensor([data.flatten() for data in x]).t().to(self.device)
+            self.whole_state = th.FloatTensor([data.squeeze() for data in x]).t().to(self.device)
         else:
             raise NotImplementedError
 

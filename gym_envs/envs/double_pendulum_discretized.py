@@ -259,12 +259,12 @@ class DiscretizedDoublePendulum(gym.Env):
             R.append(self.get_reward(s_vec, a).flatten())
         return np.stack(R)
 
-    def get_done_mat(self):
-        s_vec, a_vec = self.get_vectorized()
-        d_vec = np.zeros(len(s_vec))
-        # d_vec[np.abs(s_vec[:, 0]) >= (self.max_angles[0] - 1e-6)] = 1
-        # d_vec[np.abs(s_vec[:, 1]) >= (self.max_angles[1] - 1e-6)] = 1
-        return np.repeat(d_vec[None, :], len(a_vec), axis=0)
+    # def get_done_mat(self):
+    #     s_vec, a_vec = self.get_vectorized()
+    #     d_vec = np.zeros(len(s_vec))
+    #     # d_vec[np.abs(s_vec[:, 0]) >= (self.max_angles[0] - 1e-6)] = 1
+    #     # d_vec[np.abs(s_vec[:, 1]) >= (self.max_angles[1] - 1e-6)] = 1
+    #     return np.repeat(d_vec[None, :], len(a_vec), axis=0)
 
     def render(self, mode="human"):
         if self.viewer is None:

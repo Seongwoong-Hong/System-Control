@@ -3,8 +3,6 @@ import pickle
 
 import ray
 import torch as th
-import numpy as np
-from datetime import datetime
 from functools import partial
 from scipy import io
 
@@ -16,13 +14,13 @@ from imitation.data import rollout
 from imitation.util import logger
 from stable_baselines3.common.vec_env import DummyVecEnv
 from algos.torch.MaxEntIRL import *
-from algos.tabular.qlearning import *
 from algos.tabular.viter import *
 from common.util import make_env
-from common.verification import verify_policy
-from common.wrappers import ActionNormalizeRewardWrapper
+from common.wrappers import *
 from common.rollouts import generate_trajectories_without_shuffle
 
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # ray.init(local_mode=True, num_gpus=1)
 
@@ -69,14 +67,14 @@ def try_train(config, demo_dir):
         raise NotImplementedError
 
     subpath = os.path.join(demo_dir, "..", "HPC", config['expt'], config['expt'])
-    with open(demo_dir + f"/09191927/{config['expt']}_{config['actuation']}_half.pkl", "rb") as f:
+    with open(demo_dir + f"/17171719_log1017_quadcost/{config['expt']}_{config['actuation']}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
     for traj in expert_trajs:
         init_states += [traj.obs[0]]
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(f"{config['env_id']}-v2", N=[9, 19, 19, 27], bsp=bsp)
-    eval_env = make_env(f"{config['env_id']}-v0", N=[9, 19, 19, 27], bsp=bsp, init_states=init_states)
+    env = make_env(f"{config['env_id']}-v2", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp)
+    eval_env = make_env(f"{config['env_id']}-v0", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp, init_states=init_states)
 
     device = 'cpu'
     if th.cuda.is_available():
@@ -96,7 +94,7 @@ def try_train(config, demo_dir):
         use_action_as_input=config['use_action'],
         rew_arch=rew_arch,
         device=device,
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': ActionNormalizeRewardWrapper},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardInputNormalizeWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': config['norm_coeff'], 'lr': config['lr']},
     )
     trial_dir = tune.get_trial_dir()
