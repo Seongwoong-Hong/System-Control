@@ -22,11 +22,11 @@ from common.rollouts import generate_trajectories_without_shuffle
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
-# ray.init(local_mode=True, num_gpus=1)
+# ray.init(local_mode=False, num_gpus=1)
 
 
 def trial_name_string(trial):
-    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_" + trial.trial_id
+    trialname = f"{trial.config['expt']}_{trial.config['actuation']}_{trial.config['gamma']}" + trial.trial_id
     return trialname
 
 
@@ -103,7 +103,7 @@ def try_train(config, demo_dir):
     for epoch in range(1000):
         """ Learning """
         algo.learn(
-            total_iter=5,
+            total_iter=80,
             agent_learning_steps=0,
             n_episodes=len(expert_trajs),
             max_agent_iter=1,
@@ -137,11 +137,11 @@ def main(target, num):
     demo_dir = os.path.abspath(os.path.join("..", "demos", target))
     config = {
         'env_id': target,
-        'gamma': tune.grid_search([1]),
+        'gamma': tune.grid_search([1, 0.9, 0.8, 0.7, 0.6, 0.5]),
         'alpha': tune.grid_search([0.01]),
         'use_action': tune.grid_search([True]),
-        'expt': tune.grid_search([f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]),
-        'actuation': tune.grid_search([1, 2, 3, 4, 5, 6]),
+        'expt': tune.grid_search([f"sub{i:02d}" for i in [6]]),
+        'actuation': tune.grid_search([3]),
         # 'trial': tune.grid_search([1, 2, 3, 4, 5]),
         'rew_arch': tune.grid_search(['linear']),
         'feature': tune.grid_search(['sq']),
@@ -152,17 +152,17 @@ def main(target, num):
     scheduler = ASHAScheduler(
         metric=metric,
         mode="min",
-        max_t=30,
-        grace_period=18,
-        reduction_factor=4,
+        max_t=1,
+        grace_period=1,
+        reduction_factor=2,
     )
     reporter = CLIReporter(metric_columns=[metric, "training_iteration"])
     irl_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     # assert th.cuda.is_available()
     result = tune.run(
         partial(try_train, demo_dir=demo_dir),
-        name=target + f'_sq_09191927_half_{num}/',
-        resources_per_trial={"gpu": 0.5},
+        name=f'sq_normalize_finite_{target}_17171719_{num}/',
+        resources_per_trial={"gpu": 1},
         config=config,
         num_samples=1,
         scheduler=scheduler,
@@ -181,5 +181,5 @@ def main(target, num):
 
 
 if __name__ == "__main__":
-    for num in range(2, 6):
+    for num in range(1, 6):
         main('DiscretizedHuman', num)

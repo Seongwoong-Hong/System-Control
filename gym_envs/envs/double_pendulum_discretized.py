@@ -92,7 +92,7 @@ class DiscretizedDoublePendulum(gym.Env):
         return [(os[1:] + os[:-1]) / 2 for os in self.obs_list]
 
     def set_state(self, state):
-        assert np.abs(state) - 1e-6 in self.observation_space
+        assert state in self.observation_space
         self.state = state
 
     def get_reward(self, state, action):

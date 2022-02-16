@@ -24,18 +24,27 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
 
     def feature_fn(x):
         # return x
-        # return x ** 2
-        return th.cat([x, x ** 2], dim=1)
+        return x ** 2
+        # return th.cat([x, x ** 2], dim=1)
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
     expt = f"17171719_log1017/{subj}_{actuation}"
     load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/ext_normalize_finite_{expt}_{learned_trial}/model"
+
     with open(load_dir + "/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load().to('cpu')
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
-        expert_trajs = pickle.load(f)
+        expert_trajs = pickle.load(f)[:10]
+    # expert_trajs = []
+    # for lt in range((learned_trial - 1) * 5, learned_trial * 5):
+    #     for t in range(3):
+    #         traj = DiscEnvTrajectories()
+    #         mat = io.loadmat(f"{irl_path}/demos/HPC/{subj}_half/{subj}i{lt + 1}_{t}.mat")
+    #         traj.obs = -mat['state'][:, :4]
+    #         traj.acts = -mat['tq']
+    #         expert_trajs.append(traj)
     init_states = []
     for traj in expert_trajs:
         init_states.append(traj.obs[0])
@@ -53,9 +62,8 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     # eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
 
     agent_trajs = []
-    for _ in range(15):
+    for init_state in init_states:
         traj = DiscEnvTrajectories()
-        init_state = eval_env.reset()
         obs, acts, rews = agent.predict(init_state, deterministic=False)
         traj.obs = obs
         traj.acts = acts
@@ -79,15 +87,15 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
             for traj_idx in range(len(expert_trajs)):
                 ax.plot(x_value, agent_trajs[traj_idx].obs[:-1, ob_idx], color='k')
                 ax.plot(x_value, expert_trajs[traj_idx].obs[:-1, ob_idx], color='b')
-            ax.legend(['agent', 'expert'])
-            ax.tick_params(axis='both', which='major', labelsize=15)
+            ax.legend(['agent', 'expert'], fontsize=28)
+            ax.tick_params(axis='both', which='major', labelsize=24)
         for act_idx in range(2):
             ax = acts_fig.add_subplot(1, 2, act_idx + 1)
             for traj_idx in range(len(expert_trajs)):
                 ax.plot(x_value, agent_trajs[traj_idx].acts[:, act_idx], color='k')
                 ax.plot(x_value, expert_trajs[traj_idx].acts[:, act_idx], color='b')
-            ax.legend(['agent', 'expert'])
-            ax.tick_params(axis='both', which='major', labelsize=15)
+            ax.legend(['agent', 'expert'], fontsize=28)
+            ax.tick_params(axis='both', which='major', labelsize=24)
         obs_fig.tight_layout()
         acts_fig.tight_layout()
         plt.show()

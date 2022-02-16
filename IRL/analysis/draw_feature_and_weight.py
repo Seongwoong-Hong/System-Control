@@ -109,7 +109,6 @@ def draw_reward_weights():
     weights_stack = np.array(weights_stack)
     w_mean = weights_stack[:, :, 0, :]
     w_std = weights_stack[:, :, 1, :]
-
     x1 = [f"{i}cm" for i in [3, 4.5, 6, 7.5, 9, 12]]
     subplot_name = [f"$\omega_{{{i + 1}}}$" for i in range(12)]
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
@@ -132,9 +131,8 @@ def draw_reward_weights():
 if __name__ == "__main__":
     def feature_fn(x):
         # return x
-        # return x ** 2
-        return th.cat([x, x ** 2], dim=1)
-        # return th.cat([x, x**2, x**3, x**4], dim=1)
+        return x ** 2
+        # return th.cat([x, x ** 2], dim=1)
 
 
     # draw_feature_reward()
