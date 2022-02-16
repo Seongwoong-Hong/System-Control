@@ -19,7 +19,7 @@ def main(subj, actu, trial):
     algo_type = "MaxEntIRL"
     device = "cuda:2"
     name = f"{env_type}"
-    expt = f"17171719_quadcost_many/{subj}_{actu}"
+    expt = f"17171719_log1017/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 

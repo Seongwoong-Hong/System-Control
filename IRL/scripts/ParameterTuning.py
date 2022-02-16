@@ -67,7 +67,7 @@ def try_train(config, demo_dir):
         raise NotImplementedError
 
     subpath = os.path.join(demo_dir, "..", "HPC", config['expt'], config['expt'])
-    with open(demo_dir + f"/17171719_quadcost/{config['expt']}_{config['actuation']}.pkl", "rb") as f:
+    with open(demo_dir + f"/17171719_log1017_quadcost/{config['expt']}_{config['actuation']}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
     for traj in expert_trajs:

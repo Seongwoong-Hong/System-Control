@@ -69,9 +69,9 @@ def test_viter():
 def test_softiter():
     env = make_env("DiscretizedDoublePendulum-v2", num_envs=1, N=[19, 17, 17, 17])
     logger.configure(".", format_strs=['stdout'])
-    algo = SoftQiter(env, gamma=0.8, alpha=0.001, device='cuda:3')
+    algo = SoftQiter(env, gamma=0.6, alpha=0.001, device='cuda:3')
     algo.learn(2000)
-    algo2 = FiniteSoftQiter(env, gamma=0.8, alpha=0.001, device='cuda:3')
+    algo2 = FiniteSoftQiter(env, gamma=0.6, alpha=0.001, device='cuda:3')
     algo2.learn(0)
     sample_until = make_sample_until(n_timesteps=None, n_episodes=10)
     infinite_trajs = generate_trajectories(algo, env, sample_until, deterministic_policy=True)

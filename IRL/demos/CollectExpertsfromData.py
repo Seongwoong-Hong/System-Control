@@ -27,6 +27,6 @@ if __name__ == '__main__':
                             'bsp': io.loadmat(file)['bsp'],
                             }
                     trajectories += generate_trajectories_from_data(data, env)
-            save_name = f"{env_type}/17171719/{sub}_{actuation}.pkl"
+            save_name = f"{env_type}/17171719_log1017/{sub}_{actuation}.pkl"
             types.save(save_name, trajectories)
             print(f"Expert Trajectory {save_name} is saved")

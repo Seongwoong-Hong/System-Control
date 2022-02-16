@@ -26,7 +26,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "17171719_quadcost", f"{subj}_1.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "17171719_log1017", f"{subj}_1.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
