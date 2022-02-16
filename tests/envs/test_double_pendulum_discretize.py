@@ -20,7 +20,7 @@ def test_discretized_pendulum():
     env.render()
 
     next_s, r, _, _ = env.step(a)
-    print(f'Step from {s} to {next_s} by action {a}, torque {env.get_torque(a)}')
+    print(f'Step from {s} to {next_s} by action {a}')
 
     # rendering test (P control)
     s = env.reset()
@@ -41,7 +41,7 @@ def test_calc_trans_mat():
     """
     from scipy import io
     bsp = io.loadmat("../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
-    N = [9, 19, 19, 27]
+    N = [17, 17, 17, 19]
     NT = [11, 11]
 
     env = gym.make('DiscretizedHuman-v2', N=N, NT=NT, bsp=bsp)  # type: DiscretizedDoublePendulum
@@ -60,8 +60,9 @@ def test_value_itr(soft=True):
     import time, os
     from scipy import io
 
-    N = [21, 21, 11, 11]
-    env = gym.make('DiscretizedDoublePendulum-v2', N=N)  # type: DiscretizedDoublePendulum
+    N = [17, 17, 17, 19]
+    NT = [11, 11]
+    env = gym.make('DiscretizedDoublePendulum-v2', N=N, NT=NT)  # type: DiscretizedDoublePendulum
 
     n_dim = np.prod(env.get_num_cells())
     P = env.get_trans_mat()
@@ -169,7 +170,7 @@ def test_update_discretization():
             for t in range(1, n):
                 obs_shape[i][t] = sorted_n_obs[t * 64600 // n - 1, i]
 
-        venv.envs[0].env.obs_shape = obs_shape
+        venv.envs[0].env.obs_list = obs_shape
 
         print(venv.get_attr("obs_shape")[0])
 
@@ -213,8 +214,8 @@ def test_adaptive_disc_value_error(init_state):
         for t in range(1, n):
             obs_shape[i][t] = sorted_n_obs[t * 84000 // n - 1, i]
 
-    env.envs[0].env.obs_shape = obs_shape
-    eval_env.envs[0].env.obs_shape = obs_shape
+    env.envs[0].env.obs_list = obs_shape
+    eval_env.envs[0].env.obs_list = obs_shape
 
     print(env.get_attr("obs_shape")[0])
 

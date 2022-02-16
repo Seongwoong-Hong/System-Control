@@ -2,10 +2,12 @@ import numpy as np
 import gym, math, torch, time, gym_envs
 from matplotlib import pyplot as plt
 
+
 class NormalizedActions(gym.ActionWrapper):
     def action(self, action):
         # action *= 0.5 * (self.action_space.high - self.action_space.low)
         return np.clip(action, self.action_space.low, self.action_space.high)
+
 
 def iLQR(x, u, model):
     n = u[:, 0, 0].__len__()
@@ -21,10 +23,12 @@ def iLQR(x, u, model):
             break
     return x, u, J
 
+
 def costfn(xt, ut, model):
     Q, R = model.Q, model.R
     cost = 0.5 * (xt.T @ Q @ xt + ut.T * R * ut)
     return cost.squeeze()
+
 
 def BackwardPass(x, u, model):
     n = u[:, 0, 0].__len__()
@@ -47,6 +51,7 @@ def BackwardPass(x, u, model):
         # print(time.time()-start)
     return K, d
 
+
 def ForwardPass(x, u, K, d, model):
     n = u.__len__()
     J = np.zeros(n)
@@ -61,6 +66,7 @@ def ForwardPass(x, u, K, d, model):
         ob, _, _, _ = model.step(uk[0])
         xk = ob.reshape(4, 1)
     return x_op, u_op, J
+
 
 def cal_dynamics(state, model):
     state = torch.tensor(state, dtype=torch.float, requires_grad=True)
@@ -83,6 +89,7 @@ def cal_dynamics(state, model):
         Fk[i] = state.grad.data.numpy().squeeze()
         state.grad.data.zero_()
     return Fk
+
 
 if __name__ == "__main__":
     model = NormalizedActions(gym.make("CartPoleCont-v0"))
