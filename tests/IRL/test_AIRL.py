@@ -1,7 +1,5 @@
 import pytest
 
-from IRL.scripts.project_policies import def_policy
-
 
 @pytest.fixture()
 def algo(env):

@@ -1,10 +1,6 @@
 import time
-
-import gym
-import pytest
 import numpy as np
 
-from IRL.scripts.project_policies import def_policy
 from common.verification import verify_policy
 from common.util import make_env
 

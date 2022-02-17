@@ -7,7 +7,6 @@ from scipy import io
 from imitation.data.rollout import make_sample_until, generate_trajectories, flatten_trajectories
 
 from algos.torch.ppo import PPO
-from IRL.scripts.project_policies import def_policy
 from common.util import make_env
 
 

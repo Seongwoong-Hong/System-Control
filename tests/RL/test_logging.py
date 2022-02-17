@@ -1,6 +1,4 @@
 import os
-import dill
-from RL.project_policies import def_policy
 from common.util import make_env
 from algos.torch.sac import SAC, MlpPolicy
 

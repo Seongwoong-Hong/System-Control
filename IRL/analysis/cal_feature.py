@@ -3,13 +3,15 @@ import pickle
 import torch as th
 import numpy as np
 
-from common.util import make_env
+from common.util import make_env, CPU_Unpickler
+from common.wrappers import RewardInputNormalizeWrapper
 from algos.tabular.viter import FiniteSoftQiter
 
 from scipy import io
 from copy import deepcopy
 
 demo_path = os.path.abspath(os.path.join("..", "demos"))
+log_path = os.path.abspath(os.path.join("..", "tmp", "log"))
 
 
 def cal_feature_from_data(subj, actuation):
@@ -28,12 +30,18 @@ def cal_feature_from_data(subj, actuation):
     print(f"mean feature: {np.mean(features, axis=0)}")
 
 
-def cal_feature_from_real_reward(subj, _):
+def cal_feature_from_reward(subj, actuation, trial=1):
 
     def feature_fn(x):
         return x ** 2
+
     bsp = io.loadmat(f"{demo_path}/HPC/{subj}/{subj}i1.mat")['bsp']
-    env = make_env("DiscretizedHuman-v2", num_envs=1, bsp=bsp, N=[17, 17, 17, 19], NT=[11, 11])
+    load_dir = f"{log_path}/DiscretizedHuman/MaxEntIRL/sq_normalize_finite_17171719_quadcost_many"
+    with open(f"{load_dir}/{subj}_{actuation}_{trial}/model/reward_net.pkl", "rb") as f:
+        reward_fn = CPU_Unpickler(f).load()
+    reward_fn.feature_fn = feature_fn
+    env = make_env("DiscretizedHuman-v2", num_envs=1, bsp=bsp, N=[17, 17, 17, 19], NT=[11, 11],
+                   wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn})
     agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu')
     agent.learn(0)
 
@@ -60,4 +68,4 @@ def cal_feature_from_real_reward(subj, _):
 if __name__ == "__main__":
     for subj in [f"sub{i:02d}" for i in [6]]:
         for actuation in range(1, 2):
-            cal_feature_from_real_reward(subj, actuation)
+            cal_feature_from_reward(subj, actuation)

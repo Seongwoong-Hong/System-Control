@@ -5,7 +5,6 @@ import numpy as np
 import torch as th
 from scipy import io
 from common.util import make_env
-from RL.project_policies import def_policy
 from matplotlib import pyplot as plt
 
 

@@ -1,7 +1,6 @@
 import pickle
 from common.util import make_env
 from imitation.data import rollout
-from IRL.scripts.project_policies import def_policy
 from scipy import io
 
 

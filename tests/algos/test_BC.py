@@ -10,7 +10,6 @@ from matplotlib import pyplot as plt
 
 from common.util import make_env
 from algos.torch.MaxEntIRL import MaxEntIRL
-from IRL.scripts.project_policies import def_policy
 
 
 @pytest.fixture

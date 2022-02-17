@@ -17,7 +17,7 @@ from algos.tabular.viter import *
 def main(subj, actu, trial):
     env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cuda:2"
+    device = "cuda:3"
     name = f"{env_type}"
     expt = f"17171719_quadcost_many/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -41,11 +41,10 @@ def main(subj, actu, trial):
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/ext_normalize_finite_{expt}_{trial}"
+    log_dir += f"/sq_normalize_finite_noact_{expt}_{trial}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
-    shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
@@ -79,7 +78,7 @@ def main(subj, actu, trial):
         feature_fn=feature_fn,
         agent=agent,
         expert_trajectories=expert_trajs,
-        use_action_as_input=True,
+        use_action_as_input=False,
         rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardInputNormalizeWrapper},

@@ -118,7 +118,6 @@ def test_validity(learner, expert):
 
 def test_GCL(env, expert, eval_env):
     from imitation.util import logger
-    from IRL.scripts.project_policies import def_policy
     logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
