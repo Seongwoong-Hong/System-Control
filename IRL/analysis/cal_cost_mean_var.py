@@ -7,7 +7,6 @@ from scipy import io
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
-from IRL.scripts.project_policies import def_policy
 from common.util import make_env
 from common.verification import CostMap
 

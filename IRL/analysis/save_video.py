@@ -1,6 +1,5 @@
 import os
 
-from IRL.scripts.project_policies import def_policy
 from algos.torch.ppo import PPO
 from common.verification import verify_policy, video_record
 from common.util import make_env

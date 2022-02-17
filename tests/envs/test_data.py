@@ -1,12 +1,9 @@
 import os
 import pickle
-import numpy as np
 
-from IRL.scripts.project_policies import def_policy
 from common.util import make_env
 from common.wrappers import *
 
-from imitation.data import rollout
 from matplotlib import pyplot as plt
 from scipy import io
 

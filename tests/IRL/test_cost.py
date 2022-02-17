@@ -9,7 +9,6 @@ from common.verification import CostMap
 from common.wrappers import *
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
-from IRL.scripts.project_policies import def_policy
 
 from imitation.algorithms import bc
 from matplotlib import pyplot as plt

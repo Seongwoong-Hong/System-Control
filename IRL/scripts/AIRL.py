@@ -7,7 +7,6 @@ from imitation.algorithms import adversarial
 from imitation.data import rollout
 from imitation.util import logger
 
-from IRL.scripts.project_policies import def_policy
 from common.wrappers import ActionWrapper
 from common.util import make_env
 
@@ -38,7 +37,6 @@ if __name__ == "__main__":
     os.makedirs(model_dir, exist_ok=False)
     # Copy used file to logging folder
     shutil.copy(os.path.abspath(__file__), log_dir)
-    shutil.copy(os.path.abspath(proj_path + "/scripts/project_policies.py"), log_dir)
 
     logger.configure(log_dir, format_strs=["stdout", "log", "csv", "tensorboard"])
 

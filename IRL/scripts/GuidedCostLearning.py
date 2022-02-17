@@ -12,7 +12,6 @@ from common.util import make_env
 from common.callbacks import SaveCallback
 from common.wrappers import RewardWrapper
 from algos.torch.MaxEntIRL import GuidedCostLearning
-from IRL.scripts.project_policies import def_policy
 
 
 if __name__ == "__main__":
@@ -39,7 +38,6 @@ if __name__ == "__main__":
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
-    shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     def feature_fn(x):
         # return x

@@ -12,8 +12,7 @@ from stable_baselines3.common.vec_env import VecNormalize
 from algos.torch.MaxEntIRL import MaxEntIRL
 from common.callbacks import SaveCallback
 from common.util import make_env
-from common.wrappers import ObsConcatWrapper
-from IRL.scripts.project_policies import def_policy
+
 
 if __name__ == "__main__":
     env_type = "HPC"
@@ -40,7 +39,6 @@ if __name__ == "__main__":
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
-    shutil.copy(proj_path + "/scripts/project_policies.py", log_dir)
 
     model_dir = os.path.join(log_dir, "model")
     if not os.path.isdir(model_dir):

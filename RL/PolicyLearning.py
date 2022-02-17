@@ -34,7 +34,6 @@ if __name__ == "__main__":
         n += 1
     os.makedirs(log_dir + f"/policies_{n}", exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir + f"/policies_{n}")
-    shutil.copy(os.path.dirname(__file__) + "/project_policies.py", log_dir + f"/policies_{n}")
     # video_recorder = VideoCallback(make_env(env_id, subpath=subpath, wrapper=ActionWrapper),
     #                                n_eval_episodes=5,
     #                                render_freq=int(0.5e5))

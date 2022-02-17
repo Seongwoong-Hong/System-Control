@@ -9,7 +9,6 @@ from imitation.policies import serialize
 from imitation.data.rollout import make_sample_until, flatten_trajectories
 from matplotlib import pyplot as plt
 
-from IRL.scripts.project_policies import def_policy
 from algos.torch.MaxEntIRL import RewardNet
 from algos.torch.sac import SAC
 from common.callbacks import VideoCallback

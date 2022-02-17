@@ -3,10 +3,7 @@ import time
 import pickle
 import pytest
 from scipy import io
-import torch as th
-import numpy as np
 
-from IRL.scripts.project_policies import def_policy
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from common.util import make_env
