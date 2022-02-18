@@ -9,6 +9,7 @@ from imitation.data import rollout
 from stable_baselines3.common.vec_env import VecNormalize
 
 from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning, APIRL
+from algos.tabular.viter import FiniteSoftQiter
 from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
@@ -52,8 +53,7 @@ def eval_env(expert, demo_dir):
 @pytest.fixture
 def learner(env, expert, eval_env):
     from imitation.util import logger
-    from algos.tabular.viter import FiniteSoftQiter
-    logger.configure("tmp/log", format_strs=["stdout"])
+    logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
 
     def feature_fn(x):
         # if len(x.shape) == 1:
@@ -67,7 +67,7 @@ def learner(env, expert, eval_env):
         return x ** 2
         # return th.cat([x, x ** 2], dim=1)
 
-    agent = FiniteSoftQiter(env, gamma=0.9, alpha=0.01, device='cpu')
+    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu')
 
     return MaxEntIRL(
         env,
@@ -79,7 +79,9 @@ def learner(env, expert, eval_env):
         rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardInputNormalizeWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
+        rew_kwargs={'type': 'ann', 'scale': 1,
+                    'optim_kwargs': {'weight_decay': 0.0, 'lr': 1e-1, 'betas': (0.99, 0.999)}
+                    },
     )
 
 
@@ -105,8 +107,8 @@ def test_callback(expert, learner):
 
 def test_validity(learner, expert):
     learner.learn(
-        total_iter=10,
-        agent_learning_steps=2000,
+        total_iter=200,
+        agent_learning_steps=0,
         n_episodes=len(expert),
         max_agent_iter=1,
         min_agent_iter=1,
@@ -124,7 +126,7 @@ def test_GCL(env, expert, eval_env):
         # return x
         return th.cat([x, x**2], dim=1)
 
-    agent = def_policy("softqlearning", env, device='cuda:1', verbose=1)
+    agent = FiniteSoftQiter(env, device='cuda:1', verbose=True)
 
     learner = GuidedCostLearning(
         env,
@@ -162,3 +164,13 @@ def test_state_visitation(env, expert, learner):
     r2 = learner.cal_expert_mean_reward()
     assert th.abs((r2 - r1) / r1).item() < 0.1
     print(th.abs((r2 - r1) / r1).item())
+
+
+def test_state_visit_difference_according_to_init(learner):
+    uniform_init_D = th.ones_like(learner.init_D) / learner.init_D.numel()
+    Ds = learner.cal_state_visitation()
+    learner.init_D = uniform_init_D
+    uni_Ds = learner.cal_state_visitation()
+    assert th.max(th.abs(Ds - uni_Ds)).item() < 0.1
+    print(f"{th.max(th.abs(Ds - uni_Ds)).item()} < 0.1")
+    print(f"{th.sum(th.abs(Ds - uni_Ds)).item()}")

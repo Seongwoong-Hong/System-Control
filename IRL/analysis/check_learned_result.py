@@ -29,13 +29,10 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"17171719_quadcost_many/{subj}_{actuation}"
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_normalize_finite_{expt}_{learned_trial}/model"
-    with open(load_dir + "/reward_net.pkl", "rb") as f:
-        reward_fn = CPU_Unpickler(f).load().to('cpu')
+    expt = f"17171719_quadcost/{subj}_{actuation}"
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
-        expert_trajs = pickle.load(f)[:10]
+        expert_trajs = pickle.load(f)
     # expert_trajs = []
     # for lt in range((learned_trial - 1) * 5, learned_trial * 5):
     #     for t in range(3):
@@ -47,6 +44,10 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     init_states = []
     for traj in expert_trajs:
         init_states.append(traj.obs[0])
+
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_handnorm_finite_{expt}_{learned_trial}/model"
+    with open(load_dir + "/reward_net.pkl", "rb") as f:
+        reward_fn = CPU_Unpickler(f).load().to('cpu')
     reward_fn.feature_fn = feature_fn
     # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     env = make_env(f"{name}-v2", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp,
@@ -148,16 +149,18 @@ def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_tr
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
     expt = f"19171717_quadcost/{subj}_{actuation}"
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_{expt}_finite_normalize_{learned_trial}/model"
-    with open(load_dir + "/reward_net.pkl", "rb") as f:
-        reward_fn = CPU_Unpickler(f).load()
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
     for traj in expert_trajs:
         init_states.append(traj.obs[0])
+
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_{expt}_finite_normalize_{learned_trial}/model"
+    with open(load_dir + "/reward_net.pkl", "rb") as f:
+        reward_fn = CPU_Unpickler(f).load()
     reward_fn.feature_fn = feature_fn
+
     irl_env = make_env(f"{name}-v2", num_envs=1, N=[19, 17, 17, 17], bsp=bsp,
                        wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     irl_agent = FiniteSoftQiter(irl_env, gamma=1, alpha=0.01, device='cpu', verbose=False)
@@ -204,9 +207,7 @@ def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_tr
 
 
 if __name__ == "__main__":
-    # for subj in [f"sub{i:02d}" for i in [1, 4, 6]]:
-    for actuation in range(1, 2):
-        for learn_trial in range(1, 6):
-            compare_obs("sub06", actuation, learn_trial)
-    # for learned_trial in [1]:
-    #     compare_obs(learned_trial=learned_trial)
+    for subj in [f"sub{i:02d}" for i in [6]]:
+        for actuation in range(1, 2):
+            for learn_trial in range(1, 3):
+                compare_obs(subj, actuation, learn_trial)
