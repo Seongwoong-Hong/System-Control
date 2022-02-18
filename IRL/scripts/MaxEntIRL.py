@@ -17,9 +17,9 @@ from algos.tabular.viter import *
 def main(subj, actu, trial):
     env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cuda:3"
+    device = "cuda:2"
     name = f"{env_type}"
-    expt = f"17171719_log1017/{subj}_{actu}"
+    expt = f"17171719/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -41,7 +41,7 @@ def main(subj, actu, trial):
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_normalize_finite_noact_{expt}_{trial}"
+    log_dir += f"/sq_handnorm_finite_{expt}_{trial}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -59,10 +59,10 @@ def main(subj, actu, trial):
         #     ft[i, idx] = 1
         # return ft
         # return x
-        # return x ** 2
+        return x ** 2
         # x1, x2, x3, x4 = th.split(x, 1, dim=1)
         # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, x**2, x**3), dim=1)
-        return th.cat([x, x ** 2], dim=1)
+        # return th.cat([x, x ** 2], dim=1)
 
     # Setup callbacks
     save_net_callback = SaveCallback(cycle=10, dirpath=model_dir)
@@ -78,16 +78,16 @@ def main(subj, actu, trial):
         feature_fn=feature_fn,
         agent=agent,
         expert_trajectories=expert_trajs,
-        use_action_as_input=False,
+        use_action_as_input=True,
         rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardInputNormalizeWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'norm_coeff': 0.0, 'lr': 1e-2},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'optim_kwargs': {'weight_decay': 0.0, 'lr': 1, 'betas': (0.9, 0.999)}},
     )
 
     # Run Learning
     learner.learn(
-        total_iter=80,
+        total_iter=300,
         agent_learning_steps=0,
         n_episodes=expt_traj_num,
         max_agent_iter=1,

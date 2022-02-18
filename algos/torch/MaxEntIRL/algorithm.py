@@ -213,7 +213,7 @@ class MaxEntIRL:
                 logger.record("grad norm", grad_norm)
                 logger.record("num iteration", self.itr, exclude="tensorboard")
                 logger.dump(self.itr)
-                if np.abs(mean_loss) < 1e-2 and self.itr > 30 and np.abs(grad_norm) < 0.1 and early_stop:
+                if np.abs(mean_loss) < 1e-2 and self.itr > 30 and np.abs(grad_norm) < 1e-3 and early_stop:
                     break
             with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)

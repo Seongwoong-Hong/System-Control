@@ -56,12 +56,13 @@ class RewardInputNormalizeWrapper(RewardWrapper):
             high = (self.observation_space.nvec[None, :] - 1)
         elif isinstance(self.observation_space, gym.spaces.Box):
             high = self.observation_space.high[None, :]
+            high = np.array([[0.16, 0.7, 0.8, 2.4]])
         else:
             raise NotImplementedError
         if self.use_action_as_inp:
             if isinstance(self.action_space, gym.spaces.MultiDiscrete):
                 high = np.append(high, (self.action_space.nvec[None, :] - 1))
-            elif isinstance(self.observation_space, gym.spaces.Box):
+            elif isinstance(self.action_space, gym.spaces.Box):
                 high = np.append(high, self.action_space.high[None, :], axis=-1)
             else:
                 raise NotImplementedError
