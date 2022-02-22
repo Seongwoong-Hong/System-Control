@@ -1,12 +1,9 @@
 import os
 import pickle
 
-import numpy as np
 import torch as th
 from scipy import io
 import pytest
-from imitation.data import rollout
-from stable_baselines3.common.vec_env import VecNormalize
 
 from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning, APIRL
 from algos.tabular.viter import FiniteSoftQiter
@@ -53,7 +50,7 @@ def eval_env(expert, demo_dir):
 @pytest.fixture
 def learner(env, expert, eval_env):
     from imitation.util import logger
-    logger.configure("tmp/log", format_strs=["stdout", "tensorboard"])
+    logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
         # if len(x.shape) == 1:
@@ -67,7 +64,7 @@ def learner(env, expert, eval_env):
         return x ** 2
         # return th.cat([x, x ** 2], dim=1)
 
-    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu')
+    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cuda:1')
 
     return MaxEntIRL(
         env,
@@ -80,7 +77,7 @@ def learner(env, expert, eval_env):
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardInputNormalizeWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1,
-                    'optim_kwargs': {'weight_decay': 0.0, 'lr': 1e-1, 'betas': (0.99, 0.999)}
+                    'optim_kwargs': {'weight_decay': 0.0, 'lr': 1e-1, 'betas': (0.9, 0.999)}
                     },
     )
 

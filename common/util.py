@@ -25,48 +25,52 @@ class CPU_Unpickler(pickle.Unpickler):
 
 def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):
     wrapper_kwargs = kwargs.pop('wrapper_kwrags', {})
-    if isinstance(env_name, gym.Env):
-        env = env_name
-    else:
-        if "HPC" in env_name:
-            subpath = kwargs.pop("subpath", None)
-            pltqs = kwargs.get("pltqs")
-            if pltqs is None and subpath is not None:
-                pltqs, init_states = [], []
-                i = 0
-                while True:
-                    file = subpath + f"i{i + 1}.mat"
-                    if not p.isfile(file):
-                        break
-                    pltqs += [io.loadmat(file)['pltq']]
-                    init_states += [io.loadmat(file)['state'][0, :4]]
-                    kwargs['bsp'] = io.loadmat(file)['bsp']
-                    i += 1
-                kwargs['pltqs'] = pltqs
-                kwargs['init_states'] = init_states
+    def define_env():
+        if isinstance(env_name, gym.Env):
+            env = env_name
         else:
-            kwargs.pop('subpath', None)
-            kwargs.pop('pltqs', None)
-        if "Human" not in env_name:
-            kwargs.pop('bsp', None)
-        env = gym.make(env_name, **kwargs)
+            if "HPC" in env_name:
+                subpath = kwargs.pop("subpath", None)
+                pltqs = kwargs.get("pltqs")
+                if pltqs is None and subpath is not None:
+                    pltqs, init_states = [], []
+                    i = 0
+                    while True:
+                        file = subpath + f"i{i + 1}.mat"
+                        if not p.isfile(file):
+                            break
+                        pltqs += [io.loadmat(file)['pltq']]
+                        init_states += [io.loadmat(file)['state'][0, :4]]
+                        kwargs['bsp'] = io.loadmat(file)['bsp']
+                        i += 1
+                    kwargs['pltqs'] = pltqs
+                    kwargs['init_states'] = init_states
+            else:
+                kwargs.pop('subpath', None)
+                kwargs.pop('pltqs', None)
+            if "Human" not in env_name:
+                kwargs.pop('bsp', None)
+            env = gym.make(env_name, **kwargs)
 
-    if wrapper is not None:
-        if wrapper == "ActionWrapper":
-            env = ActionWrapper(env)
-        elif isinstance(wrapper, str):
-            warnings.warn("Not specified wrapper name so it's ignored")
-        else:
-            env = wrapper(env, **wrapper_kwargs)
+        if wrapper is not None:
+            if wrapper == "ActionWrapper":
+                env = ActionWrapper(env)
+            elif isinstance(wrapper, str):
+                warnings.warn("Not specified wrapper name so it's ignored")
+            else:
+                env = wrapper(env, **wrapper_kwargs)
+        return env
 
     if use_norm:
-        env = DummyVecEnv([lambda: Monitor(deepcopy(env)) for _ in range(num_envs)])
+        env = DummyVecEnv([lambda: Monitor(define_env()) for _ in range(num_envs)])
         if isinstance(use_norm, str):
             env = VecNormalize.load(use_norm, env)
         else:
             env = VecNormalize(env, norm_obs=True, norm_reward=True)
     elif num_envs:
-        env = DummyVecEnv([lambda: deepcopy(env) for _ in range(num_envs)])
+        env = DummyVecEnv([lambda: define_env() for _ in range(num_envs)])
+    else:
+        env = define_env()
 
     return env
 

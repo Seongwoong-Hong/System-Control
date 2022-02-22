@@ -147,36 +147,3 @@ def generate_trajectories_without_shuffle(
         assert real_rew == exp_rew, f"expected shape {exp_rew}, got {real_rew}"
 
     return trajectories
-
-
-class DiscEnvTrajectories:
-    def __init__(self):
-        self.rews = None
-        self.obs = None
-        self.acts = None
-
-
-def generate_trajectories_from_approx_dyn(agent, env, n_episodes, deterministic_policy=False):
-    trajs = []
-    P = env.env_method("get_trans_mat")[0]
-    for _ in range(n_episodes):
-        traj = DiscEnvTrajectories()
-        obs_approx, rews_approx, acts_approx = [], [], []
-        s_vec, _ = env.env_method("get_vectorized")[0]
-        current_obs = env.reset()[0]
-        obs_approx.append(current_obs)
-        for _ in range(env.get_attr("spec")[0].max_episode_steps):
-            act, _ = agent.predict(current_obs, deterministic=deterministic_policy)
-            rews_approx.append(env.env_method("get_reward", current_obs, act)[0])
-            acts_approx.append(act)
-            torque = env.env_method("get_torque", act)[0].T
-            a_ind = env.env_method("get_idx_from_acts", torque)[0]
-            obs_ind = env.env_method("get_ind_from_state", current_obs.squeeze())[0]
-            next_obs = obs_ind @ P[a_ind[0]].T @ s_vec
-            obs_approx.append(next_obs)
-            current_obs = next_obs
-        traj.obs = np.vstack(obs_approx)
-        traj.acts = np.vstack(acts_approx)
-        traj.rews = np.array(rews_approx).flatten()
-        trajs.append(traj)
-    return trajs

@@ -18,13 +18,13 @@ class DiscretizedDoublePendulum(gym.Env):
 
     def __init__(self, N=None, NT=np.array([11, 11])):
         super(DiscretizedDoublePendulum, self).__init__()
-        self.max_torques = np.array([100., 100.])
-        self.min_torques = np.array([-40., -25.])
+        self.max_torques = np.array([94., 94.])
+        self.min_torques = np.array([-35., -20.])
         # self.max_speeds = np.array([2.2, 4.8])
         # self.max_angles = np.array([0.4, 1.0])
-        self.max_speeds = np.array([0.8, 1.3])
+        self.max_speeds = np.array([0.8, 1.2])
         self.min_speeds = np.array([-0.4, -2.4])
-        self.max_angles = np.array([0.15, 0.15])
+        self.max_angles = np.array([0.11, 0.12])
         self.min_angles = np.array([-0.16, -0.7])
         # self.min_speeds = -self.max_speeds
         # self.min_angles = -self.max_angles
@@ -56,11 +56,32 @@ class DiscretizedDoublePendulum(gym.Env):
             assert (N % 2).all(), "N should be consist of odd numbers"
         self.num_cells = N
         self.obs_list = []
-        for high, low, n in zip(self.obs_high, self.obs_low, self.num_cells):
-            self.obs_list.append(np.linspace(low, high, n + 1))
+        # for high, low, n in zip(self.obs_high, self.obs_low, self.num_cells):
+        #     self.obs_list.append(np.linspace(low, high, n + 1))
+        self.obs_list.append(np.array([-0.16, -0.06905577, -0.04504992, -0.03158099, -0.02355772, -0.01807387,
+                                       -0.01303121, -0.00808586, -0.0033817 ,  0.0009511 ,  0.00603672,
+                                       0.01045889,  0.01432948,  0.01933522,  0.02531968,  0.03485342,
+                                       0.04731244,  0.11]))
+        self.obs_list.append(np.array([-0.7, -0.26426966, -0.18650391, -0.13620191, -0.10837913, -0.09063868,
+                                       -0.07702486, -0.06562291, -0.05519021, -0.04596267, -0.03732604,
+                                       -0.02830016, -0.01994053, -0.01150185, -0.00157382,  0.00847275,
+                                       0.02371308,  0.12]))
+        self.obs_list.append(np.array([-0.4, -0.07868386, -0.04972506, -0.03402085, -0.02260969, -0.01515608,
+                                       -0.00819331, -0.00311303,  0.00129641,  0.00614108,  0.01265441,
+                                       0.02071652,  0.0304818 ,  0.04392253,  0.060159  ,  0.08278333,
+                                       0.12761726,  0.8]))
+        self.obs_list.append(np.array([-2.4, -0.09004259, -0.03074923, -0.00878549,  0.00565062,  0.01610491,
+                                       0.02758075,  0.0378365 ,  0.04859672,  0.06154023,  0.07598666,
+                                       0.09150362,  0.10935564,  0.13197214,  0.15965351,  0.19708808,
+                                       0.25458551,  0.33779617,  0.48930573, 1.2]))
         self.torques_list = []
-        for high, low, n in zip(self.max_torques, self.min_torques, self.num_actions):
-            self.torques_list.append(np.linspace(low, high, n + 1))
+        # for high, low, n in zip(self.max_torques, self.min_torques, self.num_actions):
+        #     self.torques_list.append(np.linspace(low, high, n + 1))
+        self.torques_list.append(np.array([-35., -16.56290473, -10.36595945,  -6.2789712 ,  -2.80785507,
+                                           0.32777905,   3.5137375 ,   6.65675157,  10.6533842 ,
+                                           17.92133616,  32.9313544 ,  94.]))
+        self.torques_list.append(np.array([-20., -1.82168632, -0.0777958802, 1.30920105, 2.4309009, 3.51789331,
+                                           4.70681682, 6.31231202, 8.64189962, 13.2667317, 22.5047184, 94.]))
         self.observation_space = gym.spaces.Box(low=self.obs_low, high=self.obs_high, dtype=np.float64)
         self.action_space = gym.spaces.Box(low=self.min_torques, high=self.max_torques, dtype=np.float64)
         self.seed()

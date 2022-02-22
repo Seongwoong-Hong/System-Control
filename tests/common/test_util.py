@@ -2,7 +2,8 @@ import os
 import numpy as np
 
 from algos.torch.ppo import PPO
-from common.util import write_analyzed_result, make_env
+from common.util import *
+from common.wrappers import *
 
 
 def test_write_analyzed_result():
@@ -27,3 +28,8 @@ def test_write_analyzed_result():
     ana_dir = os.path.join("..", "tmp", "log", "IDP", "ppo", "AIRL_Single_test")
     policy = PPO.load(ana_dir + "/0/model/gen.zip")
     write_analyzed_result(ana_fnc, ana_dir, iter_name=0)
+
+
+def test_making_env():
+    env = make_env(f"DiscretizedHuman-v2", num_envs=10, wrapper=DiscretizeWrapper, N=[17, 17, 17, 19], NT=[11, 11])
+    print(env.reset())
