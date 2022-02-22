@@ -17,9 +17,9 @@ def draw_reward_weights():
     label_name = [f"sub{i:02d}" for i in [6]]
     for subj in label_name:
         weights_per_actuation = []
-        for actuation in range(1, 2):
+        for actuation in range(1, 7):
             weights = []
-            for trial in range(1, 3):
+            for trial in range(1, 6):
                 name = f"17171719_quadcost/{subj}_{actuation}_{trial}/model"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
                     reward_weight = CPU_Unpickler(f).load().layers[0].weight.detach()
@@ -37,7 +37,7 @@ def draw_reward_weights():
     w_mean = weights_stack[:, :, 0, :]
     w_std = weights_stack[:, :, 1, :]
 
-    x1 = [f"{i}cm" for i in [3]]#, 4.5, 6, 7.5, 9, 12]]
+    x1 = [f"{i}cm" for i in [3, 4.5, 6, 7.5, 9, 12]]
     subplot_name = [f"$\omega_{{{i + 1}}}$" for i in range(6)]
     # x = np.repeat([f"f{i}" for i in range(5, 9)], 5)
     for subj_idx, subj in enumerate(label_name):

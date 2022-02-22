@@ -13,13 +13,16 @@ from common.wrappers import *
 from algos.torch.MaxEntIRL import MaxEntIRL
 from algos.tabular.viter import *
 
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
+
 
 def main(subj, actu, trial):
     env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cuda:2"
+    device = "cuda"
     name = f"{env_type}"
-    expt = f"17171719/{subj}_{actu}"
+    expt = f"17171719_quadcost_many/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -41,7 +44,7 @@ def main(subj, actu, trial):
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_handnorm_finite_{expt}_{trial}"
+    log_dir += f"/sq_handnorm_finite_diffa_{expt}_{trial}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -71,7 +74,7 @@ def main(subj, actu, trial):
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = FiniteSoftQiter(env=env, gamma=1, alpha=0.01, device=device)
+    agent = FiniteSoftQiter(env=env, gamma=0.995, alpha=0.001, device=device)
     learner = MaxEntIRL(
         env,
         eval_env=eval_env,
@@ -82,7 +85,7 @@ def main(subj, actu, trial):
         rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardInputNormalizeWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'optim_kwargs': {'weight_decay': 0.0, 'lr': 1, 'betas': (0.9, 0.999)}},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'optim_kwargs': {'weight_decay': 0.0, 'lr': 1e-2, 'betas': (0.9, 0.999)}},
     )
 
     # Run Learning

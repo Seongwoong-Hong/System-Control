@@ -45,10 +45,23 @@ def test_drawing_human_data():
     plt.show()
 
 
+def test_drawing_hist_of_human_obs():
+    obs_stack = []
+    for subj in [f"sub{i:02d}" for i in [1, 2, 4, 5, 6, 7, 9, 10]]:
+        for actu in range(1, 7):
+            for exp_trial in range(1, 6):
+                for part in range(3):
+                    file = f"../../IRL/demos/HPC/{subj}_half/{subj}i{5 * (actu - 1) + exp_trial}_{part}.mat"
+                    obs_stack.append(-io.loadmat(file)['tq'][:, 1])
+    sorted_obs = np.sort(np.hstack(obs_stack))
+    plt.hist(np.hstack(obs_stack), bins=17, range=(-2.4, 1.3))
+    plt.show()
+
+
 def test_drawing_pkl_data():
     for subj in [f"sub{i:02d}" for i in [6]]:
         for actu in range(1, 7):
-            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "17171719_quadcost_cont", f"{subj}_{actu}.pkl")
+            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "17171719_quadcost", f"{subj}_{actu}.pkl")
             with open(expert_dir, "rb") as f:
                 expert_trajs = pickle.load(f)
             for traj in expert_trajs:

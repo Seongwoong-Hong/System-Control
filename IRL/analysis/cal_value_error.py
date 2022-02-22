@@ -3,7 +3,7 @@ from scipy import io
 
 from algos.tabular.viter import *
 from common.util import make_env
-from common.rollouts import generate_trajectories_from_approx_dyn
+from common.wrappers import *
 
 from imitation.data.rollout import make_sample_until, generate_trajectories
 from matplotlib import pyplot as plt
@@ -32,8 +32,9 @@ def cal_value_error(n):
     # for _ in range(50):
     #     obs, _, rews = agent.predict(init_state, deterministic=True)
     #     traj_rews.append(rews)
-
-    approx_trajs = generate_trajectories_from_approx_dyn(agent, eval_env, n_episodes, deterministic_policy=False)
+    d_eval_env = make_env("DiscretizedHuman-v0", num_envs=1, bsp=bsp,
+                          N=[n, n, n, n], NT=[11, 11], wrapper=DiscretizeWrapper, init_states=init_state)
+    approx_trajs = generate_trajectories(agent, d_eval_env, sample_until, deterministic_policy=False)
 
     gammas = np.array([agent.gamma ** i for i in range(50)])
     value_from_sample, value_from_approx = [], []
