@@ -31,20 +31,20 @@ class RewardNet(nn.Module):
         if self.optim_kwargs is None:
             self.optim_kwargs = {}
         self.in_features = inp
-        self._build_args = [[self.in_features] + arch]
-        self._build([self.in_features] + arch)
+        self._arch = [self.in_features] + arch
+        self._build()
         self.trainmode = True
 
-    def _build(self, arch: List[int]):
+    def _build(self):
         layers = []
         if self.act_fnc is not None:
-            for i in range(len(arch) - 1):
-                layers.append(nn.Linear(arch[i], arch[i + 1]))
+            for i in range(len(self._arch) - 1):
+                layers.append(nn.Linear(self._arch[i], self._arch[i + 1]))
                 layers.append(self.act_fnc())
         else:
-            for i in range(len(arch) - 1):
-                layers.append(nn.Linear(arch[i], arch[i + 1]))
-        layers.append(nn.Linear(arch[-1], 1, bias=False))
+            for i in range(len(self._arch) - 1):
+                layers.append(nn.Linear(self._arch[i], self._arch[i + 1]))
+        layers.append(nn.Linear(self._arch[-1], 1, bias=False))
         self.layers = nn.Sequential(*layers)
         self.optimizer = self.optim_cls(self.parameters(), **self.optim_kwargs)
         self.to(self._device)
@@ -54,7 +54,7 @@ class RewardNet(nn.Module):
         self.to(self._device)
 
     def reset(self):
-        self._build(*self._build_args)
+        self._build()
 
     def forward(self, x: th.Tensor) -> th.Tensor:
         x = self.feature_fn(x)
@@ -88,16 +88,16 @@ class RewardNet(nn.Module):
 
 
 class CNNRewardNet(RewardNet):
-    def _build(self, lr, norm_coeff, arch):
-        arch[0] = 1
+    def _build(self):
+        self._arch[0] = 1
         layers = []
-        for i in range(len(arch) - 1):
-            layers.append(nn.Conv1d(in_channels=arch[i], out_channels=arch[i + 1], kernel_size=(3,), padding=1))
+        for i in range(len(self._arch) - 1):
+            layers.append(nn.Conv1d(in_channels=self._arch[i], out_channels=self._arch[i + 1], kernel_size=(3,), padding=1))
             if self.act_fnc is not None:
                 layers.append(self.act_fnc())
         self.conv_layers = nn.Sequential(*layers)
-        self.fcnn = nn.Linear(arch[-1] * self.in_features, 1, bias=False)
-        self.optimizer = self.optim_cls(self.parameters(), lr, weight_decay=norm_coeff)
+        self.fcnn = nn.Linear(self._arch[-1] * self.in_features, 1, bias=False)
+        self.optimizer = self.optim_cls(self.parameters(), **self.optim_kwargs)
         self.to(self._device)
 
     def forward(self, x: th.Tensor) -> th.Tensor:

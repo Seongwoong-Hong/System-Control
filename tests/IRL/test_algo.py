@@ -37,17 +37,6 @@ def init_states():
     return init_states
 
 
-def test_hpc_algo(env):
-    algo = def_policy("HPC", env)
-    a_list, o_list, _ = verify_policy(env, algo)
-
-
-def test_hpcdiv_algo(tenv):
-    algo = def_policy("HPCDiv", tenv)
-    for _ in range(35):
-        a_list, o_list, _ = verify_policy(tenv, algo)
-
-
 def test_hpc_learned_policy(irl_path, pltqs, bsp, subj):
     env_name = "HPC_custom"
     env = make_env(f"{env_name}-v0", wrapper=ActionWrapper, pltqs=pltqs, bsp=bsp)
@@ -78,18 +67,12 @@ def test_hpc_action_verification(irl_path, pltqs, bsp, subj):
 
 
 def test_irl_learned_policy(irl_path):
-    env_type = "IDP_custom"
+    env_type = "DiscretizedHuman"
     env = make_env(f"{env_type}-v0", use_vec_env=False)
     name = f"{env_type}/BC/cnn_lqr_ppo_deep_noreset_rewfirst"
     model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "016")
     algo = SAC.load(model_dir + "/agent")
     a_list, o_list, _ = verify_policy(env, algo)
-
-
-def test_idp_policy():
-    env = make_env("IDP_custom-v0", use_vec_env=False)
-    algo = def_policy("IDP", env, noise_lv=0.5)
-    _, _, _ = verify_policy(env, algo, deterministic=False)
 
 
 def test_mujoco_policy(irl_path):
