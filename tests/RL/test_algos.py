@@ -1,14 +1,16 @@
 import os
 import pytest
 import pickle
+import time
 import numpy as np
 from scipy import io
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
-from common.util import make_env
+from algos.tabular.viter import FiniteSoftQiter
+from common.util import make_env, CPU_Unpickler
 from common.verification import verify_policy
-from common.wrappers import ActionWrapper
+from common.wrappers import *
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -35,13 +37,14 @@ def test_rl_learned_policy(rl_path):
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    with open(f"{irl_dir}/demos/DiscretizedHuman/19171717/{subj}.pkl", "rb") as f:
+    with open(f"{irl_dir}/demos/DiscretizedHuman/17171719/{subj}.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
     init_states = []
     for traj in expt_trajs:
         init_states += [traj.obs[0]]
-    env = make_env(f"{name}-v0", num_envs=1, N=[19, 17, 17, 17], bsp=bsp, init_states=init_states)
-    name += f"_{subj}_19171717"
+    env = make_env(f"{name}-v0", num_envs=1, N=[17, 17, 17, 19],
+                   bsp=bsp, init_states=init_states, wrapper=DiscretizeWrapper)
+    name += f"_{subj}_17171719"
     model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "softqiter", "policies_1")
     # model_dir = os.path.join("..", "..", "IRL", "tmp", "log")
     stats_path = None
@@ -50,7 +53,6 @@ def test_rl_learned_policy(rl_path):
     with open(model_dir + "/agent.pkl", "rb") as f:
         algo = pickle.load(f)
     algo.set_env(env)
-    import time
     for _ in range(5):
         obs = env.reset()
         done = False
@@ -67,6 +69,48 @@ def test_rl_learned_policy(rl_path):
     # plt.show()
     # plt.plot(o_list[0][:, :2])
     # plt.show()
+
+
+def test_finite_algo(rl_path):
+    def feature_fn(x):
+        return x
+    env_type = "DiscretizedHuman"
+    name = f"{env_type}"
+    subj = "sub06"
+    irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
+    subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
+    bsp = io.loadmat(subpath + f"i1.mat")['bsp']
+    rwfn_dir = irl_dir + "/tmp/log/DiscretizedHuman/MaxEntIRL/ann_handnorm_17171719_quadcost_finite/sub06_1_2/model"
+    with open(rwfn_dir + "/reward_net.pkl", "rb") as f:
+        rwfn = CPU_Unpickler(f).load().to('cuda:0')
+    rwfn.feature_fn = feature_fn
+    env = make_env(f"{name}-v2", num_envs=1, N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp,
+                   wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': rwfn})
+    eval_env = make_env(f"{name}-v2", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
+    agent = FiniteSoftQiter(env=env, gamma=1, alpha=0.001, device='cuda:0', verbose=True)
+    agent.learn(0)
+    agent.set_env(eval_env)
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot()
+    fig2 = plt.figure()
+    ax2 = fig2.add_subplot()
+    fig3 = plt.figure()
+    ax3 = fig3.add_subplot()
+    for epi in range(10):
+        ob = eval_env.reset()
+        obs, acts, rews = agent.predict(ob, deterministic=False)
+        ax1.plot(obs[:, :2])
+        ax2.plot(obs[:, 2:])
+        ax3.plot(acts)
+        eval_env.render()
+        for t in range(50):
+            obs_idx = eval_env.get_idx_from_obs(ob)
+            act_idx = agent.policy.choice_act(agent.policy.policy_table[t].T[obs_idx])
+            act = eval_env.get_acts_from_idx(act_idx)
+            ob, r, _, _ = eval_env.step(act[0])
+            eval_env.render()
+            time.sleep(eval_env.dt)
+    plt.show()
 
 
 def test_2d(rl_path):

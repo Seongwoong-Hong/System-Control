@@ -29,7 +29,6 @@ class MaxEntIRL:
             use_action_as_input: bool = True,
             rew_kwargs: Optional[Dict] = None,
             env_kwargs: Optional[Dict] = None,
-            **kwargs,
     ):
         assert (
             logger.is_configured()
@@ -76,8 +75,8 @@ class MaxEntIRL:
             inp = np.append(inp, self.env.action_space.sample())
         inp = feature_fn(th.from_numpy(inp).reshape(1, -1))
 
-        RNet_type = rew_kwargs.pop("type", None)
-        if RNet_type is None or RNet_type is "ann":
+        reward_net_type = rew_kwargs.pop("type", None)
+        if reward_net_type is None or reward_net_type is "ann":
             self.reward_net = RewardNet(
                 inp=inp.shape[1],
                 arch=rew_arch,
@@ -86,7 +85,7 @@ class MaxEntIRL:
                 device=self.device,
                 **self.rew_kwargs
             )
-        elif RNet_type is "cnn":
+        elif reward_net_type is "cnn":
             self.reward_net = CNNRewardNet(
                 inp=inp.shape[1],
                 arch=rew_arch,
@@ -111,6 +110,7 @@ class MaxEntIRL:
             self.vec_eval_env = DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(self.expand_ratio)])
         self.agent.reset(self.wrap_env)
 
+    # noinspection PyAttributeOutsideInit
     def collect_rollouts(self, n_episodes):
         """
         Collect trajectories using the agent
@@ -133,9 +133,10 @@ class MaxEntIRL:
         :return: (transition mean rewards, None)
         """
         trans_rewards = self.expert_gammas * self.wrap_eval_env.reward(self.expert_reward_inp)
-        return th.sum(trans_rewards) / len(self.expert_trajectories)
+        return th.div(th.sum(trans_rewards), len(self.expert_trajectories))
 
-    def cal_state_visitation(self) -> th.Tensor:
+    # noinspection PyPep8Naming
+    def cal_agent_mean_reward(self) -> th.Tensor:
         D_prev = deepcopy(self.init_D)
         Dc = D_prev
         if self.use_action_as_input:
@@ -149,7 +150,8 @@ class MaxEntIRL:
             else:
                 Dc += D * self.agent.gamma ** t
             D_prev = deepcopy(D)
-        return Dc
+        whole_reward_values = self.wrap_eval_env.get_reward_mat()
+        return th.sum(Dc * whole_reward_values)
 
     def get_whole_states_from_env(self):
         """
@@ -162,22 +164,25 @@ class MaxEntIRL:
             self.whole_state = th.from_numpy(s_vec).float().to(self.device)
         elif isinstance(obs_space, gym.spaces.MultiDiscrete):
             x = np.meshgrid(*[range(nvec) for nvec in obs_space.nvec])
+            # noinspection PyAttributeOutsideInit
             self.whole_state = th.FloatTensor([data.squeeze() for data in x]).t().to(self.device)
         else:
             raise NotImplementedError
 
     def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
-        mean_expert_rewards = self.cal_expert_mean_reward()
-        Dc = self.cal_state_visitation()
-        whole_reward_values = self.wrap_eval_env.get_reward_mat()
-        loss = th.sum(Dc * whole_reward_values) - mean_expert_rewards
-        self.reward_net.optimizer.zero_grad()
-        loss.backward()
-        self.reward_net.optimizer.step()
-        logger.record("expert_reward", mean_expert_rewards.item())
-        logger.record("agent_reward", th.sum(Dc * whole_reward_values).item())
-        logger.record("loss", loss.item())
-        return loss.item()
+        losses = []
+        for _ in range(max_gradient_steps):
+            mean_expert_rewards = self.cal_expert_mean_reward()
+            mean_agent_rewards = self.cal_agent_mean_reward()
+            loss = mean_agent_rewards - mean_expert_rewards
+            self.reward_net.optimizer.zero_grad()
+            loss.backward()
+            self.reward_net.optimizer.step()
+            logger.record("expert_reward", mean_expert_rewards.item())
+            logger.record("agent_reward", mean_agent_rewards.item())
+            logger.record("loss", loss.item())
+            losses.append(loss.item())
+        return np.mean(losses)
 
     def learn(
             self,
@@ -201,19 +206,26 @@ class MaxEntIRL:
         else:
             total_iter += self.itr
         call_num = 0
+        for param in self.reward_net.parameters():
+            last_grad = th.zeros_like(param).view(-1)
         while self.itr < total_iter:
             with logger.accumulate_means(f"reward"):
                 self.wrap_eval_env.train()
                 mean_loss = self.train_reward_fn(max_gradient_steps, min_gradient_steps)
                 weight_norm, grad_norm = 0.0, 0.0
+                params_grad_data = []
                 for param in self.reward_net.parameters():
                     weight_norm += param.norm().detach().item()
-                    grad_norm += param.grad.norm().item()
+                    params_grad_data.append(param.grad.data)
+                grad_norm = params_grad_data[-1].norm().item()
+                grad_var_angle = th.arccos(last_grad.dot(params_grad_data[-1].view(-1)) / (last_grad.norm() * params_grad_data[-1].norm())).item()
+                last_grad = deepcopy(params_grad_data[-1].view(-1))
                 logger.record("weight norm", weight_norm)
                 logger.record("grad norm", grad_norm)
+                logger.record("grad variant angle", grad_var_angle)
                 logger.record("num iteration", self.itr, exclude="tensorboard")
                 logger.dump(self.itr)
-                if np.abs(mean_loss) < 1e-2 and self.itr > 30 and np.abs(grad_norm) < 1e-3 and early_stop:
+                if self.itr > 30 and np.abs(mean_loss) < 2e-2 and np.abs(grad_norm) < 0.03 and early_stop:
                     break
             with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)
@@ -253,11 +265,11 @@ class GuidedCostLearning(MaxEntIRL):
             log_probs[i] = trans_log_prob[i*traj_len:(i+1)*traj_len].sum()
         return rewards, log_probs
 
-    def cal_loss(self, n_episodes) -> Tuple:
+    def cal_loss(self) -> Tuple:
         expert_trajectories = deepcopy(self.expert_trajectories)
-        demo_trajs = expert_trajectories + deepcopy(self.current_agent_trajectories)
+        demo_trajs = expert_trajectories + deepcopy(self.agent_trajectories)
         rewards, log_probs = self.transition_is(demo_trajs)
-        expt_rewards, _ = self.mean_transition_reward(expert_trajectories)
+        expt_rewards = self.cal_expert_mean_reward()
         loss = th.logsumexp(rewards - log_probs, 0) - expt_rewards.mean()
         logger.record("log_probs_mean", th.mean(log_probs).item())
         logger.record("log_probs_var", th.var(log_probs).item())
@@ -302,11 +314,13 @@ class APIRL(MaxEntIRL):
         super().collect_rollouts(n_episodes)
         agent_mean_feature += self.traj_to_mean_feature(self.agent_trajectories, n_episodes)
         self.agent_trajectories = agent_mean_feature
+        # noinspection PyAttributeOutsideInit
         self.current_agent_trajectories = deepcopy(self.agent_trajectories)
 
     def sample_and_cal_loss(self, n_episodes):
         expert_mean_feature = deepcopy(self.expert_trajectories)
         if isinstance(self.wrap_env, VecEnvWrapper):
+            # noinspection PyAttributeOutsideInit
             self.vec_eval_env = deepcopy(self.wrap_env)
             self.vec_eval_env.set_venv(DummyVecEnv([lambda: deepcopy(self.wrap_eval_env) for _ in range(n_episodes)]))
         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes * self.expand_ratio)
@@ -351,6 +365,7 @@ class APIRL(MaxEntIRL):
         rewards = th.dot(weight, th.from_numpy(np.array(trajectories)).float())
         return rewards, None
 
+    # noinspection PyPep8Naming
     def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
         t = cp.Variable()
         mu_e = np.array(deepcopy(self.expert_trajectories))

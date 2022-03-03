@@ -104,7 +104,6 @@ class Viter:
                     logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                     logger.record("Value Error", error, exclude="tensorboard")
                     logger.dump(self.num_timesteps)
-                self.policy.policy_table = th.round(self.policy.policy_table * 1e8) * 1e-8
                 break
             self.num_timesteps += 1
 
@@ -126,6 +125,7 @@ class Viter:
         if env is None:
             env = self.env
         self.set_env(env)
+        del self.policy
         self._setup_model()
 
     def get_env(self):
@@ -238,7 +238,7 @@ class FiniteSoftQiter(FiniteViter):
             self.policy.q_table[t] = self.reward_mat + self.gamma * \
                                      backward_trans(self.transition_mat, self.policy.v_table[t + 1])
             self.policy.v_table[t] = self.alpha * th.logsumexp(self.policy.q_table[t] / self.alpha, dim=0)
-        self.policy.policy_table = th.exp((self.policy.q_table - self.policy.v_table[:, None, :]) / self.alpha)
+            self.policy.policy_table[t] = th.exp((self.policy.q_table[t] - self.policy.v_table[t, None, :]) / self.alpha)
 
     def predict(
             self,
@@ -259,7 +259,9 @@ class FiniteSoftQiter(FiniteViter):
             obs_idx = self.env.envs[0].get_idx_from_obs(observation)
             act_idx = choose_method(self.policy.policy_table[t, :, obs_idx].T)
             act = self.env.envs[0].get_acts_from_idx(act_idx)
-            observation, reward, _, _ = self.env.step(act)
+            observation, reward, done, info = self.env.step(act)
+            if done:
+                observation = info[0]['terminal_observation']
             obs_list.append(observation.flatten())
             rew_list.append(reward.flatten())
             act_list.append(act.flatten())

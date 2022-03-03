@@ -26,8 +26,8 @@ def main(actuation=1):
     for traj in expt_trajs:
         init_states += [traj.obs[0]]
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    venv = make_env(f"{name}-v0", num_envs=1, wrapper=DiscretizeWrapper,
-                    N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp, init_states=init_states)
+    venv = make_env(f"{name}-v2", num_envs=1, wrapper=DiscretizeWrapper,
+                    N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp)#, init_states=init_states)
 
     ExpertPolicy = FiniteSoftQiter(venv, gamma=1, alpha=0.001, device='cpu')
     ExpertPolicy.learn(0)
@@ -42,11 +42,11 @@ def main(actuation=1):
     # with open(f"{proj_path}/RL/{env_type}/tmp/log/{name}_{subj}_customshape/softqiter/policies_2/agent.pkl", "rb") as f:
     #     ExpertPolicy = pickle.load(f)
     # trajectories = generate_trajectories_without_shuffle(ExpertPolicy, venv, sample_until, deterministic_policy=False)
-    save_name = f"{env_type}/customshape_quadcost_finite_many/{subj}_{actuation}.pkl"
+    save_name = f"{env_type}/17171719_quadcost_finite_many/{subj}_{actuation}.pkl"
     types.save(save_name, trajectories)
     print(f"Expert Trajectories are saved in the {save_name}")
 
 
 if __name__ == "__main__":
-    for actuation in range(1, 7):
+    for actuation in range(1, 2):
         main(actuation)

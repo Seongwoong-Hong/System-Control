@@ -22,7 +22,7 @@ def main(subj, actu, trial):
     algo_type = "MaxEntIRL"
     device = "cuda"
     name = f"{env_type}"
-    expt = f"17171719_quadcost_many/{subj}_{actu}"
+    expt = f"17171719_quadcost_finite_many/{subj}_{actu}"
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -44,7 +44,7 @@ def main(subj, actu, trial):
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_handnorm_finite_diffa_{expt}_{trial}"
+    log_dir += f"/sq_handnorm_{expt}_{trial}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -74,7 +74,7 @@ def main(subj, actu, trial):
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = FiniteSoftQiter(env=env, gamma=0.995, alpha=0.001, device=device)
+    agent = FiniteSoftQiter(env=env, gamma=1, alpha=0.001, device=device)
     learner = MaxEntIRL(
         env,
         eval_env=eval_env,
@@ -85,12 +85,12 @@ def main(subj, actu, trial):
         rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardInputNormalizeWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1, 'optim_kwargs': {'weight_decay': 0.0, 'lr': 1e-2, 'betas': (0.9, 0.999)}},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'optim_kwargs': {'weight_decay': 0, 'lr': 1e-2, 'betas': (0.9, 0.999)}},
     )
 
     # Run Learning
     learner.learn(
-        total_iter=300,
+        total_iter=400,
         agent_learning_steps=0,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
@@ -103,19 +103,20 @@ def main(subj, actu, trial):
 
     # Save the result of learning
     reward_path = model_dir + "/reward_net"
-    learner.reward_net.save(reward_path)
+    learner.reward_net.eval().save(reward_path)
     # learner.agent.save(model_dir + "/agent")
     if learner.agent.get_vec_normalize_env():
         learner.wrap_env.save(model_dir + "/normalization.pkl")
     now = datetime.datetime.now()
     print(f"Endtime: {now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}")
     del learner, agent
-    with th.cuda.device(device):
-        th.cuda.empty_cache()
+    if 'cuda' in device:
+        with th.cuda.device(device):
+            th.cuda.empty_cache()
 
 
 if __name__ == "__main__":
     for subj in [f"sub{i:02d}" for i in [6]]:
-        for actu in range(1, 7):
+        for actu in range(1, 2):
             for trial in [1, 2, 3, 4, 5]:
                 main(subj, actu, trial)

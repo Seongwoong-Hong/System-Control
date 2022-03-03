@@ -24,7 +24,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "17171719_quadcost", f"{subj}_1.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "17171719_quadcost_finite", f"{subj}_1.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -34,7 +34,7 @@ def expert(demo_dir):
 def env(demo_dir):
     subpath = os.path.join(demo_dir, "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    return make_env(f"{env_id}-v2", bsp=bsp, N=[17, 17, 17, 19], NT=[11, 11])
+    return make_env(f"{env_id}-v2", bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11])
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def eval_env(expert, demo_dir):
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    return make_env(f"{env_id}-v0", bsp=bsp, N=[17, 17, 17, 19], NT=[11, 11], init_states=init_states)
+    return make_env(f"{env_id}-v0", bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states)
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ def learner(env, expert, eval_env):
         return x ** 2
         # return th.cat([x, x ** 2], dim=1)
 
-    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cuda:1')
+    agent = FiniteSoftQiter(env, gamma=1, alpha=0.001, device='cuda:0')
 
     return MaxEntIRL(
         env,
@@ -73,7 +73,7 @@ def learner(env, expert, eval_env):
         feature_fn=feature_fn,
         expert_trajectories=expert,
         use_action_as_input=True,
-        rew_arch=[],
+        rew_arch=[16, 16],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardInputNormalizeWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1,
@@ -104,7 +104,7 @@ def test_callback(expert, learner):
 
 def test_validity(learner, expert):
     learner.learn(
-        total_iter=200,
+        total_iter=300,
         agent_learning_steps=0,
         n_episodes=len(expert),
         max_agent_iter=1,
