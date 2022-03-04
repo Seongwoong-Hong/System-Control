@@ -95,11 +95,11 @@ class Viter:
             old_value = deepcopy(self.policy.v_table)
             self.train()
             error = th.max(th.abs(old_value - self.policy.v_table)).item()
-            if self.num_timesteps % 10 == 0 and self.verbose:
+            if self.num_timesteps % 100 == 0 and self.verbose:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 logger.dump(self.num_timesteps)
-            if self.num_timesteps >= total_timesteps or error < 1e-8:
+            if self.num_timesteps >= total_timesteps or error < 1e-6:
                 if self.verbose:
                     logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                     logger.record("Value Error", error, exclude="tensorboard")
@@ -234,6 +234,7 @@ class FiniteSoftQiter(FiniteViter):
     def train(self):
         self.policy.q_table[-1] = self.reward_mat
         self.policy.v_table[-1] = self.alpha * th.logsumexp(self.policy.q_table[-1] / self.alpha, dim=0)
+        self.policy.policy_table[-1] = th.exp((self.policy.q_table[-1] - self.policy.v_table[-1, None, :]) / self.alpha)
         for t in reversed(range(self.max_t - 1)):
             self.policy.q_table[t] = self.reward_mat + self.gamma * \
                                      backward_trans(self.transition_mat, self.policy.v_table[t + 1])

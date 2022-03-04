@@ -2,6 +2,7 @@ import os
 import pickle
 import numpy as np
 import torch as th
+from scipy import io
 
 from common.util import CPU_Unpickler
 
@@ -26,3 +27,38 @@ def test_calculating_feature_from_ann():
     for layer in reward_fn.layers[:-1]:
         inp = layer(inp)
     print(inp)
+
+
+def test_calculating_feature_from_pkldata():
+    def feature_fn(x):
+        return x ** 2
+
+    load_dir = f"{irl_path}/demos/DiscretizedHuman/17171719_log1017"
+    with open(f"{load_dir}/sub06_1.pkl", "rb") as f:
+        expt_trajs = pickle.load(f)
+
+    features = []
+    for traj in expt_trajs:
+        inp = np.append(traj.obs[:-1], traj.acts, axis=1)
+        features.append(np.sum(feature_fn(inp), axis=0))
+
+    print(f"target mean feature: {np.mean(features, axis=0)}")
+
+
+def test_calculating_feature_from_data():
+    def feature_fn(x):
+        return x ** 2
+
+    load_dir = f"{irl_path}/demos/HPC/sub06_half"
+    states, Ts = [], []
+    for trial in range(1, 6):
+        for part in range(3):
+            state = -io.loadmat(load_dir + f"/sub06i{trial}_{part}.mat")['state'][:, :4]
+            T = -io.loadmat(load_dir + f"/sub06i{trial}_{part}.mat")['tq']
+            states.append(np.sum(feature_fn(state), axis=0))
+            Ts.append(np.sum(feature_fn(T), axis=0))
+    states = np.vstack(states)
+    Ts = np.vstack(Ts)
+    inp = np.append(states, Ts, axis=1)
+
+    print(f"{np.mean(inp, axis=0)}")

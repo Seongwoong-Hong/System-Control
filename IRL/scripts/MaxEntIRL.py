@@ -1,7 +1,7 @@
-import datetime
 import os
 import pickle
 import shutil
+import datetime
 import torch as th
 
 from imitation.util import logger
@@ -14,7 +14,7 @@ from algos.torch.MaxEntIRL import MaxEntIRL
 from algos.tabular.viter import *
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 
 def main(subj, actu, trial):
@@ -44,7 +44,7 @@ def main(subj, actu, trial):
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_handnorm_{expt}_{trial}"
+    log_dir += f"/cross_handnorm_{expt}_{trial}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -62,9 +62,9 @@ def main(subj, actu, trial):
         #     ft[i, idx] = 1
         # return ft
         # return x
-        return x ** 2
-        # x1, x2, x3, x4 = th.split(x, 1, dim=1)
-        # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, x**2, x**3), dim=1)
+        # return x ** 2
+        x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=1)
+        return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, a1*a2, x**2, x**3), dim=1)
         # return th.cat([x, x ** 2], dim=1)
 
     # Setup callbacks

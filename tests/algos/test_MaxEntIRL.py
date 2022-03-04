@@ -24,7 +24,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "17171719_quadcost_finite", f"{subj}_1.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "19191919", f"{subj}_1.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -64,7 +64,7 @@ def learner(env, expert, eval_env):
         return x ** 2
         # return th.cat([x, x ** 2], dim=1)
 
-    agent = FiniteSoftQiter(env, gamma=1, alpha=0.001, device='cuda:0')
+    agent = FiniteSoftQiter(env, gamma=1, alpha=0.001, device='cuda:1')
 
     return MaxEntIRL(
         env,
@@ -73,7 +73,7 @@ def learner(env, expert, eval_env):
         feature_fn=feature_fn,
         expert_trajectories=expert,
         use_action_as_input=True,
-        rew_arch=[16, 16],
+        rew_arch=[],
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardInputNormalizeWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1,

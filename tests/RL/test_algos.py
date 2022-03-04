@@ -73,20 +73,20 @@ def test_rl_learned_policy(rl_path):
 
 def test_finite_algo(rl_path):
     def feature_fn(x):
-        return x
+        return x ** 2
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
     subj = "sub06"
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    rwfn_dir = irl_dir + "/tmp/log/DiscretizedHuman/MaxEntIRL/ann_handnorm_17171719_quadcost_finite/sub06_1_2/model"
+    rwfn_dir = irl_dir + "/tmp/log/DiscretizedHuman/MaxEntIRL/sq_handnorm_19191919/sub06_1_1/model"
     with open(rwfn_dir + "/reward_net.pkl", "rb") as f:
         rwfn = CPU_Unpickler(f).load().to('cuda:0')
     rwfn.feature_fn = feature_fn
-    env = make_env(f"{name}-v2", num_envs=1, N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp,
+    env = make_env(f"{name}-v2", num_envs=1, N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp,
                    wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': rwfn})
-    eval_env = make_env(f"{name}-v2", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
+    eval_env = make_env(f"{name}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
     agent = FiniteSoftQiter(env=env, gamma=1, alpha=0.001, device='cuda:0', verbose=True)
     agent.learn(0)
     agent.set_env(eval_env)

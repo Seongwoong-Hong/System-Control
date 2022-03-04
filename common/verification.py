@@ -1,8 +1,8 @@
 import os
 import time
-import cv2
 import numpy as np
 import torch as th
+from skvideo.io import FFmpegWriter
 from typing import Dict, List, Optional
 
 from copy import deepcopy
@@ -13,12 +13,10 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 def video_record(imgs: List, filename: str, dt: float):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-    width, height, _ = imgs[0].shape
-    writer = cv2.VideoWriter(filename, fourcc, 1 / dt, (width, height))
-    for img1 in imgs:
-        img = cv2.cvtColor(img1, cv2.COLOR_RGB2BGR)
-        writer.write(img)
+    writer = FFmpegWriter(filename, outputdict={'-r': str(int(1 / dt))})
+    for img in imgs:
+        writer.writeFrame(img)
+    writer.close()
 
 
 def verify_policy(environment, policy, render="human", deterministic=True, repeat_num=5):

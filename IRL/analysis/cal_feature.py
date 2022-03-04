@@ -9,6 +9,7 @@ from algos.tabular.viter import FiniteSoftQiter
 
 from scipy import io
 from copy import deepcopy
+import matplotlib.pyplot as plt
 
 demo_path = os.path.abspath(os.path.join("..", "demos"))
 log_path = os.path.abspath(os.path.join("..", "tmp", "log"))
@@ -59,7 +60,7 @@ def cal_feature_of_learner():
         init_states.append(traj.obs[0])
     reward_fn.feature_fn = feature_fn
     env = make_env("DiscretizedHuman-v2", num_envs=1, bsp=bsp, N=[17, 17, 17, 19], NT=[11, 11],
-                   )#wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn})#init_states=init_states)
+                   )#init_states=init_states)#wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn},
     agent = FiniteSoftQiter(env, gamma=1, alpha=0.001, device=device, verbose=False)
     agent.learn(0)
 
@@ -97,11 +98,23 @@ def cal_feature_of_learner():
     mean_features = np.sum(np.sum(Dc.cpu().numpy()[..., None] * np.array(feat_mat), axis=0), axis=0)
 
     print(f"learned mean feature: {mean_features}")
+    return mean_features
 
 
 if __name__ == "__main__":
     for subj in [f"sub{i:02d}" for i in [6]]:
         for actuation in [1]:
-            for trial in range(1, 2):
+            features = []
+            for trial in [1, 3, 4]:
                 cal_feature_from_data()
-                cal_feature_of_learner()
+                features.append(cal_feature_of_learner())
+            mean = np.mean(features, axis=0)
+            std = np.std(features, axis=0)
+            print(mean)
+            # plt.figure(figsize=[6, 6], dpi=100.0)
+            plt.errorbar([f"$\omega_{{{i + 1}}}$" for i in range(6)], mean, std, fmt='o')
+            plt.xlabel("perturbation", labelpad=15.0, fontsize=14)
+            plt.ylabel("weight", labelpad=15.0, fontsize=14)
+            plt.tick_params(axis='both', which='major', labelsize=10)
+    plt.tight_layout()
+    plt.show()
