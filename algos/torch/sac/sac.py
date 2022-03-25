@@ -34,9 +34,6 @@ class SACCustom(SAC):
         for gradient_step in range(gradient_steps):
             # Sample replay buffer
             replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
-
-            mean_rewards.append(replay_data.rewards.mean().detach().item())
-
             # We need to sample because `log_std` may have changed between two gradient steps
             if self.use_sde:
                 self.actor.reset_noise()
@@ -104,6 +101,7 @@ class SACCustom(SAC):
             self.actor.optimizer.step()
 
             log_probs.append(log_prob.mean().detach().item())
+            mean_rewards.append(replay_data.rewards.mean().detach().item())
 
             # Update target networks
             if gradient_step % self.target_update_interval == 0:

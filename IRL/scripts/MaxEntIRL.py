@@ -14,7 +14,7 @@ from algos.torch.MaxEntIRL import MaxEntIRL
 from algos.tabular.viter import *
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 
 def main(subj, actu, trial):
@@ -44,7 +44,7 @@ def main(subj, actu, trial):
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/cross_handnorm_{expt}_{trial}"
+    log_dir += f"/sq_handnorm_a1_{expt}_{trial}"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -62,9 +62,9 @@ def main(subj, actu, trial):
         #     ft[i, idx] = 1
         # return ft
         # return x
-        # return x ** 2
-        x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=1)
-        return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, a1*a2, x**2, x**3), dim=1)
+        return x ** 2
+        # x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=1)
+        # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, a1*a2, x**2, x**3), dim=1)
         # return th.cat([x, x ** 2], dim=1)
 
     # Setup callbacks
@@ -74,14 +74,14 @@ def main(subj, actu, trial):
     logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
 
     # Setup Learner
-    agent = FiniteSoftQiter(env=env, gamma=1, alpha=0.001, device=device)
+    agent = FiniteSoftQiter(env=env, gamma=1, alpha=1, device=device)
     learner = MaxEntIRL(
         env,
         eval_env=eval_env,
         feature_fn=feature_fn,
         agent=agent,
         expert_trajectories=expert_trajs,
-        use_action_as_input=True,
+        use_action_as_input=False,
         rew_arch=[],
         device=device,
         env_kwargs={'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardInputNormalizeWrapper},

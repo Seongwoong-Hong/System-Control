@@ -173,13 +173,13 @@ register(
 register(
     id='HPC_custom-v0',
     entry_point='gym_envs.envs.mujoco:IDPHumanExp',
-    max_episode_steps=599,
+    max_episode_steps=100,
 )
 
 register(
-    id='HPC_custom-v1',
+    id='HPC_custom-v2',
     entry_point='gym_envs.envs.mujoco:IDPHuman',
-    max_episode_steps=599,
+    max_episode_steps=100,
 )
 
 register(

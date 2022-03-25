@@ -7,7 +7,7 @@ import numpy as np
 if __name__ == '__main__':
     env_type = "DiscretizedHuman"
     env_id = f"{env_type}-v2"
-    env = make_env(env_id, N=[21, 19, 19, 19], NT=[11, 11])
+    env = make_env(env_id, N=[19, 19, 19, 19], NT=[11, 11])
     act_coeff = 1
     # act_coeff = env.model.actuator_gear[0, 0]
     for subi in [1, 2, 4, 5, 6, 7, 9, 10]:
@@ -27,6 +27,6 @@ if __name__ == '__main__':
                             'bsp': io.loadmat(file)['bsp'],
                             }
                     trajectories += generate_trajectories_from_data(data, env)
-            save_name = f"{env_type}/21191919_1111/{sub}_{actuation}.pkl"
+            save_name = f"{env_type}/19191919_1111/{sub}_{actuation}.pkl"
             types.save(save_name, trajectories)
             print(f"Expert Trajectory {save_name} is saved")

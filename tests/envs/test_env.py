@@ -68,17 +68,15 @@ def test_init():
         time.sleep(env.dt)
 
 
-def test_2dworld():
-    env = make_env("2DWorld-v2")
-    trajs = []
+def test_2d_env():
+    env = make_env("2DTarget-v2", map_size=1)
     for i in range(10):
         env.reset()
         done = False
-        sts, rs = [], []
+        env.render()
         while not done:
             action = env.action_space.sample()
             st, r, done, _ = env.step(action)
-            sts.append(st)
-            rs.append(r)
-        trajs.append(np.append(np.array(sts), np.array(rs).reshape(-1, 1), axis=1))
-    env.draw(trajs)
+            env.render()
+            time.sleep(env.dt)
+    env.close()

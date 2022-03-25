@@ -6,13 +6,14 @@ from scipy import io
 import pytest
 
 from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning, APIRL
-from algos.tabular.viter import FiniteSoftQiter
+from algos.torch.sac import MlpPolicy, SAC
+from algos.tabular.viter import FiniteSoftQiter, FiniteViter
 from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
 
 subj = "sub06"
-env_name = "DiscretizedHuman"
+env_name = "2DTarget"
 env_id = f"{env_name}"
 
 
@@ -24,17 +25,22 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "19191919", f"{subj}_1.pkl")
+    # expert_dir = os.path.join(demo_dir, env_name, "test", f"{subj}_1.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "sac_1.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
 
 
 @pytest.fixture
-def env(demo_dir):
+def env(expert, demo_dir):
     subpath = os.path.join(demo_dir, "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    return make_env(f"{env_id}-v2", bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11])
+    init_states = []
+    for traj in expert:
+        init_states += [traj.obs[0]]
+    # return make_env(f"{env_id}-v0", bsp=bsp, init_states=init_states)
+    return make_env(f"{env_id}-v0", init_states=init_states)
 
 
 @pytest.fixture
@@ -44,8 +50,8 @@ def eval_env(expert, demo_dir):
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    return make_env(f"{env_id}-v0", bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states)
-
+    # return make_env(f"{env_id}-v0", bsp=bsp, init_states=init_states)
+    return make_env(f"{env_id}-v0", init_states=init_states)
 
 @pytest.fixture
 def learner(env, expert, eval_env):
@@ -64,7 +70,7 @@ def learner(env, expert, eval_env):
         return x ** 2
         # return th.cat([x, x ** 2], dim=1)
 
-    agent = FiniteSoftQiter(env, gamma=1, alpha=0.001, device='cuda:1')
+    agent = FiniteViter(env, gamma=1, alpha=0.001, device='cuda:1')
 
     return MaxEntIRL(
         env,
@@ -121,26 +127,44 @@ def test_GCL(env, expert, eval_env):
 
     def feature_fn(x):
         # return x
-        return th.cat([x, x**2], dim=1)
+        return x ** 2
+        # return th.cat([x, x**2], dim=1)
 
-    agent = FiniteSoftQiter(env, device='cuda:1', verbose=True)
+    # agent = FiniteSoftQiter(env, device='cuda:1', verbose=True)
+    agent = SAC(
+        MlpPolicy,
+        env=env,
+        gamma=0.99,
+        ent_coef='auto',
+        target_entropy=-0.1,
+        tau=0.01,
+        buffer_size=int(1e5),
+        learning_starts=10000,
+        train_freq=1,
+        gradient_steps=1,
+        device='cpu',
+        verbose=1,
+        policy_kwargs={'net_arch': [32, 32]}
+    )
 
     learner = GuidedCostLearning(
         env,
-        agent=agent,
+        eval_env=eval_env,
         feature_fn=feature_fn,
+        agent=agent,
         expert_trajectories=expert,
-        use_action_as_input=False,
+        use_action_as_input=True,
         rew_arch=[],
         device='cpu',
-        eval_env=eval_env,
-        env_kwargs={'reward_wrapper': ActionNormalizeRewardWrapper, "num_envs": 10},
-        rew_kwargs={'type': 'ann'},
+        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
+        rew_kwargs={'type': 'ann', 'scale': 1,
+                    'optim_kwargs': {'weight_decay': 0.01, 'lr': 1e-2, 'betas': (0.9, 0.999)}
+                    },
     )
 
     learner.learn(
         total_iter=50,
-        agent_learning_steps=1e3,
+        agent_learning_steps=1.5e5,
         n_episodes=len(expert),
         max_agent_iter=1,
         min_agent_iter=1,

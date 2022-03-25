@@ -28,9 +28,6 @@ class TwoDTargetDisc(gym.Env):
     def _get_obs(self):
         return self.st
 
-    def get_torque(self, action):
-        return action.T
-
     def _get_next_state(self, state, action):
         state = state + action - self.act_size // 2
         return np.clip(state, a_max=self.map_size - 1, a_min=0)
@@ -45,7 +42,7 @@ class TwoDTargetDisc(gym.Env):
         return self._get_obs()
 
     def get_reward(self, state, action):
-        target = np.array([10, 15])
+        target = np.array([7, 7])
         return - ((state - target) ** 2 + (action - self.act_size // 2) ** 2).sum(axis=-1, keepdims=True)
 
     def get_vectorized(self):

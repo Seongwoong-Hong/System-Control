@@ -4,35 +4,30 @@ import pytest
 import numpy as np
 import torch as th
 from scipy import io
+
+from algos.torch.sac import SAC, MlpPolicy
 from common.util import make_env
+
 from matplotlib import pyplot as plt
 
 
-def test_ppo_log():
-    env = make_env("IDP_custom-v1", use_vec_env=False, num_envs=8)
-    algo = def_policy("sac", env, log_dir="tmp/log/rl")
-    algo.learn(total_timesteps=1e5)
-
-
-def test_learn_ppo():
-    env = make_env("IDP_pybullet-v2")
-    algo = def_policy("ppo", env, device='cpu', log_dir=None, verbose=1)
-    algo.learn(total_timesteps=1e5)
-
-
 def test_iter_predict():
-    env = make_env("2DTarget_disc-v2", use_vec_env=True, num_envs=1)
-    algo = def_policy("viter", env, device='cpu')
+    env = make_env("2DTarget-v2", map_size=1)
+    algo = SAC(
+        MlpPolicy,
+        env=env,
+        gamma=0.99,
+        ent_coef='auto',
+        tau=0.01,
+        buffer_size=int(5e4),
+        learning_starts=10000,
+        train_freq=1,
+        gradient_steps=1,
+        device='cpu',
+        verbose=1,
+        policy_kwargs={'net_arch': [32, 32]}
+    )
     algo.learn(10000)
-    obs = []
-    ob = env.reset()
-    done = False
-    obs.append(ob)
-    while not done:
-        act, _ = algo.predict(ob, deterministic=False)
-        ob, r, done, _ = env.step(act)
-        obs.append(ob)
-    print('end')
 
 
 def test_finite_softqiter_at_discretized_env():

@@ -223,7 +223,9 @@ class FiniteViter(Viter):
                 eps = np.random.random()
                 if eps < self.epsilon:
                     act = self.action_space.sample()[None, :]
-            observation, reward, _, _ = self.env.step(act)
+            observation, reward, done, info = self.env.step(act)
+            if done:
+                observation = info[0]['terminal_observation']
             obs_list.append(observation.flatten())
             rew_list.append(reward.flatten())
             act_list.append(act.flatten())

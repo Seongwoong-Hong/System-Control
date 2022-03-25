@@ -39,6 +39,7 @@ class DiscretizedDoublePendulum(gym.Env):
         # self.Q = np.diag([0.16540, 0.14075, 0.01067, 0.00152])
         self.Q = np.diag([2.1139, 1.0872182, 0.13639979, 0.03540204])
         self.R = np.diag([0.02537065, 0.01358577])
+        # self.R = np.diag([0.0, 0.0])
         # self.R = np.diag([0.00076, 0.000576])
 
         self.np_random = None
@@ -366,7 +367,7 @@ class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
         super(DiscretizedDoublePendulumDet, self).__init__(N=N, NT=NT)
         if init_states is None:
             self.init_states, _ = self.get_vectorized()
-            self.init_states = self.init_states[0:len(self.init_states):100]
+            self.init_states = self.init_states[0:len(self.init_states)]
         else:
             self.init_states = np.array(init_states).reshape(-1, 4)
         self.n = 0

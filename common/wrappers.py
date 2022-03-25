@@ -14,6 +14,7 @@ class ActionWrapper(gym.ActionWrapper):
 class RewardWrapper(gym.RewardWrapper):
     def __init__(self, env, rwfn):
         super(RewardWrapper, self).__init__(env)
+        self._ob = None
         self.rwfn = rwfn
         self.use_action_as_inp = self.rwfn.use_action_as_inp
 
@@ -24,14 +25,17 @@ class RewardWrapper(gym.RewardWrapper):
         self.train(mode=False)
 
     def step(self, action: np.ndarray):
-        next_ob, rew, done, info = self.env.step(action)
-        inp = info['obs']
+        assert self._ob is not None
+        inp = self._ob.reshape(1, -1)
         if self.use_action_as_inp:
-            inp = np.append(inp, info['acts'], axis=1)
+            inp = np.append(inp, action.reshape(1, -1), axis=1)
         r = self.reward(inp).item()
-        if info.get('done'):
-            r -= 1000
-        return next_ob, r, done, info
+        self._ob, _, done, info = self.env.step(action)
+        return self._ob, r, done, info
+
+    def reset(self, **kwargs):
+        self._ob = self.env.reset(**kwargs)
+        return self._ob
 
     def get_reward_mat(self):
         inp, acts = self.env.get_vectorized()
@@ -56,7 +60,7 @@ class RewardInputNormalizeWrapper(RewardWrapper):
             high = (self.observation_space.nvec[None, :] - 1)
         elif isinstance(self.observation_space, gym.spaces.Box):
             high = self.observation_space.high[None, :]
-            high = np.array([[0.16, 0.7, 0.8, 2.4]])
+            # high = np.array([[0.16, 0.7, 0.8, 2.4]])
         else:
             raise NotImplementedError
         if self.use_action_as_inp:
