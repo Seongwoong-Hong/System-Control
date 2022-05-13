@@ -11,7 +11,7 @@ class DiscretizedPendulum(gym.Env):
     State, action 이 이산화된 Single Pendulum 환경, 전환 행렬 P 계산
     Reward 는 state 에 대한 2 차 cost 의 음수임
     Step 은 explicit euler 방법을 따름
-    Angle 과 speed 는 maximum 값에서 clip 됨
+    Angle 과 speed 는 bound_info.json 값에서 clip 됨
     """
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 30}
 

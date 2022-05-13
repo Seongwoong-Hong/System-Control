@@ -24,7 +24,7 @@ class CPU_Unpickler(pickle.Unpickler):
 
 
 def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):
-    wrapper_kwargs = kwargs.pop('wrapper_kwrags', {})
+    wrapper_kwargs = kwargs.pop('wrapper_kwargs', {})
     def define_env():
         if isinstance(env_name, gym.Env):
             env = env_name

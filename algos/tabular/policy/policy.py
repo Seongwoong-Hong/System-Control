@@ -46,7 +46,7 @@ class TabularPolicy:
             self.obs_size = len(s_vec)
             self.act_size = len(a_vec)
         self.q_table = th.zeros([self.act_size, self.obs_size], dtype=th.float32).to(self.device)
-        self.v_table = th.full([self.obs_size], -np.inf, dtype=th.float32).to(self.device)
+        self.v_table = th.full([self.obs_size], 0, dtype=th.float32).to(self.device)
         self.policy_table = th.full([self.act_size, self.obs_size], 1 / self.act_size, dtype=th.float32).to(self.device)
 
     def predict(

@@ -72,20 +72,26 @@ register(
 
 register(
     id='2DWorld_disc-v0',
-    entry_point='gym_envs.envs:TwoDWorldDiscDetOrder',
-    max_episode_steps=100,
-)
-
-register(
-    id='2DWorld_disc-v1',
     entry_point='gym_envs.envs:TwoDWorldDiscDet',
-    max_episode_steps=100,
+    max_episode_steps=20,
 )
 
 register(
     id='2DWorld_disc-v2',
     entry_point='gym_envs.envs:TwoDWorldDisc',
-    max_episode_steps=100,
+    max_episode_steps=20,
+)
+
+register(
+    id='SpringBall_disc-v2',
+    entry_point='gym_envs.envs:SpringBallDisc',
+    max_episode_steps=40,
+)
+
+register(
+    id='SpringBall_disc-v0',
+    entry_point='gym_envs.envs:SpringBallDiscDet',
+    max_episode_steps=40,
 )
 
 register(

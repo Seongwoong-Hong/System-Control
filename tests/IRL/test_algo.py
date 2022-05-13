@@ -1,12 +1,17 @@
 import os
 import time
+import json
 import pickle
 import pytest
+import torch as th
+import numpy as np
 from scipy import io
+from matplotlib import pyplot as plt
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
-from common.util import make_env
+from algos.tabular.viter import FiniteSoftQiter, SoftQiter
+from common.util import make_env, CPU_Unpickler
 from common.verification import verify_policy
 from common.wrappers import *
 
@@ -66,29 +71,42 @@ def test_hpc_action_verification(irl_path, pltqs, bsp, subj):
     plt.show()
 
 
-def test_irl_learned_policy(irl_path):
-    env_type = "DiscretizedHuman"
-    env = make_env(f"{env_type}-v0", use_vec_env=False)
-    name = f"{env_type}/BC/cnn_lqr_ppo_deep_noreset_rewfirst"
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "model", "016")
+def test_irl_learned_policy():
+    env_type = "2DTarget"
+    with open(f"{irl_path}/demos/{env_type}/sac_1.pkl", "rb") as f:
+        expert_trajs = pickle.load(f)
+    init_states = []
+    for traj in expert_trajs:
+        init_states.append(traj.obs[0])
+    env = make_env(f"{env_type}-v0", init_states=init_states)
+    name = f"{env_type}/GCL/sq_sac_1_sac_resetstd"
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "model")
     algo = SAC.load(model_dir + "/agent")
-    a_list, o_list, _ = verify_policy(env, algo)
+    for _ in range(len(init_states)):
+        ob = env.reset()
+        env.render()
+        done = False
+        while not done:
+            act, _ = algo.predict(ob, deterministic=False)
+            ob, _, done, _ = env.step(act)
+            env.render()
+            time.sleep(env.dt)
 
 
-def test_mujoco_policy(irl_path):
+def test_mujoco_policy():
     name = "Hopper"
     env = make_env(f"{name}-v2", use_vec_env=False)
-    model_dir = os.path.join(irl_path, "tmp", "log", "mujoco_envs", "ppo", name, "10", "model")
+    model_dir = os.path.join(irl_path, "tmp", "log", "mujoco_envs", "ppo", name, "1", "model")
     # model_dir = os.path.join("..", "..", "RL", "mujoco_envs", "tmp", "log", name, "ppo")
     algo = PPO.load(model_dir + "/gen")
     for _ in range(10):
         verify_policy(env, algo, deterministic=False)
 
 
-def test_2D(irl_path):
+def test_2D():
     name = "2DTarget"
-    env = make_env(f"{name}-v0")
-    model_dir = os.path.join(irl_path, "tmp", "log", name, "GCL", "ext_sac_linear_reset_0.2_2", "model", "029")
+    env = make_env(f"{name}-v2")
+    model_dir = os.path.join(irl_path, "tmp", "log", name, "GCL", "sq_sac_1_sac", "model")
     algo = SAC.load(model_dir + f"/agent")
     trajs = []
     for i in range(20):
@@ -115,33 +133,228 @@ def test_1D(irl_path):
     print('end')
 
 
-def test_discretized_env(init_states):
-    from algos.tabular.viter import SoftQiter
-    name = "DiscretizedHuman"
-    env_id = f"{name}"
-    with open(f"{irl_path}/demos/DiscretizedHuman/{subj}_1.pkl", "rb") as f:
-        expert = pickle.load(f)
+@pytest.mark.parametrize("trial", range(1, 11))
+def test_discretized_env(trial):
+    def feature_fn(x):
+        # x1, x2, a1, a2 = th.split(x, 1, dim=-1)
+        # out = x ** 2
+        # for i in range(1, 50):
+        #     out = th.cat([out, (x1 - i / 49) ** 2, (x2 - i / 49) ** 2], dim=1)
+        # for i in range(1, 7):
+        #     out = th.cat([out, (a1 - i / 6) ** 2, (a2 - i / 6) ** 2], dim=1)
+        # return out
+        return th.cat([x, x**2], dim=1)
+        # return th.cat([x, x**2, x**3, x**4], dim=1)
+    env_type = "2DWorld"
+    name = f"{env_type}_disc"
+    expt = "dot2_1dot2_8/01alpha_nobias"
+    with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
+        expt_trajs = pickle.load(f)
     init_states = []
-    for traj in expert:
+    for traj in expt_trajs:
         init_states += [traj.obs[0]]
-    env = make_env(f"{env_id}-v0", num_envs=1, N=[11, 21, 21, 21], bsp=bsp, init_states=init_states)
-    model_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", f"sq_{subj}_2_finite_action",
-                             "model")
-    with open(model_dir + "/agent.pkl", "rb") as f:
-        agent = pickle.load(f)
-    algo = SoftQiter(env, gamma=1, alpha=0.01)
-    algo.policy.policy_table = agent.policy.policy_table[0]
-    for _ in range(5):
-        obs_list = []
-        obs = env.reset()
-        done = False
-        obs_list.append(obs)
-        while not done:
-            a, _ = algo.predict(obs, deterministic=False)
-            ns, _, done, _ = env.step(a)
-            env.render()
-            time.sleep(env.get_attr("dt")[0])
-            obs = ns
-            obs_list.append(obs)
-        obs_list = np.array(obs_list).reshape(-1, 4)
+    rwfn_dir = irl_path + f"/tmp/log/{name}/MaxEntIRL/ext_01alpha_{expt}_{trial}/model"
+    with open(rwfn_dir + "/reward_net.pkl", "rb") as f:
+        rwfn = CPU_Unpickler(f).load().eval().to('cpu')
+    rwfn.feature_fn = feature_fn
+    print(rwfn.layers[0].weight.detach())
+    # env = make_env(f"{env_id}-v0", num_envs=1, N=[19, 19, 19, 19], bsp=bsp, init_states=init_states)
+    env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': rwfn})
+    # env = make_env(f"{name}-v2", num_envs=1, wrapper=DiscretizeWrapper)
+    eval_env = make_env(f"{name}-v0", init_states=init_states, wrapper=DiscretizeWrapper)
+    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device=rwfn.device, verbose=False)
+    agent.learn(0)
+    agent.set_env(eval_env)
+
+    fig1 = plt.figure(figsize=[9, 14.4])
+    fig2 = plt.figure(figsize=[9.6, 4.8])
+    ax2_ex = fig2.add_subplot(1, 2, 1)
+    ax2_ag = fig2.add_subplot(1, 2, 2)
+    ax11 = fig1.add_subplot(6, 2, 1)
+    ax12 = fig1.add_subplot(6, 2, 2)
+    ax21 = fig1.add_subplot(6, 2, 3)
+    ax22 = fig1.add_subplot(6, 2, 4)
+    ax51 = fig1.add_subplot(6, 2, 9)
+    ax52 = fig1.add_subplot(6, 2, 10)
+    ax61 = fig1.add_subplot(6, 2, 11)
+    ax62 = fig1.add_subplot(6, 2, 12)
+
+    for traj in expt_trajs:
+        # Expert Trajectories
+        ax2_ex.plot(traj.obs[:-1, 0], traj.obs[:-1, 1])
+        ax2_ex.set_xlim([eval_env.obs_low[0], eval_env.obs_high[0]])
+        ax2_ex.set_ylim([eval_env.obs_low[1], eval_env.obs_high[1]])
+        ax11.plot(traj.obs[:-1, 0])
+        ax21.plot(traj.obs[:-1, 1])
+        ax51.plot(traj.acts[:, 0])
+        ax61.plot(traj.acts[:, 1])
+        ax11.set_ylim([eval_env.obs_low[0], eval_env.obs_high[0]])
+        ax21.set_ylim([eval_env.obs_low[1], eval_env.obs_high[1]])
+        ax51.set_ylim([eval_env.acts_low[0], eval_env.acts_high[0]])
+        ax61.set_ylim([eval_env.acts_low[1], eval_env.acts_high[1]])
+
+    for i in range(len(expt_trajs)):
+        # obs, acts = [], []
+        ob = init_states[i]
+        # obs.append(ob)
+        # done = False
+        # while not done:
+        #     act, _ = agent.predict(ob, deterministic=False)
+        #     ob, _, done, _ = eval_env.step(act[0])
+        #     acts.append(act[0])
+        #     obs.append(ob)
+        # obs = np.array(obs)
+        # acts = np.array(acts)
+        obs, acts, _ = agent.predict(ob, deterministic=False)
+        ax2_ag.plot(obs[:-1, 0], obs[:-1, 1])
+        ax2_ag.set_xlim([eval_env.obs_low[0], eval_env.obs_high[0]])
+        ax2_ag.set_ylim([eval_env.obs_low[1], eval_env.obs_high[1]])
+        ax12.plot(obs[:-1, 0])
+        ax22.plot(obs[:-1, 1])
+        ax52.plot(acts[:, 0])
+        ax62.plot(acts[:, 1])
+        ax12.set_ylim([eval_env.obs_low[0], eval_env.obs_high[0]])
+        ax22.set_ylim([eval_env.obs_low[1], eval_env.obs_high[1]])
+        ax52.set_ylim([eval_env.acts_low[0], eval_env.acts_high[0]])
+        ax62.set_ylim([eval_env.acts_low[1], eval_env.acts_high[1]])
+        # done = False
+        # obs_list.append(obs)
+        # while not done:
+        #     a, _ = algo.predict(obs, deterministic=False)
+        #     ns, _, done, _ = eval_env.step(a)
+        #     eval_env.render()
+        #     time.sleep(env.get_attr("dt")[0])
+        #     obs = ns
+        #     obs_list.append(obs)
+        # obs_list = np.array(obs_list).reshape(-1, 4)
+    fig1.tight_layout()
+    fig2.tight_layout()
+    plt.show()
     env.close()
+
+params = []
+for actu in range(4, 5):
+    for trial in range(1, 10):
+        params.append([actu, trial])
+
+@pytest.mark.parametrize("actu, trial", [[4, 1]])
+def test_learned_human_policy(actu, trial):
+
+    def feature_fn(x):
+        # x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=-1)
+        # out = x ** 2
+        # ob_sec, act_sec = 4, 3
+        # for i in range(1, ob_sec):
+        #     out = th.cat([out, (x1 - i / ob_sec) ** 2, (x2 - i / ob_sec) ** 2, (x3 - i /ob_sec) ** 2, (x4 - i / ob_sec) ** 2,
+        #                   (x1 + i / ob_sec) ** 2, (x2 + i / ob_sec) ** 2, (x3 + i / ob_sec) ** 2, (x4 + i / ob_sec) ** 2], dim=1)
+        # for i in range(1, act_sec):
+        #     out = th.cat([out, (a1 - i / act_sec) ** 2, (a2 - i / act_sec) ** 2, (a1 + i / act_sec) ** 2, (a2 + i / act_sec) ** 2], dim=1)
+        # return out
+        # return x
+        # return x ** 2
+        return th.cat([x, x ** 2], dim=1)
+        # x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=1)
+        # return th.cat((x, x ** 2, x1 * x2, x3 * x4, a1 * a2), dim=1)
+    env_type = "DiscretizedHuman"
+    name = f"{env_type}"
+    subj = "sub05"
+    device = 'cuda:0'
+    expt = f"19191919/{subj}_{actu}"
+    with open(irl_path + f"/demos/DiscretizedHuman/{expt}.pkl", "rb") as f:
+        expt_trajs = pickle.load(f)
+    with open(irl_path + f"/demos/bound_info.json", "r") as f:
+        bound_info = json.load(f)
+    init_states = []
+    for traj in expt_trajs:
+        init_states.append(traj.obs[0])
+    bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
+    rwfn_dir = irl_path + f"/tmp/log/DiscretizedHuman/MaxEntIRL/ext_lastpolicy_001alpha_lrdecay_{expt}_{trial}/model/700"
+    with open(rwfn_dir + "/reward_net.pkl", "rb") as f:
+        rwfn = CPU_Unpickler(f).load().to(device)
+    rwfn.feature_fn = feature_fn
+    # rwfn.layers[0].weight = th.nn.Parameter(rwfn.layers[0].weight.detach() / 5)
+    # rwfn.layers[0].weight = th.nn.Parameter(th.tensor([[-0.03946868, -0.24135341, -0.02744996, -0.0490342 , -0.07611195, -0.04075731]]))
+
+    env = make_env(f"{name}-v2", num_envs=1, N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp,
+                   wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': rwfn})
+    eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11],
+                        bsp=bsp, init_states=init_states, wrapper=DiscretizeWrapper)
+    perturbation = actu - 1
+    max_states = bound_info[subj][perturbation]["max_states"]
+    min_states = bound_info[subj][perturbation]["min_states"]
+    max_torques = bound_info[subj][perturbation]["max_torques"]
+    min_torques = bound_info[subj][perturbation]["min_torques"]
+    env.env_method('set_bounds', max_states, min_states, max_torques, min_torques)
+    eval_env.set_bounds(max_states, min_states, max_torques, min_torques)
+    agent2 = FiniteSoftQiter(env=env, gamma=1, alpha=0.001, device=device, verbose=True)
+    agent2.learn(0)
+    # agent.set_env(eval_env)
+    agent = SoftQiter(env=env, gamma=1, alpha=0.001, device='cuda:1', verbose=True)
+    agent.policy.policy_table = agent2.policy.policy_table[0]
+
+    fig1 = plt.figure(figsize=[9, 14.4])
+    ax11 = fig1.add_subplot(6, 2, 1)
+    ax12 = fig1.add_subplot(6, 2, 2)
+    ax21 = fig1.add_subplot(6, 2, 3)
+    ax22 = fig1.add_subplot(6, 2, 4)
+    ax31 = fig1.add_subplot(6, 2, 5)
+    ax32 = fig1.add_subplot(6, 2, 6)
+    ax41 = fig1.add_subplot(6, 2, 7)
+    ax42 = fig1.add_subplot(6, 2, 8)
+    ax51 = fig1.add_subplot(6, 2, 9)
+    ax52 = fig1.add_subplot(6, 2, 10)
+    ax61 = fig1.add_subplot(6, 2, 11)
+    ax62 = fig1.add_subplot(6, 2, 12)
+
+    for traj in expt_trajs:
+        # Expert Trajectories
+        ax11.plot(traj.obs[:, 0])
+        ax21.plot(traj.obs[:, 1])
+        ax31.plot(traj.obs[:, 2])
+        ax41.plot(traj.obs[:, 3])
+        ax51.plot(traj.acts[:, 0])
+        ax61.plot(traj.acts[:, 1])
+        ax11.set_ylim([min_states[0], max_states[0]])
+        ax21.set_ylim([min_states[1], max_states[1]])
+        ax31.set_ylim([min_states[2], max_states[2]])
+        ax41.set_ylim([min_states[3], max_states[3]])
+        ax51.set_ylim([min_torques[0], max_torques[0]])
+        ax61.set_ylim([min_torques[1], max_torques[1]])
+
+    for i in range(60):
+        # Agent Trajectories
+        obs, acts = [], []
+        ob = eval_env.reset()
+        obs.append(ob)
+        done = False
+        while not done:
+            act, _ = agent.predict(ob, deterministic=False)
+            ob, _, done, _ = eval_env.step(act[0])
+            acts.append(act[0])
+            obs.append(ob)
+        obs = np.array(obs)
+        acts = np.array(acts)
+        # ob = init_states[i % len(init_states)]
+        # obs, acts, _ = agent.predict(ob, deterministic=False)
+        ax12.plot(obs[:-1, 0])
+        ax22.plot(obs[:-1, 1])
+        ax32.plot(obs[:-1, 2])
+        ax42.plot(obs[:-1, 3])
+        ax52.plot(acts[:, 0])
+        ax62.plot(acts[:, 1])
+        ax12.set_ylim([min_states[0], max_states[0]])
+        ax22.set_ylim([min_states[1], max_states[1]])
+        ax32.set_ylim([min_states[2], max_states[2]])
+        ax42.set_ylim([min_states[3], max_states[3]])
+        ax52.set_ylim([min_torques[0], max_torques[0]])
+        ax62.set_ylim([min_torques[1], max_torques[1]])
+        # eval_env.render()
+        # for t in range(50):
+        #     obs_idx = eval_env.get_idx_from_obs(ob)
+        #     act_idx = agent.policy.choice_act(agent.policy.policy_table[t].T[obs_idx])
+        #     act = eval_env.get_acts_from_idx(act_idx)
+        #     ob, r, _, _ = eval_env.step(act[0])
+        #     eval_env.render()
+        #     time.sleep(eval_env.dt)
+    plt.tight_layout()
+    plt.show()

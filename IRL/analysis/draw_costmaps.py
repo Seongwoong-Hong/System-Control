@@ -53,7 +53,7 @@ def draw_trajectories():
     subj = "softqiter_disc_20"
     wrapper = ActionWrapper if "HPC" in env_type else None
     # pltqs, init_states = [], []
-    # for i in range(5, 10):
+    # for i in range(5, 1):
     #     pltqs += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['pltq']]
     #     init_states += [io.loadmat(f"../demos/HPC/sub01/sub01i{i+1}.mat")['state'][0, :4]]
     env = make_env(f"{env_id}-v0", num_envs=1, wrapper=wrapper, subpath=f"../demos/HPC/sub01/sub01")

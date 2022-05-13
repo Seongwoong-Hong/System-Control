@@ -2,7 +2,8 @@ from gym_envs.envs.cartpolecont import CartPoleContEnv
 from gym_envs.envs.cartpolecont_test import CartPoleContTestEnv
 from gym_envs.envs.inverted_double_pendulum import InvertedDoublePendulum
 from gym_envs.envs.twod_navigate import TwoDWorld, TwoDWorldDet, TwoDWorldDetOrder
-from gym_envs.envs.twod_navigate_discrete import TwoDWorldDiscDet, TwoDWorldDiscDetOrder, TwoDWorldDisc
+from gym_envs.envs.twod_navigate_discrete import TwoDWorldDiscDet, TwoDWorldDisc
+from gym_envs.envs.spring_ball_discrete import SpringBallDisc, SpringBallDiscDet
 from gym_envs.envs.twod_target import TwoDTarget, TwoDTargetDet
 from gym_envs.envs.twod_target_discrete import TwoDTargetDisc, TwoDTargetDiscDet
 from gym_envs.envs.oned_target_discrete import OneDTargetDiscDet, OneDTargetDisc

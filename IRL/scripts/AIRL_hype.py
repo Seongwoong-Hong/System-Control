@@ -40,7 +40,7 @@ if __name__ == "__main__":
         gen_lr = np.random.choice(np.linspace(1e-5, 1e-3, num=6))
         n_epochs = 10
 
-        # n_epochs = random.sample([2, 5, 8, 10], 1)[0]
+        # n_epochs = random.sample([2, 5, 8, 1], 1)[0]
 
         name = log_dir + f"/{i}"
         if not os.path.isdir(name):

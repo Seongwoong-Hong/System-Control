@@ -10,14 +10,14 @@ from imitation.util import logger
 from common.util import make_env
 from common.callbacks import SaveCallback
 from common.wrappers import *
-from algos.torch.MaxEntIRL import GuidedCostLearning
+from algos.torch.MaxEntIRL import GuidedCostLearning, ContMaxEntIRL
 from algos.torch.sac import MlpPolicy, SAC
 
 
 if __name__ == "__main__":
     env_type = "2DTarget"
-    algo_type = "GCL"
-    device = "cpu"
+    algo_type = "ContMaxEntIRL"
+    device = "cuda:1"
     subj, actu = "sub06", 1
     expt = f"sac_1"
     name = f"{env_type}"
@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     # Setup log directories
     log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-    log_dir += f"/sq_{expt}_sac"
+    log_dir += f"/sq_{expt}_sac_noreset"
     os.makedirs(log_dir, exist_ok=False)
     shutil.copy(os.path.abspath(__file__), log_dir)
     shutil.copy(expert_dir, log_dir)
@@ -67,8 +67,8 @@ if __name__ == "__main__":
         ent_coef='auto',
         target_entropy=-0.1,
         tau=0.01,
-        buffer_size=int(1e5),
-        learning_starts=10000,
+        buffer_size=int(1e4),
+        learning_starts=2000,
         train_freq=1,
         gradient_steps=1,
         device=device,
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         policy_kwargs={'net_arch': [32, 32]}
     )
 
-    learner = GuidedCostLearning(
+    learner = ContMaxEntIRL(
         env,
         eval_env=eval_env,
         feature_fn=feature_fn,
@@ -93,8 +93,8 @@ if __name__ == "__main__":
 
     # Run Learning
     learner.learn(
-        total_iter=50,
-        agent_learning_steps=1.5e5,
+        total_iter=300,
+        agent_learning_steps=3e4,
         n_episodes=expt_traj_num,
         max_agent_iter=1,
         min_agent_iter=1,

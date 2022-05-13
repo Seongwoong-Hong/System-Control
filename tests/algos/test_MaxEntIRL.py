@@ -7,14 +7,14 @@ import pytest
 
 from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning, APIRL
 from algos.torch.sac import MlpPolicy, SAC
-from algos.tabular.viter import FiniteSoftQiter, FiniteViter
+from algos.tabular.viter import FiniteSoftQiter, FiniteViter, SoftQiter
 from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
 
-subj = "sub06"
-env_name = "2DTarget"
-env_id = f"{env_name}"
+subj = "sub05"
+env_name = "2DWorld"
+env_id = f"{env_name}_disc"
 
 
 @pytest.fixture
@@ -25,8 +25,8 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    # expert_dir = os.path.join(demo_dir, env_name, "test", f"{subj}_1.pkl")
-    expert_dir = os.path.join(demo_dir, env_name, "sac_1.pkl")
+    # expert_dir = os.path.join(demo_dir, env_name, "19191919", f"{subj}_1.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "20", "2*alpha_nobias.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -39,8 +39,8 @@ def env(expert, demo_dir):
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    # return make_env(f"{env_id}-v0", bsp=bsp, init_states=init_states)
-    return make_env(f"{env_id}-v0", init_states=init_states)
+    # return make_env(f"{env_id}-v2", bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11])
+    return make_env(f"{env_id}-v2")
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def eval_env(expert, demo_dir):
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    # return make_env(f"{env_id}-v0", bsp=bsp, init_states=init_states)
+    # return make_env(f"{env_id}-v0", bsp=bsp, init_states=init_states, N=[19, 19, 19, 19], NT=[11, 11])
     return make_env(f"{env_id}-v0", init_states=init_states)
 
 @pytest.fixture
@@ -59,18 +59,23 @@ def learner(env, expert, eval_env):
     logger.configure("tmp/log", format_strs=["stdout"])
 
     def feature_fn(x):
-        # if len(x.shape) == 1:
-        #     x = x.reshape(1, -1)
-        # ft = th.zeros([x.shape[0], env_op], dtype=th.float32)
-        # for i, row in enumerate(x):
-        #     idx = int(row.item())
-        #     ft[i, idx] = 1
-        # return ft
-        # return x
-        return x ** 2
-        # return th.cat([x, x ** 2], dim=1)
+        # x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=-1)
+        # return th.cat([x, x ** 2, x1 * x2, x3 * x4, a1 * a2], dim=1)
+        # return x ** 2
+        # return th.cat([x, x**2, x**3, x**4], dim=1)
+        # x1, x2, a1, a2 = th.split(x, 1, dim=-1)
+        # out = x ** 2
+        # ob_sec, act_sec = 4, 3
+        # for i in range(1, ob_sec):
+        #     out = th.cat([out, (x1 - i / ob_sec) ** 2, (x2 - i / ob_sec) ** 2, (x3 - i /ob_sec) ** 2, (x4 - i / ob_sec) ** 2,
+        #                   (x1 + i / ob_sec) ** 2, (x2 + i / ob_sec) ** 2, (x3 + i / ob_sec) ** 2, (x4 + i / ob_sec) ** 2], dim=1)
+        # for i in range(1, act_sec):
+        #     out = th.cat([out, (a1 - i / act_sec) ** 2, (a2 - i / act_sec) ** 2, (a1 + i / act_sec) ** 2, (a2 + i / act_sec) ** 2], dim=1)
+        # return out
+        return th.cat([x, x**2], dim=1)
 
-    agent = FiniteViter(env, gamma=1, alpha=0.001, device='cuda:1')
+    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu')
+    # agent = SoftQiter(env, gamma=0.99, alpha=0.01, device='cuda:2')
 
     return MaxEntIRL(
         env,
@@ -83,7 +88,9 @@ def learner(env, expert, eval_env):
         device=agent.device,
         env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardInputNormalizeWrapper},
         rew_kwargs={'type': 'ann', 'scale': 1,
-                    'optim_kwargs': {'weight_decay': 0.0, 'lr': 1e-1, 'betas': (0.9, 0.999)}
+                    'optim_kwargs': {'weight_decay': 0.0, 'lr': 1e-2, 'betas': (0.9, 0.999)},
+                    'lr_scheduler_cls': th.optim.lr_scheduler.StepLR,
+                    'lr_scheduler_kwargs': {'step_size': 10, 'gamma': 0.95},
                     },
     )
 
@@ -174,17 +181,32 @@ def test_GCL(env, expert, eval_env):
     )
 
 
-def test_state_visitation(env, expert, learner):
-    from algos.tabular.viter import FiniteSoftQiter
-    policy = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu')
-    policy.learn(0)
-    learner.agent = policy
-    Ds = learner.cal_state_visitation()
-    learner.get_whole_states_from_env()
-    r1 = th.sum(Ds * env.get_reward_mat())
-    r2 = learner.cal_expert_mean_reward()
-    assert th.abs((r2 - r1) / r1).item() < 0.1
-    print(th.abs((r2 - r1) / r1).item())
+def test_state_visitation(env):
+    from copy import deepcopy
+    agent1 = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu')
+    agent1.learn(0)
+    agent2 = SoftQiter(env, gamma=0.99, alpha=0.01, device='cpu')
+    agent2.learn(1e3)
+
+    D_prev1 = th.ones_like(agent1.policy.v_table[0]) / (agent1.policy.act_size * agent1.policy.obs_size)
+    D_prev2 = th.ones_like(agent2.policy.v_table) / (agent2.policy.act_size * agent2.policy.obs_size)
+    Dc1 = D_prev1[None, :] * agent1.policy.policy_table[0]
+    Dc2 = D_prev2[None, :] * agent2.policy.policy_table
+    for t in range(1, 50):
+        D1 = th.zeros_like(agent1.policy.v_table[0]).to(agent1.device)
+        D2 = th.zeros_like(agent2.policy.v_table).to(agent2.device)
+        for a in range(agent1.policy.act_size):
+            D1 += agent1.transition_mat[a] @ (D_prev1 * agent1.policy.policy_table[t - 1, a])
+            D2 += agent2.transition_mat[a] @ (D_prev2 * agent2.policy.policy_table[a])
+        Dc1 += agent1.policy.policy_table[t] * D1[None, :] * agent1.gamma ** t
+        Dc2 += agent2.policy.policy_table * D2[None, :] * agent2.gamma ** t
+        D_prev1 = deepcopy(D1)
+        D_prev2 = deepcopy(D2)
+
+    print(Dc1.mean(), Dc2.mean())
+    print(Dc1.max(), Dc2.max())
+    print((Dc1.cpu() - Dc2.cpu()).abs().mean())
+    print((Dc1.cpu() - Dc2.cpu()).abs().max())
 
 
 def test_state_visit_difference_according_to_init(learner):

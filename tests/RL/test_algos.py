@@ -1,13 +1,15 @@
 import os
 import pytest
 import pickle
+import json
 import time
 import numpy as np
+import torch as th
 from scipy import io
 
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
-from algos.tabular.viter import FiniteSoftQiter, FiniteViter
+from algos.tabular.viter import FiniteSoftQiter, FiniteViter, SoftQiter
 from common.util import make_env, CPU_Unpickler
 from common.verification import verify_policy
 from common.wrappers import *
@@ -71,45 +73,27 @@ def test_rl_learned_policy(rl_path):
 
 
 def test_finite_algo(rl_path):
-
-    def feature_fn(x):
-        return x ** 2
-        # x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=1)
-        # return th.cat((x, x1*x2, x3*x4, x1*x3, x2*x4, x1*x4, x2*x3, a1*a2, x**2, x**3), dim=1)
-    env_type = "DiscretizedHuman"
-    name = f"{env_type}"
-    subj = "sub06"
+    name = "DiscretizedHuman"
+    env_id = f"{name}"
+    subj = "sub05"
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
-    with open(irl_dir + f"/demos/DiscretizedHuman/17171719/{subj}_1.pkl", "rb") as f:
-        expt_trajs = pickle.load(f)
-    init_states = []
-    for traj in expt_trajs:
-        init_states.append(traj.obs[0])
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    rwfn_dir = irl_dir + f"/tmp/log/DiscretizedHuman/MaxEntIRL/sq_handnorm_17171719_quadcost_finite_det/{subj}_1_1/model"
-    with open(rwfn_dir + "/reward_net.pkl", "rb") as f:
-        rwfn = CPU_Unpickler(f).load().to('cpu')
-    rwfn.feature_fn = feature_fn
-    env = make_env(f"{name}-v2", num_envs=1, N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp,
-                   )#wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': rwfn})
-    eval_env = make_env(f"{name}-v0", N=[17, 17, 17, 19], NT=[11, 11],
-                        bsp=bsp, wrapper=DiscretizeWrapper, init_states=init_states)
-    agent = FiniteViter(env=env, gamma=1, alpha=0.001, device='cpu', verbose=True)
+    env = make_env(f"{env_id}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
+    # init_states = np.array([[11, 35], [ 8, 16], [ 6,  2], [ 5, 45], [29, 27], [18, 37]])
+    # env = make_env(f"{env_id}-v0", num_envs=1, init_states=init_states)
+    # agent = SoftQiter(env=env, gamma=1, alpha=0.001, device='cuda:0')
+    # agent.learn(50)
+    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cuda:0')
     agent.learn(0)
-    agent.set_env(eval_env)
-    fig1 = plt.figure()
-    ax1 = fig1.add_subplot()
-    fig2 = plt.figure()
-    ax2 = fig2.add_subplot()
-    # fig3 = plt.figure()
-    # ax3 = fig3.add_subplot()
-    for epi in range(15):
-        ob = eval_env.reset()
+    for epi in range(300):
+        # ob = init_states[epi % len(init_states)]
+        ob = env.reset()
         obs, acts, rews = agent.predict(ob, deterministic=True)
-        ax1.plot(obs[:, 0:2])
-        ax2.plot(obs[:, 2:4])
-        # ax3.plot(acts)
+        plt.plot(obs[:, 0], obs[:, 1])
+        plt.xlim([0, 50])
+        plt.ylim([0, 50])
+        # plt.plot(obs[:, 1])
         # eval_env.render()
         # for t in range(50):
         #     obs_idx = eval_env.get_idx_from_obs(ob)
@@ -121,25 +105,36 @@ def test_finite_algo(rl_path):
     plt.show()
 
 
-def test_2d(rl_path):
-    name = "2DTarget"
-    env_id = f"{name}"
-    env = make_env(f"{env_id}-v2")
-    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "sac", "policies_1")
-    algo = SAC.load(model_dir + "/agent")
-    # with open(model_dir + "/agent.pkl", "rb") as f:
-    #     algo = pickle.load(f)
+def test_toy_disc_env(rl_path):
+    name = "SpringBall"
+    env_id = f"{name}_disc"
+    env = make_env(f"{env_id}-v2", wrapper=DiscretizeWrapper)
+    algo = SoftQiter(env=env, gamma=0.99, alpha=0.01, device='cpu')
+    algo.learn(1000)
+    fig = plt.figure(figsize=[6.4, 6.4])
+    ax1 = fig.add_subplot(3, 1, 1)
+    ax2 = fig.add_subplot(3, 1, 2)
+    ax3 = fig.add_subplot(3, 1, 3)
     for _ in range(10):
-        obs = env.reset()
+        obs = []
+        acts = []
+        ob = env.reset()
         done = False
-        env.render()
+        # env.render()
         while not done:
-            act, _ = algo.predict(obs, deterministic=True)
-            obs, _, done, _ = env.step(act)
-            env.render()
-            time.sleep(env.dt)
-        print(obs)
-    env.close()
+            obs.append(ob)
+            act, _ = algo.predict(ob, deterministic=False)
+            ob, _, done, _ = env.step(act[0])
+            acts.append(act[0])
+            # env.render()
+            # time.sleep(env.dt)
+        obs = np.array(obs)
+        acts = np.array(acts)
+        ax1.plot(obs[:, 0])
+        ax2.plot(obs[:, 1])
+        ax3.plot(acts)
+    fig.tight_layout()
+    plt.show()
 
 
 def test_1d(rl_path):

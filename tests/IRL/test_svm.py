@@ -28,13 +28,13 @@ def test_svm():
     for i in range(len(agent_trajs)):
         agent_mu[i, 0] = (agent_gammas * agent_input[:, 0].flatten())[i * 20:(i + 1) * 20].sum()
         agent_mu[i, 1] = (agent_gammas * agent_input[:, 1].flatten())[i * 20:(i + 1) * 20].sum()
-        # agent_mu[i, 2] = (agent_gammas * agent_input[:, 2].flatten())[i * 10:(i + 1) * 10].sum()
-        # agent_mu[i, 3] = (agent_gammas * agent_input[:, 3].flatten())[i * 10:(i + 1) * 10].sum()
+        # agent_mu[i, 2] = (agent_gammas * agent_input[:, 2].flatten())[i * 1:(i + 1) * 1].sum()
+        # agent_mu[i, 3] = (agent_gammas * agent_input[:, 3].flatten())[i * 1:(i + 1) * 1].sum()
     for i in range(len(expt_trajs)):
         expt_mu[i, 0] = (expt_gammas * expt_input[:, 0].flatten())[i * 20:(i + 1) * 20].sum()
         expt_mu[i, 1] = (expt_gammas * expt_input[:, 1].flatten())[i * 20:(i + 1) * 20].sum()
-        # expt_mu[i, 2] = (expt_gammas * expt_input[:, 2].flatten())[i * 10:(i + 1) * 10].sum()
-        # expt_mu[i, 3] = (expt_gammas * expt_input[:, 3].flatten())[i * 10:(i + 1) * 10].sum()
+        # expt_mu[i, 2] = (expt_gammas * expt_input[:, 2].flatten())[i * 1:(i + 1) * 1].sum()
+        # expt_mu[i, 3] = (expt_gammas * expt_input[:, 3].flatten())[i * 1:(i + 1) * 1].sum()
 
     w1, w2 = reward_fn.layers[0].weight.detach().flatten()
     w1, w2 = w1.item(), w2.item()

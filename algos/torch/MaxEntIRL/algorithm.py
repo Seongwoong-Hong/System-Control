@@ -120,14 +120,25 @@ class MaxEntIRL:
     def cal_agent_mean_reward(self) -> th.Tensor:
         D_prev = deepcopy(self.init_D)
         Dc = D_prev
+        is_finite_agent = len(self.agent.policy.policy_table.shape) == 3
         if self.use_action_as_input:
-            Dc = Dc[None, :] * self.agent.policy.policy_table[0]
+            if is_finite_agent:
+                Dc = Dc[None, :] * self.agent.policy.policy_table[0]
+            else:
+                Dc = Dc[None, :] * self.agent.policy.policy_table
         for t in range(1, self.env.spec.max_episode_steps):
             D = th.zeros_like(self.init_D).to(self.device)
             for a in range(self.agent.policy.act_size):
-                D += self.agent.transition_mat[a] @ (D_prev * self.agent.policy.policy_table[t - 1, a])
+                if is_finite_agent:
+                    D += self.agent.transition_mat[a] @ (D_prev * self.agent.policy.policy_table[t - 1, a])
+                    # D += self.agent.transition_mat[a] @ (D_prev * self.agent.policy.policy_table[0, a])
+                else:
+                    D += self.agent.transition_mat[a] @ (D_prev * self.agent.policy.policy_table[a])
             if self.use_action_as_input:
-                Dc += self.agent.policy.policy_table[t] * D[None, :] * self.agent.gamma ** t
+                if is_finite_agent:
+                    Dc += self.agent.policy.policy_table[t] * D[None, :] * self.agent.gamma ** t
+                else:
+                    Dc += self.agent.policy.policy_table * D[None, :] * self.agent.gamma ** t
             else:
                 Dc += D * self.agent.gamma ** t
             D_prev = deepcopy(D)
@@ -159,6 +170,8 @@ class MaxEntIRL:
             self.reward_net.optimizer.zero_grad()
             loss.backward()
             self.reward_net.optimizer.step()
+            if self.reward_net.lr_scheduler and self.reward_net.lr_scheduler.get_last_lr()[0] > 1.5e-4:
+                self.reward_net.lr_scheduler.step()
             logger.record("expert_reward", mean_expert_rewards.item())
             logger.record("agent_reward", mean_agent_rewards.item())
             logger.record("loss", loss.item())
@@ -187,6 +200,7 @@ class MaxEntIRL:
         call_num = 0
         for param in self.reward_net.parameters():
             last_grad = th.zeros_like(param).view(-1)
+            last_weight = th.zeros_like(param).view(-1)
         while self.itr < total_iter:
             with logger.accumulate_means(f"reward"):
                 self.wrap_eval_env.train()
@@ -195,16 +209,26 @@ class MaxEntIRL:
                 params_grad_data = []
                 for param in self.reward_net.parameters():
                     weight_norm += param.norm().detach().item()
-                    params_grad_data.append(param.grad.data)
+                    params_grad_data.append(param.grad.data.view(-1))
+                    current_weight = param.data.view(-1)
                 grad_norm = params_grad_data[-1].norm().item()
-                grad_var_angle = th.arccos(last_grad.dot(params_grad_data[-1].view(-1)) / (last_grad.norm() * params_grad_data[-1].norm() + 1e-8)).item()
-                last_grad = deepcopy(params_grad_data[-1].view(-1))
+                grad_var_angle = th.arccos(th.clip(
+                    (last_grad @ params_grad_data[-1]) / (last_grad.norm() * params_grad_data[-1].norm()),
+                    min= -1 + 1e-8, max= +1 - 1e-8)
+                ).item()
+                weight_var_angle = th.arccos(th.clip(
+                    (last_weight @ current_weight) / (last_weight.norm() * current_weight.norm()),
+                    min= -1 + 1e-8, max= +1 - 1e-8)
+                ).item()
+                last_weight = deepcopy(current_weight)
+                last_grad = deepcopy(params_grad_data[-1])
                 logger.record("weight norm", weight_norm)
                 logger.record("grad norm", grad_norm)
+                logger.record("weight variant angle", weight_var_angle)
                 logger.record("grad variant angle", grad_var_angle)
                 logger.record("num iteration", self.itr, exclude="tensorboard")
                 logger.dump(self.itr)
-                if self.itr > 30 and np.abs(mean_loss) < 2e-2 and np.abs(grad_norm) < 0.03 and early_stop:
+                if self.itr > 30 and np.abs(grad_norm) < 1e-3 and weight_var_angle < 1e-4 and early_stop:
                     break
             with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)
@@ -219,7 +243,7 @@ class MaxEntIRL:
                 call_num += 1
 
 
-class GuidedCostLearning(MaxEntIRL):
+class ContMaxEntIRL(MaxEntIRL):
     def _setup(self):
         self.expert_reward_inp = self.expert_trajectories[0].obs[:-1]
         if self.use_action_as_input:
@@ -247,6 +271,26 @@ class GuidedCostLearning(MaxEntIRL):
         self.agent.set_env(self.wrap_env)
 
     def cal_agent_mean_reward(self) -> th.Tensor:
+        rewards = th.zeros(len(self.agent_trajectories))
+        for i, traj in enumerate(self.agent_trajectories):
+            np_input = traj.obs[:-1]
+            if self.use_action_as_input:
+                acts = traj.acts
+                if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
+                    acts = self.wrap_eval_env.action(acts)
+                np_input = np.append(np_input, acts, axis=1)
+            th_input = th.from_numpy(np_input).float().to(self.device)
+            gammas = th.Tensor([self.agent.gamma ** i for i in range(len(traj))]).reshape(-1, 1).to(self.device)
+            rewards[i] = (gammas * self.reward_net(th_input)).sum()
+        return th.mean(rewards)
+
+    def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
+        self.collect_rollouts(16)
+        return super().train_reward_fn(max_gradient_steps, min_gradient_steps)
+
+
+class GuidedCostLearning(ContMaxEntIRL):
+    def cal_agent_mean_reward(self) -> th.Tensor:
         rewards, log_probs = th.zeros(len(self.agent_trajectories)), th.zeros(len(self.agent_trajectories))
         for i, traj in enumerate(self.agent_trajectories):
             np_input = traj.obs[:-1]
@@ -260,37 +304,6 @@ class GuidedCostLearning(MaxEntIRL):
             rewards[i] = (gammas * self.reward_net(th_input)).sum()
             log_probs[i] = get_trajectories_probs(flatten_trajectories([traj]), self.agent.policy).sum()
         return th.logsumexp(rewards - log_probs, 0)
-
-    def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
-        self.collect_rollouts(16)
-        return super().train_reward_fn(max_gradient_steps, min_gradient_steps)
-
-    def learn(
-            self,
-            total_iter: int,
-            agent_learning_steps: Union[int, float],
-            max_gradient_steps: int = 40,
-            min_gradient_steps: int = 15,
-            max_agent_iter: int = 15,
-            min_agent_iter: int = 3,
-            agent_callback=None,
-            callback=None,
-            early_stop=False,
-            n_episodes: int = 10,
-            **kwargs
-    ):
-        super(GuidedCostLearning, self).learn(
-            total_iter=total_iter,
-            agent_learning_steps=agent_learning_steps,
-            max_gradient_steps=max_gradient_steps,
-            min_gradient_steps=min_gradient_steps,
-            max_agent_iter=max_agent_iter,
-            min_agent_iter=min_agent_iter,
-            agent_callback=agent_callback,
-            callback=callback,
-            early_stop=early_stop,
-            **kwargs,
-        )
 
 
 class APIRL(MaxEntIRL):

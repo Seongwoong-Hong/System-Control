@@ -162,9 +162,9 @@ class Viter:
 
 class SoftQiter(Viter):
     def train(self):
-        self.policy.v_table = self.alpha * th.logsumexp(self.policy.q_table / self.alpha, dim=0)
         self.policy.q_table = self.reward_mat + self.gamma * (1 - self.done_mat) * \
                               backward_trans(self.transition_mat, self.policy.v_table)
+        self.policy.v_table = self.alpha * th.logsumexp(self.policy.q_table / self.alpha, dim=0)
         self.policy.policy_table = th.exp((self.policy.q_table - self.policy.v_table[None, :]) / self.alpha)
 
     def predict(
@@ -182,7 +182,7 @@ class FiniteViter(Viter):
         self.num_timesteps = 0
         self.observation_space = self.env.observation_space
         self.action_space = self.env.action_space
-        assert hasattr(self.env.get_attr("spec")[0], "max_episode_steps"), "Need to be specified the maximum timestep"
+        assert hasattr(self.env.get_attr("spec")[0], "max_episode_steps"), "Need to be specified the bound_info.json timestep"
         self.max_t = self.env.get_attr("spec")[0].max_episode_steps
         self.policy = FiniteTabularPolicy(
             observation_space=self.observation_space,
