@@ -171,10 +171,13 @@ def test_state_visitation_diff_according_to_alpha_diff():
 
 
 def test_wrapped_reward():
-    with open(
-            "../../IRL/tmp/log/1DTarget_disc/MaxEntIRL/ext_ppo_disc_samp_linear_ppoagent_svm_reset/model/000/reward_net.pkl",
-            "rb") as f:
+    def feature_fn(x):
+        return th.cat([x, x**2], dim=1)
+
+    reward_dir = "../../IRL/tmp/log/1DTarget_disc/MaxEntIRL/ext_ppo_disc_samp_linear_ppoagent_svm_reset/model"
+    with open(f"{reward_dir}/000/reward_net.pkl", "rb") as f:
         reward_net = pickle.load(f).cpu()
+    reward_net.feature_fn = feature_fn
     env = make_env("1DTarget_disc-v2", wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_net})
     algo1 = QLearning(env, gamma=0.8, epsilon=0.2, alpha=0.6, device='cpu')
     algo1.learn(1000)
@@ -183,9 +186,3 @@ def test_wrapped_reward():
 
     print('env')
 
-
-if __name__ == "__main__":
-    def feature_fn(x):
-        return th.cat([x, x**2], dim=1)
-
-    test_wrapped_reward()

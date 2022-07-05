@@ -9,28 +9,36 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
         self._order = 0
         self.timesteps = 0
-        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml"), 8)
+        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml"), 1)
         utils.EzPickle.__init__(self)
         self.observation_space = spaces.Box(
-            low=np.array([-1.0, -1.0, -1.0, -1.0, 0.0]),
-            high=np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+            low=np.array([-0.05, -0.2, -0.08, -0.4]),
+            high=np.array([0.05, 0.05, 0.3, 0.35])
         )
-        self.action_space = spaces.Box(low=-1, high=1, shape=(2, ))
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
         self.timesteps = 0
 
     def step(self, action: np.ndarray):
         prev_ob = self._get_obs()
-        r = 1.0 - (prev_ob[0] ** 2 + prev_ob[1] ** 2 + 0.1 * (prev_ob[2] ** 2 + prev_ob[3] ** 2)
-                   + 1e-6 * (self.data.qfrc_actuator @ np.eye(2, 2) @ self.data.qfrc_actuator.T))
+        r = - (3.5139 * prev_ob[0] ** 2 + 1.2872182 * prev_ob[1] ** 2
+               + 0.14639979 * prev_ob[2] ** 2 + 0.10540204 * prev_ob[3] ** 2
+               + 0.02537065 * action[0] ** 2 + 0.01358577 * action[1])
+        r += 1
         self.do_simulation(action, self.frame_skip)
         self.timesteps += 1
         ob = self._get_obs()
         done = bool(
-            0.95 <= ob[0] or ob[0] <= -0.95 or
-            0.95 <= ob[1] or ob[1] <= -0.95
+            ((ob[:2] < np.array([-0.05, -0.2])).any() or
+             (ob[:2] > np.array([0.05, 0.05])).any() or
+             (ob[2:4] < np.array([-0.08, -0.4])).any() or
+             (ob[2:4] > np.array([0.3, 0.35])).any()
+             ) and self.timesteps > 10
         )
+        qpos = np.clip(ob[:2], a_min=np.array([-0.05, -0.2]), a_max=np.array([0.05, 0.05]))
+        qvel = np.clip(ob[2:4], a_min=np.array([-0.08, -0.4]), a_max=np.array([0.3, 0.35]))
+        self.set_state(qpos, qvel)
+        ob = self._get_obs()
         info = {'obs': prev_ob.reshape(1, -1), "acts": action.reshape(1, -1)}
         return ob, r, None, info
 
@@ -42,7 +50,6 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         return np.concatenate([
             self.sim.data.qpos,  # link angles
             self.sim.data.qvel,   # link angular velocities
-            np.array([self.timesteps / 600])
         ]).ravel()
 
     @property
@@ -51,13 +58,11 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def set_state(self, qpos, qvel):
         super().set_state(qpos, qvel)
-        self.timesteps = 0
 
     def reset_model(self):
-        self.set_state(
-            self.init_qpos + self.np_random.uniform(low=-.3, high=.3, size=self.model.nq),
-            self.init_qvel + self.np_random.uniform(low=-.3, high=.3, size=self.model.nv),
-        )
+        init_state = self.observation_space.sample()
+        self.set_state(init_state[:2], init_state[2:])
+        self.timesteps = 0
         return self._get_obs()
 
     def viewer_setup(self):
@@ -68,25 +73,23 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
 
 class IDPCustomExp(IDPCustom):
-    def __init__(self):
+    def __init__(self, init_states):
         super().__init__()
-        self.init_group = np.array([[[+0.10, +0.10], [+0.05, -0.05]],
-                                    [[+0.15, +0.10], [-0.05, +0.05]],
-                                    [[-0.16, +0.20], [+0.10, -0.10]],
-                                    [[-0.10, +0.06], [+0.05, -0.10]],
-                                    [[+0.05, +0.15], [-0.20, -0.20]],
-                                    [[-0.05, +0.05], [+0.15, +0.15]],
-                                    [[+0.12, +0.05], [-0.10, -0.15]],
-                                    [[-0.08, +0.15], [+0.05, -0.15]],
-                                    [[-0.15, +0.20], [-0.10, +0.05]],
-                                    [[+0.20, +0.01], [+0.09, -0.15]],
-                                    ])
+        self.init_group = init_states
+        # self.init_group = np.array([[[+0.10, +0.10], [+0.05, -0.05]],
+        #                             [[+0.15, +0.10], [-0.05, +0.05]],
+        #                             [[-0.16, +0.20], [+0.10, -0.10]],
+        #                             [[-0.10, +0.06], [+0.05, -0.10]],
+        #                             [[+0.05, +0.15], [-0.20, -0.20]],
+        #                             [[-0.05, +0.05], [+0.15, +0.15]],
+        #                             [[+0.12, +0.05], [-0.10, -0.15]],
+        #                             [[-0.08, +0.15], [+0.05, -0.15]],
+        #                             [[-0.15, +0.20], [-0.10, +0.05]],
+        #                             [[+0.20, +0.01], [+0.09, -0.15]],
+        #                             ])
 
     def reset_model(self):
         self._order += 1
         q = self.init_group[self._order % len(self.init_group)]
-        self.set_state(
-            q[0].reshape(self.model.nq),
-            q[1].reshape(self.model.nv)
-        )
+        self.set_state(q[:2], q[2:])
         return self._get_obs()

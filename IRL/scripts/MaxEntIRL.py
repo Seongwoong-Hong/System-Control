@@ -15,7 +15,7 @@ from algos.torch.MaxEntIRL import MaxEntIRL
 from algos.tabular.viter import *
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 def main(
@@ -53,7 +53,7 @@ def main(
 
     # Run Learning
     learner.learn(
-        total_iter=2000,
+        total_iter=6000,
         agent_learning_steps=0,
         n_episodes=len(expert_trajs),
         max_agent_iter=1,
@@ -61,7 +61,7 @@ def main(
         max_gradient_steps=1,
         min_gradient_steps=1,
         callback=callback_fn,
-        early_stop=False,
+        early_stop=True,
     )
 
     # Save the result of learning
@@ -79,10 +79,10 @@ def main(
 
 
 if __name__ == "__main__":
-    env_type = "SpringBall"
+    env_type = "DiscretizedHuman"
     algo_type = "MaxEntIRL"
-    device = "cpu"
-    name = f"{env_type}_disc"
+    device = "cuda"
+    name = f"{env_type}"
 
     script_args = []
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -109,11 +109,10 @@ if __name__ == "__main__":
 
     for subj in [f"sub{i:02d}" for i in [5]]:
         for actu in range(4, 5):
-            for trial in range(2, 4):
+            for trial in range(5, 7):
 
-                # expt = f"19191919_quadcost_disc/{subj}_01alpha_det_init"
-                # expt = f"19191919/{subj}_{actu}"
-                expt = f"dot4_2_10_largestate/01alpha_nobias"
+                expt = f"19191919_lqr/quadcost_from_contlqr_{subj}"
+                # expt = f"dot4_2_10/405_from_cont"
                 subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
                 # Load data
@@ -126,9 +125,9 @@ if __name__ == "__main__":
                     init_states += [traj.obs[0]]
 
                 # Define environments
-                # env = make_env(f"{name}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp)
-                # eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states, bsp=bsp)
-                # perturbation = actu - 1
+                env = make_env(f"{name}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp)
+                eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states, bsp=bsp)
+                perturbation = actu - 1
                 # max_states = bound_info[subj][perturbation]["max_states"]
                 # min_states = bound_info[subj][perturbation]["min_states"]
                 # max_torques = bound_info[subj][perturbation]["max_torques"]
@@ -136,8 +135,8 @@ if __name__ == "__main__":
                 # env.set_bounds(max_states, min_states, max_torques, min_torques)
                 # eval_env.set_bounds(max_states, min_states, max_torques, min_torques)
 
-                env = make_env(f"{name}-v2")
-                eval_env = make_env(f"{name}-v0", init_states=init_states)
+                # env = make_env(f"{name}-v2")
+                # eval_env = make_env(f"{name}-v0", init_states=init_states)
 
                 # Setup log directories
                 log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)

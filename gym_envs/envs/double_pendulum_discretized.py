@@ -7,9 +7,10 @@ from gym.utils import seeding
 from scipy.sparse import csc_matrix
 
 from gym_envs.envs.utils import calc_trans_mat_error, angle_normalize
+from gym_envs.envs import BaseDiscEnv
 
 
-class DiscretizedDoublePendulum(gym.Env):
+class DiscretizedDoublePendulum(BaseDiscEnv):
     """
     State, action 이 이산화된 Double Pendulum 환경, 전환 행렬 P 계산
     Reward 는 state 에 대한 2 차 cost 의 음수임
@@ -25,8 +26,11 @@ class DiscretizedDoublePendulum(gym.Env):
         self.lcs = [0.5, 0.5]
         self.ls = [1., 1.]
         self.num_actions = NT
-        self.Q = np.diag([3.1139, 1.2872182, 0.14639979, 0.04540204])
+        # self.Q = np.diag([3.1139, 1.2872182, 0.14639979, 0.04540204])
+        self.Q = np.diag([3.5139, 1.2872182, 0.14639979, 0.10540204])
+        # self.Q = np.diag([1.5139, 1.0872182, 0.7639979, 0.4540204])
         self.R = np.diag([0.02537065, 0.01358577])
+        # self.R = np.diag([0, 0])
         # self.R = np.diag([2.3648150e-02, 5.8471207e-03])
 
         self.max_angles = None
@@ -53,16 +57,13 @@ class DiscretizedDoublePendulum(gym.Env):
             assert (N % 2).all(), "N should be consist of odd numbers"
         self.num_cells = N
         self.set_bounds(
-            max_states=[0.065, 0.25, 0.25, 0.5],
-            min_states=[-0.065, -0.25, -0.25, -0.6],
-            max_torques=[35., 20.],
-            min_torques=[-35., -20.,],
+            max_states=[0.05, 0.05, 0.3, 0.35],
+            min_states=[-0.05, -0.2, -0.08, -0.4],
+            # max_torques=[40., 30.],
+            max_torques=[50., 65.],
+            # min_torques=[-20., -10.,],
+            min_torques=[-30., -10.,],
         )
-        self.seed()
-
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random()
-        return [seed]
 
     def reset(self):
         high = np.array([*self.max_angles, *self.max_speeds])
@@ -80,14 +81,6 @@ class DiscretizedDoublePendulum(gym.Env):
         self.state = self.get_next_state(self.state[None, ...], action[None, ...])[0, 0, ...]
 
         return self._get_obs(), r, False, info
-
-    @property
-    def disc_states(self):
-        return [(os[1:] + os[:-1]) / 2 for os in self.obs_list]
-
-    @property
-    def disc_actions(self):
-        return [(ts[1:] + ts[:-1]) / 2 for ts in self.acts_list]
 
     def set_state(self, state):
         assert state in self.observation_space
@@ -147,7 +140,7 @@ class DiscretizedDoublePendulum(gym.Env):
         th0_before = np.copy(th0)
         th0 = th0 + thd0 * dt
 
-        # 충동 시 upper rod eom 을 single pendulum 으로 변경
+        # 충돌 시 upper rod eom 을 single pendulum 으로 변경
         c_ind = np.logical_and(np.abs(th0_before) >= self.max_angles[0] - 1e-3, th0 * thd0 > 0)
         nc_ind = np.logical_not(c_ind)
 
@@ -179,19 +172,6 @@ class DiscretizedDoublePendulum(gym.Env):
     def _get_obs(self):
         return self.state
 
-    def get_num_cells(self):
-        return self.num_cells
-
-    def get_vectorized(self):
-        s_vec = np.stack(np.meshgrid(*self.disc_states,
-                                     indexing='ij'),
-                         -1).reshape(-1, 4)
-        a_vec = np.stack(np.meshgrid(*self.disc_actions,
-                                     indexing='ij'),
-                         -1).reshape(-1, 2)
-
-        return s_vec, a_vec
-
     def get_init_vector(self):
         return self.get_vectorized()
 
@@ -212,42 +192,6 @@ class DiscretizedDoublePendulum(gym.Env):
 
         return ind_vec
 
-    def get_idx_from_obs(self, obs: np.ndarray):
-        if len(obs.shape) == 1:
-            obs = obs[None, :]
-        assert (np.max(obs, axis=0) <= self.obs_high + 1e-6).all() or (np.min(obs, axis=0) >= self.obs_low - 1e-6).all()
-        dims = self.get_num_cells()
-        idx = []
-        for i, whole_candi in enumerate(self.obs_list):
-            idx.append((obs[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
-        tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
-        return tot_idx.flatten()
-
-    def get_obs_from_idx(self, idx: np.ndarray):
-        assert len(idx.shape) == 1
-        s_vec = np.stack(np.meshgrid(*self.disc_states,
-                                     indexing='ij'),
-                         -1).reshape(-1, 4)
-        return s_vec[idx]
-
-    def get_acts_from_idx(self, idx: np.ndarray):
-        assert len(idx.shape) == 1
-        a_vec = np.stack(np.meshgrid(*self.disc_actions,
-                                     indexing='ij'),
-                         -1).reshape(-1, 2)
-        return a_vec[idx]
-
-    def get_idx_from_acts(self, acts: np.ndarray):
-        if len(acts.shape) == 1:
-            acts = acts[None, :]
-        assert (np.max(acts, axis=0) <= self.max_torques + 1e-6).all()
-        dims = np.array(self.num_actions)
-        idx = []
-        for i, whole_candi in enumerate(self.acts_list):
-            idx.append((acts[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
-        tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
-
-        return tot_idx.flatten()
 
     def get_trans_mat(self, h=None, verbose=False):
         # Transition Matrix shape: (|A|, |Next S|, |S|)
@@ -275,13 +219,6 @@ class DiscretizedDoublePendulum(gym.Env):
         for a in a_vec:
             R.append(self.get_reward(s_vec, a).flatten())
         return np.stack(R)
-
-    # def get_done_mat(self):
-    #     s_vec, a_vec = self.get_vectorized()
-    #     d_vec = np.zeros(len(s_vec))
-    #     # d_vec[np.abs(s_vec[:, 0]) >= (self.max_angles[0] - 1e-6)] = 1
-    #     # d_vec[np.abs(s_vec[:, 1]) >= (self.max_angles[1] - 1e-6)] = 1
-    #     return np.repeat(d_vec[None, :], len(a_vec), axis=0)
 
     def render(self, mode="human"):
         if self.viewer is None:
@@ -355,12 +292,16 @@ class DiscretizedDoublePendulum(gym.Env):
 class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
     def __init__(self, N=None, init_states=None, NT=np.array([11, 11])):
         super(DiscretizedDoublePendulumDet, self).__init__(N=N, NT=NT)
-        if init_states is None:
-            self.init_states, _ = self.get_vectorized()
-            self.init_states = self.init_states[0:len(self.init_states):1000]
-        else:
-            self.init_states = np.array(init_states).reshape(-1, 4)
+        self._init_states = init_states
         self.n = 0
+
+    @property
+    def init_states(self):
+        if self._init_states is None:
+            init_states, _ = self.get_vectorized()
+            return init_states[0:len(init_states):1000]
+        else:
+            return np.array(self._init_states).reshape(-1, 4)
 
     def reset(self):
         self.set_state(self.init_states[self.n])

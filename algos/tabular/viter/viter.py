@@ -255,7 +255,6 @@ class FiniteSoftQiter(FiniteViter):
         else:
             choose_method = self.policy.arg_max
         obs_list, act_list, rew_list = [], [], []
-        self.env.reset()
         self.env.env_method("set_state", observation.squeeze())
         obs_list.append(observation.flatten())
         for t in range(self.max_t):

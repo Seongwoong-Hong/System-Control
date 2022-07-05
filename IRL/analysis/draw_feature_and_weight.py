@@ -14,7 +14,7 @@ with open(f"{irl_path}/demos/bound_info.json", "r") as f:
 
 def draw_reward_weights():
     unnormalize = True
-    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "sqmany_001alpha_lrdecay_")
+    log_dir = os.path.join(irl_path, "tmp", "log", "DiscretizedHuman", "MaxEntIRL", "ext_01alpha_")
     # get reward_weight and stack
     weights_stack = []
     label_name = [f"sub{i:02d}" for i in [5]]
@@ -22,8 +22,8 @@ def draw_reward_weights():
         weights_per_actuation = []
         for actuation in [4]:
             weights = []
-            for trial in [4, 8]:#
-                name = f"19191919/{subj}_{actuation}_{trial}/model"
+            for trial in range(1, 5):#
+                name = f"19191919_quadcost_disc/{subj}_{actuation}_0001alpha_{trial}/model"
                 # name = f"50/1alpha_{trial}/model"
                 with open(log_dir + name + "/reward_net.pkl", "rb") as f:
                     reward_weight = CPU_Unpickler(f).load().layers[0].weight.detach()
@@ -79,10 +79,9 @@ def draw_reward_weights():
 if __name__ == "__main__":
     def feature_fn(x):
         # return x
-        return x ** 2
-        # return th.cat([x, x ** 2], dim=1)
+        # return x ** 2
+        return th.cat([x, x ** 2], dim=1)
         # x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=1)
         # return th.cat((x, x ** 2, x1 * x2, x3 * x4, a1 * a2), dim=1)
 
-    # draw_feature_reward()
     draw_reward_weights()

@@ -13,10 +13,10 @@ if __name__ == '__main__':
     env = make_env(env_id, N=[19, 19, 19, 19], NT=[11, 11])
     act_coeff = 1
     # act_coeff = env.model.actuator_gear[0, 0]
-    for subi in [4]:
+    for subi in [5]:
         # subi = 3
         sub = f"sub{subi:02d}"
-        for actuation in range(6, 7):
+        for actuation in range(1, 7):
             max_states = bound_info[sub][actuation - 1]["max_states"]
             min_states = bound_info[sub][actuation - 1]["min_states"]
             max_torques = bound_info[sub][actuation - 1]["max_torques"]

@@ -1,14 +1,15 @@
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
-from gym.utils import seeding
 from matplotlib import cm
 from typing import List
 from scipy.sparse import csc_matrix
+from gym_envs.envs import BaseDiscEnv
 
 
-class SpringBallDisc(gym.Env):
+class SpringBallDisc(BaseDiscEnv):
     def __init__(self):
+        super(SpringBallDisc, self).__init__()
         self.map_size = 0.4
         self.dt = 0.05
         self.st = None
@@ -18,8 +19,8 @@ class SpringBallDisc(gym.Env):
         self.viewer = None
         self.target = np.array([0.1])
 
-        self.num_cells = [100, 100]
-        self.num_actions = [20]
+        self.num_cells = [40, 40]
+        self.num_actions = [5]
         self.obs_low = np.array([-self.map_size, -2.0])
         self.obs_high = np.array([self.map_size, 2.0])
         self.acts_low = np.array([-10.0])
@@ -33,19 +34,6 @@ class SpringBallDisc(gym.Env):
 
         self.observation_space = gym.spaces.Box(low=self.obs_low, high=self.obs_high)
         self.action_space = gym.spaces.Box(low=self.acts_low, high=self.acts_high)
-        self.seed()
-
-    @property
-    def disc_states(self):
-        return [(os[1:] + os[:-1]) / 2 for os in self.obs_list]
-
-    @property
-    def disc_actions(self):
-        return [(ts[1:] + ts[:-1]) / 2 for ts in self.acts_list]
-
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random()
-        return [seed]
 
     def step(self, action: np.ndarray):
         assert self.st is not None, "Can't step the environment before calling reset function"
@@ -57,81 +45,29 @@ class SpringBallDisc(gym.Env):
         return self.st, r, None, info
 
     def reset(self):
-        high = np.array([*self.obs_high[0]])
-        low = np.array([*self.obs_low[0]])
-        self.st = self.np_random.uniform(low=low, high=high)
+        self.st = self.np_random.uniform(low=self.obs_low, high=self.obs_high)
         return self._get_obs()
 
-    def set_state(self, st):
-        assert st in self.observation_space
-        self.st = st
+    def set_state(self, state):
+        assert state in self.observation_space
+        self.st = state
 
     def get_reward(self, state, action):
         x, dx = np.split(state, 2, axis=-1)
         return - (x ** 2 - 2 * self.target * x + 0.1 * dx ** 2 + 1e-2 * action ** 2)
-        # return - (x ** 2 - 2 * self.target * x)
+        # return 1/3 * (np.exp(-3 * (self.target - x) ** 2) + 0.5 * np.exp(-2 * dx ** 2) + 0.2 * np.exp(-2 * action ** 2))
 
     def _get_next_state(self, state, action):
         x, dx = np.split(state, 2, axis=-1)
         ddx = - (self.k / self.mass) * x + action / self.mass + self.k * self.l0 / self.mass
         next_state = state + np.append(dx, ddx, axis=-1) * self.dt
-        return np.clip(next_state, a_min=self.obs_low, a_max=self.obs_high)
+        return np.clip(next_state, a_min=self.obs_low + 1e-8, a_max=self.obs_high - 1e-8)
 
     def _get_obs(self):
         return self.st
 
-    def get_num_cells(self):
-        return self.num_cells
-
-    def get_vectorized(self):
-        s_vec = np.stack(np.meshgrid(*self.disc_states,
-                                     indexing='ij'),
-                         -1).reshape(-1, 2)
-        a_vec = np.stack(np.meshgrid(*self.disc_actions,
-                                     indexing='ij'),
-                         -1).reshape(-1, 1)
-
-        return s_vec, a_vec
-
     def get_init_vector(self):
         return self.get_vectorized()
-
-    def get_idx_from_obs(self, obs: np.ndarray):
-        if len(obs.shape) == 1:
-            obs = obs[None, :]
-        assert (np.max(obs, axis=0) <= self.obs_high + 1e-6).all() or (np.min(obs, axis=0) >= self.obs_low - 1e-6).all()
-        dims = self.get_num_cells()
-        idx = []
-        for i, whole_candi in enumerate(self.obs_list):
-            idx.append((obs[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
-        tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
-        return tot_idx.flatten()
-
-    def get_obs_from_idx(self, idx: np.ndarray):
-        assert len(idx.shape) == 1
-        s_vec = np.stack(np.meshgrid(*self.disc_states,
-                                     indexing='ij'),
-                         -1).reshape(-1, 2)
-        return s_vec[idx]
-
-    def get_idx_from_acts(self, acts: np.ndarray):
-        if len(acts.shape) == 1:
-            acts = acts[None, :]
-        assert (np.max(acts, axis=0) <= self.acts_high + 1e-6).all() or (np.min(acts, axis=0) >= self.acts_low - 1e-6).all()
-        dims = np.array(self.num_actions)
-        idx = []
-        for i, whole_candi in enumerate(self.acts_list):
-            idx.append((acts[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
-        tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
-
-        return tot_idx.flatten()
-
-    def get_acts_from_idx(self, idx: np.ndarray):
-        assert len(idx.shape) == 1
-        a_vec = np.stack(np.meshgrid(*self.disc_actions,
-                                     indexing='ij'),
-                         -1).reshape(-1, 1)
-        return a_vec[idx]
 
     def get_trans_mat(self):
         s_vec, a_vec = self.get_vectorized()

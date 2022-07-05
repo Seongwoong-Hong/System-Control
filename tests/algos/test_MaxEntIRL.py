@@ -13,8 +13,8 @@ from common.util import make_env
 from common.wrappers import *
 
 subj = "sub05"
-env_name = "2DWorld"
-env_id = f"{env_name}_disc"
+env_name = "DiscretizedHuman"
+env_id = f"{env_name}"
 
 
 @pytest.fixture
@@ -25,8 +25,8 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    # expert_dir = os.path.join(demo_dir, env_name, "19191919", f"{subj}_1.pkl")
-    expert_dir = os.path.join(demo_dir, env_name, "20", "2*alpha_nobias.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "19191919", f"{subj}_4.pkl")
+    # expert_dir = os.path.join(demo_dir, env_name, "20", "2*alpha_nobias.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     return expert_trajs
@@ -39,8 +39,8 @@ def env(expert, demo_dir):
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    # return make_env(f"{env_id}-v2", bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11])
-    return make_env(f"{env_id}-v2")
+    return make_env(f"{env_id}-v2", bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11])
+    # return make_env(f"{env_id}-v2")
 
 
 @pytest.fixture
@@ -50,8 +50,8 @@ def eval_env(expert, demo_dir):
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    # return make_env(f"{env_id}-v0", bsp=bsp, init_states=init_states, N=[19, 19, 19, 19], NT=[11, 11])
-    return make_env(f"{env_id}-v0", init_states=init_states)
+    return make_env(f"{env_id}-v0", bsp=bsp, init_states=init_states, N=[19, 19, 19, 19], NT=[11, 11])
+    # return make_env(f"{env_id}-v0", init_states=init_states)
 
 @pytest.fixture
 def learner(env, expert, eval_env):
@@ -207,6 +207,10 @@ def test_state_visitation(env):
     print(Dc1.max(), Dc2.max())
     print((Dc1.cpu() - Dc2.cpu()).abs().mean())
     print((Dc1.cpu() - Dc2.cpu()).abs().max())
+
+
+def test_state_visitation_from_trajs(env):
+    agent = SoftQiter(env, gamma=0.99, alpha=0.01, device='cuda:3')
 
 
 def test_state_visit_difference_according_to_init(learner):

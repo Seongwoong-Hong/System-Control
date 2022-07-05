@@ -43,7 +43,7 @@ def test_calculating_feature(trial):
 
     bsp = io.loadmat(f"{irl_path}/demos/HPC/sub01/sub01i1.mat")['bsp']
     expt_name = "01alpha_nobias_many"
-    load_dir = f"{log_path}/SpringBall_disc/MaxEntIRL/ext_01alpha_dot4_2_10/{expt_name}_{trial}"
+    load_dir = f"{log_path}/SpringBall/MaxEntIRL/ext_01alpha_dot4_2_10/{expt_name}_{trial}"
     with open(f"{load_dir}/model/1000/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load().eval()
     with open(f"{load_dir}/{expt_name}.pkl", "rb") as f:
@@ -55,8 +55,8 @@ def test_calculating_feature(trial):
     # reward_fn.layers[0].weight = th.nn.Parameter(th.tensor([0.2333, 0.0025, -0.0032, -1.1755, -0.1169, -0.0118]))
     # env = make_env("DiscretizedHuman-v0", num_envs=1, bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11],
     #                wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn}, init_states=init_states, )
-    # env = make_env("SpringBall_disc-v0", init_states=init_states, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': reward_fn})
-    env = make_env("SpringBall_disc-v0", init_states=init_states)#, wrapper=RewardWrapper, wrapper_kwargs={'rwfn': reward_fn})
+    # env = make_env("SpringBall-v0", init_states=init_states, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': reward_fn})
+    env = make_env("SpringBall-v0", init_states=init_states)#, wrapper=RewardWrapper, wrapper_kwargs={'rwfn': reward_fn})
     agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu', verbose=False)
     agent.learn(0)
 

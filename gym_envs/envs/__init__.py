@@ -1,3 +1,4 @@
+from gym_envs.envs.discret_env import BaseDiscEnv
 from gym_envs.envs.cartpolecont import CartPoleContEnv
 from gym_envs.envs.cartpolecont_test import CartPoleContTestEnv
 from gym_envs.envs.inverted_double_pendulum import InvertedDoublePendulum

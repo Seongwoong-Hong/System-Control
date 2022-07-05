@@ -53,7 +53,7 @@ def test_init():
 
 
 def test_2d_env():
-    env = make_env("SpringBall_disc-v2")
+    env = make_env("SpringBall-v2")
     for i in range(10):
         env.reset()
         done = False

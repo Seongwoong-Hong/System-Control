@@ -6,24 +6,26 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 class LQRPolicy(BasePolicy):
-    def __init__(self, env, noise_lv: float = 0.1,
-                 observation_space=None,
-                 action_space=None,
-                 ):
+    def __init__(
+            self,
+            env,
+            noise_lv: float = 0.1,
+            observation_space=None,
+            action_space=None,
+        ):
         if observation_space is None:
             observation_space = env.observation_space
         if action_space is None:
             action_space = env.action_space
-        super(LQRPolicy, self).__init__(
-            observation_space,
-            action_space)
+        super(LQRPolicy, self).__init__(observation_space, action_space)
 
         self.env = env
-        if isinstance(env, DummyVecEnv):
-            self.env = env.envs[0]
         self.noise_lv = noise_lv
         self._build_env()
         self.K = self._get_gains()
+
+    def set_env(self, env):
+        self.env = env
 
     def _get_gains(self) -> th.Tensor:
         X = linalg.solve_continuous_are(self.A, self.B, self.Q, self.R)
@@ -31,7 +33,7 @@ class LQRPolicy(BasePolicy):
             K = (np.linalg.inv(self.R) @ (self.B.T @ X))
         else:
             K = (1 / self.R * (self.B.T @ X)).reshape(-1)
-        return th.from_numpy(K)
+        return th.from_numpy(K).float()
 
     def _build_env(self) -> np.array:
         # define self.A, self.B, self.Q, self.R

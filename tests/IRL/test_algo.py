@@ -133,7 +133,7 @@ def test_1D(irl_path):
     print('end')
 
 
-@pytest.mark.parametrize("trial", range(1, 11))
+@pytest.mark.parametrize("trial", range(1, 9))
 def test_discretized_env(trial):
     def feature_fn(x):
         # x1, x2, a1, a2 = th.split(x, 1, dim=-1)
@@ -147,7 +147,7 @@ def test_discretized_env(trial):
         # return th.cat([x, x**2, x**3, x**4], dim=1)
     env_type = "2DWorld"
     name = f"{env_type}_disc"
-    expt = "dot2_1dot2_8/01alpha_nobias"
+    expt = "dot2_1dot2_8_largestate/001alpha_nobias"
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
     init_states = []
@@ -234,10 +234,10 @@ def test_discretized_env(trial):
 
 params = []
 for actu in range(4, 5):
-    for trial in range(1, 10):
+    for trial in range(1, 3):
         params.append([actu, trial])
 
-@pytest.mark.parametrize("actu, trial", [[4, 1]])
+@pytest.mark.parametrize("actu, trial", params)
 def test_learned_human_policy(actu, trial):
 
     def feature_fn(x):
@@ -255,12 +255,13 @@ def test_learned_human_policy(actu, trial):
         return th.cat([x, x ** 2], dim=1)
         # x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=1)
         # return th.cat((x, x ** 2, x1 * x2, x3 * x4, a1 * a2), dim=1)
-    env_type = "DiscretizedHuman"
-    name = f"{env_type}"
+    env_type = "SpringBall"
+    name = f"{env_type}_disc"
     subj = "sub05"
-    device = 'cuda:0'
-    expt = f"19191919/{subj}_{actu}"
-    with open(irl_path + f"/demos/DiscretizedHuman/{expt}.pkl", "rb") as f:
+    device = 'cpu'
+    # expt = f"19191919/{subj}_{actu}"
+    expt = f"dot4_2_10/01alpha_diffreward"
+    with open(irl_path + f"/demos/{env_type}/{expt}.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
     with open(irl_path + f"/demos/bound_info.json", "r") as f:
         bound_info = json.load(f)
@@ -268,29 +269,31 @@ def test_learned_human_policy(actu, trial):
     for traj in expt_trajs:
         init_states.append(traj.obs[0])
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
-    rwfn_dir = irl_path + f"/tmp/log/DiscretizedHuman/MaxEntIRL/ext_lastpolicy_001alpha_lrdecay_{expt}_{trial}/model/700"
+    rwfn_dir = irl_path + f"/tmp/log/{name}/MaxEntIRL/ext_01alpha_{expt}_{trial}/model"
     with open(rwfn_dir + "/reward_net.pkl", "rb") as f:
         rwfn = CPU_Unpickler(f).load().to(device)
     rwfn.feature_fn = feature_fn
     # rwfn.layers[0].weight = th.nn.Parameter(rwfn.layers[0].weight.detach() / 5)
     # rwfn.layers[0].weight = th.nn.Parameter(th.tensor([[-0.03946868, -0.24135341, -0.02744996, -0.0490342 , -0.07611195, -0.04075731]]))
 
-    env = make_env(f"{name}-v2", num_envs=1, N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp,
-                   wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': rwfn})
-    eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11],
-                        bsp=bsp, init_states=init_states, wrapper=DiscretizeWrapper)
-    perturbation = actu - 1
-    max_states = bound_info[subj][perturbation]["max_states"]
-    min_states = bound_info[subj][perturbation]["min_states"]
-    max_torques = bound_info[subj][perturbation]["max_torques"]
-    min_torques = bound_info[subj][perturbation]["min_torques"]
-    env.env_method('set_bounds', max_states, min_states, max_torques, min_torques)
-    eval_env.set_bounds(max_states, min_states, max_torques, min_torques)
-    agent2 = FiniteSoftQiter(env=env, gamma=1, alpha=0.001, device=device, verbose=True)
-    agent2.learn(0)
-    # agent.set_env(eval_env)
-    agent = SoftQiter(env=env, gamma=1, alpha=0.001, device='cuda:1', verbose=True)
-    agent.policy.policy_table = agent2.policy.policy_table[0]
+    env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn':rwfn})
+    eval_env = make_env(f"{name}-v0", num_envs=1, wrapper=DiscretizeWrapper)
+    # env = make_env(f"{name}-v2", num_envs=1, N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp,
+    #                wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': rwfn})
+    # eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11], wrapper=DiscretizeWrapper,
+    #                     bsp=bsp, init_states=init_states,)
+    # perturbation = actu - 1
+    # max_states = bound_info[subj][perturbation]["max_states"]
+    # min_states = bound_info[subj][perturbation]["min_states"]
+    # max_torques = bound_info[subj][perturbation]["max_torques"]
+    # min_torques = bound_info[subj][perturbation]["min_torques"]
+    # env.env_method('set_bounds', max_states, min_states, max_torques, min_torques)
+    # eval_env.set_bounds(max_states, min_states, max_torques, min_torques)
+    agent = FiniteSoftQiter(env=env, gamma=1, alpha=0.01, device=device, verbose=True)
+    agent.learn(0)
+    agent.set_env(eval_env)
+    # agent = SoftQiter(env=env, gamma=1, alpha=0.01, device=device, verbose=True)
+    # agent.policy.policy_table = agent2.policy.policy_table[0]
 
     fig1 = plt.figure(figsize=[9, 14.4])
     ax11 = fig1.add_subplot(6, 2, 1)
@@ -308,46 +311,48 @@ def test_learned_human_policy(actu, trial):
 
     for traj in expt_trajs:
         # Expert Trajectories
-        ax11.plot(traj.obs[:, 0])
-        ax21.plot(traj.obs[:, 1])
-        ax31.plot(traj.obs[:, 2])
-        ax41.plot(traj.obs[:, 3])
+        ax11.plot(traj.obs[:-1, 0])
+        ax21.plot(traj.obs[:-1, 1])
+        # ax31.plot(traj.obs[:-1, 2])
+        # ax41.plot(traj.obs[:-1, 3])
         ax51.plot(traj.acts[:, 0])
-        ax61.plot(traj.acts[:, 1])
-        ax11.set_ylim([min_states[0], max_states[0]])
-        ax21.set_ylim([min_states[1], max_states[1]])
-        ax31.set_ylim([min_states[2], max_states[2]])
-        ax41.set_ylim([min_states[3], max_states[3]])
-        ax51.set_ylim([min_torques[0], max_torques[0]])
-        ax61.set_ylim([min_torques[1], max_torques[1]])
+        # ax61.plot(traj.acts[:, 1])
+        # ax11.set_ylim([min_states[0], max_states[0]])
+        # ax21.set_ylim([min_states[1], max_states[1]])
+        # ax31.set_ylim([min_states[2], max_states[2]])
+        # ax41.set_ylim([min_states[3], max_states[3]])
+        # ax51.set_ylim([min_torques[0], max_torques[0]])
+        # ax61.set_ylim([min_torques[1], max_torques[1]])
 
-    for i in range(60):
+    # for i in range(len(expt_trajs)):
         # Agent Trajectories
-        obs, acts = [], []
+        # obs, acts = [], []
         ob = eval_env.reset()
-        obs.append(ob)
-        done = False
-        while not done:
-            act, _ = agent.predict(ob, deterministic=False)
-            ob, _, done, _ = eval_env.step(act[0])
-            acts.append(act[0])
-            obs.append(ob)
-        obs = np.array(obs)
-        acts = np.array(acts)
+        # obs.append(ob)
+        # done = False
+        # while not done:
+        #     act, _ = agent.predict(ob, deterministic=False)
+        #     ob, _, done, _ = eval_env.step(act[0])
+        #     acts.append(act[0])
+        #     obs.append(ob)
+        # obs = np.array(obs)
+        # acts = np.array(acts)
+
         # ob = init_states[i % len(init_states)]
-        # obs, acts, _ = agent.predict(ob, deterministic=False)
+        obs, acts, _ = agent.predict(ob, deterministic=False)
+
         ax12.plot(obs[:-1, 0])
         ax22.plot(obs[:-1, 1])
-        ax32.plot(obs[:-1, 2])
-        ax42.plot(obs[:-1, 3])
+        # ax32.plot(obs[:-1, 2])
+        # ax42.plot(obs[:-1, 3])
         ax52.plot(acts[:, 0])
-        ax62.plot(acts[:, 1])
-        ax12.set_ylim([min_states[0], max_states[0]])
-        ax22.set_ylim([min_states[1], max_states[1]])
-        ax32.set_ylim([min_states[2], max_states[2]])
-        ax42.set_ylim([min_states[3], max_states[3]])
-        ax52.set_ylim([min_torques[0], max_torques[0]])
-        ax62.set_ylim([min_torques[1], max_torques[1]])
+        # ax62.plot(acts[:, 1])
+        # ax12.set_ylim([min_states[0], max_states[0]])
+        # ax22.set_ylim([min_states[1], max_states[1]])
+        # ax32.set_ylim([min_states[2], max_states[2]])
+        # ax42.set_ylim([min_states[3], max_states[3]])
+        # ax52.set_ylim([min_torques[0], max_torques[0]])
+        # ax62.set_ylim([min_torques[1], max_torques[1]])
         # eval_env.render()
         # for t in range(50):
         #     obs_idx = eval_env.get_idx_from_obs(ob)

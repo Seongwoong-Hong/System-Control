@@ -4,11 +4,20 @@ import torch
 
 
 class ActionWrapper(gym.ActionWrapper):
+    def __init__(self, env):
+        super(ActionWrapper, self).__init__(env)
+        self.coeff = 50
+        self.action_space = gym.spaces.Box(
+            low=self.env.action_space.low / self.coeff,
+            high=self.env.action_space.high / self.coeff,
+            dtype=np.float64
+        )
+
     def action(self, action):
-        return 0.4 * action
+        return self.coeff * action
 
     def reverse_action(self, action):
-        return 1/(action * 0.4)
+        return 1/(action * self.coeff)
 
 
 class RewardWrapper(gym.RewardWrapper):

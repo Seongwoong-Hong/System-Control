@@ -17,7 +17,7 @@ def test_discretized_pendulum():
     s = env.reset()
     a = env.action_space.sample()
 
-    env.render()
+    # env.render()
 
     next_s, r, _, _ = env.step(a)
     print(f'Step from {s} to {next_s} by action {a}')
@@ -27,7 +27,7 @@ def test_discretized_pendulum():
     for _ in range(400):
         a = np.array([0, 0])
         s, r, d, _ = env.step(a)
-        env.render()
+        # env.render()
 
         if d:
             s = env.reset()

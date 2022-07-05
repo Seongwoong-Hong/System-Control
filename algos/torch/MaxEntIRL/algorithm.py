@@ -228,7 +228,7 @@ class MaxEntIRL:
                 logger.record("grad variant angle", grad_var_angle)
                 logger.record("num iteration", self.itr, exclude="tensorboard")
                 logger.dump(self.itr)
-                if self.itr > 30 and np.abs(grad_norm) < 1e-3 and weight_var_angle < 1e-4 and early_stop:
+                if self.itr > 30 and np.abs(grad_norm) < 8e-4 and weight_var_angle < 5e-4 and early_stop:
                     break
             with logger.accumulate_means(f"agent"):
                 self._reset_agent(**self.env_kwargs)

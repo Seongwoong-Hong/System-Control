@@ -33,28 +33,30 @@ def test_mujoco_envs_learned_policy():
 
 
 def test_rl_learned_policy(rl_path):
-    env_type = "Hopper"
+    env_type = "SpringBall"
     name = f"{env_type}"
-    subj = "sub06"
+    subj = "sub05"
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    with open(f"{irl_dir}/demos/DiscretizedHuman/17171719/{subj}_1.pkl", "rb") as f:
+    with open(f"{irl_dir}/demos/DiscretizedHuman/19191919/{subj}_1.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
     init_states = []
     for traj in expt_trajs:
         init_states += [traj.obs[0]]
-    # env = make_env(f"{name}-v0", bsp=bsp, init_states=init_states)#, wrapper=DiscretizeWrapper)
+    # env = make_env(f"{name}-v0", num_envs=1, bsp=bsp, init_states=init_states)#, wrapper=DiscretizeWrapper)
     env = make_env(f"{name}-v2", num_envs=1)
+    # env = make_env(f"{name}-v0", num_envs=1, N=[19, 19, 19, 19], NT=[11, 11],
+    #                bsp=bsp, init_states=init_states, wrapper=ActionWrapper)
     # name += f"_{subj}"
-    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "sac", "policies_3")
+    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "ppo", "policies_1")
     stats_path = None
     if os.path.isfile(model_dir + "normalization.pkl"):
         stats_path = model_dir + "normalization.pkl"
     # with open(model_dir + "/agent.pkl", "rb") as f:
     #     algo = pickle.load(f)
     # algo.set_env(env)
-    algo = SAC.load(model_dir + f"/agent")
+    algo = PPO.load(model_dir + f"/agent_5")
     lengths = []
     for _ in range(20):
         obs = env.reset()
@@ -63,8 +65,8 @@ def test_rl_learned_policy(rl_path):
         while not done:
             a, _ = algo.predict(obs, deterministic=False)
             obs, _, done, _ = env.step(a)
-            # env.render()
-            # time.sleep(env.get_attr("dt")[0])
+            env.render()
+            time.sleep(env.get_attr("dt")[0])
             length += 1
         print(length)
         lengths.append(length)
@@ -73,36 +75,39 @@ def test_rl_learned_policy(rl_path):
 
 
 def test_finite_algo(rl_path):
-    name = "DiscretizedHuman"
+    name = "SpringBall"
     env_id = f"{name}"
     subj = "sub05"
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(f"{env_id}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
+    # env = make_env(f"{env_id}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
+    env = make_env(f"{env_id}-v2", num_envs=1, wrapper=DiscretizeWrapper)
     # init_states = np.array([[11, 35], [ 8, 16], [ 6,  2], [ 5, 45], [29, 27], [18, 37]])
-    # env = make_env(f"{env_id}-v0", num_envs=1, init_states=init_states)
+    eval_env = make_env(f"{env_id}-v2", wrapper=DiscretizeWrapper)
     # agent = SoftQiter(env=env, gamma=1, alpha=0.001, device='cuda:0')
     # agent.learn(50)
-    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cuda:0')
+    agent = FiniteSoftQiter(env, gamma=1, alpha=0.001, device='cpu')
     agent.learn(0)
-    for epi in range(300):
+    agent.set_env(eval_env)
+    for epi in range(30):
         # ob = init_states[epi % len(init_states)]
-        ob = env.reset()
+        ob = eval_env.reset()
         obs, acts, rews = agent.predict(ob, deterministic=True)
-        plt.plot(obs[:, 0], obs[:, 1])
-        plt.xlim([0, 50])
-        plt.ylim([0, 50])
+        # plt.plot(obs[:, 2])
         # plt.plot(obs[:, 1])
-        # eval_env.render()
-        # for t in range(50):
-        #     obs_idx = eval_env.get_idx_from_obs(ob)
-        #     act_idx = agent.policy.choice_act(agent.policy.policy_table[t].T[obs_idx])
-        #     act = eval_env.get_acts_from_idx(act_idx)
-        #     ob, r, _, _ = eval_env.step(act[0])
-        #     eval_env.render()
-        #     time.sleep(eval_env.dt)
-    plt.show()
+        eval_env.render()
+        tot_r = 0
+        for t in range(40):
+            obs_idx = eval_env.get_idx_from_obs(ob)
+            act_idx = agent.policy.choice_act(agent.policy.policy_table[t].T[obs_idx])
+            act = eval_env.get_acts_from_idx(act_idx)
+            ob, r, _, _ = eval_env.step(act[0])
+            tot_r += r
+            eval_env.render()
+            time.sleep(eval_env.dt)
+        print(tot_r)
+    # plt.show()
 
 
 def test_toy_disc_env(rl_path):
