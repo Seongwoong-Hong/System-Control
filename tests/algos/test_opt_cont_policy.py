@@ -26,9 +26,26 @@ class IDPLQRPolicy(LQRPolicy):
         self.gear = 100
 
 
+class IPLQRPolicy(LQRPolicy):
+    def _build_env(self) -> np.array:
+        g = 9.81
+        m = 1.
+        l = 1.
+        lc = l / 2
+        I = m * l ** 2 / 3
+        self.A, self.B = np.zeros([2, 2]), np.zeros([2, 1])
+        self.A[0, 1] = 1
+        self.A[1, 0] = m * g * lc / I
+        self.B[1, 0] = 1 / I
+        self.Q = np.diag([2.5139, 0.2872182])
+        self.R = np.diag([0.01537065/2500])
+        self.gear = 100
+
+
 def test_lqr_policy():
-    env = make_env("IDP_custom-v2")
-    policy = IDPLQRPolicy(env)
+    # env = make_env("DiscretizedPendulum-v2", N=[19, 19], NT=[11])
+    env = make_env("IP_custom-v2")
+    policy = IPLQRPolicy(env)
     for _ in range(10):
         ob = env.reset()
         env.render()

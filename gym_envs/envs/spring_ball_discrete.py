@@ -1,8 +1,5 @@
 import gym
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from typing import List
 from scipy.sparse import csc_matrix
 from gym_envs.envs import BaseDiscEnv
 

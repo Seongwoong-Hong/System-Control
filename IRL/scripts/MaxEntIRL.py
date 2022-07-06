@@ -15,7 +15,7 @@ from algos.torch.MaxEntIRL import MaxEntIRL
 from algos.tabular.viter import *
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 
 def main(
@@ -79,7 +79,7 @@ def main(
 
 
 if __name__ == "__main__":
-    env_type = "DiscretizedHuman"
+    env_type = "DiscretizedPendulum"
     algo_type = "MaxEntIRL"
     device = "cuda"
     name = f"{env_type}"
@@ -109,9 +109,8 @@ if __name__ == "__main__":
 
     for subj in [f"sub{i:02d}" for i in [5]]:
         for actu in range(4, 5):
-            for trial in range(5, 7):
-
-                expt = f"19191919_lqr/quadcost_from_contlqr_{subj}"
+            for trial in range(2, 4):
+                expt = f"1919_lqr/quadcost_from_contlqr"
                 # expt = f"dot4_2_10/405_from_cont"
                 subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -125,8 +124,10 @@ if __name__ == "__main__":
                     init_states += [traj.obs[0]]
 
                 # Define environments
-                env = make_env(f"{name}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp)
-                eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states, bsp=bsp)
+                # env = make_env(f"{name}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp)
+                # eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states, bsp=bsp)
+                env = make_env(f"{name}-v2", N=[19, 19], NT=[11], bsp=bsp)
+                eval_env = make_env(f"{name}-v0", N=[19, 19], NT=[11], bsp=bsp)
                 perturbation = actu - 1
                 # max_states = bound_info[subj][perturbation]["max_states"]
                 # min_states = bound_info[subj][perturbation]["min_states"]

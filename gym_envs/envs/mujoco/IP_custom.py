@@ -1,7 +1,6 @@
 import os
-
 import numpy as np
-from gym import utils
+from gym import utils, spaces
 from gym.envs.mujoco import mujoco_env
 
 
@@ -9,17 +8,25 @@ class IPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self):
         self.traj_len = 0
         utils.EzPickle.__init__(self)
-        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml"), 20)
+        mujoco_env.MujocoEnv.__init__(self, os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml"), 1)
+        self.observation_space = spaces.Box(
+            low=np.array([-0.25, -0.3]),
+            high=np.array([0.25, 0.3]),
+            dtype=np.float64,
+        )
 
-    def step(self, a):
+    def step(self, action: np.ndarray):
         prev_ob = self._get_obs()
         rew = - prev_ob[0] ** 2
-        self.do_simulation(a, self.frame_skip)
+        self.do_simulation(action, self.frame_skip)
         ob = self._get_obs()
-        done = False
-        info = {'rw_inp': prev_ob}
+        qpos = np.clip(ob[:1], a_min=np.array([-0.25]), a_max=np.array([0.25]))
+        qvel = np.clip(ob[1:], a_min=np.array([-0.3]), a_max=np.array([0.3]))
+        self.set_state(qpos, qvel)
+        ob = self._get_obs()
+        info = {'obs': prev_ob.reshape(1, -1), "acts": action.reshape(1, -1)}
         self.traj_len += 1
-        return ob, rew, done, info
+        return ob, rew, False, info
 
     def reset_model(self):
         q = np.random.uniform(size=2, low=-0.25, high=0.25)

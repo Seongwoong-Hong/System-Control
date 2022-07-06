@@ -3,7 +3,6 @@ from os import path
 import gym
 import numpy as np
 from copy import deepcopy
-from gym.utils import seeding
 from scipy.sparse import csc_matrix
 
 from gym_envs.envs.utils import calc_trans_mat_error, angle_normalize
@@ -27,24 +26,17 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
         self.ls = [1., 1.]
         self.num_actions = NT
         # self.Q = np.diag([3.1139, 1.2872182, 0.14639979, 0.04540204])
-        self.Q = np.diag([3.5139, 1.2872182, 0.14639979, 0.10540204])
+        # self.Q = np.diag([3.5139, 1.2872182, 0.14639979, 0.10540204])
+        self.Q = np.diag([3.5139, 0.2872182, 0.24639979, 0.01540204])
         # self.Q = np.diag([1.5139, 1.0872182, 0.7639979, 0.4540204])
-        self.R = np.diag([0.02537065, 0.01358577])
-        # self.R = np.diag([0, 0])
-        # self.R = np.diag([2.3648150e-02, 5.8471207e-03])
+        # self.R = np.diag([0.02537065, 0.01358577])
+        self.R = np.diag([0.02537065*2500/1600, 0.01358577*(65**2)/900])
 
         self.max_angles = None
         self.max_speeds = None
         self.min_angles = None
         self.min_speeds = None
-        self.max_torques = None
-        self.min_torques = None
-        self.obs_high = None
-        self.obs_low = None
-        self.obs_list = []
-        self.acts_list = []
 
-        self.np_random = None
         self.state = None
         self.viewer = None
         self.last_a = None
@@ -179,7 +171,7 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
         state_backup = deepcopy(state)
         if len(state.shape) == 1:
             state = state[None, :]
-        dims = self.get_num_cells()
+        dims = self.num_cells
         tot_idx = self.get_idx_from_obs(state)
 
         if state_backup.ndim == 1:
@@ -191,7 +183,6 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
                                  shape=[batch_size, np.prod(dims)])
 
         return ind_vec
-
 
     def get_trans_mat(self, h=None, verbose=False):
         # Transition Matrix shape: (|A|, |Next S|, |S|)

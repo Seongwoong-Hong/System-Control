@@ -11,6 +11,7 @@ class BaseDiscEnv(gym.Env):
         self.obs_high = None
         self.obs_low = None
         self.max_torques = None
+        self.min_torques = None
         self.num_cells = None
         self.num_actions = None
         self.np_random = None
@@ -84,7 +85,6 @@ class BaseDiscEnv(gym.Env):
         for i, whole_candi in enumerate(self.acts_list):
             idx.append((acts[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
         tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
-
         return tot_idx.flatten()
 
     def get_trans_mat(self):

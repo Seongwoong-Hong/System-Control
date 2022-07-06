@@ -45,7 +45,7 @@ def test_soft_q_learning():
 
 
 def test_viter():
-    env = make_env("DiscretizedDoublePendulum-v2", num_envs=1, N=[19, 17, 17, 17])
+    env = make_env("DiscretizedPendulum-v2", num_envs=1, N=[19, 19])
     algo = Viter(env, gamma=0.7, epsilon=0.2, device='cpu')
     algo.learn(2000)
     algo2 = FiniteViter(env, gamma=0.7, epsilon=0.2, device='cpu')
@@ -94,7 +94,7 @@ def test_softiter_finite_diff():
 
 
 def test_finite_iter(bsp):
-    env = make_env("DiscretizedHuman-v2", N=[17, 17, 17, 19], NT=[11, 11], num_envs=1, bsp=bsp)
+    env = make_env("DiscretizedPendulum-v2", N=[19, 19], NT=[11], num_envs=1)
     logger.configure(".", format_strs=['stdout'])
     algo = FiniteViter(env, gamma=1, alpha=0.00001, device='cpu')
     algo.learn(0)

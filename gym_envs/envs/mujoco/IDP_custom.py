@@ -21,10 +21,9 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def step(self, action: np.ndarray):
         prev_ob = self._get_obs()
-        r = - (3.5139 * prev_ob[0] ** 2 + 1.2872182 * prev_ob[1] ** 2
-               + 0.14639979 * prev_ob[2] ** 2 + 0.10540204 * prev_ob[3] ** 2
-               + 0.02537065 * action[0] ** 2 + 0.01358577 * action[1])
-        r += 1
+        r = - (3.5139 * prev_ob[0] ** 2 + 0.2872182 * prev_ob[1] ** 2
+               + 0.24639979 * prev_ob[2] ** 2 + 0.01540204 * prev_ob[3] ** 2
+               + 0.016237216 * action[0] ** 2 + 0.002894010177514793 * action[1])
         self.do_simulation(action, self.frame_skip)
         self.timesteps += 1
         ob = self._get_obs()

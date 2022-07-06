@@ -19,13 +19,13 @@ register(
 register(
     id='DiscretizedPendulum-v2',
     entry_point='gym_envs.envs:DiscretizedPendulum',
-    max_episode_steps=200,
+    max_episode_steps=50,
 )
 
 register(
     id='DiscretizedPendulum-v0',
     entry_point='gym_envs.envs:DiscretizedPendulumDet',
-    max_episode_steps=200,
+    max_episode_steps=50,
 )
 
 register(
@@ -148,19 +148,19 @@ register(
 register(
     id='IP_custom-v0',
     entry_point='gym_envs.envs.mujoco:IPCustomExp',
-    max_episode_steps=600,
+    max_episode_steps=50,
 )
 
 register(
     id='IP_custom-v1',
     entry_point='gym_envs.envs.mujoco:IPCustom',
-    max_episode_steps=600,
+    max_episode_steps=50,
 )
 
 register(
     id='IP_custom-v2',
     entry_point='gym_envs.envs.mujoco:IPCustom',
-    max_episode_steps=600,
+    max_episode_steps=50,
 )
 
 

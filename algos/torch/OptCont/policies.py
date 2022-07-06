@@ -33,7 +33,7 @@ class LQRPolicy(BasePolicy):
             K = (np.linalg.inv(self.R) @ (self.B.T @ X))
         else:
             K = (1 / self.R * (self.B.T @ X)).reshape(-1)
-        return th.from_numpy(K).float()
+        return th.from_numpy(K).double()
 
     def _build_env(self) -> np.array:
         # define self.A, self.B, self.Q, self.R

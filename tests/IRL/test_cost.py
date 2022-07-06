@@ -4,6 +4,7 @@ import pytest
 import torch as th
 import numpy as np
 
+from scipy import io
 from common.util import make_env, CPU_Unpickler
 from common.verification import CostMap
 from common.wrappers import *
@@ -25,15 +26,15 @@ def mapping(x: th.tensor):
 
 @pytest.mark.parametrize("trial", [1, 2, 3, 4])
 def test_weight_consistency(trial):
-    log_dir = f"{irl_path}/tmp/log/SpringBall_disc/MaxEntIRL/ext_01alpha_dot4_2_10/4010_from_cont_{trial}/model"
+    log_dir = f"{irl_path}/tmp/log/DiscretizedHuman/MaxEntIRL/ext_01alpha_19191919_quadcost_disc/sub05_4_0001alpha_{trial}/model"
     with open(f"{log_dir}/reward_net.pkl", "rb") as f:
         weights = CPU_Unpickler(f).load().layers[-1].weight.detach()[0]
     print("\n", weights)
-    print(weights[0]/0.4, weights[1]/2, weights[2]/10, weights[3]/0.16, weights[4]/4, weights[5]/100)
+    # print(weights[0]/0.4, weights[1]/2, weights[2]/10, weights[3]/0.16, weights[4]/4, weights[5]/100)
     # print(weights[0] * 0.4 / weights[3], weights[1]*2/weights[4], weights[2]*10/weights[5])
     # print(weights[0]/0.2, weights[1]/1.2, weights[2]/8, weights[3]/8, weights[4]/0.04, weights[5]/1.44, weights[6]/64, weights[7]/64)
-    # print(weights[0]/0.05, weights[1]/0.2, weights[2]/0.3, weights[3]/0.4, weights[4]/40, weights[5]/30,
-    #       weights[6]/(0.05**2), weights[7]/0.04, weights[8]/0.09, weights[9]/0.15, weights[10]/1600, weights[11]/900)
+    print(weights[0]/0.05, weights[1]/0.2, weights[2]/0.3, weights[3]/0.4, weights[4]/40, weights[5]/30,
+          weights[6]/(0.05**2), weights[7]/(0.2**2), weights[8]/(0.3**2), weights[9]/(0.4**2), weights[10]/1600, weights[11]/900)
     # print(weights[0], weights[1], weights[2], weights[3], weights[4], weights[5],
     #       weights[6], weights[7], weights[8], weights[9], weights[10], weights[11])
 
@@ -102,8 +103,49 @@ def test_draw_costmap():
     inputs = [[[0, 1, 2, 3], [3, 4, 5, 6]]]
     fig = CostMap.draw_costmap(inputs)
 
+from algos.torch.OptCont import LQRPolicy
+class IDPLQRPolicy(LQRPolicy):
+    def _build_env(self) -> np.array:
+        I1, I2 = 0.878121, 1.047289
+        l1 = 0.7970
+        lc1, lc2 = 0.5084, 0.2814
+        m1 ,m2 = 17.2955, 34.5085
+        g = 9.81
+        M = np.array([[I1 + m1*lc1**2 + I2 + m2*l1**2 + 2*m2*l1*lc2 + m2*lc2**2, I2 + m2*l1*lc2 + m2*lc2**2],
+                      [I2 + m2*l1*lc2 + m2*lc2**2, I2 + m2*lc2**2]])
+        C = np.array([[m1*lc1*g + m2*l1*g + m2*g*lc2, m2*g*lc2],
+                      [m2*g*lc2, m2*g*lc2]])
+        self.A, self.B = np.zeros([4, 4]), np.zeros([4, 2])
+        self.A[:2, 2:] = np.eye(2, 2)
+        self.A[2:, :2] = np.linalg.inv(M) @ C
+        self.B[2:, :] = np.linalg.inv(M) @ np.eye(2, 2)
+        self.Q = np.diag([3.5139, 0.2872182, 0.24639979, 0.01540204])
+        self.R = np.diag([0.02537065/1600, 0.01358577/900])
+        self.gear = 100
 
-def test_cal_cost():
+def test_reward_calculation():
+    from imitation.data import types
+    with open("../../IRL/demos/DiscretizedHuman/19191919_lqr/quadcost_from_contlqr_sub05.pkl", "rb") as f:
+        expert_trajs = pickle.load(f)
+    init_states = []
+    for traj in expert_trajs:
+        init_states += [traj.obs[0]]
+    bsp = io.loadmat("../../IRL/demos/HPC/sub05/sub05i1.mat")['bsp']
+    env = make_env("DiscretizedHuman-v0", bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states)
+    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu')
+    agent.learn(0)
+    agent_trajs = []
+    for i in range(len(init_states)):
+        init_state = env.reset()
+        obs, acts, rews = agent.predict(init_state, deterministic=True)
+        data_dict = {'obs': obs, 'acts': acts, 'rews': rews.flatten(), 'infos': None}
+        traj = types.TrajectoryWithRew(**data_dict)
+        agent_trajs.append(traj)
+        print(env.get_reward(expert_trajs[i].obs[:-1], expert_trajs[i].acts).sum(), rews.sum())
+    print('end')
+
+
+def test_cal_cost_for_airl():
     from imitation.data.rollout import flatten_trajectories
     expert_dir = os.path.join(irl_path, "demos", "HPC", "lqrTest.pkl")
     with open(expert_dir, "rb") as f:
