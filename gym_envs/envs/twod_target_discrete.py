@@ -10,7 +10,7 @@ from scipy.sparse import csc_matrix
 class TwoDTargetDisc(gym.Env):
     def __init__(self, map_size=50):
         self.map_size = map_size
-        self.act_size = 7
+        self.act_size = 3
         self.dt = 0.1
         self.st = None
         self.timesteps = 0
@@ -28,9 +28,6 @@ class TwoDTargetDisc(gym.Env):
     def _get_obs(self):
         return self.st
 
-    def get_torque(self, action):
-        return action.T
-
     def _get_next_state(self, state, action):
         state = state + action - self.act_size // 2
         return np.clip(state, a_max=self.map_size - 1, a_min=0)
@@ -45,8 +42,14 @@ class TwoDTargetDisc(gym.Env):
         return self._get_obs()
 
     def get_reward(self, state, action):
-        target = np.array([10, 15])
-        return - ((state - target) ** 2 + (action - self.act_size // 2) ** 2).sum(axis=-1, keepdims=True)
+        target = np.array([7, 7])
+        x, y = np.split(state, 2, axis=-1)
+        a1, a2 = np.split(action, 2, axis=-1)
+        # return - ((state - target) ** 2 + (action - self.act_size // 2) ** 2).sum(axis=-1, keepdims=True)
+        # return - ((state - target) ** 2).sum(axis=-1, keepdims=True)
+        # return - (0.1 * x ** 2 + y ** 2 - 1.4 * x - 14 * y).sum(axis=-1, keepdims=True)
+        # return - (x ** 2 + y ** 2 - 14 * x - 14 * y + a1 ** 2 + a2 ** 2- 6 * a1 - 6 * a2).sum(axis=-1, keepdims=True)
+        return - (x ** 2 + y ** 2 - 14 * x - 14 * y).sum(axis=-1, keepdims=True)
 
     def get_vectorized(self):
         s_vec = np.stack(np.meshgrid(range(self.map_size), range(self.map_size), indexing='ij'),
@@ -121,7 +124,7 @@ class TwoDTargetDiscDet(TwoDTargetDisc):
         super(TwoDTargetDiscDet, self).__init__(map_size=map_size)
         if init_states is None:
             self.init_states, _ = self.get_vectorized()
-            self.init_states = self.init_states[0:len(self.init_states):3]
+            # self.init_states = self.init_states[np.random.choice(range(len(self.init_states)), 1)]
         else:
             self.init_states = self.get_obs_from_idx(self.get_idx_from_obs(np.array(init_states)))
         self.n = 0

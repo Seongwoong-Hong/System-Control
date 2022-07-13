@@ -1,29 +1,14 @@
+import gym
 import time
 import numpy as np
 
 from common.verification import verify_policy
 from common.util import make_env
 
-
-def test_env_order():
-    env = make_env("HPC_custom-v1", subpath="../../IRL/demos/HPC/sub01/sub01")
-    exp = def_policy("HPC", env)
-    for _ in range(40):
-        a_list, o_list, _, = verify_policy(env, exp, "None")
-    print(env.order)
-    assert env.order == 5
-
-
-def test_env_traj_len():
-    env = make_env("HPC_custom-v1", subpath="../../IRL/demos/HPC/sub01/sub01")
-    exp = def_policy("HPC", env)
-    a_list, o_list, _, = verify_policy(env, exp, "None")
-    assert len(a_list) == env.n_steps
+from scipy import io
 
 
 def test_pybullet_envs():
-    import gym, time
-    from common.util import make_env
     env = make_env("HPC_pybullet-v0", subpath="../../IRL/demos/HPC/sub01/sub01")
     env.render(mode="human")
     env.reset()
@@ -39,7 +24,6 @@ def test_pybullet_envs():
 
 
 def test_hpc_obs_reset():
-    from scipy import io
     init_states = []
     for i in range(35):
         file = f"../../IRL/demos/HPC/sub01/sub01i{i+1}.mat"
@@ -68,17 +52,15 @@ def test_init():
         time.sleep(env.dt)
 
 
-def test_2dworld():
-    env = make_env("2DWorld-v2")
-    trajs = []
+def test_2d_env():
+    env = make_env("SpringBall-v2")
     for i in range(10):
         env.reset()
         done = False
-        sts, rs = [], []
+        env.render()
         while not done:
             action = env.action_space.sample()
-            st, r, done, _ = env.step(action)
-            sts.append(st)
-            rs.append(r)
-        trajs.append(np.append(np.array(sts), np.array(rs).reshape(-1, 1), axis=1))
-    env.draw(trajs)
+            st, r, done, _ = env.step(np.array([0]))
+            env.render()
+            time.sleep(env.dt)
+    env.close()

@@ -13,21 +13,21 @@ from scipy.special import softmax, logsumexp
 
 def test_discretized_pendulum():
     """ 기본 환경 테스트 """
-    env = gym.make('DiscretizedPendulum-v0', h=[0.03, 0.15])  # type: DiscretizedPendulum
+    env = gym.make('DiscretizedPendulum-v0', N=[11, 11], NT=[11])  # type: DiscretizedPendulum
 
     # step test
     s = env.reset()
-    env.render()
+    # env.render()
     a = env.action_space.sample()
     next_s, r, _, _ = env.step(a)
-    print(f'Step from {s} to {next_s} by action {a}, torque {env.get_torque(a)}')
+    # print(f'Step from {s} to {next_s} by action {a}, torque {env.get_torque(a)}')
 
     # rendering test (P control)
     s = env.reset()
     for _ in range(100):
         a = np.array([0])
         s, r, d, _ = env.step(a)
-        env.render()
+        # env.render()
 
         if d:
             s = env.reset()

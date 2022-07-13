@@ -19,13 +19,25 @@ register(
 register(
     id='DiscretizedPendulum-v2',
     entry_point='gym_envs.envs:DiscretizedPendulum',
-    max_episode_steps=200,
+    max_episode_steps=50,
 )
 
 register(
     id='DiscretizedPendulum-v0',
     entry_point='gym_envs.envs:DiscretizedPendulumDet',
-    max_episode_steps=200,
+    max_episode_steps=50,
+)
+
+register(
+    id='DiscretizedPendulum_DataBased-v2',
+    entry_point='gym_envs.envs:DataBasedDiscretizedPendulum',
+    max_episode_steps=50,
+)
+
+register(
+    id='DiscretizedPendulum_DataBased-v0',
+    entry_point='gym_envs.envs:DataBasedDiscretizedPendulumDet',
+    max_episode_steps=50,
 )
 
 register(
@@ -72,20 +84,26 @@ register(
 
 register(
     id='2DWorld_disc-v0',
-    entry_point='gym_envs.envs:TwoDWorldDiscDetOrder',
-    max_episode_steps=100,
-)
-
-register(
-    id='2DWorld_disc-v1',
     entry_point='gym_envs.envs:TwoDWorldDiscDet',
-    max_episode_steps=100,
+    max_episode_steps=20,
 )
 
 register(
     id='2DWorld_disc-v2',
     entry_point='gym_envs.envs:TwoDWorldDisc',
-    max_episode_steps=100,
+    max_episode_steps=20,
+)
+
+register(
+    id='SpringBall_disc-v2',
+    entry_point='gym_envs.envs:SpringBallDisc',
+    max_episode_steps=40,
+)
+
+register(
+    id='SpringBall_disc-v0',
+    entry_point='gym_envs.envs:SpringBallDiscDet',
+    max_episode_steps=40,
 )
 
 register(
@@ -142,44 +160,44 @@ register(
 register(
     id='IP_custom-v0',
     entry_point='gym_envs.envs.mujoco:IPCustomExp',
-    max_episode_steps=600,
+    max_episode_steps=50,
 )
 
 register(
     id='IP_custom-v1',
     entry_point='gym_envs.envs.mujoco:IPCustom',
-    max_episode_steps=600,
+    max_episode_steps=50,
 )
 
 register(
     id='IP_custom-v2',
     entry_point='gym_envs.envs.mujoco:IPCustom',
-    max_episode_steps=600,
+    max_episode_steps=50,
 )
 
 
 register(
     id='IDP_custom-v0',
     entry_point='gym_envs.envs.mujoco:IDPCustomExp',
-    max_episode_steps=600,
+    max_episode_steps=50,
 )
 
 register(
     id='IDP_custom-v2',
     entry_point='gym_envs.envs.mujoco:IDPCustom',
-    max_episode_steps=600,
+    max_episode_steps=50,
 )
 
 register(
     id='HPC_custom-v0',
     entry_point='gym_envs.envs.mujoco:IDPHumanExp',
-    max_episode_steps=599,
+    max_episode_steps=50,
 )
 
 register(
-    id='HPC_custom-v1',
+    id='HPC_custom-v2',
     entry_point='gym_envs.envs.mujoco:IDPHuman',
-    max_episode_steps=599,
+    max_episode_steps=50,
 )
 
 register(

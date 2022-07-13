@@ -3,7 +3,7 @@ import os
 
 def test_load_logging():
     hype = {}
-    dir_name = os.path.join("..", "tmp", "log", "HPC", "ppo", "AIRL_test", "10", "model")
+    dir_name = os.path.join("..", "tmp", "log", "HPC", "ppo", "AIRL_test", "1", "model")
     f = open(dir_name + "/hyper_parameters.txt", "r")
     for line in f.readlines():
         name, value = line[:line.find(":")], float(line[line.find(":")+1:-1])

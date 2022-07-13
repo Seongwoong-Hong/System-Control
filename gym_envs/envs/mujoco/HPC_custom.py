@@ -20,10 +20,10 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         filepath = os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml")
         if bsp is not None:
             self._set_body_config(filepath, bsp)
-        mujoco_env.MujocoEnv.__init__(self, filepath, frame_skip=5)
+        mujoco_env.MujocoEnv.__init__(self, filepath, frame_skip=1)
         self.observation_space = gym.spaces.Box(
-            low=np.array([-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 0.0]),
-            high=np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+            low=np.array([-0.05, -0.2, -0.08, -0.4, -1.0, -1.0]),
+            high=np.array([0.05, 0.05, 0.3, 0.35, 1.0, 1.0])
         )
         utils.EzPickle.__init__(self)
         self.init_qpos = np.array([0.0, 0.0])
@@ -43,14 +43,24 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def step(self, action: np.ndarray):
         prev_ob = self._get_obs()
-        r = 1 - (prev_ob[0] ** 2 + prev_ob[1] ** 2 +
-                 0.1 * prev_ob[2] ** 2 + 0.1 * prev_ob[3] ** 2 +
-                 5e-6 * ((self.model.actuator_gear[0, 0] * action[0]) ** 2 +
-                         (self.model.actuator_gear[0, 0] * action[1]) ** 2))
+        r = - (3.5139 * prev_ob[0] ** 2 + 1.2872182 * prev_ob[1] ** 2
+               + 0.14639979 * prev_ob[2] ** 2 + 0.10540204 * prev_ob[3] ** 2
+               + 0.02537065 * action[0] ** 2 + 0.01358577 * action[1])
+        r += 1
         self.do_simulation(action + self.plt_torque, self.frame_skip)
         self._timesteps += 1
         ob = self._get_obs()
-        done = False
+        done = bool(
+            (ob[:2] < np.array([-0.05, -0.2])).any() or
+            (ob[:2] > np.array([0.05, 0.05])).any() or
+            (ob[2:4] < np.array([-0.08, -0.4])).any() or
+            (ob[2:4] > np.array([0.3, 0.35])).any()
+        )
+        qpos = np.clip(ob[:2], a_min=np.array([-0.05, -0.2]), a_max=np.array([0.05, 0.05]))
+        qvel = np.clip(ob[2:4], a_min=np.array([-0.08, -0.4]), a_max=np.array([0.3, 0.35]))
+        self.set_state(qpos, qvel)
+        ob = self._get_obs()
+        # done = False
         info = {"obs": prev_ob.reshape(1, -1), "acts": action.reshape(1, -1)}
         return ob, r, done, info
 
@@ -59,14 +69,14 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
             self.sim.data.qpos,  # link angles
             self.sim.data.qvel,  # link angular velocities
             self.plt_torque,  # torque from platform movement
-            np.array([self.timesteps / 600]),
+            # np.array([self.timesteps / 600]),
         ]).ravel()
 
     def reset_model(self):
         self._order += 1
         if self._init_states is not None:
             self.init_qpos = np.array(self._init_states[self.order][:2])
-            self.init_qvel = np.array(self._init_states[self.order][2:])
+            self.init_qvel = np.array(self._init_states[self.order][2:4])
         self.set_state(self.init_qpos, self.init_qvel)
         return self._get_obs()
 
@@ -85,7 +95,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     @property
     def order(self):
         if self._pltqs is None:
-            return self._order
+            return self._order % len(self._init_states)
         return self._order % len(self._pltqs)
 
     @property

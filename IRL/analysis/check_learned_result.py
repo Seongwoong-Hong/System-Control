@@ -11,6 +11,8 @@ from common.util import make_env, CPU_Unpickler
 from common.wrappers import *
 
 irl_path = os.path.abspath("..")
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 
 def compare_obs(subj="sub01", actuation=1, learned_trial=1):
@@ -24,7 +26,7 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
 
     env_type = "DiscretizedHuman"
     name = f"{env_type}"
-    expt = f"17171719/{subj}_{actuation}"
+    expt = f"19191919/{subj}_{actuation}"
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
@@ -32,19 +34,19 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     for traj in expert_trajs:
         init_states.append(traj.obs[0])
 
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_handnorm_finite_{expt}_{learned_trial}/model"
+    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_handnorm_{expt}_{learned_trial}/model"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
-        reward_fn = CPU_Unpickler(f).load().to('cuda:3')
+        reward_fn = CPU_Unpickler(f).load().to('cuda')
     reward_fn.feature_fn = feature_fn
     # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    env = make_env(f"{name}-v2", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp,
+    env = make_env(f"{name}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp,
                    wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     d_env = make_env(env, num_envs=1, wrapper=DiscretizeWrapper)
 
-    agent = FiniteSoftQiter(d_env, gamma=1., alpha=0.01, device='cuda:3', verbose=False)
+    agent = FiniteSoftQiter(d_env, gamma=1., alpha=0.001, device='cuda', verbose=False)
     agent.learn(0)
 
-    eval_env = make_env(f"{name}-v0", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp, init_states=init_states,
+    eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, init_states=init_states,
                         wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
     # eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
 
@@ -174,6 +176,6 @@ def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_tr
 
 if __name__ == "__main__":
     for subj in [f"sub{i:02d}" for i in [6]]:
-        for actuation in range(1, 7):
+        for actuation in range(1, 2):
             for learn_trial in range(1, 2):
                 compare_obs(subj, actuation, learn_trial)

@@ -36,19 +36,16 @@ def test_qlearning():
 
 
 def test_soft_q_learning():
-    env = make_env("2DTarget_disc-v2", map_size=7, num_envs=10)
+    env = make_env("2DTarget_disc-v2", map_size=10, num_envs=1)
     logger.configure(".", format_strs=['stdout'])
-    algo = SoftQLearning(env, gamma=0.8, epsilon=0.4, alpha=0.2, device='cpu')
-    import time
-    start = time.time()
+    algo = SoftQLearning(env, gamma=0.999, epsilon=0.4, alpha=0.01, device='cpu')
     algo.learn(int(1e4))
-    print(f"time: {time.time() - start}")
 
     print('end')
 
 
 def test_viter():
-    env = make_env("DiscretizedDoublePendulum-v2", num_envs=1, N=[19, 17, 17, 17])
+    env = make_env("DiscretizedPendulum-v2", num_envs=1, N=[19, 19])
     algo = Viter(env, gamma=0.7, epsilon=0.2, device='cpu')
     algo.learn(2000)
     algo2 = FiniteViter(env, gamma=0.7, epsilon=0.2, device='cpu')
@@ -66,8 +63,18 @@ def test_viter():
     print(f"{np.array(obs_differs).mean()} < 1e-2 and {np.array(acts_differs).mean()} < 0.1")
 
 
-def test_softiter():
-    env = make_env("DiscretizedDoublePendulum-v2", num_envs=1, N=[19, 17, 17, 17])
+def test_softqiter():
+    env = make_env("2DTarget_disc-v2", map_size=10, num_envs=1)
+    logger.configure(".", format_strs=['stdout'])
+    algo = SoftQiter(env, gamma=0.999, alpha=0.01, device='cpu')
+    algo.learn(int(1e4))
+    algo2 = SoftQiter(env, gamma=0.999, alpha=0.05, device='cpu')
+    algo2.learn(int(1e4))
+
+    print('end')
+
+def test_softiter_finite_diff():
+    env = make_env("2DTarget_disc-v2", num_envs=1, map_size=10)
     logger.configure(".", format_strs=['stdout'])
     algo = SoftQiter(env, gamma=0.6, alpha=0.001, device='cuda:3')
     algo.learn(2000)
@@ -87,11 +94,17 @@ def test_softiter():
 
 
 def test_finite_iter(bsp):
-    env = make_env("DiscretizedHuman-v2", N=[19, 17, 17, 17], NT=[11, 11], num_envs=1, bsp=bsp)
+    env = make_env("DiscretizedPendulum_DataBased-v2", N=[29, 29], NT=[21], num_envs=1)
+    with open("../envs/obs_test.pkl", "rb") as f:
+        obs_info_tree = pickle.load(f)
+    env.envs[0].obs_info.info_tree = obs_info_tree
+    with open("../envs/acts_test.pkl", "rb") as f:
+        acts_info_tree = pickle.load(f)
+    env.envs[0].acts_info.info_tree = acts_info_tree
     logger.configure(".", format_strs=['stdout'])
-    algo = FiniteViter(env, gamma=0.8, alpha=0.00001, device='cpu')
+    algo = FiniteViter(env, gamma=1, alpha=0.00001, device='cpu')
     algo.learn(0)
-    algo2 = FiniteSoftQiter(env, gamma=0.8, alpha=0.00001, device='cpu')
+    algo2 = FiniteSoftQiter(env, gamma=1, alpha=0.00001, device='cpu')
     algo2.learn(0)
     init_obs = env.reset()
     print(init_obs)
@@ -114,11 +127,63 @@ def test_infinite_iter(bsp):
     print(f"Value: {np.abs(algo.policy.v_table - algo2.policy.v_table).mean()}")
 
 
+def test_state_visitation_diff_according_to_alpha_diff():
+    from copy import deepcopy
+    env = make_env("2DTarget_disc-v2", map_size=10)
+    policy1 = FiniteSoftQiter(env, gamma=1, alpha=3, device='cpu')
+    policy1.learn(0)
+    policy2 = FiniteSoftQiter(env, gamma=1, alpha=6, device='cpu')
+    policy2.learn(0)
+
+    D_prev1 = th.ones([policy1.policy.obs_size]) / policy1.policy.obs_size
+    D_prev2 = th.ones([policy2.policy.obs_size]) / policy2.policy.obs_size
+    Dc1 = D_prev1[None, :] * policy1.policy.policy_table[0]
+    Dc2 = D_prev2[None, :] * policy2.policy.policy_table[0]
+    for t in range(1, policy1.max_t):
+        D1 = th.zeros_like(D_prev1)
+        D2 = th.zeros_like(D_prev2)
+        for a in range(policy1.policy.act_size):
+            D1 += policy1.transition_mat[a] @ (D_prev1 * policy1.policy.policy_table[t - 1, a])
+            D2 += policy2.transition_mat[a] @ (D_prev2 * policy2.policy.policy_table[t - 1, a])
+        Dc1 += policy1.policy.policy_table[t] * D1[None, :] * policy1.gamma ** t
+        Dc2 += policy2.policy.policy_table[t] * D2[None, :] * policy2.gamma ** t
+        D_prev1 = deepcopy(D1)
+        D_prev2 = deepcopy(D2)
+
+    fig1 = plt.figure(figsize=[8, 8], dpi=100)
+    fig2 = plt.figure(figsize=[8, 8], dpi=100)
+    for obs in range(100):
+        ax1 = fig1.add_subplot(10, 10, obs+1)
+        ax2 = fig2.add_subplot(10, 10, obs+1)
+        ax1.imshow(Dc1[:, obs].reshape(7, 7))
+        ax2.imshow(Dc2[:, obs].reshape(7, 7))
+    fig1.tight_layout()
+    fig2.tight_layout()
+    plt.show()
+
+    s_vec, a_vec = env.get_vectorized()
+
+    def feature_fn(x):
+        return x ** 2
+
+    feat_mat = []
+    for acts in a_vec:
+        feat_mat.append(feature_fn(th.from_numpy(np.append(s_vec, np.repeat(acts[None, :], len(s_vec), axis=0), axis=1))).numpy())
+    mean_features1 = np.sum(np.sum(Dc1.numpy()[..., None] * np.array(feat_mat), axis=0), axis=0)
+    mean_features2 = np.sum(np.sum(Dc2.numpy()[..., None] * np.array(feat_mat), axis=0), axis=0)
+    print(mean_features1)
+    print(mean_features2)
+    print((Dc1 - Dc2).abs().mean())
+
+
 def test_wrapped_reward():
-    with open(
-            "../../IRL/tmp/log/1DTarget_disc/MaxEntIRL/ext_ppo_disc_samp_linear_ppoagent_svm_reset/model/000/reward_net.pkl",
-            "rb") as f:
+    def feature_fn(x):
+        return th.cat([x, x**2], dim=1)
+
+    reward_dir = "../../IRL/tmp/log/1DTarget_disc/MaxEntIRL/ext_ppo_disc_samp_linear_ppoagent_svm_reset/model"
+    with open(f"{reward_dir}/000/reward_net.pkl", "rb") as f:
         reward_net = pickle.load(f).cpu()
+    reward_net.feature_fn = feature_fn
     env = make_env("1DTarget_disc-v2", wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_net})
     algo1 = QLearning(env, gamma=0.8, epsilon=0.2, alpha=0.6, device='cpu')
     algo1.learn(1000)
@@ -127,9 +192,3 @@ def test_wrapped_reward():
 
     print('env')
 
-
-if __name__ == "__main__":
-    def feature_fn(x):
-        return th.cat([x, x**2], dim=1)
-
-    test_wrapped_reward()

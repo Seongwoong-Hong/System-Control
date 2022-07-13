@@ -4,16 +4,26 @@ import torch
 
 
 class ActionWrapper(gym.ActionWrapper):
+    def __init__(self, env):
+        super(ActionWrapper, self).__init__(env)
+        self.coeff = 50
+        self.action_space = gym.spaces.Box(
+            low=self.env.action_space.low / self.coeff,
+            high=self.env.action_space.high / self.coeff,
+            dtype=np.float64
+        )
+
     def action(self, action):
-        return 0.4 * action
+        return self.coeff * action
 
     def reverse_action(self, action):
-        return 1/(action * 0.4)
+        return 1/(action * self.coeff)
 
 
 class RewardWrapper(gym.RewardWrapper):
     def __init__(self, env, rwfn):
         super(RewardWrapper, self).__init__(env)
+        self._ob = None
         self.rwfn = rwfn
         self.use_action_as_inp = self.rwfn.use_action_as_inp
 
@@ -24,14 +34,17 @@ class RewardWrapper(gym.RewardWrapper):
         self.train(mode=False)
 
     def step(self, action: np.ndarray):
-        next_ob, rew, done, info = self.env.step(action)
-        inp = info['obs']
+        assert self._ob is not None
+        inp = self._ob.reshape(1, -1)
         if self.use_action_as_inp:
-            inp = np.append(inp, info['acts'], axis=1)
+            inp = np.append(inp, action.reshape(1, -1), axis=1)
         r = self.reward(inp).item()
-        if info.get('done'):
-            r -= 1000
-        return next_ob, r, done, info
+        self._ob, _, done, info = self.env.step(action)
+        return self._ob, r, done, info
+
+    def reset(self, **kwargs):
+        self._ob = self.env.reset(**kwargs)
+        return self._ob
 
     def get_reward_mat(self):
         inp, acts = self.env.get_vectorized()
@@ -55,15 +68,16 @@ class RewardInputNormalizeWrapper(RewardWrapper):
         if isinstance(self.observation_space, gym.spaces.MultiDiscrete):
             high = (self.observation_space.nvec[None, :] - 1)
         elif isinstance(self.observation_space, gym.spaces.Box):
-            high = self.observation_space.high[None, :]
-            high = np.array([[0.16, 0.7, 0.8, 2.4]])
+            candi = np.append(abs(self.observation_space.high[None, :]), abs(self.observation_space.low[None, :]), axis=0)
+            high = np.max(candi, axis=0, keepdims=True)
         else:
             raise NotImplementedError
         if self.use_action_as_inp:
             if isinstance(self.action_space, gym.spaces.MultiDiscrete):
-                high = np.append(high, (self.action_space.nvec[None, :] - 1))
+                high = np.append(high, (self.action_space.nvec[None, :] - 1), axis=-1)
             elif isinstance(self.action_space, gym.spaces.Box):
-                high = np.append(high, self.action_space.high[None, :], axis=-1)
+                candi = np.append(abs(self.action_space.high[None, :]), abs(self.action_space.low[None, :]), axis=0)
+                high = np.append(high, np.max(candi, axis=0, keepdims=True), axis=-1)
             else:
                 raise NotImplementedError
         inp = inp / high

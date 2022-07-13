@@ -4,6 +4,7 @@ import torch as th
 from copy import deepcopy
 
 from torch import nn
+from torch.optim.lr_scheduler import ExponentialLR
 from typing import List
 
 
@@ -18,6 +19,8 @@ class RewardNet(nn.Module):
             device: str = 'cpu',
             optim_cls=th.optim.Adam,
             optim_kwargs=None,
+            lr_scheduler_cls=None,
+            lr_scheduler_kwargs=None,
             activation_fn=th.nn.Tanh,
     ):
         super(RewardNet, self).__init__()
@@ -30,6 +33,8 @@ class RewardNet(nn.Module):
         self.optim_kwargs = optim_kwargs
         if self.optim_kwargs is None:
             self.optim_kwargs = {}
+        self.lr_scheduler_cls = lr_scheduler_cls
+        self.lr_scheduler_kwargs = lr_scheduler_kwargs
         self.in_features = inp
         self._arch = [self.in_features] + arch
         self._build()
@@ -46,7 +51,12 @@ class RewardNet(nn.Module):
                 layers.append(nn.Linear(self._arch[i], self._arch[i + 1]))
         layers.append(nn.Linear(self._arch[-1], 1, bias=False))
         self.layers = nn.Sequential(*layers)
+        # self.layers[0].weight = th.nn.Parameter(
+        #     th.tensor([0.686, 0.686, 0.072, 0.072, -2.401, -2.401, -0.036, -0.036]))
         self.optimizer = self.optim_cls(self.parameters(), **self.optim_kwargs)
+        self.lr_scheduler = None
+        if self.lr_scheduler_cls:
+            self.lr_scheduler = self.lr_scheduler_cls(self.optimizer, **self.lr_scheduler_kwargs)
         self.to(self._device)
 
     def reset_optim(self):

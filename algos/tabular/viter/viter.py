@@ -95,11 +95,11 @@ class Viter:
             old_value = deepcopy(self.policy.v_table)
             self.train()
             error = th.max(th.abs(old_value - self.policy.v_table)).item()
-            if self.num_timesteps % 10 == 0 and self.verbose:
+            if self.num_timesteps % 100 == 0 and self.verbose:
                 logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                 logger.record("Value Error", error, exclude="tensorboard")
                 logger.dump(self.num_timesteps)
-            if self.num_timesteps >= total_timesteps or error < 1e-8:
+            if self.num_timesteps >= total_timesteps or error < 1e-6:
                 if self.verbose:
                     logger.record("num_timesteps", self.num_timesteps, exclude="tensorboard")
                     logger.record("Value Error", error, exclude="tensorboard")
@@ -162,9 +162,9 @@ class Viter:
 
 class SoftQiter(Viter):
     def train(self):
-        self.policy.v_table = self.alpha * th.logsumexp(self.policy.q_table / self.alpha, dim=0)
         self.policy.q_table = self.reward_mat + self.gamma * (1 - self.done_mat) * \
                               backward_trans(self.transition_mat, self.policy.v_table)
+        self.policy.v_table = self.alpha * th.logsumexp(self.policy.q_table / self.alpha, dim=0)
         self.policy.policy_table = th.exp((self.policy.q_table - self.policy.v_table[None, :]) / self.alpha)
 
     def predict(
@@ -182,7 +182,7 @@ class FiniteViter(Viter):
         self.num_timesteps = 0
         self.observation_space = self.env.observation_space
         self.action_space = self.env.action_space
-        assert hasattr(self.env.get_attr("spec")[0], "max_episode_steps"), "Need to be specified the maximum timestep"
+        assert hasattr(self.env.get_attr("spec")[0], "max_episode_steps"), "Need to be specified the bound_info.json timestep"
         self.max_t = self.env.get_attr("spec")[0].max_episode_steps
         self.policy = FiniteTabularPolicy(
             observation_space=self.observation_space,
@@ -223,7 +223,9 @@ class FiniteViter(Viter):
                 eps = np.random.random()
                 if eps < self.epsilon:
                     act = self.action_space.sample()[None, :]
-            observation, reward, _, _ = self.env.step(act)
+            observation, reward, done, info = self.env.step(act)
+            if done:
+                observation = info[0]['terminal_observation']
             obs_list.append(observation.flatten())
             rew_list.append(reward.flatten())
             act_list.append(act.flatten())
@@ -234,6 +236,7 @@ class FiniteSoftQiter(FiniteViter):
     def train(self):
         self.policy.q_table[-1] = self.reward_mat
         self.policy.v_table[-1] = self.alpha * th.logsumexp(self.policy.q_table[-1] / self.alpha, dim=0)
+        self.policy.policy_table[-1] = th.exp((self.policy.q_table[-1] - self.policy.v_table[-1, None, :]) / self.alpha)
         for t in reversed(range(self.max_t - 1)):
             self.policy.q_table[t] = self.reward_mat + self.gamma * \
                                      backward_trans(self.transition_mat, self.policy.v_table[t + 1])
@@ -252,7 +255,6 @@ class FiniteSoftQiter(FiniteViter):
         else:
             choose_method = self.policy.arg_max
         obs_list, act_list, rew_list = [], [], []
-        self.env.reset()
         self.env.env_method("set_state", observation.squeeze())
         obs_list.append(observation.flatten())
         for t in range(self.max_t):
