@@ -75,16 +75,17 @@ def test_rl_learned_policy(rl_path):
 
 
 def test_finite_algo(rl_path):
-    name = "SpringBall"
+    name = "DiscretizedHuman"
     env_id = f"{name}"
     subj = "sub05"
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    # env = make_env(f"{env_id}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
-    env = make_env(f"{env_id}-v2", num_envs=1, wrapper=DiscretizeWrapper)
+    env = make_env(f"{env_id}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
+    # env = make_env(f"{env_id}-v2", num_envs=1, wrapper=DiscretizeWrapper)
     # init_states = np.array([[11, 35], [ 8, 16], [ 6,  2], [ 5, 45], [29, 27], [18, 37]])
-    eval_env = make_env(f"{env_id}-v2", wrapper=DiscretizeWrapper)
+    # eval_env = make_env(f"{env_id}-v2", wrapper=DiscretizeWrapper)
+    eval_env = make_env(f"{env_id}-v0", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
     # agent = SoftQiter(env=env, gamma=1, alpha=0.001, device='cuda:0')
     # agent.learn(50)
     agent = FiniteSoftQiter(env, gamma=1, alpha=0.001, device='cpu')
@@ -93,7 +94,7 @@ def test_finite_algo(rl_path):
     for epi in range(30):
         # ob = init_states[epi % len(init_states)]
         ob = eval_env.reset()
-        obs, acts, rews = agent.predict(ob, deterministic=True)
+        # obs, acts, rews = agent.predict(ob, deterministic=True)
         # plt.plot(obs[:, 2])
         # plt.plot(obs[:, 1])
         eval_env.render()

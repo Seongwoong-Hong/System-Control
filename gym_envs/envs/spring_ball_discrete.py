@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 from scipy.sparse import csc_matrix
-from gym_envs.envs import BaseDiscEnv
+from gym_envs.envs import BaseDiscEnv, UncorrDiscreteInfo
 
 
 class SpringBallDisc(BaseDiscEnv):
@@ -22,13 +22,10 @@ class SpringBallDisc(BaseDiscEnv):
         self.obs_high = np.array([self.map_size, 2.0])
         self.acts_low = np.array([-10.0])
         self.acts_high = np.array([10.0])
-        self.obs_list = []
-        for high, low, n in zip(self.obs_high, self.obs_low, self.num_cells):
-            self.obs_list.append(np.linspace(low, high, n + 1))
-        self.acts_list = []
-        for high, low, n in zip(self.acts_high, self.acts_low, self.num_actions):
-            self.acts_list.append(np.linspace(low, high, n + 1))
-
+        self.obs_info = UncorrDiscreteInfo(self.num_cells)
+        self.acts_info = UncorrDiscreteInfo(self.num_actions)
+        self.obs_info.set_info(self.obs_high, self.obs_low)
+        self.acts_info.set_info(self.acts_high, self.acts_low)
         self.observation_space = gym.spaces.Box(low=self.obs_low, high=self.obs_high)
         self.action_space = gym.spaces.Box(low=self.acts_low, high=self.acts_high)
 

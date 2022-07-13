@@ -35,7 +35,7 @@ class LQRPolicy(BasePolicy):
             K = (1 / self.R * (self.B.T @ X)).reshape(-1)
         return th.from_numpy(K).double()
 
-    def _build_env(self) -> np.array:
+    def _build_env(self):
         # define self.A, self.B, self.Q, self.R
         # Their types are all numpy array even though they are 1-dim value.
         raise NotImplementedError

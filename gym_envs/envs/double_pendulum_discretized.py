@@ -6,7 +6,7 @@ from copy import deepcopy
 from scipy.sparse import csc_matrix
 
 from gym_envs.envs.utils import calc_trans_mat_error, angle_normalize
-from gym_envs.envs import BaseDiscEnv
+from gym_envs.envs import BaseDiscEnv, UncorrDiscreteInfo
 
 
 class DiscretizedDoublePendulum(BaseDiscEnv):
@@ -24,7 +24,6 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
         self.ms = [1., 1.]
         self.lcs = [0.5, 0.5]
         self.ls = [1., 1.]
-        self.num_actions = NT
         # self.Q = np.diag([3.1139, 1.2872182, 0.14639979, 0.04540204])
         # self.Q = np.diag([3.5139, 1.2872182, 0.14639979, 0.10540204])
         self.Q = np.diag([3.5139, 0.2872182, 0.24639979, 0.01540204])
@@ -48,6 +47,9 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
             assert N is not None, "The number of discretization should be defined"
             assert (N % 2).all(), "N should be consist of odd numbers"
         self.num_cells = N
+        self.num_actions = NT
+        self.obs_info = UncorrDiscreteInfo(self.num_cells)
+        self.acts_info = UncorrDiscreteInfo(self.num_actions)
         self.set_bounds(
             max_states=[0.05, 0.05, 0.3, 0.35],
             min_states=[-0.05, -0.2, -0.08, -0.4],
@@ -83,18 +85,14 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
         self.max_speeds = np.array(max_states[2:])
         self.min_angles = np.array(min_states[:2])
         self.min_speeds = np.array(min_states[2:])
-        self.max_torques = np.array(max_torques)
-        self.min_torques = np.array(min_torques)
 
         self.obs_high = np.array([*self.max_angles, *self.max_speeds])
         self.obs_low = np.array([*self.min_angles, *self.min_speeds])
+        self.max_torques = np.array(max_torques)
+        self.min_torques = np.array(min_torques)
 
-        self.obs_list = []
-        for high, low, n in zip(self.obs_high, self.obs_low, self.num_cells):
-            self.obs_list.append(np.linspace(low, high, n + 1))
-        self.acts_list = []
-        for high, low, n in zip(self.max_torques, self.min_torques, self.num_actions):
-            self.acts_list.append(np.linspace(low, high, n + 1))
+        self.obs_info.set_info(self.obs_high, self.obs_low)
+        self.acts_info.set_info(self.max_torques, self.min_torques)
         self.observation_space = gym.spaces.Box(low=self.obs_low, high=self.obs_high, dtype=np.float64)
         self.action_space = gym.spaces.Box(low=self.min_torques, high=self.max_torques, dtype=np.float64)
 
@@ -200,10 +198,6 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
 
         return P
 
-    def get_action_mat(self, pi):
-        s_vec, _ = self.get_vectorized()
-        return pi(s_vec)
-
     def get_reward_mat(self):
         s_vec, a_vec = self.get_vectorized()
         R = []
@@ -302,10 +296,7 @@ class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
 
     def get_init_vector(self):
         s_vec = deepcopy(self.init_states)
-        a_vec = np.stack(np.meshgrid(np.arange(self.num_actions[0]),
-                                     np.arange(self.num_actions[1]),
-                                     indexing='ij'),
-                         -1).reshape(-1, 2)
+        a_vec = self.acts_info.get_vectorized()
         return s_vec, a_vec
 
 

@@ -15,7 +15,7 @@ from algos.torch.MaxEntIRL import MaxEntIRL
 from algos.tabular.viter import *
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 def main(
@@ -81,8 +81,8 @@ def main(
 if __name__ == "__main__":
     env_type = "DiscretizedPendulum"
     algo_type = "MaxEntIRL"
-    device = "cuda"
-    name = f"{env_type}"
+    device = "cpu"
+    name = f"{env_type}_DataBased"
 
     script_args = []
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -90,8 +90,8 @@ if __name__ == "__main__":
         bound_info = json.load(f)
 
     def feature_fn(x):
-        # x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=-1)
-        # return th.cat([x, x ** 2, x1 * x2, x3 * x4, a1 * a2], dim=1)
+        # x1, x2, a1 = th.split(x, 1, dim=-1)
+        # return th.cat([x, x1 * x2, x ** 2, x ** 3], dim=1)
         # return x ** 2
         # return th.cat([x, x**2, x**3, x**4], dim=1)
         # x1, x2, a1, a2 = th.split(x, 1, dim=-1)
@@ -109,8 +109,8 @@ if __name__ == "__main__":
 
     for subj in [f"sub{i:02d}" for i in [5]]:
         for actu in range(4, 5):
-            for trial in range(2, 4):
-                expt = f"1919_lqr/quadcost_from_contlqr"
+            for trial in range(1, 5):
+                expt = f"databased_lqr/quadcost_from_contlqr"
                 # expt = f"dot4_2_10/405_from_cont"
                 subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -122,12 +122,20 @@ if __name__ == "__main__":
                 init_states = []
                 for traj in expert_trajs:
                     init_states += [traj.obs[0]]
+                with open(f"{proj_path}/../tests/envs/obs_test.pkl", "rb") as f:
+                    obs_info_tree = pickle.load(f)
+                with open(f"{proj_path}/../tests/envs/acts_test.pkl", "rb") as f:
+                    acts_info_tree = pickle.load(f)
 
                 # Define environments
                 # env = make_env(f"{name}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp)
                 # eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states, bsp=bsp)
-                env = make_env(f"{name}-v2", N=[19, 19], NT=[11], bsp=bsp)
-                eval_env = make_env(f"{name}-v0", N=[19, 19], NT=[11], bsp=bsp)
+                env = make_env(f"{name}-v2", N=[29, 29], NT=[51])
+                eval_env = make_env(f"{name}-v0", N=[29, 29], NT=[51], init_states=init_states)
+                env.obs_info.info_tree = obs_info_tree
+                eval_env.obs_info.info_tree = obs_info_tree
+                env.acts_info.info_tree = acts_info_tree
+                eval_env.acts_info.info_tree = acts_info_tree
                 perturbation = actu - 1
                 # max_states = bound_info[subj][perturbation]["max_states"]
                 # min_states = bound_info[subj][perturbation]["min_states"]

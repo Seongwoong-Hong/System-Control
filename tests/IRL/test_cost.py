@@ -26,17 +26,14 @@ def mapping(x: th.tensor):
 
 @pytest.mark.parametrize("trial", [1, 2, 3, 4])
 def test_weight_consistency(trial):
-    log_dir = f"{irl_path}/tmp/log/DiscretizedHuman/MaxEntIRL/ext_01alpha_19191919_quadcost_disc/sub05_4_0001alpha_{trial}/model"
+    log_dir = f"{irl_path}/tmp/log/DiscretizedPendulum/MaxEntIRL/ext_01alpha_3939_51_lqr/quadcost_from_contlqr_{trial}/model"
     with open(f"{log_dir}/reward_net.pkl", "rb") as f:
         weights = CPU_Unpickler(f).load().layers[-1].weight.detach()[0]
     print("\n", weights)
     # print(weights[0]/0.4, weights[1]/2, weights[2]/10, weights[3]/0.16, weights[4]/4, weights[5]/100)
-    # print(weights[0] * 0.4 / weights[3], weights[1]*2/weights[4], weights[2]*10/weights[5])
-    # print(weights[0]/0.2, weights[1]/1.2, weights[2]/8, weights[3]/8, weights[4]/0.04, weights[5]/1.44, weights[6]/64, weights[7]/64)
-    print(weights[0]/0.05, weights[1]/0.2, weights[2]/0.3, weights[3]/0.4, weights[4]/40, weights[5]/30,
-          weights[6]/(0.05**2), weights[7]/(0.2**2), weights[8]/(0.3**2), weights[9]/(0.4**2), weights[10]/1600, weights[11]/900)
-    # print(weights[0], weights[1], weights[2], weights[3], weights[4], weights[5],
-    #       weights[6], weights[7], weights[8], weights[9], weights[10], weights[11])
+    print(weights[0]/0.05, weights[1]/0.3, weights[2]/40 ,weights[3]/(0.05**2), weights[4]/(0.3**2), weights[5]/1600)
+    # print(weights[0]/0.05, weights[1]/0.2, weights[2]/0.3, weights[3]/0.4, weights[4]/40, weights[5]/30,
+    #       weights[6]/(0.05**2), weights[7]/(0.2**2), weights[8]/(0.3**2), weights[9]/(0.4**2), weights[10]/1600, weights[11]/900)
 
 @pytest.mark.parametrize("trial", [1, 2, 3, 4])
 def test_total_reward_fn_for_sqmany(trial):
@@ -125,23 +122,20 @@ class IDPLQRPolicy(LQRPolicy):
 
 def test_reward_calculation():
     from imitation.data import types
-    with open("../../IRL/demos/DiscretizedHuman/19191919_lqr/quadcost_from_contlqr_sub05.pkl", "rb") as f:
+    with open("../../IRL/demos/DiscretizedPendulum/quadcost_lqr_many.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
     for traj in expert_trajs:
         init_states += [traj.obs[0]]
     bsp = io.loadmat("../../IRL/demos/HPC/sub05/sub05i1.mat")['bsp']
-    env = make_env("DiscretizedHuman-v0", bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states)
-    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu')
-    agent.learn(0)
-    agent_trajs = []
+    env = make_env("DiscretizedPendulum-v2", N=[39, 39], NT=[51])
+    with open("../../IRL/demos/DiscretizedPendulum/3939_51_softqiter/quadcost_det.pkl", "rb") as f:
+        agent_trajs = pickle.load(f)
+    r_e, r_a = [], []
     for i in range(len(init_states)):
-        init_state = env.reset()
-        obs, acts, rews = agent.predict(init_state, deterministic=True)
-        data_dict = {'obs': obs, 'acts': acts, 'rews': rews.flatten(), 'infos': None}
-        traj = types.TrajectoryWithRew(**data_dict)
-        agent_trajs.append(traj)
-        print(env.get_reward(expert_trajs[i].obs[:-1], expert_trajs[i].acts).sum(), rews.sum())
+        r_e.append(env.get_reward(expert_trajs[i].obs[:-1], expert_trajs[i].acts).sum())
+        r_a.append(env.get_reward(agent_trajs[i].obs[:-1], agent_trajs[i].acts).sum())
+    print(np.mean(r_e), np.mean(r_a))
     print('end')
 
 

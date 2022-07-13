@@ -94,7 +94,13 @@ def test_softiter_finite_diff():
 
 
 def test_finite_iter(bsp):
-    env = make_env("DiscretizedPendulum-v2", N=[19, 19], NT=[11], num_envs=1)
+    env = make_env("DiscretizedPendulum_DataBased-v2", N=[29, 29], NT=[21], num_envs=1)
+    with open("../envs/obs_test.pkl", "rb") as f:
+        obs_info_tree = pickle.load(f)
+    env.envs[0].obs_info.info_tree = obs_info_tree
+    with open("../envs/acts_test.pkl", "rb") as f:
+        acts_info_tree = pickle.load(f)
+    env.envs[0].acts_info.info_tree = acts_info_tree
     logger.configure(".", format_strs=['stdout'])
     algo = FiniteViter(env, gamma=1, alpha=0.00001, device='cpu')
     algo.learn(0)

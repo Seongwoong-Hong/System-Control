@@ -35,11 +35,12 @@ def test_drawing_hist_of_human_obs():
 def test_drawing_pkl_data():
     with open("../../IRL/demos/bound_info.json", "r") as f:
         bound_info = json.load(f)
+    env = make_env("DiscretizedPendulum-v2", N=[201, 201], NT=[101])
     for subj in [f"sub{i:02d}" for i in [5]]:
         for actu in range(4, 5):
             bound_dict = bound_info[subj][actu - 1]
             # expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "19191919_lqr", f"quadcost_from_contlqr_sub05.pkl")
-            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedPendulum", f"quadcost_lqr.pkl")
+            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedPendulum", "databased_21_lqr", f"quadcost_lqr.pkl")
             # expert_dir = os.path.join("../../IRL", "demos", "SpringBall", "cont", f"quadcost.pkl")
             with open(expert_dir, "rb") as f:
                 expert_trajs = pickle.load(f)
@@ -50,6 +51,7 @@ def test_drawing_pkl_data():
             ax22 = fig1.add_subplot(3, 2, 4)
             ax31 = fig1.add_subplot(3, 2, 5)
             ax32 = fig1.add_subplot(3, 2, 6)
+            palette = np.zeros([201*201])
             for traj in expert_trajs:
                 ax11.plot(traj.obs[:-1, 0])
                 ax12.plot(traj.obs[:-1, 1])
@@ -57,7 +59,10 @@ def test_drawing_pkl_data():
                 # ax12.set_ylim([-2.0, 2.0])
                 # ax11.set_ylim([bound_dict["min_states"][0], bound_dict["max_states"][0]])
                 # ax12.set_ylim([bound_dict["min_states"][1], bound_dict["max_states"][1]])
-                # ax21.plot(traj.obs[:-1, 0], traj.obs[:-1, 1])
+                ax21.plot(traj.obs[:-1, 0], traj.obs[:-1, 1])
+                traj_idx = env.get_idx_from_obs(traj.obs[:-1])
+                unique, counts = np.unique(traj_idx, return_counts=True)
+                palette[unique] += counts
                 # ax21.set_xlim([-.2, .20])
                 # ax21.set_ylim([-1.20, 1.20])
                 # ax21.plot(traj.obs[:-1, 2])
@@ -72,16 +77,17 @@ def test_drawing_pkl_data():
                 # ax32.set_ylim([-10, 10])
                 # ax31.set_ylim([bound_dict["min_torques"][0], bound_dict["max_torques"][0]])
                 # ax32.set_ylim([bound_dict["min_torques"][1], bound_dict["max_torques"][1]])
+            # ax32.imshow(palette.reshape(201, 201))
         plt.tight_layout()
         plt.show()
 
 
 def test_stepping_pkl_data():
-    expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "19171717_done", "sub06_1.pkl")
+    expert_dir = os.path.join("../../IRL", "demos", "DiscretizedPendulum", "301201_101_lqr", "quadcost_from_contlqr.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     bsp = io.loadmat("../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
-    env = make_env("DiscretizedHuman-v2", bsp=bsp, N=[19, 17, 17, 17], NT=[11, 11], wrapper=DiscretizeWrapper)
+    env = make_env("DiscretizedPendulum-v2", N=[301, 201], NT=[101], wrapper=DiscretizeWrapper)
     for traj in expert_trajs:
         obs_list = []
         env.reset()
@@ -91,6 +97,6 @@ def test_stepping_pkl_data():
             ob, _, _, _ = env.step(act)
             obs_list.append(ob)
         print(f"obs difference: {np.mean(np.abs(traj.obs - np.array(obs_list)))}")
-        plt.plot(traj.obs[:, 1], color='k')
-        plt.plot(np.array(obs_list)[:, 1], color='b')
+        plt.plot(traj.obs[:, 0], color='k')
+        plt.plot(np.array(obs_list)[:, 0], color='b')
     plt.show()
