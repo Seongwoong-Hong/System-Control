@@ -15,7 +15,7 @@ from common.wrappers import *
 from common.rollouts import generate_trajectories_without_shuffle
 
 
-class IPLQRPolicy(LQRPolicy):
+class DiscIPLQRPolicy(LQRPolicy):
     def _build_env(self):
         g = 9.81
         m = 17.2955
@@ -30,16 +30,23 @@ class IPLQRPolicy(LQRPolicy):
         self.R = np.diag([1.617065e-4])
         self.gear = 1
 
+    def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
+        action = super(DiscIPLQRPolicy, self)._predict(observation, deterministic)
+        high = th.from_numpy(self.env.action_space.high).float()
+        low = th.from_numpy(self.env.action_space.low).float()
+        action = th.clip(action, min=low, max=high)
+        d_act = self.env.env_method("get_acts_from_idx", self.env.env_method("get_idx_from_acts", action.numpy())[0])[0]
+        return th.from_numpy(d_act).float()
 
 def main():
     # env_op = 0.1
     env_type = "DiscretizedPendulum"
-    name = f"{env_type}_DataBased"
-    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    subpath = os.path.join(proj_path, "IRL", "demos", "HPC", subj, subj)
-    with open(f"{proj_path}/IRL/demos/DiscretizedHuman/19191919/{subj}_{actuation}.pkl", "rb") as f:
+    name = f"{env_type}"
+    demo_path = os.path.abspath(os.path.join(os.path.dirname(__file__)))
+    subpath = os.path.join(demo_path, "HPC", subj, subj)
+    with open(f"{demo_path}/DiscretizedHuman/19191919/{subj}_{actuation}.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
-    with open(f"{proj_path}/IRL/demos/bound_info.json", "r") as f:
+    with open(f"{demo_path}/bound_info.json", "r") as f:
         bound_info = json.load(f)
     init_states = []
     for traj in expt_trajs:
@@ -52,12 +59,12 @@ def main():
     # max_torques = bound_info[subj][perturbation]["max_torques"]
     # min_torques = bound_info[subj][perturbation]["min_torques"]
     # env.set_bounds(max_states, min_states, max_torques, min_torques)
-    with open("../../tests/envs/obs_test.pkl", "rb") as f:
-        obs_info_tree = pickle.load(f)
-    with open("../../tests/envs/acts_test.pkl", "rb") as f:
-        acts_info_tree = pickle.load(f)
-    venv = make_env(f"{name}-v2", num_envs=1, N=[29, 29], NT=[21], wrapper=DiscretizeWrapper)
-    venv.envs[0].obs_info.info_tree = obs_info_tree
+    # with open(f"{demo_path}/{env_type}/databased_lqr/obs_info_tree.pkl", "rb") as f:
+    #     obs_info_tree = pickle.load(f)
+    # with open(f"{demo_path}/{env_type}/databased_lqr/acts_info_tree.pkl", "rb") as f:
+    #     acts_info_tree = pickle.load(f)
+    venv = make_env(f"{name}-v2", num_envs=1, N=[39, 39], NT=[51], wrapper=DiscretizeWrapper)
+    # venv.envs[0].obs_info.info_tree = obs_info_tree
     # venv.envs[0].acts_info.info_tree = acts_info_tree
 
     # ExpertPolicy = FiniteSoftQiter(venv, gamma=1, alpha=0.001, device='cpu')
@@ -73,11 +80,11 @@ def main():
     #     trajectories.append(traj)
     sample_until = rollout.make_sample_until(n_timesteps=None, n_episodes=300)
     # ExpertPolicy = PPO.load(f"{proj_path}/RL/{env_type}/tmp/log/{name}/ppo/policies_1/agent_10.zip")
-    ExpertPolicy = IPLQRPolicy(env=make_env(f"{name}-v2", N=[29, 29], NT=[21]))
+    ExpertPolicy = DiscIPLQRPolicy(env=venv.envs[0])
     # venv = make_env(f"{name}-v2", num_envs=1, N=[19, 19], NT=[11])
     trajectories = generate_trajectories_without_shuffle(ExpertPolicy, venv, sample_until, deterministic_policy=True)
     # save_name = f"{env_type}/cont_quadcost/{subj}_{actuation}.pkl"
-    save_name = f"{env_type}/databased_21_lqr/quadcost_lqr.pkl"
+    save_name = f"{env_type}/3939_51_lqr/quadcost_lqr.pkl"
     types.save(save_name, trajectories)
 
     print(f"Expert Trajectories are saved in the {save_name}")

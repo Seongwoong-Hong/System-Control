@@ -146,8 +146,8 @@ def test_discretized_env(trial):
         return th.cat([x, x**2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
     env_type = "DiscretizedPendulum"
-    name = f"{env_type}"
-    expt = "2929_51_lqr/quadcost_from_contlqr_many"
+    name = f"{env_type}_DataBased"
+    expt = "databased_lqr/quadcost_from_contlqr"
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
     init_states = []
@@ -157,10 +157,18 @@ def test_discretized_env(trial):
     with open(rwfn_dir + "/reward_net.pkl", "rb") as f:
         rwfn = CPU_Unpickler(f).load().eval().to('cpu')
     rwfn.feature_fn = feature_fn
+    with open(f"{irl_path}/demos/{env_type}/databased_lqr/obs_info_tree.pkl", "rb") as f:
+        obs_info_tree = pickle.load(f)
+    with open(f"{irl_path}/demos/{env_type}/databased_lqr/acts_info_tree.pkl", "rb") as f:
+        acts_info_tree = pickle.load(f)
     # env = make_env(f"{env_id}-v0", num_envs=1, N=[19, 19, 19, 19], bsp=bsp, init_states=init_states)
     env = make_env(f"{name}-v2", num_envs=1, N=[29, 29], NT=[51], wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': rwfn})
     # env = make_env(f"{name}-v2", num_envs=1, wrapper=DiscretizeWrapper)
     eval_env = make_env(f"{name}-v0", N=[29, 29], NT=[51], init_states=init_states, wrapper=DiscretizeWrapper)
+    env.envs[0].obs_info.info_tree = obs_info_tree
+    env.envs[0].acts_info.info_tree = acts_info_tree
+    eval_env.obs_info.info_tree = obs_info_tree
+    eval_env.acts_info.info_tree = acts_info_tree
     agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device=rwfn.device, verbose=False)
     agent.learn(0)
     agent.set_env(eval_env)

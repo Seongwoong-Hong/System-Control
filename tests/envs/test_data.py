@@ -40,7 +40,7 @@ def test_drawing_pkl_data():
         for actu in range(4, 5):
             bound_dict = bound_info[subj][actu - 1]
             # expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "19191919_lqr", f"quadcost_from_contlqr_sub05.pkl")
-            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedPendulum", "databased_21_lqr", f"quadcost_lqr.pkl")
+            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedPendulum", "databased_lqr", f"quadcost_from_contlqr_many.pkl")
             # expert_dir = os.path.join("../../IRL", "demos", "SpringBall", "cont", f"quadcost.pkl")
             with open(expert_dir, "rb") as f:
                 expert_trajs = pickle.load(f)

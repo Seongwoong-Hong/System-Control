@@ -122,16 +122,16 @@ if __name__ == "__main__":
                 init_states = []
                 for traj in expert_trajs:
                     init_states += [traj.obs[0]]
-                with open(f"{proj_path}/../tests/envs/obs_test.pkl", "rb") as f:
+                with open(f"{proj_path}/demos/{env_type}/databased_lqr/obs_info_tree.pkl", "rb") as f:
                     obs_info_tree = pickle.load(f)
-                with open(f"{proj_path}/../tests/envs/acts_test.pkl", "rb") as f:
+                with open(f"{proj_path}/demos/{env_type}/databased_lqr/acts_info_tree.pkl", "rb") as f:
                     acts_info_tree = pickle.load(f)
 
                 # Define environments
                 # env = make_env(f"{name}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp)
                 # eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states, bsp=bsp)
-                env = make_env(f"{name}-v2", N=[29, 29], NT=[51])
-                eval_env = make_env(f"{name}-v0", N=[29, 29], NT=[51], init_states=init_states)
+                env = make_env(f"{name}-v2", N=[29, 29], NT=[21])
+                eval_env = make_env(f"{name}-v0", N=[29, 29], NT=[21], init_states=init_states)
                 env.obs_info.info_tree = obs_info_tree
                 eval_env.obs_info.info_tree = obs_info_tree
                 env.acts_info.info_tree = acts_info_tree

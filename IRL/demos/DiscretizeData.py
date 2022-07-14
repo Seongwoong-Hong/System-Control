@@ -11,10 +11,10 @@ if __name__ == '__main__':
     env_id = f"{env_type}_DataBased-v2"
     with open(f"bound_info.json", "r") as f:
         bound_info = json.load(f)
-    env = make_env(env_id, N=[29, 29], NT=[51])
-    with open("../../tests/envs/obs_test.pkl", "rb") as f:
+    env = make_env(env_id, N=[29, 29], NT=[21])
+    with open(f"{env_type}/databased_lqr/obs_info_tree.pkl", "rb") as f:
         obs_info_tree = pickle.load(f)
-    with open("../../tests/envs/acts_test.pkl", "rb") as f:
+    with open(f"{env_type}/databased_lqr/acts_info_tree.pkl", "rb") as f:
         acts_info_tree = pickle.load(f)
     env.obs_info.info_tree = obs_info_tree
     env.acts_info.info_tree = acts_info_tree

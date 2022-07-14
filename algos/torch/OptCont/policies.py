@@ -2,7 +2,7 @@ import torch as th
 import numpy as np
 from scipy import linalg
 from stable_baselines3.common.policies import BasePolicy
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv
 
 
 class LQRPolicy(BasePolicy):
@@ -19,13 +19,16 @@ class LQRPolicy(BasePolicy):
             action_space = env.action_space
         super(LQRPolicy, self).__init__(observation_space, action_space)
 
-        self.env = env
+        self.set_env(env)
         self.noise_lv = noise_lv
         self._build_env()
         self.K = self._get_gains()
 
     def set_env(self, env):
-        self.env = env
+        if not isinstance(env, VecEnv):
+            self.env = DummyVecEnv([lambda: env])
+        else:
+            self.env = env
 
     def _get_gains(self) -> th.Tensor:
         X = linalg.solve_continuous_are(self.A, self.B, self.Q, self.R)

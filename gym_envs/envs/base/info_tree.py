@@ -47,6 +47,10 @@ class InformationTree:
         self.data = [node_type(*self.init_state, *self.init_radius)]
         self.visitation = [self.data[0].visitation]
 
+    def __len__(self):
+        assert len(self.data) == len(self.visitation)
+        return len(self.data)
+
     def divide_node(self, target: np.ndarray):
         node, _ = self.find_target_node(target)
         sub_nodes = node.divide_node()
@@ -65,4 +69,3 @@ class InformationTree:
                 return node, idx
             idx += 1
         raise AssertionError("Target is not in the every nodes")
-
