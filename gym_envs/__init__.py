@@ -23,6 +23,12 @@ register(
 )
 
 register(
+    id='DiscretizedPendulum-v1',
+    entry_point='gym_envs.envs:DiscretizedPendulumV1',
+    max_episode_steps=50,
+)
+
+register(
     id='DiscretizedPendulum-v0',
     entry_point='gym_envs.envs:DiscretizedPendulumDet',
     max_episode_steps=50,

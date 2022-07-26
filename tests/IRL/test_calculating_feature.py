@@ -6,6 +6,7 @@ import torch as th
 from scipy import io
 from copy import deepcopy
 
+from gym_envs.envs import FaissDiscretizationInfo, UncorrDiscretizationInfo
 from common.util import CPU_Unpickler, make_env
 from common.wrappers import *
 from algos.tabular.viter import FiniteSoftQiter
@@ -33,7 +34,7 @@ def test_calculating_feature_from_ann():
     print(inp)
 
 
-@pytest.mark.parametrize("trial", [1])
+@pytest.mark.parametrize("trial", [1, 2, 3, 4])
 def test_calculating_feature(trial):
 
     def feature_fn(x):
@@ -42,9 +43,9 @@ def test_calculating_feature(trial):
         return th.cat([x, x ** 2], dim=1)
 
     bsp = io.loadmat(f"{irl_path}/demos/HPC/sub01/sub01i1.mat")['bsp']
-    expt_name = "01alpha_nobias_many"
-    load_dir = f"{log_path}/SpringBall/MaxEntIRL/ext_01alpha_dot4_2_10/{expt_name}_{trial}"
-    with open(f"{load_dir}/model/1000/reward_net.pkl", "rb") as f:
+    expt_name = "quadcost_400080_from_contlqr"
+    load_dir = f"{log_path}/DiscretizedDoublePendulum/MaxEntIRL/ext_01alpha_databased_faiss_lqr/{expt_name}_{trial}"
+    with open(f"{load_dir}/model/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load().eval()
     with open(f"{load_dir}/{expt_name}.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
@@ -52,11 +53,19 @@ def test_calculating_feature(trial):
     for traj in expt_trajs:
         init_states.append(traj.obs[0])
     reward_fn.feature_fn = feature_fn
+    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_4000.pkl", "rb") as f:
+        obs_info_tree = pickle.load(f)
+    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/acts_info_tree_80.pkl", "rb") as f:
+        acts_info_tree = pickle.load(f)
+    obs_info = FaissDiscretizationInfo([0.05, 0.05, 0.3, 0.35], [-0.05, -0.2, -0.08, -0.4], obs_info_tree)
+    acts_info = FaissDiscretizationInfo([60, 50], [-60, -20], acts_info_tree)
+    # obs_info = UncorrDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], [301, 201])
+    # acts_info = UncorrDiscretizationInfo([40], [-30], [101])
     # reward_fn.layers[0].weight = th.nn.Parameter(th.tensor([0.2333, 0.0025, -0.0032, -1.1755, -0.1169, -0.0118]))
     # env = make_env("DiscretizedHuman-v0", num_envs=1, bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11],
     #                wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn}, init_states=init_states, )
     # env = make_env("SpringBall-v0", init_states=init_states, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': reward_fn})
-    env = make_env("SpringBall-v0", init_states=init_states)#, wrapper=RewardWrapper, wrapper_kwargs={'rwfn': reward_fn})
+    env = make_env("DiscretizedDoublePendulum-v2", obs_info=obs_info, acts_info=acts_info, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': reward_fn})
     agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu', verbose=False)
     agent.learn(0)
 
@@ -68,7 +77,7 @@ def test_calculating_feature(trial):
 
     Dc = D_prev
     Dc = Dc[None, :] * agent.policy.policy_table[0]
-    for t in range(1, 40):
+    for t in range(1, 50):
         D = th.zeros_like(D_prev)
         for a in range(agent.policy.act_size):
             D += agent.transition_mat[a] @ (D_prev * agent.policy.policy_table[t - 1, a])
@@ -87,7 +96,7 @@ def test_calculating_feature(trial):
     for acts in a_vec:
         feat_mat.append(feature_fn(
             th.from_numpy(
-                np.append(s_vec, np.repeat(acts[None, :], len(s_vec), axis=0), axis=1) / np.array([[0.4, 2, 10]])
+                np.append(s_vec, np.repeat(acts[None, :], len(s_vec), axis=0), axis=1) / np.array([[0.05, 0.2, 0.3, 0.4, 60, 50]])
             ).float()).numpy())
     mean_features = np.sum(np.sum(Dc.cpu().numpy()[..., None] * np.array(feat_mat), axis=0), axis=0)
 
@@ -99,15 +108,15 @@ def test_calculating_feature_from_pkldata():
         return th.cat([x, x**2], dim=1)
         # return x ** 2
 
-    load_dir = f"{irl_path}/demos/SpringBall/dot4_2_10"
-    with open(f"{load_dir}/01alpha_nobias_many.pkl", "rb") as f:
+    load_dir = f"{irl_path}/demos/DiscretizedDoublePendulum/databased_faiss_lqr"
+    with open(f"{load_dir}/quadcost_400080_from_contlqr.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
 
     features = []
     for traj in expt_trajs:
         inp = np.append(traj.obs[:-1], traj.acts, axis=1)
         features.append(np.sum(feature_fn(
-            th.from_numpy(inp / np.array([[0.4, 2, 10]])).float()
+            th.from_numpy(inp / np.array([[0.05, 0.2, 0.3, 0.4, 60, 50]])).float()
         ).numpy(), axis=0))
 
     print(f"target mean feature: {np.mean(features, axis=0)}")

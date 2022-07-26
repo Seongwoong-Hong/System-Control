@@ -8,6 +8,7 @@ import torch as th
 from imitation.util import logger
 from scipy import io
 
+from gym_envs.envs import FaissDiscretizationInfo, DataBasedDiscretizationInfo
 from common.util import make_env
 from common.callbacks import SaveCallback
 from common.wrappers import *
@@ -82,7 +83,7 @@ if __name__ == "__main__":
     env_type = "DiscretizedPendulum"
     algo_type = "MaxEntIRL"
     device = "cpu"
-    name = f"{env_type}_DataBased"
+    name = f"{env_type}"
 
     script_args = []
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -108,9 +109,9 @@ if __name__ == "__main__":
 
 
     for subj in [f"sub{i:02d}" for i in [5]]:
-        for actu in range(4, 5):
+        for actu in range(1, 2):
             for trial in range(1, 5):
-                expt = f"databased_lqr/quadcost_from_contlqr"
+                expt = f"databased_faiss_lqr/quadcost_20020_from_contlqr_many"
                 # expt = f"dot4_2_10/405_from_cont"
                 subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
 
@@ -122,28 +123,21 @@ if __name__ == "__main__":
                 init_states = []
                 for traj in expert_trajs:
                     init_states += [traj.obs[0]]
-                with open(f"{proj_path}/demos/{env_type}/databased_lqr/obs_info_tree.pkl", "rb") as f:
+                with open(f"{proj_path}/demos/{env_type}/databased_lqr/obs_info_tree_200.pkl", "rb") as f:
                     obs_info_tree = pickle.load(f)
-                with open(f"{proj_path}/demos/{env_type}/databased_lqr/acts_info_tree.pkl", "rb") as f:
+                with open(f"{proj_path}/demos/{env_type}/databased_lqr/acts_info_tree_20.pkl", "rb") as f:
                     acts_info_tree = pickle.load(f)
-
-                # Define environments
-                # env = make_env(f"{name}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp)
-                # eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11], init_states=init_states, bsp=bsp)
-                env = make_env(f"{name}-v2", N=[29, 29], NT=[21])
-                eval_env = make_env(f"{name}-v0", N=[29, 29], NT=[21], init_states=init_states)
-                env.obs_info.info_tree = obs_info_tree
-                eval_env.obs_info.info_tree = obs_info_tree
-                env.acts_info.info_tree = acts_info_tree
-                eval_env.acts_info.info_tree = acts_info_tree
                 perturbation = actu - 1
                 # max_states = bound_info[subj][perturbation]["max_states"]
                 # min_states = bound_info[subj][perturbation]["min_states"]
                 # max_torques = bound_info[subj][perturbation]["max_torques"]
                 # min_torques = bound_info[subj][perturbation]["min_torques"]
-                # env.set_bounds(max_states, min_states, max_torques, min_torques)
-                # eval_env.set_bounds(max_states, min_states, max_torques, min_torques)
+                obs_info = FaissDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], obs_info_tree)
+                acts_info = FaissDiscretizationInfo([40], [-30], acts_info_tree)
 
+                # Define environments
+                env = make_env(f"{name}-v2", obs_info=obs_info, acts_info=acts_info)
+                eval_env = make_env(f"{name}-v2", obs_info=obs_info, acts_info=acts_info)#, init_states=init_states)
                 # env = make_env(f"{name}-v2")
                 # eval_env = make_env(f"{name}-v0", init_states=init_states)
 

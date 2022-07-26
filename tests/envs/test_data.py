@@ -35,15 +35,15 @@ def test_drawing_hist_of_human_obs():
 def test_drawing_pkl_data():
     with open("../../IRL/demos/bound_info.json", "r") as f:
         bound_info = json.load(f)
-    env = make_env("DiscretizedPendulum-v2", N=[201, 201], NT=[101])
+    # env = make_env("DiscretizedPendulum-v2", N=[201, 201], NT=[101])
     for subj in [f"sub{i:02d}" for i in [5]]:
-        for actu in range(4, 5):
+        for actu in range(1, 2):
             bound_dict = bound_info[subj][actu - 1]
-            # expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "19191919_lqr", f"quadcost_from_contlqr_sub05.pkl")
-            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedPendulum", "databased_lqr", f"quadcost_from_contlqr_many.pkl")
-            # expert_dir = os.path.join("../../IRL", "demos", "SpringBall", "cont", f"quadcost.pkl")
+            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedPendulum", "databased_lqr",f"quadcost_150030_many.pkl")
+            # expert_dir = os.path.join("../../IRL", "demos", "SpringBall", "cont", f"quadcost_lqr_many.pkl")
             with open(expert_dir, "rb") as f:
                 expert_trajs = pickle.load(f)
+            print(len(expert_trajs))
             fig1 = plt.figure(figsize=[9.6, 9.6])
             ax11 = fig1.add_subplot(3, 2, 1)
             ax12 = fig1.add_subplot(3, 2, 2)
@@ -54,36 +54,36 @@ def test_drawing_pkl_data():
             palette = np.zeros([201*201])
             for traj in expert_trajs:
                 ax11.plot(traj.obs[:-1, 0])
-                ax12.plot(traj.obs[:-1, 1])
-                # ax11.set_ylim([-.4, .4])
-                # ax12.set_ylim([-2.0, 2.0])
+                # ax12.plot(traj.obs[:-1, 1])
+                ax11.set_ylim([-.05, .05])
+                # ax12.set_ylim([-.2, .05])
                 # ax11.set_ylim([bound_dict["min_states"][0], bound_dict["max_states"][0]])
                 # ax12.set_ylim([bound_dict["min_states"][1], bound_dict["max_states"][1]])
-                ax21.plot(traj.obs[:-1, 0], traj.obs[:-1, 1])
-                traj_idx = env.get_idx_from_obs(traj.obs[:-1])
-                unique, counts = np.unique(traj_idx, return_counts=True)
-                palette[unique] += counts
+                # ax21.plot(traj.obs[:-1, 0], traj.obs[:-1, 1])
+                # traj_idx = env.get_idx_from_obs(traj.obs[:-1])
+                # unique, counts = np.unique(traj_idx, return_counts=True)
+                # palette[unique] += counts
                 # ax21.set_xlim([-.2, .20])
                 # ax21.set_ylim([-1.20, 1.20])
-                # ax21.plot(traj.obs[:-1, 2])
+                ax21.plot(traj.obs[:-1, 1])
                 # ax22.plot(traj.obs[:-1, 3])
-                # ax21.set_ylim([-.3, .3])
-                # ax22.set_ylim([-1., 1.])
+                ax21.set_ylim([-.08, .3])
+                # ax22.set_ylim([-.4, .35])
                 # ax21.set_ylim([bound_dict["min_states"][2], bound_dict["max_states"][2]])
                 # ax22.set_ylim([bound_dict["min_states"][3], bound_dict["max_states"][3]])
                 ax31.plot(traj.acts[:, 0])
                 # ax32.plot(traj.acts[:, 1])
-                # ax31.set_ylim([-10, 10])
-                # ax32.set_ylim([-10, 10])
+                # ax31.set_ylim([-60, 60])
+                # ax32.set_ylim([-20, 50])
                 # ax31.set_ylim([bound_dict["min_torques"][0], bound_dict["max_torques"][0]])
                 # ax32.set_ylim([bound_dict["min_torques"][1], bound_dict["max_torques"][1]])
             # ax32.imshow(palette.reshape(201, 201))
-        plt.tight_layout()
-        plt.show()
+            plt.tight_layout()
+            plt.show()
 
 
 def test_stepping_pkl_data():
-    expert_dir = os.path.join("../../IRL", "demos", "DiscretizedPendulum", "301201_101_lqr", "quadcost_from_contlqr.pkl")
+    expert_dir = os.path.join("../../IRL", "demos", "DiscretizedPendulum", "301201_101_lqr", "quadcost_150050_from_contlqr.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
     bsp = io.loadmat("../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']

@@ -3,7 +3,8 @@ import numpy as np
 from os import path
 from copy import deepcopy
 from scipy.sparse import csc_matrix
-from gym_envs.envs import BaseDiscEnv, UncorrDiscreteInfo, DataBasedDiscretizationInfo
+
+from gym_envs.envs import BaseDiscEnv
 
 
 class DiscretizedPendulum(BaseDiscEnv):
@@ -15,8 +16,8 @@ class DiscretizedPendulum(BaseDiscEnv):
     """
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 30}
 
-    def __init__(self, N, NT):
-        super(DiscretizedPendulum, self).__init__()
+    def __init__(self, obs_info, acts_info):
+        super(DiscretizedPendulum, self).__init__(obs_info, acts_info)
         self.dt = 0.025
         self.g = 9.81
         self.m = 17.2955
@@ -30,27 +31,18 @@ class DiscretizedPendulum(BaseDiscEnv):
         self.max_speed = None
         self.min_angle = None
         self.min_speed = None
+        self.max_torques = None
+        self.min_torques = None
 
         self.state = None
         self.viewer = None
         self.last_a = None
 
-        if N is int:
-            assert N % 2, "N should be a odd number"
-            N = N * np.ones(4, dtype=int)
-        else:
-            N = np.array(N)
-            assert N is not None, "The number of discretization should be defined"
-            assert (N % 2).all(), "N should be consist of odd numbers"
-        self.num_cells = N
-        self.num_actions = np.array(NT)
-        self.obs_info = UncorrDiscreteInfo(self.num_cells)
-        self.acts_info = UncorrDiscreteInfo(self.num_actions)
         self.set_bounds(
-            max_states=[0.05, 0.3],
-            min_states=[-0.05, -0.08],
-            max_torques=[40.],
-            min_torques=[-30.],
+            max_states=obs_info.high,
+            min_states=obs_info.low,
+            max_torques=acts_info.high,
+            min_torques=acts_info.low,
         )
 
     def reset(self):
@@ -63,11 +55,10 @@ class DiscretizedPendulum(BaseDiscEnv):
     def step(self, action: np.ndarray):
         assert self.state is not None, "Can't step the environment before calling reset function"
         assert action in self.action_space, f"{action} is Out of action space"
-        self.last_a = action
         info = {'obs': self.state.reshape(1, -1), 'act': action.reshape(1, -1)}
         r = self.get_reward(self.state, action)
         self.state = self.get_next_state(self.state, action)
-
+        self.last_a = action
         return self._get_obs(), r, False, info
 
     def set_state(self, state: np.ndarray):
@@ -79,16 +70,16 @@ class DiscretizedPendulum(BaseDiscEnv):
         self.max_speed = np.array(max_states)[1:]
         self.min_angle = np.array(min_states)[:1]
         self.min_speed = np.array(min_states)[1:]
-
-        self.obs_high = np.array([*self.max_angle, *self.max_speed])
-        self.obs_low = np.array([*self.min_angle, *self.min_speed])
         self.max_torques = np.array(max_torques)
         self.min_torques = np.array(min_torques)
 
+        self.obs_high = np.array(max_states)
+        self.obs_low = np.array(min_states)
+
         self.obs_info.set_info(self.obs_high, self.obs_low)
-        self.acts_info.set_info(self.max_torques, self.min_torques)
+        self.acts_info.set_info(max_torques, min_torques)
         self.observation_space = gym.spaces.Box(low=self.obs_low, high=self.obs_high, dtype=np.float64)
-        self.action_space = gym.spaces.Box(low=self.min_torques, high=self.max_torques, dtype=np.float64)
+        self.action_space = gym.spaces.Box(low=min_torques, high=max_torques, dtype=np.float64)
 
     def get_reward(self, state, action):
         state = deepcopy(state)
@@ -133,16 +124,16 @@ class DiscretizedPendulum(BaseDiscEnv):
         state_backup = deepcopy(state)
         if len(state.shape) == 1:
             state = state[None, :]
-        dims = self.num_cells
+        tot_dims = self.obs_info.num_cells
         tot_idx = self.get_idx_from_obs(state)
 
-        # if state_backup.ndim == 1:
-        #     ind_vec = np.zeros(np.prod(dims)).astype('i')
-        #     ind_vec[tot_idx.ravel()] = 1
-        # else:
-        batch_size = state.shape[0]
-        ind_vec = csc_matrix((np.ones(batch_size), (np.arange(batch_size), tot_idx.ravel())),
-                             shape=[batch_size, batch_size])
+        if state_backup.ndim == 1:
+            ind_vec = np.zeros(tot_dims).astype('i')
+            ind_vec[tot_idx.ravel()] = 1
+        else:
+            batch_size = state.shape[0]
+            ind_vec = csc_matrix((np.ones(batch_size), (np.arange(batch_size), tot_idx.ravel())),
+                                 shape=[batch_size, tot_dims])
 
         return ind_vec
 
@@ -160,10 +151,10 @@ class DiscretizedPendulum(BaseDiscEnv):
             test_s_ind = self.get_ind_from_state(test_s).T
 
             err = 0.
-            for a_ind in range(self.num_actions):
+            for a_ind in range(self.acts_info.num_cells):
                 next_s_pred = s_vec.T @ P[a_ind] @ test_s_ind
                 err += np.mean(np.linalg.norm(next_s[a_ind] - next_s_pred.T, axis=-1))
-            err /= self.num_actions
+            err /= self.acts_info.num_cells
             print(f'(h={h}) 1 step prediction error: {err:.4f}')
 
         return P
@@ -217,8 +208,8 @@ class DiscretizedPendulum(BaseDiscEnv):
 
 
 class DiscretizedPendulumDet(DiscretizedPendulum):
-    def __init__(self, N, NT, init_states):
-        super(DiscretizedPendulumDet, self).__init__(N=N, NT=NT)
+    def __init__(self, obs_info, acts_info, init_states):
+        super(DiscretizedPendulumDet, self).__init__(obs_info, acts_info)
         self._init_states = init_states
         self.n = 0
 
@@ -241,18 +232,6 @@ class DiscretizedPendulumDet(DiscretizedPendulum):
         a_vec = self.acts_info.get_vectorized()
         return s_vec, a_vec
 
-
-class DataBasedDiscretizedPendulum(DiscretizedPendulum):
-    def __init__(self, N, NT):
-        super(DataBasedDiscretizedPendulum, self).__init__(N, NT)
-        self.obs_info = DataBasedDiscretizationInfo(self.num_cells)
-        self.acts_info = DataBasedDiscretizationInfo(self.num_actions)
-
-class DataBasedDiscretizedPendulumDet(DiscretizedPendulumDet):
-    def __init__(self, N, NT, init_states):
-        super(DataBasedDiscretizedPendulumDet, self).__init__(N, NT, init_states)
-        self.obs_info = DataBasedDiscretizationInfo(self.num_cells)
-        self.acts_info = DataBasedDiscretizationInfo(self.num_actions)
 
 def angle_normalize(x):
     """ 각 x 가 -pi ~ pi 사이 값으로 표현되도록 변환 """

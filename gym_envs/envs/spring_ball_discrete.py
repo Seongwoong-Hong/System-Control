@@ -1,13 +1,19 @@
 import gym
 import numpy as np
 from scipy.sparse import csc_matrix
-from gym_envs.envs import BaseDiscEnv, UncorrDiscreteInfo
+from gym_envs.envs import BaseDiscEnv, UncorrDiscretizationInfo
 
 
 class SpringBallDisc(BaseDiscEnv):
     def __init__(self):
-        super(SpringBallDisc, self).__init__()
         self.map_size = 0.4
+        self.obs_low = np.array([-self.map_size, -2.0])
+        self.obs_high = np.array([self.map_size, 2.0])
+        self.acts_low = np.array([-10.0])
+        self.acts_high = np.array([10.0])
+        obs_info = UncorrDiscretizationInfo(self.obs_high, self.obs_low, [40, 40])
+        acts_info = UncorrDiscretizationInfo(self.acts_high, self.acts_low, [5])
+        super(SpringBallDisc, self).__init__(obs_info, acts_info)
         self.dt = 0.05
         self.st = None
         self.mass = 1
@@ -15,17 +21,6 @@ class SpringBallDisc(BaseDiscEnv):
         self.k = 1
         self.viewer = None
         self.target = np.array([0.1])
-
-        self.num_cells = [40, 40]
-        self.num_actions = [5]
-        self.obs_low = np.array([-self.map_size, -2.0])
-        self.obs_high = np.array([self.map_size, 2.0])
-        self.acts_low = np.array([-10.0])
-        self.acts_high = np.array([10.0])
-        self.obs_info = UncorrDiscreteInfo(self.num_cells)
-        self.acts_info = UncorrDiscreteInfo(self.num_actions)
-        self.obs_info.set_info(self.obs_high, self.obs_low)
-        self.acts_info.set_info(self.acts_high, self.acts_low)
         self.observation_space = gym.spaces.Box(low=self.obs_low, high=self.obs_high)
         self.action_space = gym.spaces.Box(low=self.acts_low, high=self.acts_high)
 

@@ -5,6 +5,7 @@ import torch as th
 from scipy import io
 import pytest
 
+from gym_envs.envs import FaissDiscretizationInfo
 from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning, APIRL
 from algos.torch.sac import MlpPolicy, SAC
 from algos.tabular.viter import FiniteSoftQiter, FiniteViter, SoftQiter
@@ -13,7 +14,7 @@ from common.util import make_env
 from common.wrappers import *
 
 subj = "sub05"
-env_name = "DiscretizedHuman"
+env_name = "DiscretizedPendulum"
 env_id = f"{env_name}"
 
 
@@ -25,7 +26,7 @@ def demo_dir():
 
 @pytest.fixture
 def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "19191919", f"{subj}_4.pkl")
+    expert_dir = os.path.join(demo_dir, env_name, "databased_faiss_lqr", f"quadcost_from_contlqr.pkl")
     # expert_dir = os.path.join(demo_dir, env_name, "20", "2*alpha_nobias.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
@@ -34,24 +35,30 @@ def expert(demo_dir):
 
 @pytest.fixture
 def env(expert, demo_dir):
-    subpath = os.path.join(demo_dir, "HPC", subj, subj)
-    bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    init_states = []
-    for traj in expert:
-        init_states += [traj.obs[0]]
-    return make_env(f"{env_id}-v2", bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11])
+    with open(f"{demo_dir}/{env_name}/databased_lqr/obs_info_tree_1500.pkl", "rb") as f:
+        obs_info_tree = pickle.load(f)
+    with open(f"{demo_dir}/{env_name}/databased_lqr/acts_info_tree_30.pkl", "rb") as f:
+        acts_info_tree = pickle.load(f)
+    obs_info = FaissDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], obs_info_tree)
+    acts_info = FaissDiscretizationInfo([40], [-30], acts_info_tree)
+    return make_env(f"{env_id}-v2", obs_info=obs_info, acts_info=acts_info)
     # return make_env(f"{env_id}-v2")
 
 
 @pytest.fixture
 def eval_env(expert, demo_dir):
+    with open(f"{demo_dir}/{env_name}/databased_lqr/obs_info_tree_1500.pkl", "rb") as f:
+        obs_info_tree = pickle.load(f)
+    with open(f"{demo_dir}/{env_name}/databased_lqr/acts_info_tree_30.pkl", "rb") as f:
+        acts_info_tree = pickle.load(f)
+    obs_info = FaissDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], obs_info_tree)
+    acts_info = FaissDiscretizationInfo([40], [-30], acts_info_tree)
     subpath = os.path.join(demo_dir, "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    return make_env(f"{env_id}-v0", bsp=bsp, init_states=init_states, N=[19, 19, 19, 19], NT=[11, 11])
-    # return make_env(f"{env_id}-v0", init_states=init_states)
+    return make_env(f"{env_id}-v0", init_states=init_states, obs_info=obs_info, acts_info=acts_info)
 
 @pytest.fixture
 def learner(env, expert, eval_env):

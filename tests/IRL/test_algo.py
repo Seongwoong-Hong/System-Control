@@ -8,6 +8,7 @@ import numpy as np
 from scipy import io
 from matplotlib import pyplot as plt
 
+from gym_envs.envs import UncorrDiscretizationInfo, DataBasedDiscretizationInfo, FaissDiscretizationInfo
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from algos.tabular.viter import FiniteSoftQiter, SoftQiter
@@ -146,45 +147,40 @@ def test_discretized_env(trial):
         return th.cat([x, x**2], dim=1)
         # return th.cat([x, x**2, x**3, x**4], dim=1)
     env_type = "DiscretizedPendulum"
-    name = f"{env_type}_DataBased"
-    expt = "databased_lqr/quadcost_from_contlqr"
+    name = f"{env_type}"
+    expt = f"2929_51_lqr/quadcost_from_contlqr_many"
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
-    init_states = []
-    for traj in expt_trajs:
-        init_states += [traj.obs[0]]
     rwfn_dir = irl_path + f"/tmp/log/{name}/MaxEntIRL/ext_01alpha_{expt}_{trial}/model"
     with open(rwfn_dir + "/reward_net.pkl", "rb") as f:
         rwfn = CPU_Unpickler(f).load().eval().to('cpu')
     rwfn.feature_fn = feature_fn
-    with open(f"{irl_path}/demos/{env_type}/databased_lqr/obs_info_tree.pkl", "rb") as f:
-        obs_info_tree = pickle.load(f)
-    with open(f"{irl_path}/demos/{env_type}/databased_lqr/acts_info_tree.pkl", "rb") as f:
-        acts_info_tree = pickle.load(f)
-    # env = make_env(f"{env_id}-v0", num_envs=1, N=[19, 19, 19, 19], bsp=bsp, init_states=init_states)
-    env = make_env(f"{name}-v2", num_envs=1, N=[29, 29], NT=[51], wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': rwfn})
-    # env = make_env(f"{name}-v2", num_envs=1, wrapper=DiscretizeWrapper)
-    eval_env = make_env(f"{name}-v0", N=[29, 29], NT=[51], init_states=init_states, wrapper=DiscretizeWrapper)
-    env.envs[0].obs_info.info_tree = obs_info_tree
-    env.envs[0].acts_info.info_tree = acts_info_tree
-    eval_env.obs_info.info_tree = obs_info_tree
-    eval_env.acts_info.info_tree = acts_info_tree
+    # with open(f"{irl_path}/demos/{env_type}/databased_lqr/obs_info_tree_1500.pkl", "rb") as f:
+    #     obs_info_tree = pickle.load(f)
+    # with open(f"{irl_path}/demos/{env_type}/databased_lqr/acts_info_tree_30.pkl", "rb") as f:
+    #     acts_info_tree = pickle.load(f)
+    # obs_info = FaissDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], obs_info_tree)
+    # acts_info = FaissDiscretizationInfo([40.], [-30.], acts_info_tree)
+    obs_info = UncorrDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], [29, 29])
+    acts_info = UncorrDiscretizationInfo([40], [-30], [51])
+
+    env = make_env(f"{name}-v2", num_envs=1, obs_info=obs_info, acts_info=acts_info, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': rwfn})
+    eval_env = make_env(f"{name}-v2", obs_info=obs_info, acts_info=acts_info, wrapper=DiscretizeWrapper)
     agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device=rwfn.device, verbose=False)
     agent.learn(0)
     agent.set_env(eval_env)
+    eval_env.reset()
 
-    fig1 = plt.figure(figsize=[9, 14.4])
-    fig2 = plt.figure(figsize=[9.6, 4.8])
-    ax2_ex = fig2.add_subplot(1, 2, 1)
-    ax2_ag = fig2.add_subplot(1, 2, 2)
-    ax11 = fig1.add_subplot(6, 2, 1)
-    ax12 = fig1.add_subplot(6, 2, 2)
-    ax21 = fig1.add_subplot(6, 2, 3)
-    ax22 = fig1.add_subplot(6, 2, 4)
-    ax51 = fig1.add_subplot(6, 2, 9)
-    ax52 = fig1.add_subplot(6, 2, 10)
-    ax61 = fig1.add_subplot(6, 2, 11)
-    ax62 = fig1.add_subplot(6, 2, 12)
+    fig1 = plt.figure(figsize=[9, 7.2])
+    # fig2 = plt.figure(figsize=[9.6, 4.8])
+    # ax2_ex = fig2.add_subplot(1, 2, 1)
+    # ax2_ag = fig2.add_subplot(1, 2, 2)
+    ax11 = fig1.add_subplot(3, 2, 1)
+    ax12 = fig1.add_subplot(3, 2, 2)
+    ax21 = fig1.add_subplot(3, 2, 3)
+    ax22 = fig1.add_subplot(3, 2, 4)
+    ax31 = fig1.add_subplot(3, 2, 5)
+    ax32 = fig1.add_subplot(3, 2, 6)
 
     for traj in expt_trajs:
         # Expert Trajectories
@@ -193,17 +189,15 @@ def test_discretized_env(trial):
         # ax2_ex.set_ylim([eval_env.obs_low[1], eval_env.obs_high[1]])
         ax11.plot(traj.obs[:-1, 0])
         ax21.plot(traj.obs[:-1, 1])
-        ax51.plot(traj.acts[:, 0])
-        # ax61.plot(traj.acts[:, 1])
+        ax31.plot(traj.acts[:, 0])
         # ax11.set_ylim([eval_env.obs_low[0], eval_env.obs_high[0]])
         # ax21.set_ylim([eval_env.obs_low[1], eval_env.obs_high[1]])
         # ax51.set_ylim([eval_env.acts_low[0], eval_env.acts_high[0]])
         # ax61.set_ylim([eval_env.acts_low[1], eval_env.acts_high[1]])
 
-    for i in range(len(expt_trajs)):
         # obs, acts = [], []
-        eval_env.reset()
-        ob = init_states[i]
+    # for _ in range(5000):
+        ob = traj.obs[0]
         # obs.append(ob)
         # done = False
         # while not done:
@@ -214,35 +208,17 @@ def test_discretized_env(trial):
         # obs = np.array(obs)
         # acts = np.array(acts)
         obs, acts, _ = agent.predict(ob, deterministic=False)
-        # ax2_ag.plot(obs[:-1, 0], obs[:-1, 1])
-        # ax2_ag.set_xlim([eval_env.obs_low[0], eval_env.obs_high[0]])
-        # ax2_ag.set_ylim([eval_env.obs_low[1], eval_env.obs_high[1]])
         ax12.plot(obs[:-1, 0])
         ax22.plot(obs[:-1, 1])
-        ax52.plot(acts[:, 0])
-        # ax62.plot(acts[:, 1])
-        # ax12.set_ylim([eval_env.obs_low[0], eval_env.obs_high[0]])
-        # ax22.set_ylim([eval_env.obs_low[1], eval_env.obs_high[1]])
-        # ax52.set_ylim([eval_env.acts_low[0], eval_env.acts_high[0]])
-        # ax62.set_ylim([eval_env.acts_low[1], eval_env.acts_high[1]])
-        # done = False
-        # obs_list.append(obs)
-        # while not done:
-        #     a, _ = algo.predict(obs, deterministic=False)
-        #     ns, _, done, _ = eval_env.step(a)
-        #     eval_env.render()
-        #     time.sleep(env.get_attr("dt")[0])
-        #     obs = ns
-        #     obs_list.append(obs)
-        # obs_list = np.array(obs_list).reshape(-1, 4)
+        ax32.plot(acts[:, 0])
     fig1.tight_layout()
-    fig2.tight_layout()
+    # fig2.tight_layout()
     plt.show()
     env.close()
 
 params = []
 for actu in range(4, 5):
-    for trial in range(1, 3):
+    for trial in range(1, 5):
         params.append([actu, trial])
 
 
@@ -264,12 +240,12 @@ def test_learned_human_policy(actu, trial):
         return th.cat([x, x ** 2], dim=1)
         # x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=1)
         # return th.cat((x, x ** 2, x1 * x2, x3 * x4, a1 * a2), dim=1)
-    env_type = "DiscretizedPendulum"
+    env_type = "DiscretizedDoublePendulum"
     name = f"{env_type}"
     subj = "sub05"
-    device = 'cpu'
-    # expt = f"19191919/{subj}_{actu}"
-    expt = f"301201_101_lqr/quadcost_from_contlqr"
+    device = 'cuda:0'
+    # expt = f"19191919_lqr/{subj}_{actu}"
+    expt = f"databased_faiss_lqr/quadcost_400080_from_contlqr"
     with open(irl_path + f"/demos/{env_type}/{expt}.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
     with open(irl_path + f"/demos/bound_info.json", "r") as f:
@@ -284,13 +260,15 @@ def test_learned_human_policy(actu, trial):
     rwfn.feature_fn = feature_fn
     # rwfn.layers[0].weight = th.nn.Parameter(rwfn.layers[0].weight.detach() / 5)
     # rwfn.layers[0].weight = th.nn.Parameter(th.tensor([[-0.03946868, -0.24135341, -0.02744996, -0.0490342 , -0.07611195, -0.04075731]]))
-
-    # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn':rwfn})
-    # eval_env = make_env(f"{name}-v0", num_envs=1, wrapper=DiscretizeWrapper)
-    env = make_env(f"{name}-v2", num_envs=1, N=[301, 201], NT=[101],
-                   wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': rwfn})
-    eval_env = make_env(f"{name}-v0", N=[301, 201], NT=[101], wrapper=DiscretizeWrapper,
-                        bsp=bsp, init_states=init_states,)
+    rwfn.feature_fn = feature_fn
+    with open(f"{irl_path}/demos/{env_type}/databased_lqr/obs_info_tree_4000.pkl", "rb") as f:
+        obs_info_tree = pickle.load(f)
+    with open(f"{irl_path}/demos/{env_type}/databased_lqr/acts_info_tree_80.pkl", "rb") as f:
+        acts_info_tree = pickle.load(f)
+    obs_info = FaissDiscretizationInfo([0.05, 0.05, 0.3, 0.35], [-0.05, -0.2, -0.08, -0.4], obs_info_tree)
+    acts_info = FaissDiscretizationInfo([60., 50.], [-60., -20., ], acts_info_tree)
+    env = make_env(f"{name}-v2", num_envs=1, obs_info=obs_info, acts_info=acts_info, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn':rwfn})
+    eval_env = make_env(f"{name}-v0", num_envs=1, obs_info=obs_info, acts_info=acts_info, wrapper=DiscretizeWrapper)
     # perturbation = actu - 1
     # max_states = bound_info[subj][perturbation]["max_states"]
     # min_states = bound_info[subj][perturbation]["min_states"]
@@ -301,6 +279,7 @@ def test_learned_human_policy(actu, trial):
     agent = FiniteSoftQiter(env=env, gamma=1, alpha=0.01, device=device, verbose=True)
     agent.learn(0)
     agent.set_env(eval_env)
+    eval_env.reset()
     # agent = SoftQiter(env=env, gamma=1, alpha=0.01, device=device, verbose=True)
     # agent.policy.policy_table = agent2.policy.policy_table[0]
 
@@ -322,10 +301,10 @@ def test_learned_human_policy(actu, trial):
         # Expert Trajectories
         ax11.plot(traj.obs[:-1, 0])
         ax21.plot(traj.obs[:-1, 1])
-        # ax31.plot(traj.obs[:-1, 2])
-        # ax41.plot(traj.obs[:-1, 3])
+        ax31.plot(traj.obs[:-1, 2])
+        ax41.plot(traj.obs[:-1, 3])
         ax51.plot(traj.acts[:, 0])
-        # ax61.plot(traj.acts[:, 1])
+        ax61.plot(traj.acts[:, 1])
         # ax11.set_ylim([min_states[0], max_states[0]])
         # ax21.set_ylim([min_states[1], max_states[1]])
         # ax31.set_ylim([min_states[2], max_states[2]])
@@ -333,10 +312,9 @@ def test_learned_human_policy(actu, trial):
         # ax51.set_ylim([min_torques[0], max_torques[0]])
         # ax61.set_ylim([min_torques[1], max_torques[1]])
 
-    # for i in range(len(expt_trajs)):
         # Agent Trajectories
         # obs, acts = [], []
-        ob = eval_env.reset()
+        ob = traj.obs[0]
         # obs.append(ob)
         # done = False
         # while not done:
@@ -348,27 +326,27 @@ def test_learned_human_policy(actu, trial):
         # acts = np.array(acts)
 
         # ob = init_states[i % len(init_states)]
-        obs, acts, _ = agent.predict(ob, deterministic=False)
+        obs, acts, _ = agent.predict(ob, deterministic=True)
 
         ax12.plot(obs[:-1, 0])
         ax22.plot(obs[:-1, 1])
-        # ax32.plot(obs[:-1, 2])
-        # ax42.plot(obs[:-1, 3])
+        ax32.plot(obs[:-1, 2])
+        ax42.plot(obs[:-1, 3])
         ax52.plot(acts[:, 0])
-        # ax62.plot(acts[:, 1])
+        ax62.plot(acts[:, 1])
         # ax12.set_ylim([min_states[0], max_states[0]])
         # ax22.set_ylim([min_states[1], max_states[1]])
         # ax32.set_ylim([min_states[2], max_states[2]])
         # ax42.set_ylim([min_states[3], max_states[3]])
         # ax52.set_ylim([min_torques[0], max_torques[0]])
         # ax62.set_ylim([min_torques[1], max_torques[1]])
-        eval_env.render()
-        for t in range(50):
-            obs_idx = eval_env.get_idx_from_obs(ob)
-            act_idx = agent.policy.choice_act(agent.policy.policy_table[t].T[obs_idx])
-            act = eval_env.get_acts_from_idx(act_idx)
-            ob, r, _, _ = eval_env.step(act[0])
-            eval_env.render()
-            time.sleep(eval_env.dt)
+        # eval_env.render()
+        # for t in range(50):
+        #     obs_idx = eval_env.get_idx_from_obs(ob)
+        #     act_idx = agent.policy.choice_act(agent.policy.policy_table[t].T[obs_idx])
+        #     act = eval_env.get_acts_from_idx(act_idx)
+        #     ob, r, _, _ = eval_env.step(act[0])
+        #     eval_env.render()
+        #     time.sleep(eval_env.dt)
     plt.tight_layout()
     plt.show()

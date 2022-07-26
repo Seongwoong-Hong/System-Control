@@ -1,9 +1,10 @@
 import os.path
-
 import pytest
 import torch as th
 import numpy as np
 import pickle
+
+from gym_envs.envs import DataBasedDiscretizationInfo
 from common.util import make_env
 from common.wrappers import RewardWrapper
 from imitation.data.rollout import generate_trajectories, make_sample_until, flatten_trajectories
@@ -94,13 +95,14 @@ def test_softiter_finite_diff():
 
 
 def test_finite_iter(bsp):
-    env = make_env("DiscretizedPendulum_DataBased-v2", N=[29, 29], NT=[21], num_envs=1)
-    with open("../envs/obs_test.pkl", "rb") as f:
+    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_5000.pkl", "rb") as f:
         obs_info_tree = pickle.load(f)
-    env.envs[0].obs_info.info_tree = obs_info_tree
-    with open("../envs/acts_test.pkl", "rb") as f:
+    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/acts_info_tree_20.pkl", "rb") as f:
         acts_info_tree = pickle.load(f)
-    env.envs[0].acts_info.info_tree = acts_info_tree
+    obs_info = DiscretizationInfo([0.05, 0.05, 0.3, 0.35], [-0.05, -0.2, -0.08, -0.4], obs_info_tree)
+    acts_info = DataBasedDiscretizationInfo([60, 50], [-60, -20], acts_info_tree)
+    env = make_env("DiscretizedDoublePendulum-v2", obs_info=obs_info, acts_info=acts_info, num_envs=1)
+
     logger.configure(".", format_strs=['stdout'])
     algo = FiniteViter(env, gamma=1, alpha=0.00001, device='cpu')
     algo.learn(0)

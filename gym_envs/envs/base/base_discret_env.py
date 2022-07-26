@@ -4,12 +4,12 @@ from gym.utils import seeding
 
 
 class DiscretizationInfo:
-    def __init__(self, dims):
-        self.dims = dims
+    def __init__(self):
         self.high = None
         self.low = None
+        self.num_cells = None
 
-    def set_info(self, high, low):
+    def set_info(self, *args, **kwargs):
         # 전체 discrete information 을 업데이트하는 함수
         raise NotImplementedError
 
@@ -27,11 +27,11 @@ class DiscretizationInfo:
 
 
 class BaseDiscEnv(gym.Env):
-    def __init__(self):
+    def __init__(self, obs_info: DiscretizationInfo, acts_info: DiscretizationInfo):
         super(BaseDiscEnv, self).__init__()
         self.np_random = None
-        self.obs_info = None
-        self.acts_info = None
+        self.obs_info = obs_info
+        self.acts_info = acts_info
         self.seed()
 
     def step(self, action):

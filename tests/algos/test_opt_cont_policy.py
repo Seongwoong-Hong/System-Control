@@ -23,7 +23,7 @@ class IDPLQRPolicy(LQRPolicy):
         self.B[2:, :] = np.linalg.inv(M) @ np.eye(2, 2)
         self.Q = np.diag([3.5139, 0.7872182, 0.14639979, 0.07540204])
         self.R = np.diag([0.02537065/1600, 0.01358577/900])
-        self.gear = 100
+        self.gear = 1
 
 
 class IPLQRPolicy(LQRPolicy):
@@ -44,8 +44,8 @@ class IPLQRPolicy(LQRPolicy):
 
 def test_lqr_policy():
     # env = make_env("DiscretizedPendulum-v2", N=[19, 19], NT=[11])
-    env = make_env("IP_custom-v2")
-    policy = IPLQRPolicy(env)
+    env = make_env("DiscretizedHuman-v2", N=[19, 19, 19, 19], NT=[11, 11])
+    policy = IDPLQRPolicy(env)
     for _ in range(10):
         ob = env.reset()
         env.render()

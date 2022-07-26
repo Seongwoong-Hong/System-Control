@@ -13,3 +13,4 @@ pytest~=6.2.1
 dill~=0.3.3
 ray~=2.0.0.dev0
 cvxpy~=1.1.17
+faiss~=1.7.2

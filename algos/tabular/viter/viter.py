@@ -137,13 +137,13 @@ class Viter:
             self.env = DummyVecEnv([lambda: env])
         self.policy.env = self.env.envs[0]
         self.num_envs = 1
-        transition_mat = self.env.env_method('get_trans_mat')[0]
-        self.transition_mat = []
-        for csr in transition_mat:
-            coo = csr.tocoo()
-            self.transition_mat.append(th.sparse_coo_tensor(
-                th.LongTensor(np.vstack((coo.row, coo.col))), th.FloatTensor(coo.data), th.Size(coo.shape),
-            ).to(self.device))
+        # transition_mat = self.env.env_method('get_trans_mat')[0]
+        # self.transition_mat = []
+        # for csr in transition_mat:
+        #     coo = csr.tocoo()
+        #     self.transition_mat.append(th.sparse_coo_tensor(
+        #         th.LongTensor(np.vstack((coo.row, coo.col))), th.FloatTensor(coo.data), th.Size(coo.shape),
+        #     ).to(self.device))
 
     def get_vec_normalize_env(self):
         return None
