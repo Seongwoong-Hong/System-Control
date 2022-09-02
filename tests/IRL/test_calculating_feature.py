@@ -6,7 +6,7 @@ import torch as th
 from scipy import io
 from copy import deepcopy
 
-from gym_envs.envs import FaissDiscretizationInfo, UncorrDiscretizationInfo
+from gym_envs.envs import FaissDiscretizationInfo, UncorrDiscretizationInfo, DataBasedDiscretizationInfo
 from common.util import CPU_Unpickler, make_env
 from common.wrappers import *
 from algos.tabular.viter import FiniteSoftQiter
@@ -34,7 +34,7 @@ def test_calculating_feature_from_ann():
     print(inp)
 
 
-@pytest.mark.parametrize("trial", [1, 2, 3, 4])
+@pytest.mark.parametrize("trial", [1, 2, 3])
 def test_calculating_feature(trial):
 
     def feature_fn(x):
@@ -59,15 +59,13 @@ def test_calculating_feature(trial):
         acts_info_tree = pickle.load(f)
     obs_info = FaissDiscretizationInfo([0.05, 0.05, 0.3, 0.35], [-0.05, -0.2, -0.08, -0.4], obs_info_tree)
     acts_info = FaissDiscretizationInfo([60, 50], [-60, -20], acts_info_tree)
-    # obs_info = UncorrDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], [301, 201])
-    # acts_info = UncorrDiscretizationInfo([40], [-30], [101])
-    # reward_fn.layers[0].weight = th.nn.Parameter(th.tensor([0.2333, 0.0025, -0.0032, -1.1755, -0.1169, -0.0118]))
-    # env = make_env("DiscretizedHuman-v0", num_envs=1, bsp=bsp, N=[19, 19, 19, 19], NT=[11, 11],
-    #                wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn}, init_states=init_states, )
-    # env = make_env("SpringBall-v0", init_states=init_states, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': reward_fn})
+    # obs_info = UncorrDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], [39, 39])
+    # acts_info = UncorrDiscretizationInfo([40], [-30], [51])
+    # env = make_env("DiscretizedDoublePendulum-v0", obs_info=obs_info, acts_info=acts_info, init_states=init_states, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': reward_fn})
     env = make_env("DiscretizedDoublePendulum-v2", obs_info=obs_info, acts_info=acts_info, wrapper=RewardInputNormalizeWrapper, wrapper_kwargs={'rwfn': reward_fn})
     agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu', verbose=False)
     agent.learn(0)
+
 
     D_prev = th.zeros([agent.policy.obs_size], dtype=th.float32)
     init_obs, _ = env.get_init_vector()
@@ -108,8 +106,9 @@ def test_calculating_feature_from_pkldata():
         return th.cat([x, x**2], dim=1)
         # return x ** 2
 
-    load_dir = f"{irl_path}/demos/DiscretizedDoublePendulum/databased_faiss_lqr"
+    load_dir = f"{irl_path}/demos/DiscretizedDoublePendulum/databased_faiss_lqr/"
     with open(f"{load_dir}/quadcost_400080_from_contlqr.pkl", "rb") as f:
+    # with open(f"traj_cal_test.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
 
     features = []

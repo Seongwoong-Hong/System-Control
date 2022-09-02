@@ -2,10 +2,12 @@ import numpy as np
 import gym, time, gym_envs
 from matplotlib import pyplot as plt
 
+
 def LQR(x0, u, n, model):
     K = BackwardPass(n, model)
     x, u, J = ForwardPass(x0, u, n, K, model)
     return x, u, J
+
 
 def BackwardPass(n, model):
     Q, R = model.Q, model.R
@@ -20,6 +22,7 @@ def BackwardPass(n, model):
         K[idx] = -(Qk[-1, -1] ** -1) * Qk[-1, 0:-1]
         Vk = Qk[0:-1, 0:-1] + Qk[0:-1, [-1]] @ K[idx] + K[idx].T @ Qk[[-1], 0:-1] + K[idx].T * Qk[-1, -1] @ K[idx]
     return K
+
 
 def ForwardPass(x0, u, n, K, model):
     J = np.zeros(n)
@@ -40,6 +43,7 @@ def ForwardPass(x0, u, n, K, model):
     model.saving_gif(name="LQR.gif", frames=frames)
     model.close()
     return x_op, u_op, J
+
 
 if __name__ == "__main__":
     n = 1000

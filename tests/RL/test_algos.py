@@ -5,11 +5,12 @@ import json
 import time
 import numpy as np
 import torch as th
-from scipy import io
-
+from scipy import io, signal
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from algos.tabular.viter import FiniteSoftQiter, FiniteViter, SoftQiter
+from algos.torch.OptCont import LQRPolicy, FiniteLQRPolicy, DiscreteLQRPolicy
+from gym_envs.envs import FaissDiscretizationInfo, UncorrDiscretizationInfo
 from common.util import make_env, CPU_Unpickler
 from common.verification import verify_policy
 from common.wrappers import *
@@ -32,9 +33,63 @@ def test_mujoco_envs_learned_policy():
     a_list, o_list, _ = verify_policy(env, algo, render='human', repeat_num=10)
 
 
+class IPLQRPolicy(LQRPolicy):
+    def _build_env(self):
+        g = 9.81
+        m = 17.2955
+        l = 0.7970
+        lc = 0.5084
+        I = 0.878121 + m * lc**2
+        self.A, self.B = np.zeros([2, 2]), np.zeros([2, 1])
+        self.A[0, 1] = 1
+        self.A[1, 0] = m * g * lc / I
+        self.B[1, 0] = 1 / I
+        self.Q = self.env.envs[0].Q
+        self.R = self.env.envs[0].R
+        self.gear = 1
+
+    # def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
+    #     action = super(DiscIPLQRPolicy, self)._predict(observation[:, :2], deterministic)
+    #     high = th.from_numpy(self.env.action_space.high).float()
+    #     low = th.from_numpy(self.env.action_space.low).float()
+    #     action = th.clip(action, min=low, max=high)
+    #     d_act = self.env.env_method("get_acts_from_idx", self.env.env_method("get_idx_from_acts", action.numpy())[0])[0]
+    #     return th.from_numpy(d_act).float()
+
+
+class IDPLQRPolicy(LQRPolicy):
+    def _build_env(self) -> np.array:
+        I1, I2 = self.env.envs[0].Is
+        l1 = self.env.envs[0].ls[0]
+        lc1, lc2 = self.env.envs[0].lcs
+        m1 ,m2 = self.env.envs[0].ms
+        g = 9.81
+        M = np.array([[I1 + m1*lc1**2 + I2 + m2*l1**2 + 2*m2*l1*lc2 + m2*lc2**2, I2 + m2*l1*lc2 + m2*lc2**2],
+                      [I2 + m2*l1*lc2 + m2*lc2**2, I2 + m2*lc2**2]])
+        C = np.array([[m1*lc1*g + m2*l1*g + m2*g*lc2, m2*g*lc2],
+                      [m2*g*lc2, m2*g*lc2]])
+        self.A, self.B = np.zeros([4, 4]), np.zeros([4, 2])
+        self.A[:2, 2:] = np.eye(2, 2)
+        self.A[2:, :2] = np.linalg.inv(M) @ C
+        self.B[2:, :] = np.linalg.inv(M) @ np.eye(2, 2)
+        # self.A, self.B, _, _, dt = signal.cont2discrete((self.A, self.B, np.array([1, 1, 1, 1]), 0), self.env.envs[0].dt)
+        self.Q = self.env.envs[0].Q
+        self.R = self.env.envs[0].R
+        # self.gear = th.tensor([60, 50])
+        self.gear = 1
+
+    # def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
+    #     action = super(DiscIDPLQRPolicy, self)._predict(observation, deterministic)
+    #     high = th.from_numpy(self.env.action_space.high).float()
+    #     low = th.from_numpy(self.env.action_space.low).float()
+    #     action = th.clip(action, min=low, max=high)
+    #     d_act = self.env.env_method("get_acts_from_idx", self.env.env_method("get_idx_from_acts", action.numpy())[0])[0]
+    #     return th.from_numpy(d_act).float()
+
+
 def test_rl_learned_policy(rl_path):
-    env_type = "SpringBall"
-    name = f"{env_type}"
+    env_type = "IDP"
+    name = f"{env_type}_custom"
     subj = "sub05"
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
@@ -44,71 +99,173 @@ def test_rl_learned_policy(rl_path):
     init_states = []
     for traj in expt_trajs:
         init_states += [traj.obs[0]]
-    # env = make_env(f"{name}-v0", num_envs=1, bsp=bsp, init_states=init_states)#, wrapper=DiscretizeWrapper)
-    env = make_env(f"{name}-v2", num_envs=1)
-    # env = make_env(f"{name}-v0", num_envs=1, N=[19, 19, 19, 19], NT=[11, 11],
-    #                bsp=bsp, init_states=init_states, wrapper=ActionWrapper)
-    # name += f"_{subj}"
-    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "ppo", "policies_1")
+    with open(f"../../IRL/demos/DiscretizedHuman/databased_lqr/obs_info_tree_4000.pkl", "rb") as f:
+        obs_info_tree = pickle.load(f)
+    with open(f"../../IRL/demos/DiscretizedHuman/databased_lqr/acts_info_tree_80.pkl", "rb") as f:
+        acts_info_tree = pickle.load(f)
+    # obs_info = FaissDiscretizationInfo([0.02, 0.05, 0.3, 0.45], [-0.01, -0.2, -0.18, -0.4], obs_info_tree)
+    # acts_info = FaissDiscretizationInfo([20, 20], [-40, -10], acts_info_tree)
+    obs_info = UncorrDiscretizationInfo([0.05, 0.05, 0.3, 0.45], [-0.05, -0.2, -0.18, -0.4], [19, 19, 19, 19])
+    acts_info = UncorrDiscretizationInfo([100, 100], [-100, -100], [11, 11])
+    env = make_env(f"DiscretizedHuman-v2", obs_info=obs_info, acts_info=acts_info, bsp=bsp)#, init_states=init_states)
+    # env = make_env(f"DiscretizedPendulum-v2", obs_info=obs_info, acts_info=acts_info, wrapper=DiscretizeWrapper)
+    env.Q = np.diag([0.7139, 0.5872182, 1.0639979, 0.9540204])
+    env.R = np.diag([.0061537065, .0031358577])
+    # env.Q = np.diag([0.7139, 1.0639979])
+    # env.R = np.diag([.0061537065])
+    algo = IDPLQRPolicy(env)
+    # algo = SoftQiter(env, gamma=0.9995, alpha=0.0001,device='cuda:0')
+    # algo.learn(5e4)
+    # env = make_env(f"{name}-v2", bsp=bsp)
+    name += f"_{subj}"
+    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "ppo", "policies_17")
     stats_path = None
     if os.path.isfile(model_dir + "normalization.pkl"):
         stats_path = model_dir + "normalization.pkl"
     # with open(model_dir + "/agent.pkl", "rb") as f:
     #     algo = pickle.load(f)
     # algo.set_env(env)
-    algo = PPO.load(model_dir + f"/agent_5")
-    lengths = []
-    for _ in range(20):
-        obs = env.reset()
+    # algo = PPO.load(model_dir + f"/agent_7")
+    fig = plt.figure(figsize=[9.6, 9.6])
+    ax11 = fig.add_subplot(3, 2, 1)
+    ax12 = fig.add_subplot(3, 2, 2)
+    ax21 = fig.add_subplot(3, 2, 3)
+    ax22 = fig.add_subplot(3, 2, 4)
+    ax31 = fig.add_subplot(3, 2, 5)
+    ax32 = fig.add_subplot(3, 2, 6)
+    rews = []
+    for _ in range(300):
+        obs, acts = [], []
+        ob = env.reset()
+        obs.append(ob)
         done = False
-        length = 0
-        while not done:
-            a, _ = algo.predict(obs, deterministic=False)
-            obs, _, done, _ = env.step(a)
-            env.render()
-            time.sleep(env.get_attr("dt")[0])
-            length += 1
-        print(length)
-        lengths.append(length)
-    print(np.mean(lengths), np.std(lengths))
+        rew = 0
+        for _ in range(100):
+            a, _ = algo.predict(ob, deterministic=True)
+            # a = env.get_acts_from_idx(env.get_idx_from_acts(np.array([a * np.array([60, 50])])))[0]
+            ob, rw, done, _ = env.step(a)
+            obs.append(ob)
+            acts.append(a)
+            # env.render()
+            # time.sleep(env.dt)
+            rew += rw
+        rews.append(rew)
+        obs = np.array(obs)
+        acts = np.array(acts)
+        ax11.plot(obs[:-1, 0])
+        ax12.plot(obs[:-1, 1])
+        ax11.set_ylim([-.05, .05])
+        ax12.set_ylim([-.2, .05])
+        ax21.plot(obs[:-1, 2])
+        ax22.plot(obs[:-1, 3])
+        ax21.set_ylim([-.18, .3])
+        ax22.set_ylim([-.4, .45])
+        ax31.plot(acts[:, 0])
+        ax32.plot(acts[:, 1])
+        # ax31.set_ylim([-30, 40])
+        ax31.set_ylim([-60, 60])
+        ax32.set_ylim([-20, 50])
+    fig.tight_layout()
+    plt.show()
+    print(np.mean(rews), np.std(rews))
     env.close()
 
 
+class FiniteIDPLQRPolicy(FiniteLQRPolicy):
+    def _build_env(self) -> np.array:
+        I1, I2 = self.env.envs[0].Is
+        l1 = self.env.envs[0].ls[0]
+        lc1, lc2 = self.env.envs[0].lcs
+        m1, m2 = self.env.envs[0].ms
+        g = 9.81
+        M = np.array([[I1 + m1*lc1**2 + I2 + m2*l1**2 + 2*m2*l1*lc2 + m2*lc2**2, I2 + m2*l1*lc2 + m2*lc2**2],
+                      [I2 + m2*l1*lc2 + m2*lc2**2, I2 + m2*lc2**2]])
+        C = np.array([[m1*lc1*g + m2*l1*g + m2*g*lc2, m2*g*lc2],
+                      [m2*g*lc2, m2*g*lc2]])
+        self.A, self.B = np.zeros([4, 4]), np.zeros([4, 2])
+        self.A[:2, 2:] = np.eye(2, 2)
+        self.A[2:, :2] = np.linalg.inv(M) @ C
+        self.B[2:, :] = np.linalg.inv(M) @ np.eye(2, 2)
+        self.A, self.B, _, _, dt = signal.cont2discrete((self.A, self.B, np.array([1, 1, 1, 1]), 0), self.env.envs[0].dt)
+        print(dt)
+        # self.A = self.A * self.env.envs[0].dt + np.eye(4, 4)
+        # self.B = self.B * self.env.envs[0].dt
+        self.Q = self.env.envs[0].Q*100
+        self.R = self.env.envs[0].R*100
+        # self.gear = th.tensor([60, 50])
+        self.gear = 1
+
+
 def test_finite_algo(rl_path):
-    name = "DiscretizedHuman"
-    env_id = f"{name}"
+    env_type = "IDP"
+    env_id = f"{env_type}_custom"
     subj = "sub05"
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(f"{env_id}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
-    # env = make_env(f"{env_id}-v2", num_envs=1, wrapper=DiscretizeWrapper)
-    # init_states = np.array([[11, 35], [ 8, 16], [ 6,  2], [ 5, 45], [29, 27], [18, 37]])
-    # eval_env = make_env(f"{env_id}-v2", wrapper=DiscretizeWrapper)
-    eval_env = make_env(f"{env_id}-v0", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=DiscretizeWrapper)
-    # agent = SoftQiter(env=env, gamma=1, alpha=0.001, device='cuda:0')
-    # agent.learn(50)
-    agent = FiniteSoftQiter(env, gamma=1, alpha=0.001, device='cpu')
-    agent.learn(0)
-    agent.set_env(eval_env)
-    for epi in range(30):
+    # with open(f"../../IRL/demos/{env_type}/databased_faiss_400080/{subj}_1.pkl", "rb") as f:
+    #     expt_trajs = pickle.load(f)
+    # init_states = []
+    # for traj in expt_trajs:
+    #     init_states.append(traj.obs[0])
+    # with open(f"../../IRL/demos/{env_type}/databased_lqr/obs_info_tree_4000.pkl", "rb") as f:
+    #     obs_info_tree = pickle.load(f)
+    # with open(f"../../IRL/demos/{env_type}/databased_lqr/acts_info_tree_80.pkl", "rb") as f:
+    #     acts_info_tree = pickle.load(f)
+    obs_info = UncorrDiscretizationInfo([0.05, 0.05, 0.3, 0.45], [-0.05, -0.2, -0.18, -0.4], [19, 19, 19, 19])
+    acts_info = UncorrDiscretizationInfo([100, 100], [-100, -100], [11, 11])
+    env = make_env(f"DiscretizedHuman-v2", obs_info=obs_info, acts_info=acts_info, bsp=bsp)#, init_states=init_states)
+    env.Q = np.diag([1.9139, 1.5872182, 2.0639979, 1.9540204])
+    env.R = np.diag([.00061537065, .00031358577])
+    agent = FiniteIDPLQRPolicy(env)
+    env = make_env(f"{env_id}-v2", bsp=bsp)
+    agent.set_env(env)
+    # agent = FiniteSoftQiter(env, gamma=0.9995, alpha=0.0001, device='cpu')
+    # agent.learn(0)
+    fig = plt.figure(figsize=[9.6, 9.6])
+    ax11 = fig.add_subplot(3, 2, 1)
+    ax12 = fig.add_subplot(3, 2, 2)
+    ax21 = fig.add_subplot(3, 2, 3)
+    ax22 = fig.add_subplot(3, 2, 4)
+    ax31 = fig.add_subplot(3, 2, 5)
+    ax32 = fig.add_subplot(3, 2, 6)
+    rews = []
+    b, a = signal.butter(3, 3.5/100)
+    for epi in range(300):
         # ob = init_states[epi % len(init_states)]
-        ob = eval_env.reset()
-        # obs, acts, rews = agent.predict(ob, deterministic=True)
-        # plt.plot(obs[:, 2])
-        # plt.plot(obs[:, 1])
-        eval_env.render()
-        tot_r = 0
-        for t in range(40):
-            obs_idx = eval_env.get_idx_from_obs(ob)
-            act_idx = agent.policy.choice_act(agent.policy.policy_table[t].T[obs_idx])
-            act = eval_env.get_acts_from_idx(act_idx)
-            ob, r, _, _ = eval_env.step(act[0])
-            tot_r += r
-            eval_env.render()
-            time.sleep(eval_env.dt)
-        print(tot_r)
-    # plt.show()
+        ob = env.reset()
+        obs, acts, rws = agent.predict(ob, deterministic=False)
+        # obs = signal.filtfilt(b, a, obs, axis=0)
+        # acts = signal.filtfilt(b, a, acts, axis=0)
+        rews.append(rws.sum())
+        ax11.plot(obs[:-1, 0])
+        ax12.plot(obs[:-1, 1])
+        ax11.set_ylim([-.05, .05])
+        ax12.set_ylim([-.2, .05])
+        ax21.plot(obs[:-1, 2])
+        ax22.plot(obs[:-1, 3])
+        ax21.set_ylim([-.18, .3])
+        ax22.set_ylim([-.4, .45])
+        ax31.plot(acts[:, 0])
+        ax32.plot(acts[:, 1])
+        # ax31.set_ylim([-30, 40])
+        ax31.set_ylim([-60, 60])
+        ax32.set_ylim([-20, 50])
+        # env.render()
+        # tot_r = 0
+        # for t in range(40):
+        #     obs_idx = env.get_idx_from_obs(ob)
+        #     act_idx = agent.policy.choice_act(agent.policy.policy_table[t].T[obs_idx])
+        #     act = env.get_acts_from_idx(act_idx)
+        #     ob, r, _, _ = env.step(act[0])
+        #     tot_r += r
+        #     env.render()
+        #     time.sleep(env.dt)
+        # print(tot_r)
+    print(np.mean(rews), np.std(rews))
+    fig.tight_layout()
+    plt.show()
+    print('end')
 
 
 def test_toy_disc_env(rl_path):

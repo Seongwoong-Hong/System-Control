@@ -2,31 +2,29 @@ import os
 import pickle
 
 import torch as th
-from scipy import io
+from scipy import io, signal
 import pytest
 
 from gym_envs.envs import FaissDiscretizationInfo
 from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning, APIRL
 from algos.torch.sac import MlpPolicy, SAC
+from algos.torch.OptCont import FiniteLQRPolicy
 from algos.tabular.viter import FiniteSoftQiter, FiniteViter, SoftQiter
 from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
 
 subj = "sub05"
-env_name = "DiscretizedPendulum"
-env_id = f"{env_name}"
+env_name = "IDP"
+env_id = f"{env_name}_custom"
+proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+demo_dir = os.path.join(proj_path, "IRL", "demos", env_name)
+bsp = io.loadmat(demo_dir + f"/{subj}/{subj}i1.mat")['bsp']
 
 
 @pytest.fixture
-def demo_dir():
-    proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    return os.path.join(proj_path, "IRL", "demos")
-
-
-@pytest.fixture
-def expert(demo_dir):
-    expert_dir = os.path.join(demo_dir, env_name, "databased_faiss_lqr", f"quadcost_from_contlqr.pkl")
+def expert_trajs():
+    expert_dir = os.path.join(demo_dir, f"{subj}_1.pkl")
     # expert_dir = os.path.join(demo_dir, env_name, "20", "2*alpha_nobias.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
@@ -34,105 +32,64 @@ def expert(demo_dir):
 
 
 @pytest.fixture
-def env(expert, demo_dir):
-    with open(f"{demo_dir}/{env_name}/databased_lqr/obs_info_tree_1500.pkl", "rb") as f:
-        obs_info_tree = pickle.load(f)
-    with open(f"{demo_dir}/{env_name}/databased_lqr/acts_info_tree_30.pkl", "rb") as f:
-        acts_info_tree = pickle.load(f)
-    obs_info = FaissDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], obs_info_tree)
-    acts_info = FaissDiscretizationInfo([40], [-30], acts_info_tree)
-    return make_env(f"{env_id}-v2", obs_info=obs_info, acts_info=acts_info)
-    # return make_env(f"{env_id}-v2")
+def env(expert_trajs):
+    return make_env(f"{env_id}-v2", bsp=bsp)
 
 
 @pytest.fixture
 def eval_env(expert, demo_dir):
-    with open(f"{demo_dir}/{env_name}/databased_lqr/obs_info_tree_1500.pkl", "rb") as f:
-        obs_info_tree = pickle.load(f)
-    with open(f"{demo_dir}/{env_name}/databased_lqr/acts_info_tree_30.pkl", "rb") as f:
-        acts_info_tree = pickle.load(f)
-    obs_info = FaissDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], obs_info_tree)
-    acts_info = FaissDiscretizationInfo([40], [-30], acts_info_tree)
-    subpath = os.path.join(demo_dir, "HPC", subj, subj)
-    bsp = io.loadmat(subpath + f"i1.mat")['bsp']
     init_states = []
     for traj in expert:
         init_states += [traj.obs[0]]
-    return make_env(f"{env_id}-v0", init_states=init_states, obs_info=obs_info, acts_info=acts_info)
+    return make_env(f"{env_id}-v0", init_states=init_states, bsp=bsp)
 
-@pytest.fixture
-def learner(env, expert, eval_env):
-    from imitation.util import logger
-    logger.configure("tmp/log", format_strs=["stdout"])
 
+class IDPLQRPolicy(FiniteLQRPolicy):
+    def _build_env(self):
+        I1, I2 = self.env.envs[0].model.body_inertia[1:, 0]
+        l1 = self.env.envs[0].model.body_pos[2, 2]
+        lc1, lc2 = self.env.envs[0].model.body_ipos[1:, 2]
+        m1, m2 = self.env.envs[0].model.body_mass[1:]
+        g = 9.81
+        M = np.array([[I1 + m1*lc1**2 + I2 + m2*l1**2 + 2*m2*l1*lc2 + m2*lc2**2, I2 + m2*l1*lc2 + m2*lc2**2],
+                      [I2 + m2*l1*lc2 + m2*lc2**2, I2 + m2*lc2**2]])
+        C = np.array([[m1*lc1*g + m2*l1*g + m2*g*lc2, m2*g*lc2],
+                      [m2*g*lc2, m2*g*lc2]])
+        self.A, self.B = np.zeros([4, 4]), np.zeros([4, 2])
+        self.A[:2, 2:] = np.eye(2, 2)
+        self.A[2:, :2] = np.linalg.inv(M) @ C
+        self.B[2:, :] = np.linalg.inv(M) @ np.eye(2, 2)
+        self.A, self.B, _, _, dt = signal.cont2discrete((self.A, self.B, np.array([1, 1, 1, 1]), 0), self.env.envs[0].dt)
+        self.Q = self.env.envs[0].Q*100
+        self.R = self.env.envs[0].R*100
+        # self.gear = th.tensor([60, 50])
+        self.gear = 1
+
+def test_maxentirl_scripts(expert_trajs):
+    from IRL.scripts.MaxEntIRL import main
     def feature_fn(x):
-        # x1, x2, x3, x4, a1, a2 = th.split(x, 1, dim=-1)
-        # return th.cat([x, x ** 2, x1 * x2, x3 * x4, a1 * a2], dim=1)
-        # return x ** 2
-        # return th.cat([x, x**2, x**3, x**4], dim=1)
-        # x1, x2, a1, a2 = th.split(x, 1, dim=-1)
-        # out = x ** 2
-        # ob_sec, act_sec = 4, 3
-        # for i in range(1, ob_sec):
-        #     out = th.cat([out, (x1 - i / ob_sec) ** 2, (x2 - i / ob_sec) ** 2, (x3 - i /ob_sec) ** 2, (x4 - i / ob_sec) ** 2,
-        #                   (x1 + i / ob_sec) ** 2, (x2 + i / ob_sec) ** 2, (x3 + i / ob_sec) ** 2, (x4 + i / ob_sec) ** 2], dim=1)
-        # for i in range(1, act_sec):
-        #     out = th.cat([out, (a1 - i / act_sec) ** 2, (a2 - i / act_sec) ** 2, (a1 + i / act_sec) ** 2, (a2 + i / act_sec) ** 2], dim=1)
-        # return out
         return th.cat([x, x**2], dim=1)
+    kwargs = {
+        'log_dir': ".",
+        'env': env,
+        'eval_env': eval_env,
+        'feature_fn': feature_fn,
+        'expert_trajs': expert_trajs,
+        'use_action_as_input': True,
+        'rew_arch': [],
+        'env_kwargs': {'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardInputNormalizeWrapper},
+        'rew_kwargs': {'type': 'ann', 'scale': 1,
+                       'optim_kwargs': {'weight_decay': 1e-3, 'lr': 1e-1, 'betas': (0.9, 0.999)},
+                       # 'lr_scheduler_cls': th.optim.lr_scheduler.StepLR,
+                       # 'lr_scheduler_kwargs': {'step_size': 1, 'gamma': 0.95}
+                       },
+        'agent_cls': FiniteSoftQiter,
+        'agent_kwargs': {'env': env, 'gamma': 1, 'alpha': 0.01},
+        'device': 'cpu',
+        'callback_fn': None,
+    }
+    main(**kwargs)
 
-    agent = FiniteSoftQiter(env, gamma=1, alpha=0.01, device='cpu')
-    # agent = SoftQiter(env, gamma=0.99, alpha=0.01, device='cuda:2')
-
-    return MaxEntIRL(
-        env,
-        eval_env=eval_env,
-        agent=agent,
-        feature_fn=feature_fn,
-        expert_trajectories=expert,
-        use_action_as_input=True,
-        rew_arch=[],
-        device=agent.device,
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardInputNormalizeWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1,
-                    'optim_kwargs': {'weight_decay': 0.0, 'lr': 1e-2, 'betas': (0.9, 0.999)},
-                    'lr_scheduler_cls': th.optim.lr_scheduler.StepLR,
-                    'lr_scheduler_kwargs': {'step_size': 10, 'gamma': 0.95},
-                    },
-    )
-
-
-def test_callback(expert, learner):
-    from stable_baselines3.common import callbacks
-    from imitation.policies import serialize
-    save_policy_callback = serialize.SavePolicyCallback(f"tmp/log", None)
-    save_policy_callback = callbacks.EveryNTimesteps(int(1e3), save_policy_callback)
-    save_reward_callback = SaveCallback(cycle=1, dirpath=f"tmp/log")
-    learner.learn(
-        total_iter=10,
-        agent_learning_steps=0,
-        n_episodes=len(expert),
-        max_agent_iter=1,
-        min_agent_iter=1,
-        max_gradient_steps=1,
-        min_gradient_steps=1,
-        early_stop=True,
-        callback=save_reward_callback.net_save,
-        callback_period=1,
-    )
-
-
-def test_validity(learner, expert):
-    learner.learn(
-        total_iter=300,
-        agent_learning_steps=0,
-        n_episodes=len(expert),
-        max_agent_iter=1,
-        min_agent_iter=1,
-        max_gradient_steps=1,
-        min_gradient_steps=1,
-        early_stop=True,
-    )
 
 
 def test_GCL(env, expert, eval_env):

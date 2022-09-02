@@ -13,7 +13,7 @@ from algos.torch.OptCont import LQRPolicy
 from algos.tabular.viter import FiniteSoftQiter
 from common.util import make_env
 from common.wrappers import DiscretizeWrapper
-from IRL.demos.MakeInfoTree import DiscIPLQRPolicy, DiscIDPLQRPolicy
+from IRL.demos.MakeInfoTree import IPLQRPolicy, DiscIDPLQRPolicy
 
 
 def test_information_tree():
@@ -33,7 +33,7 @@ def test_dividing_nodes():
 
 
 def test_draw_discrete_node():
-    with open("../../IRL/demos/DiscretizedPendulum/databased_lqr/obs_info_tree_1500.pkl", "rb") as f:
+    with open("../../IRL/demos/DiscretizedPendulum/databased_lqr/obs_info_tree_200.pkl", "rb") as f:
         info_tree = pickle.load(f)
     ax = plt.gca()
     for node in info_tree.data:
