@@ -1,1 +1,1 @@
-from algos.torch.OptCont.policies import LQRPolicy
+from algos.torch.OptCont.policies import LQRPolicy, DiscreteLQRPolicy, FiniteLQRPolicy
