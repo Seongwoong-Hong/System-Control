@@ -51,57 +51,25 @@ def test_drawing_hist_of_human_obs():
 
 
 def test_drawing_pkl_data():
-    with open("../../IRL/demos/bound_info.json", "r") as f:
-        bound_info = json.load(f)
-    # env = make_env("DiscretizedPendulum-v2", N=[201, 201], NT=[101])
-    for subj in [f"sub{i:02d}" for i in [5]]:
+    for subj in [f"sub{i:02d}" for i in range(1, 2)]:
         for actu in range(4, 5):
-            bound_dict = bound_info[subj][actu - 1]
-            expert_dir = os.path.join("../../IRL", "demos", "DiscretizedHuman", "databased_faiss_400080", f"sub05_1.pkl")
+            # bound_dict = bound_info[subj][actu - 1]
+            expert_dir = os.path.join("../../IRL", "demos", "HPC", f"full/{subj}_{actu}.pkl")
             # expert_dir = os.path.join("../../IRL", "demos", "SpringBall", "cont", f"quadcost_lqr_many.pkl")
             with open(expert_dir, "rb") as f:
                 expert_trajs = pickle.load(f)
-            print(len(expert_trajs))
-            fig1 = plt.figure(figsize=[9.6, 9.6])
-            ax11 = fig1.add_subplot(3, 2, 1)
-            ax12 = fig1.add_subplot(3, 2, 2)
-            ax21 = fig1.add_subplot(3, 2, 3)
-            ax22 = fig1.add_subplot(3, 2, 4)
-            ax31 = fig1.add_subplot(3, 2, 5)
-            ax32 = fig1.add_subplot(3, 2, 6)
-            # ax11 = fig1.add_subplot(1, 3, 1)
-            # ax21 = fig1.add_subplot(1, 3, 2)
-            # ax31 = fig1.add_subplot(1, 3, 3)
-            palette = np.zeros([201*201])
+            fig1 = plt.figure()
+            for i in range(4):
+                fig1.add_subplot(4, 1, i + 1)
             for traj in expert_trajs:
-                ax11.plot(traj.obs[:-1, 0])
-                ax12.plot(traj.obs[:-1, 1])
-                ax11.set_ylim([-.05, .05])
-                ax12.set_ylim([-.2, .05])
-                # ax11.set_ylim([bound_dict["min_states"][0], bound_dict["max_states"][0]])
-                # ax12.set_ylim([bound_dict["min_states"][1], bound_dict["max_states"][1]])
-                # ax31.plot(traj.obs[:-1, 0], traj.obs[:-1, 1])
-                # traj_idx = env.get_idx_from_obs(traj.obs[:-1])
-                # unique, counts = np.unique(traj_idx, return_counts=True)
-                # palette[unique] += counts
-                # ax21.set_xlim([-.2, .20])
-                # ax21.set_ylim([-1.20, 1.20])
-                ax21.plot(traj.obs[:-1, 2])
-                ax22.plot(traj.obs[:-1, 3])
-                ax21.set_ylim([-.18, .3])
-                ax22.set_ylim([-.4, .45])
-                # ax21.set_ylim([bound_dict["min_states"][2], bound_dict["max_states"][2]])
-                # ax22.set_ylim([bound_dict["min_states"][3], bound_dict["max_states"][3]])
-                ax31.plot(traj.acts[:, 0])
-                ax32.plot(traj.acts[:, 1])
-                # ax31.set_ylim([-30, 40])
-                ax31.set_ylim([-60, 60])
-                ax32.set_ylim([-20, 50])
-                # ax31.set_ylim([bound_dict["min_torques"][0], bound_dict["max_torques"][0]])
-                # ax32.set_ylim([bound_dict["min_torques"][1], bound_dict["max_torques"][1]])
-            # ax32.imshow(palette.reshape(201, 201))
-            plt.tight_layout()
-            plt.show()
+                for i in range(2):
+                    fig1.axes[i].plot(traj.obs[:-1, i])
+                for j in range(1):
+                    fig1.axes[j + 2].plot(traj.acts[:, j])
+                for k in range(1):
+                    fig1.axes[k + 3].plot(traj.pltq[:, k])
+            fig1.tight_layout()
+            fig1.show()
 
 
 def test_stepping_pkl_data():

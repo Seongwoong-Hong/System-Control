@@ -46,8 +46,10 @@ class DiscretizedPendulum(BaseDiscEnv):
         )
 
     def reset(self):
-        high = np.array([*self.max_angle - 0.01, *self.max_speed - 0.03])
-        low = np.array([*self.min_angle + 0.01, *self.min_speed + 0.03])
+        high = np.array([0.025, 0.15])
+        low = np.array([-0.025, -0.03])
+        # high = np.array([*self.max_angle - 0.01, *self.max_speed - 0.03])
+        # low = np.array([*self.min_angle + 0.01, *self.min_speed + 0.03])
         self.state = self.np_random.uniform(low=low, high=high)
 
         return self._get_obs()
@@ -208,7 +210,7 @@ class DiscretizedPendulum(BaseDiscEnv):
 
 
 class DiscretizedPendulumDet(DiscretizedPendulum):
-    def __init__(self, obs_info, acts_info, init_states):
+    def __init__(self, obs_info, acts_info, init_states=None):
         super(DiscretizedPendulumDet, self).__init__(obs_info, acts_info)
         self._init_states = init_states
         self.n = 0
@@ -217,9 +219,9 @@ class DiscretizedPendulumDet(DiscretizedPendulum):
     def init_states(self):
         if self._init_states is None:
             init_states, _ = self.get_vectorized()
-            return init_states[0:len(init_states):10]
-        else:
-            return np.array(self._init_states).reshape(-1, 2)
+            self._init_states = init_states[0:len(init_states):50]
+        self._init_states = np.array(self._init_states)
+        return self._init_states
 
     def reset(self):
         self.set_state(self.init_states[self.n])

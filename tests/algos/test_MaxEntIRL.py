@@ -1,30 +1,28 @@
 import os
 import pickle
-
-import torch as th
-from scipy import io, signal
 import pytest
+import torch as th
+from scipy import io
+from imitation.util import logger
 
-from gym_envs.envs import FaissDiscretizationInfo
-from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning, APIRL
-from algos.torch.sac import MlpPolicy, SAC
-from algos.torch.OptCont import FiniteLQRPolicy
+from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning, APIRL, ContMaxEntIRL
 from algos.tabular.viter import FiniteSoftQiter, FiniteViter, SoftQiter
-from common.callbacks import SaveCallback
 from common.util import make_env
 from common.wrappers import *
+from IRL.scripts.MaxEntIRL import main
+from IRL.src import *
 
 subj = "sub05"
-env_name = "IDP"
+env_name = "HPC"
 env_id = f"{env_name}_custom"
 proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-demo_dir = os.path.join(proj_path, "IRL", "demos", env_name)
-bsp = io.loadmat(demo_dir + f"/{subj}/{subj}i1.mat")['bsp']
+demo_dir = os.path.join(proj_path, "IRL", "demos")
+bsp = io.loadmat(demo_dir + f"/HPC/{subj}_full/{subj}i1.mat")['bsp']
 
 
 @pytest.fixture
 def expert_trajs():
-    expert_dir = os.path.join(demo_dir, f"{subj}_1.pkl")
+    expert_dir = os.path.join(demo_dir, "HPC", "full", f"{subj}_1.pkl")
     # expert_dir = os.path.join(demo_dir, env_name, "20", "2*alpha_nobias.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
@@ -33,116 +31,77 @@ def expert_trajs():
 
 @pytest.fixture
 def env(expert_trajs):
-    return make_env(f"{env_id}-v2", bsp=bsp)
+    pltqs = []
+    init_states = []
+    for traj in expert_trajs:
+        pltqs += [traj.pltq]
+        init_states += [traj.obs[0]]
+    return make_env(f"{env_id}-v2", init_states=init_states, bsp=bsp, pltqs=pltqs)
 
 
 @pytest.fixture
-def eval_env(expert, demo_dir):
+def eval_env(expert_trajs):
+    pltqs = []
     init_states = []
-    for traj in expert:
+    for traj in expert_trajs:
+        pltqs += [traj.pltq]
         init_states += [traj.obs[0]]
-    return make_env(f"{env_id}-v0", init_states=init_states, bsp=bsp)
+    return make_env(f"{env_id}-v0", init_states=init_states, bsp=bsp, pltqs=pltqs)
 
 
-class IDPLQRPolicy(FiniteLQRPolicy):
-    def _build_env(self):
-        I1, I2 = self.env.envs[0].model.body_inertia[1:, 0]
-        l1 = self.env.envs[0].model.body_pos[2, 2]
-        lc1, lc2 = self.env.envs[0].model.body_ipos[1:, 2]
-        m1, m2 = self.env.envs[0].model.body_mass[1:]
-        g = 9.81
-        M = np.array([[I1 + m1*lc1**2 + I2 + m2*l1**2 + 2*m2*l1*lc2 + m2*lc2**2, I2 + m2*l1*lc2 + m2*lc2**2],
-                      [I2 + m2*l1*lc2 + m2*lc2**2, I2 + m2*lc2**2]])
-        C = np.array([[m1*lc1*g + m2*l1*g + m2*g*lc2, m2*g*lc2],
-                      [m2*g*lc2, m2*g*lc2]])
-        self.A, self.B = np.zeros([4, 4]), np.zeros([4, 2])
-        self.A[:2, 2:] = np.eye(2, 2)
-        self.A[2:, :2] = np.linalg.inv(M) @ C
-        self.B[2:, :] = np.linalg.inv(M) @ np.eye(2, 2)
-        self.A, self.B, _, _, dt = signal.cont2discrete((self.A, self.B, np.array([1, 1, 1, 1]), 0), self.env.envs[0].dt)
-        self.Q = self.env.envs[0].Q*100
-        self.R = self.env.envs[0].R*100
-        # self.gear = th.tensor([60, 50])
-        self.gear = 1
+def test_maxentirl_scripts(env, eval_env, expert_trajs):
+    logger.configure("./test_log", format_strs=['stdout'])
 
-def test_maxentirl_scripts(expert_trajs):
-    from IRL.scripts.MaxEntIRL import main
     def feature_fn(x):
-        return th.cat([x, x**2], dim=1)
+        t, dt, u = th.split(x, 2, 1)
+        prev_u = th.cat([th.zeros(1, 2), u], dim=0)
+        u_diff = u - prev_u[:-1]
+        return th.cat([t, dt, u, u_diff], dim=-1)
+        # return x ** 2
+        # return th.cat([x, x ** 2], dim=-1)
     kwargs = {
-        'log_dir': ".",
+        'log_dir': "./test_log",
         'env': env,
         'eval_env': eval_env,
         'feature_fn': feature_fn,
         'expert_trajs': expert_trajs,
         'use_action_as_input': True,
         'rew_arch': [],
-        'env_kwargs': {'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardInputNormalizeWrapper},
-        'rew_kwargs': {'type': 'ann', 'scale': 1,
-                       'optim_kwargs': {'weight_decay': 1e-3, 'lr': 1e-1, 'betas': (0.9, 0.999)},
-                       # 'lr_scheduler_cls': th.optim.lr_scheduler.StepLR,
-                       # 'lr_scheduler_kwargs': {'step_size': 1, 'gamma': 0.95}
+        'env_kwargs': {'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardWrapper},
+        'rew_kwargs': {'type': 'xx',
+                       'optim_kwargs': {'weight_decay': 0.0, 'lr': 3e-2, 'betas': (0.9, 0.999)},
                        },
-        'agent_cls': FiniteSoftQiter,
+        'agent_cls': IDPDiffLQRPolicy,
         'agent_kwargs': {'env': env, 'gamma': 1, 'alpha': 0.01},
         'device': 'cpu',
-        'callback_fn': None,
+        'callback_fns': None,
     }
     main(**kwargs)
 
 
-
-def test_GCL(env, expert, eval_env):
-    from imitation.util import logger
-    logger.configure("tmp/log", format_strs=["stdout"])
-
+def test_callbacks(env, eval_env, expert_trajs):
+    logger.configure("./test_log", format_strs=['stdout', 'tensorboard'])
     def feature_fn(x):
-        # return x
-        return x ** 2
-        # return th.cat([x, x**2], dim=1)
+        return th.cat([x ** 2, x ** 4], dim=-1)
 
-    # agent = FiniteSoftQiter(env, device='cuda:1', verbose=True)
-    agent = SAC(
-        MlpPolicy,
-        env=env,
-        gamma=0.99,
-        ent_coef='auto',
-        target_entropy=-0.1,
-        tau=0.01,
-        buffer_size=int(1e5),
-        learning_starts=10000,
-        train_freq=1,
-        gradient_steps=1,
-        device='cpu',
-        verbose=1,
-        policy_kwargs={'net_arch': [32, 32]}
-    )
-
-    learner = GuidedCostLearning(
-        env,
-        eval_env=eval_env,
-        feature_fn=feature_fn,
-        agent=agent,
-        expert_trajectories=expert,
-        use_action_as_input=True,
-        rew_arch=[],
-        device='cpu',
-        env_kwargs={'vec_normalizer': None, 'reward_wrapper': RewardWrapper},
-        rew_kwargs={'type': 'ann', 'scale': 1,
-                    'optim_kwargs': {'weight_decay': 0.01, 'lr': 1e-2, 'betas': (0.9, 0.999)}
-                    },
-    )
-
-    learner.learn(
-        total_iter=50,
-        agent_learning_steps=1.5e5,
-        n_episodes=len(expert),
-        max_agent_iter=1,
-        min_agent_iter=1,
-        max_gradient_steps=1,
-        min_gradient_steps=1,
-        early_stop=True,
-    )
+    kwargs = {
+        'log_dir': "./test_log",
+        'env': env,
+        'eval_env': eval_env,
+        'feature_fn': feature_fn,
+        'expert_trajs': expert_trajs,
+        'use_action_as_input': True,
+        'rew_arch': [],
+        'env_kwargs': {'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardWrapper},
+        'rew_kwargs': {'type': 'sq',
+                       'optim_kwargs': {'weight_decay': 0.01, 'lr': 3e-2, 'betas': (0.9, 0.999)},
+                       },
+        'agent_cls': IDPiterLQRPolicy,
+        'agent_kwargs': {'env': env, 'gamma': 1, 'alpha': 0.02},
+        'device': 'cpu',
+        'callback_fns': [callback.log_figure],
+    }
+    main(**kwargs)
 
 
 def test_state_visitation(env):
@@ -173,8 +132,45 @@ def test_state_visitation(env):
     print((Dc1.cpu() - Dc2.cpu()).abs().max())
 
 
-def test_state_visitation_from_trajs(env):
-    agent = SoftQiter(env, gamma=0.99, alpha=0.01, device='cuda:3')
+def test_state_visitation_from_trajs(env, eval_env, expert_trajs):
+    logger.configure(".", format_strs=["stdout"])
+    def feature_fn(x):
+        return x ** 2
+    agent = IDPLQRPolicy(env, gamma=1, alpha=0.002, device='cpu')
+    learner = ContMaxEntIRL(
+        env,
+        eval_env=eval_env,
+        feature_fn=feature_fn,
+        agent=agent,
+        expert_trajectories=expert_trajs,
+        use_action_as_input=True,
+        rew_arch=[],
+        device='cpu',
+        env_kwargs={'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardWrapper},
+        rew_kwargs={'type': 'ann', 'scale': 1, 'optim_kwargs': {'weight_decay': 0.0, 'lr': 1e-1}},
+    )
+    learner.reward_net.w_th = th.tensor([ 3.5593e+00, -3.3656e-17], requires_grad=True)
+    learner.reward_net.w_tq = th.tensor([-4.8090e-09, -6.0656e-05], requires_grad=True)
+
+    learner._reset_agent(**{'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardWrapper})
+    er = learner.cal_expert_mean_reward()
+    import time
+    t1 = time.time()
+    learner.collect_rollouts(75)
+    r1 = learner.cal_agent_mean_reward()
+    # t2 = time.time()
+    # learner.collect_rollouts(75)
+    # r2 = learner.cal_agent_mean_reward()
+    # t3 = time.time()
+    # learner.collect_rollouts(150)
+    # r3 = learner.cal_agent_mean_reward()
+    # t4 = time.time()
+    # learner.collect_rollouts(300)
+    # r4 = learner.cal_agent_mean_reward()
+    # t5 = time.time()
+    print(er, r1)
+    # print(r1, r2, r3, r4)
+    # print(t2 - t1, t3 - t2, t4 - t3, t5 - t4)
 
 
 def test_state_visit_difference_according_to_init(learner):

@@ -1,4 +1,4 @@
-import torch
+import dataclasses
 from typing import Sequence
 import numpy as np
 from common.wrappers import *
@@ -6,6 +6,20 @@ from common.wrappers import *
 from imitation.data import rollout, types
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.base_class import BaseAlgorithm
+
+
+@dataclasses.dataclass(frozen=True)
+class TrajectoryWithPltqs(types.Trajectory):
+    pltq: np.ndarray
+    """Torque from perturbation, shape (trajectory_len, ) + observation_shape. dtype float."""
+    def __post_init__(self):
+        """Performs input validation, including for pltq."""
+        super().__post_init__()
+        if len(self.acts) != len(self.pltq):
+            raise ValueError(
+                "expected same number of pltq and actions: "
+                f"{len(self.pltq)} != {len(self.acts)}"
+            )
 
 
 def get_trajectories_probs(

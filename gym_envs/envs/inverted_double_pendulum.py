@@ -64,6 +64,7 @@ class InvertedDoublePendulum(gym.Env):
         return [seed]
 
     def step(self, action):
+        # 시계 반대 방향이 +
         err_msg = "%r (%s) invalid" % (action, type(action))
         assert self.action_space.contains(action), err_msg
 

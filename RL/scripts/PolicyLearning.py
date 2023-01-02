@@ -16,7 +16,7 @@ if __name__ == "__main__":
     device = "cuda:3"
     env_id = f"{name}-v2"
     subj = "sub05"
-    irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "IRL"))
+    irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
     env = make_env(env_id, bsp=bsp)

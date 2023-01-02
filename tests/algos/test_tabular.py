@@ -18,11 +18,6 @@ logger.configure(".", format_strs=['stdout'])
 
 
 @pytest.fixture
-def irl_path():
-    return os.path.abspath("../../IRL")
-
-
-@pytest.fixture
 def bsp(irl_path):
     return io.loadmat(f"{irl_path}/demos/HPC/sub06/sub06i1.mat")['bsp']
 

@@ -1,6 +1,4 @@
 import os
-
-import gym
 import mujoco_py
 from copy import deepcopy
 import random
@@ -10,22 +8,22 @@ from gym.envs.mujoco import mujoco_env
 from xml.etree.ElementTree import ElementTree, parse
 
 
-class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
+class IPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self, bsp=None, pltqs=None, init_states=None):
         self._timesteps = 0
         self._order = -1
         self._pltqs = pltqs
         self._pltq = None
         self._init_states = init_states
-        self.high = np.array([0.5, 1.0, 2.0, 2.0])
-        self.low = np.array([-0.5, -1.0, -2.0, -2.0])
-        filepath = os.path.join(os.path.dirname(__file__), "assets", "HPC_custom.xml")
+        self.high = np.array([0.5, 2.0])
+        self.low = np.array([-0.5, -2.0])
+        filepath = os.path.join(os.path.dirname(__file__), "assets", "IP_HPC.xml")
         if bsp is not None:
             self._set_body_config(filepath, bsp)
         mujoco_env.MujocoEnv.__init__(self, filepath, frame_skip=1)
         utils.EzPickle.__init__(self)
-        self.init_qpos = np.array([0.0, 0.0])
-        self.init_qvel = np.array([0.0, 0.0])
+        self.init_qpos = np.array([0.0])
+        self.init_qvel = np.array([0.0])
 
     def __deepcopy__(self, memo):
         cls = self.__class__
@@ -42,10 +40,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def step(self, action: np.ndarray):
         prev_ob = self._get_obs()
-        r = - (3.5139 * prev_ob[0] ** 2 + 1.2872182 * prev_ob[1] ** 2
-               + 0.14639979 * prev_ob[2] ** 2 + 0.10540204 * prev_ob[3] ** 2
-               + 0.02537065 * action[0] ** 2 + 0.01358577 * action[1])
-        r += 1
+        r = 1 - (3.5139 * prev_ob[0] ** 2 + 1.2872182 * prev_ob[1] ** 2 + 0.02537065 * action ** 2)
         self.do_simulation(action + self.plt_torque, self.frame_skip)
         self._timesteps += 1
         ob = self._get_obs()
@@ -67,17 +62,17 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def reset_model(self):
         self._order = random.randrange(0, len(self._pltqs))
         init_state = self.np_random.uniform(low=self.low, high=self.high)
-        self.init_qpos, self.init_qvel = init_state[:2], init_state[2:]
+        self.init_qpos, self.init_qvel = init_state[:1], init_state[1:]
         if self._init_states is not None:
-            self.init_qpos = np.array(self._init_states[self.order][:2])
-            self.init_qvel = np.array(self._init_states[self.order][2:4])
+            self.init_qpos = np.array(self._init_states[self.order][:1])
+            self.init_qvel = np.array(self._init_states[self.order][1:2])
         self.set_state(self.init_qpos, self.init_qvel)
         self._set_pltqs()
         return self._get_obs()
 
     def set_state(self, *args):
         if len(args) == 1:
-            qpos, qvel = args[0][:2], args[0][2:4]
+            qpos, qvel = args[0][:1], args[0][1:2]
         elif len(args) == 2:
             qpos, qvel = args[0], args[1]
         else:
@@ -106,10 +101,10 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
     def plt_torque(self):
         if self.pltq is not None:
             if self._timesteps == len(self.pltq):
-                return np.array([0, 0])
+                return np.array([0])
             return self.pltq[self._timesteps, :].reshape(-1)
         else:
-            return np.array([0, 0])
+            return np.array([0])
 
     @property
     def pltq(self):
@@ -128,26 +123,14 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
 
     @staticmethod
     def _set_body_config(filepath, bsp):
-        m_u, l_u, com_u, I_u = bsp[6, :]
-        m_s, l_s, com_s, I_s = bsp[2, :]
-        m_t, l_t, com_t, I_t = bsp[3, :]
-        l_l = l_s + l_t
-        m_l = 2 * (m_s + m_t)
-        com_l = (m_s * com_s + m_t * (l_s + com_t)) / (m_s + m_t)
-        I_l = 2 * (I_s + m_s * (com_l - com_s) ** 2 + I_t + m_t * (com_l - (l_s + com_t)) ** 2)
+        m, l, lc, I = bsp[0, :]
         tree = parse(filepath)
         root = tree.getroot()
-        l_body = root.find("worldbody").find("body")
-        l_body.find('geom').attrib['fromto'] = f"0 0 0 0 0 {l_l:.4f}"
-        l_body.find('inertial').attrib['diaginertia'] = f"{I_l:.6f} {I_l:.6f} 0.001"
-        l_body.find('inertial').attrib['mass'] = f"{m_l:.4f}"
-        l_body.find('inertial').attrib['pos'] = f"0 0 {com_l:.4f}"
-        u_body = l_body.find("body")
-        u_body.attrib["pos"] = f"0 0 {l_l:.4f}"
-        u_body.find("geom").attrib["fromto"] = f"0 0 0 0 0 {l_u:.4f}"
-        u_body.find("inertial").attrib['diaginertia'] = f"{I_u:.6f} {I_u:.6f} 0.001"
-        u_body.find("inertial").attrib['mass'] = f"{m_u:.4f}"
-        u_body.find("inertial").attrib['pos'] = f"0 0 {com_u:.4f}"
+        body = root.find("worldbody").find("body")
+        body.find('geom').attrib['fromto'] = f"0 0 0 0 0 {l:.4f}"
+        body.find('inertial').attrib['diaginertia'] = f"{I:.6f} {I:.6f} 0.001"
+        body.find('inertial').attrib['mass'] = f"{m:.4f}"
+        body.find('inertial').attrib['pos'] = f"0 0 {lc:.4f}"
         m_tree = ElementTree(root)
         m_tree.write(filepath + ".tmp")
         os.replace(filepath + ".tmp", filepath)
@@ -159,14 +142,14 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         v.cam.lookat[2] = 0.5  # 0.12250000000000005  # v.model.stat.center[2]
 
 
-class IDPHumanDet(IDPHuman):
+class IPHumanDet(IPHuman):
     def reset_model(self):
         self._order += 1
         init_state = self.np_random.uniform(low=self.low, high=self.high)
-        self.init_qpos, self.init_qvel = init_state[:2], init_state[2:]
+        self.init_qpos, self.init_qvel = init_state[:1], init_state[1:]
         if self._init_states is not None:
-            self.init_qpos = np.array(self._init_states[self.order][:2])
-            self.init_qvel = np.array(self._init_states[self.order][2:4])
+            self.init_qpos = np.array(self._init_states[self.order][:1])
+            self.init_qvel = np.array(self._init_states[self.order][1:2])
         self.set_state(self.init_qpos, self.init_qvel)
         self._set_pltqs()
         return self._get_obs()

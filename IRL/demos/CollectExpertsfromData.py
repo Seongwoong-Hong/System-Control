@@ -1,39 +1,40 @@
-from imitation.data import types
-from common.rollouts import generate_trajectories_from_data
-from common.util import make_env
 from scipy import io
-import numpy as np
-import json
+from imitation.data import types
+from gym_envs.envs import FaissDiscretizationInfo
+from common.rollouts import TrajectoryWithPltqs
+from common.util import make_env
 
 if __name__ == '__main__':
-    env_type = "DiscretizedHuman"
+    env_type = "IP_HPC"
     env_id = f"{env_type}-v2"
-    with open(f"bound_info.json", "r") as f:
-        bound_info = json.load(f)
-    env = make_env(env_id, N=[19, 19, 19, 19], NT=[11, 11])
-    act_coeff = 1
+    act_coeff = 300
+    env = make_env(f"{env_id}")
     # act_coeff = env.model.actuator_gear[0, 0]
-    for subi in [5]:
+    for subi in range(5, 6):
         # subi = 3
         sub = f"sub{subi:02d}"
-        for actuation in range(1, 7):
-            max_states = bound_info[sub][actuation - 1]["max_states"]
-            min_states = bound_info[sub][actuation - 1]["min_states"]
-            max_torques = bound_info[sub][actuation - 1]["max_torques"]
-            min_torques = bound_info[sub][actuation - 1]["min_torques"]
-            env.set_bounds(max_states, min_states, max_torques, min_torques)
+        for actuation in range(4, 5):
             trajectories = []
             for exp_trial in range(1, 6):
-                for part in range(3):
-                    file = f"HPC/{sub}_half/{sub}i{5 * (actuation - 1) + exp_trial}_{part}.mat"
-                    state = env.get_obs_from_idx(env.get_idx_from_obs(-io.loadmat(file)['state'][:, :4]))
-                    T = env.get_acts_from_idx(env.get_idx_from_acts(-io.loadmat(file)['tq'] / act_coeff))
-                    data = {'state': state,
-                            'T': T,
-                            'pltq': -io.loadmat(file)['pltq'] / act_coeff,
-                            'bsp': io.loadmat(file)['bsp'],
-                            }
-                    trajectories += generate_trajectories_from_data(data, env)
-            save_name = f"{env_type}/19191919/{sub}_{actuation}.pkl"
+                # for part in range(0):
+                file = f"HPC/{sub}_full/{sub}i{5 * (actuation - 1) + exp_trial}.mat"
+                states = io.loadmat(file)['state'][None, ...]
+                Ts = io.loadmat(file)['tq'][None, ...]
+                import matplotlib.pyplot as plt
+                fig = plt.figure()
+                for i in range(6):
+                    fig.add_subplot(3, 2, i+1)
+                for i in range(4):
+                    fig.axes[i].plot(states[0, :, i])
+                for j in range(2):
+                    fig.axes[j+4].plot(Ts[0, :, j])
+                fig.tight_layout()
+                fig.show()
+                for idx in range(len(states)):
+                    state = states[idx, :, :2].copy(order='C')
+                    T = Ts[idx, :].copy(order='C') / act_coeff
+                    pltq = io.loadmat(file)['pltq'] / act_coeff
+                    trajectories += [TrajectoryWithPltqs(obs=state, acts=T, infos=None, pltq=pltq)]
+            save_name = f"{env_type}/full/{sub}_{actuation}.pkl"
             types.save(save_name, trajectories)
             print(f"Expert Trajectory {save_name} is saved")

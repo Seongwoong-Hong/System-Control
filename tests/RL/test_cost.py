@@ -34,6 +34,7 @@ class DiscIPLQRPolicy(LQRPolicy):
         d_act = self.env.env_method("get_acts_from_idx", self.env.env_method("get_idx_from_acts", action.numpy())[0])[0]
         return th.from_numpy(d_act).float()
 
+
 def draw_trajs(traj1, traj2):
     fig = plt.figure(figsize=[6.4, 9.6])
     ax1 = fig.add_subplot(3, 1, 1)
@@ -47,36 +48,30 @@ def draw_trajs(traj1, traj2):
     ax3.scatter(range(50), traj2.acts)
     plt.show()
 
-def test_expt_cost():
-    env_type = "DiscretizedPendulum"
-    env_id = f"{env_type}"
-    with open("../../IRL/demos/DiscretizedPendulum/databased_lqr/obs_info_tree_300.pkl", "rb") as f:
-        obs_info_tree = pickle.load(f)
-    with open("../../IRL/demos/DiscretizedPendulum/databased_lqr/acts_info_tree_50.pkl", "rb") as f:
-        acts_info_tree = pickle.load(f)
-    obs_info = DataBasedDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], obs_info_tree)
-    acts_info = DataBasedDiscretizationInfo([30], [-40], acts_info_tree)
-    venv = make_env(f"{env_id}-v2", num_envs=1, obs_info=obs_info, acts_info=acts_info)
-    agent1 = DiscIPLQRPolicy(venv)
-    sample_until = make_sample_until(n_timesteps=None, n_episodes=100)
-    venv.reset()
-    trajs1 = generate_trajectories(agent1, venv, sample_until=sample_until, deterministic_policy=True)
-    init_states = []
-    rew1 = 0
-    for traj in trajs1:
-        init_states.append(traj.obs[0])
-        rew1 += traj.rews.sum()
-    rew1 /= len(trajs1)
-    agent2 = FiniteSoftQiter(venv, gamma=1, alpha=0.0001, device='cpu')
-    agent2.learn(0)
-    trajs2 = []
-    rew2 = 0
-    for i in range(len(init_states)):
-        init_state = init_states[i]
-        obs, acts, rews = agent2.predict(init_state, deterministic=True)
-        data_dict = {'obs': obs, 'acts': acts, 'rews': rews.flatten(), 'infos': None}
-        traj = types.TrajectoryWithRew(**data_dict)
-        trajs2.append(traj)
-        rew2 += rews.sum()
-    rew2 /= len(init_states)
-    print(rew1, rew2)
+
+def test_expt_cost(hpc_env, idpdiffpolicy):
+    proj_path = os.path.abspath("../..")
+    with open(f"{proj_path}/IRL/demos/HPC/full/sub01_1.pkl", "rb") as f:
+        expt_trajs = pickle.load(f)
+    agent = idpdiffpolicy(hpc_env, alpha=0.001, gamma=1)
+    Q, R1, R2 = agent.Q, agent.R1, agent.R2
+    cost1, cost2 = 0, 0
+    for traj in expt_trajs:
+        init_state = traj.obs[0]
+        agent_obs, agent_acts, _ = agent.predict(init_state, deterministic=True)
+        agent_prev_acts = np.append(np.zeros([1, 2]), agent_acts, axis=0)
+        agent_diff_acts = agent_acts - agent_prev_acts[:-1]
+        expt_diff_acts = traj.acts - np.append(np.zeros([1, 2]), traj.acts, axis=0)[:-1]
+        cost1 += np.sum(
+            np.sum((traj.obs[:-1] @ Q) * traj.obs[:-1], axis=1) +
+            np.sum((traj.acts @ R1) * traj.acts, axis=1) +
+            np.sum((expt_diff_acts @ R2) * expt_diff_acts, axis=1)
+        )
+        cost2 += np.sum(
+            np.sum((agent_obs[:-1] @ Q) * agent_obs[:-1], axis=1) +
+            np.sum((agent_acts @ R1) * agent_acts, axis=1) +
+            np.sum((agent_diff_acts @ R2) * agent_diff_acts, axis=1)
+        )
+    cost1 /= len(expt_trajs)
+    cost2 /= len(expt_trajs)
+    print(cost1, cost2)

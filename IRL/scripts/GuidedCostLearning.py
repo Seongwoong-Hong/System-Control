@@ -3,7 +3,7 @@ import os
 import pickle
 import shutil
 import torch as th
-from scipy import io
+from scipy import io, signal
 
 from imitation.util import logger
 
@@ -12,6 +12,32 @@ from common.callbacks import SaveCallback
 from common.wrappers import *
 from algos.torch.MaxEntIRL import GuidedCostLearning, ContMaxEntIRL
 from algos.torch.sac import MlpPolicy, SAC
+from algos.torch.OptCont import DiscreteLQRPolicy
+
+
+class IDPLQRPolicy(DiscreteLQRPolicy):
+    def _build_env(self):
+        I1, I2 = self.env.envs[0].model.body_inertia[1:, 0]
+        l1 = self.env.envs[0].model.body_pos[2, 2]
+        lc1, lc2 = self.env.envs[0].model.body_ipos[1:, 2]
+        m1, m2 = self.env.envs[0].model.body_mass[1:]
+        g = 9.81
+        M = np.array([[I1 + m1*lc1**2 + I2 + m2*l1**2 + 2*m2*l1*lc2 + m2*lc2**2, I2 + m2*l1*lc2 + m2*lc2**2],
+                      [I2 + m2*l1*lc2 + m2*lc2**2, I2 + m2*lc2**2]])
+        C = np.array([[m1*lc1*g + m2*l1*g + m2*g*lc2, m2*g*lc2],
+                      [m2*g*lc2, m2*g*lc2]])
+        # self.A, self.B = np.zeros([4, 4]), np.zeros([4, 2])
+        # self.A[:2, 2:] = np.eye(2, 2)
+        self.A[2:, :2] = np.linalg.inv(M) @ C
+        self.A[2:, :2] = np.array([])
+        self.B[2:, :] = np.linalg.inv(M) @ np.eye(2, 2)
+        # self.B[2:, :] = np.array([[1, -7.7], [0, 24.5]])
+        self.A, self.B, _, _, dt = signal.cont2discrete((self.A, self.B, np.array([1, 1, 1, 1]), 0), self.env.envs[0].dt)
+        # self.max_t = self.env.get_attr("spec")[0].max_episode_steps // 2
+        self.max_t = 400
+        self.Q = np.diag([1.9139, 1.5872182, 2.0639979, 1.9540204])
+        self.R = np.diag([.01, .01])
+        self.gear = 100
 
 
 if __name__ == "__main__":

@@ -8,15 +8,14 @@ import torch as th
 from imitation.util import logger
 from scipy import io
 
-from gym_envs.envs import FaissDiscretizationInfo, DataBasedDiscretizationInfo
 from common.util import make_env
 from common.callbacks import SaveCallback
 from common.wrappers import *
-from algos.torch.MaxEntIRL import MaxEntIRL
-from algos.tabular.viter import *
+from algos.torch.MaxEntIRL import ContMaxEntIRL
+from IRL.src import *
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 
 def main(
@@ -32,14 +31,11 @@ def main(
         agent_cls,
         agent_kwargs,
         device,
-        callback_fn,
+        callback_fns,
 ):
-
-    logger.configure(log_dir, format_strs=["stdout", "tensorboard"])
-
     # Setup Learner
     agent = agent_cls(**agent_kwargs, device=device)
-    learner = MaxEntIRL(
+    learner = ContMaxEntIRL(
         env,
         eval_env=eval_env,
         feature_fn=feature_fn,
@@ -54,14 +50,14 @@ def main(
 
     # Run Learning
     learner.learn(
-        total_iter=6000,
+        total_iter=500,
         agent_learning_steps=0,
         n_episodes=len(expert_trajs),
         max_agent_iter=1,
         min_agent_iter=1,
         max_gradient_steps=1,
         min_gradient_steps=1,
-        callback=callback_fn,
+        callback_fns=callback_fns,
         early_stop=True,
     )
 
@@ -80,10 +76,10 @@ def main(
 
 
 if __name__ == "__main__":
-    env_type = "DiscretizedPendulum"
+    env_type = "HPC"
     algo_type = "MaxEntIRL"
     device = "cpu"
-    name = f"{env_type}"
+    name = f"{env_type}_custom"
 
     script_args = []
     proj_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -91,59 +87,36 @@ if __name__ == "__main__":
         bound_info = json.load(f)
 
     def feature_fn(x):
-        # x1, x2, a1 = th.split(x, 1, dim=-1)
-        # return th.cat([x, x1 * x2, x ** 2, x ** 3], dim=1)
-        # return x ** 2
-        # return th.cat([x, x**2, x**3, x**4], dim=1)
-        # x1, x2, a1, a2 = th.split(x, 1, dim=-1)
-        # out = x ** 2
-        # ob_sec, act_sec = 5, 2
-        # for i in range(1, ob_sec):
-        #     out = th.cat([out, (x1 - i / ob_sec) ** 2, (x2 - i / ob_sec) ** 2,#, (x3 - i /ob_sec) ** 2, (x4 - i / ob_sec) ** 2,
-        #                   (x1 + i / ob_sec) ** 2, (x2 + i / ob_sec) ** 2], dim=1)#, (x3 + i / ob_sec) ** 2, (x4 + i / ob_sec) ** 2], dim=1)
-        # for i in range(1, act_sec):
-        #     out = th.cat([out, (a1 - i / act_sec) ** 2, (a2 - i / act_sec) ** 2, (a1 + i / act_sec) ** 2, (a2 + i / act_sec) ** 2], dim=1)
-        # return out
-        # return x
-        return th.cat([x, x ** 2], dim=1)
-
-
+        t, dt, u = th.split(x, 2, 1)
+        prev_u = th.cat([th.zeros(1, 2), u], dim=0)
+        u_diff = u - prev_u[:-1]
+        return th.cat([t, dt, u, u_diff], dim=-1)
+        # return th.cat([x, x ** 2], dim=-1)
+    # [1, 5, 6, 7, 9, 10]
     for subj in [f"sub{i:02d}" for i in [5]]:
-        for actu in range(1, 2):
-            for trial in range(1, 5):
-                expt = f"databased_faiss_lqr/quadcost_20020_from_contlqr_many"
-                # expt = f"dot4_2_10/405_from_cont"
-                subpath = os.path.join(proj_path, "demos", "HPC", subj, subj)
+        for trial in range(1, 5):
+            for actu in range(3, 6):
+                expt = f"full/{subj}_{actu}"
+                subpath = os.path.join(proj_path, "demos", "HPC", subj + "_full", subj)
 
                 # Load data
                 expert_path = os.path.join(proj_path, "demos", env_type, f"{expt}.pkl")
                 with open(expert_path, "rb") as f:
                     expert_trajs = pickle.load(f)
                 bsp = io.loadmat(subpath + f"i1.mat")['bsp']
+                pltqs = []
                 init_states = []
                 for traj in expert_trajs:
+                    pltqs += [traj.pltq]
                     init_states += [traj.obs[0]]
-                with open(f"{proj_path}/demos/{env_type}/databased_lqr/obs_info_tree_200.pkl", "rb") as f:
-                    obs_info_tree = pickle.load(f)
-                with open(f"{proj_path}/demos/{env_type}/databased_lqr/acts_info_tree_20.pkl", "rb") as f:
-                    acts_info_tree = pickle.load(f)
-                perturbation = actu - 1
-                # max_states = bound_info[subj][perturbation]["max_states"]
-                # min_states = bound_info[subj][perturbation]["min_states"]
-                # max_torques = bound_info[subj][perturbation]["max_torques"]
-                # min_torques = bound_info[subj][perturbation]["min_torques"]
-                obs_info = FaissDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], obs_info_tree)
-                acts_info = FaissDiscretizationInfo([40], [-30], acts_info_tree)
 
                 # Define environments
-                env = make_env(f"{name}-v2", obs_info=obs_info, acts_info=acts_info)
-                eval_env = make_env(f"{name}-v2", obs_info=obs_info, acts_info=acts_info)#, init_states=init_states)
-                # env = make_env(f"{name}-v2")
-                # eval_env = make_env(f"{name}-v0", init_states=init_states)
+                env = make_env(f"{name}-v2", bsp=bsp, init_states=init_states, pltqs=pltqs)
+                eval_env = make_env(f"{name}-v0", bsp=bsp, init_states=init_states, pltqs=pltqs)
 
                 # Setup log directories
                 log_dir = os.path.join(proj_path, "tmp", "log", name, algo_type)
-                log_dir += f"/ext_01alpha_{expt}_{trial}"
+                log_dir += f"/xx_001alpha_{expt}_{trial}"
                 os.makedirs(log_dir, exist_ok=False)
                 shutil.copy(os.path.abspath(__file__), log_dir)
                 shutil.copy(expert_path, log_dir)
@@ -151,7 +124,7 @@ if __name__ == "__main__":
                 if not os.path.isdir(model_dir):
                     os.mkdir(model_dir)
 
-                save_net_callback = SaveCallback(cycle=500, dirpath=model_dir)
+                save_net_callback = SaveCallback(cycle=50, dirpath=model_dir)
 
                 kwargs = {
                     'log_dir': log_dir,
@@ -161,18 +134,19 @@ if __name__ == "__main__":
                     'expert_trajs': expert_trajs,
                     'use_action_as_input': True,
                     'rew_arch': [],
-                    'env_kwargs': {'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardInputNormalizeWrapper},
-                    'rew_kwargs': {'type': 'ann', 'scale': 1,
-                                   'optim_kwargs': {'weight_decay': 0.0, 'lr': 1e-1, 'betas': (0.9, 0.999)},
+                    'env_kwargs': {'vec_normalizer': None, 'num_envs': 1, 'reward_wrapper': RewardWrapper},
+                    'rew_kwargs': {'type': 'xx',
+                                   'optim_kwargs': {'weight_decay': 0.0, 'lr': 3e-2, 'betas': (0.9, 0.999)},
                                    # 'lr_scheduler_cls': th.optim.lr_scheduler.StepLR,
                                    # 'lr_scheduler_kwargs': {'step_size': 1, 'gamma': 0.95}
                                    },
-                    'agent_cls': FiniteSoftQiter,
-                    'agent_kwargs': {'env': env, 'gamma': 1, 'alpha': 0.01},
+                    'agent_cls': IDPDiffLQRPolicy,
+                    'agent_kwargs': {'env': env, 'gamma': 1, 'alpha': 0.001},
                     'device': device,
-                    'callback_fn': save_net_callback.rew_save,
+                    'callback_fns': [save_net_callback.rew_save],
                 }
                 script_args.append(kwargs)
 
     for kwargs in script_args:
+        logger.configure(kwargs['log_dir'], format_strs=["stdout", "tensorboard"])
         main(**kwargs)

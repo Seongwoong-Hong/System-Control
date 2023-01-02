@@ -45,8 +45,8 @@ def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):
                         i += 1
                     kwargs['pltqs'] = pltqs
                     kwargs['init_states'] = init_states
-            elif "Human" not in env_name:
-                kwargs.pop('bsp', None)
+            # elif "Human" not in env_name:
+            #     kwargs.pop('bsp', None)
             else:
                 kwargs.pop('subpath', None)
                 kwargs.pop('pltqs', None)

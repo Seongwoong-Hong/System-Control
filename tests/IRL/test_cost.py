@@ -24,16 +24,18 @@ def mapping(x: th.tensor):
     x_mid = (x_max + x_min) / 2
     return 2 * (x - x_mid) / (x_max - x_min)
 
+
 @pytest.mark.parametrize("trial", [1, 2, 3, 4])
 def test_weight_consistency(trial):
-    log_dir = f"{irl_path}/tmp/log/DiscretizedPendulum/MaxEntIRL/ext_01alpha_301201_101_lqr/quadcost_from_contlqr_{trial}/model"
+    log_dir = f"{irl_path}/tmp/log/IDP_custom/MaxEntIRL/sq_02alpha_uncropped_2/sub01_6_{trial}/model"
     with open(f"{log_dir}/reward_net.pkl", "rb") as f:
         weights = CPU_Unpickler(f).load().layers[-1].weight.detach()[0]
-    print("\n", weights)
+    print("\n", -np.square(weights))
     # print(weights[0]/0.4, weights[1]/2, weights[2]/10, weights[3]/0.16, weights[4]/4, weights[5]/100)
-    print(weights[0]/0.05, weights[1]/0.3, weights[2]/40 ,weights[3]/(0.05**2), weights[4]/(0.3**2), weights[5]/1600)
+    # print(weights[0]/0.05, weights[1]/0.3, weights[2]/40 ,weights[3]/(0.05**2), weights[4]/(0.3**2), weights[5]/1600)
     # print(weights[0]/0.05, weights[1]/0.2, weights[2]/0.3, weights[3]/0.4, weights[4]/60, weights[5]/50,
     #       weights[6]/(0.05**2), weights[7]/(0.2**2), weights[8]/(0.3**2), weights[9]/(0.4**2), weights[10]/3600, weights[11]/2500)
+
 
 @pytest.mark.parametrize("trial", [1, 2, 3, 4])
 def test_total_reward_fn_for_sqmany(trial):

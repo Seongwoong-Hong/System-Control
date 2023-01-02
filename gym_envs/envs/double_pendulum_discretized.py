@@ -17,7 +17,7 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
 
     def __init__(self, obs_info, acts_info):
         super(DiscretizedDoublePendulum, self).__init__(obs_info, acts_info)
-        self.dt = 0.025
+        self.dt = 0.005
         self.g = 9.81
         self.Is = [0.878121, 1.047289]
         self.ms = [17.2955, 34.5085]
@@ -46,8 +46,10 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
         )
 
     def reset(self):
-        high = np.array([*self.max_angles - 0.025, *self.max_speeds - 0.15])
-        low = np.array([*self.min_angles + 0.025, *self.min_speeds + 0.05])
+        # high = np.array([*self.max_angles - 0.025, *self.max_speeds - 0.15])
+        # low = np.array([*self.min_angles + 0.025, *self.min_speeds + 0.05])
+        high = np.array([0.025, 0.025, 0.15, 0.2])
+        low = np.array([-0.025, -0.15, -0.1, -0.25])
         self.state = self.np_random.uniform(low=low, high=high)
 
         return self._get_obs()
@@ -97,6 +99,7 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
         return r
 
     def get_next_state(self, state, action):
+        # 시계 반대 방향이 +
         th0, th1, thd0, thd1 = np.split(np.copy(state), (1, 2, 3), axis=-1)
         T0, T1 = action.T[..., None, None]
         g, (I0, I1), (m0, m1), (lc0, lc1), (l0, l1), dt = \
