@@ -1,13 +1,13 @@
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
-from gym.utils import seeding
 from matplotlib import cm
 from typing import List
 from scipy.sparse import csc_matrix
+from gym_envs.envs import BaseDiscEnv, UncorrDiscretizationInfo
 
 
-class TwoDWorldDisc(gym.Env):
+class TwoDWorldDisc(BaseDiscEnv):
     def __init__(self):
         self.height = 1.2
         self.width = 0.2
@@ -20,28 +20,12 @@ class TwoDWorldDisc(gym.Env):
         self.obs_high = np.array([self.width, self.height])
         self.acts_low = np.array([-8.0, -8.0])
         self.acts_high = np.array([8.0, 8.0])
-        self.obs_list = []
-        for high, low, n in zip(self.obs_high, self.obs_low, self.num_cells):
-            self.obs_list.append(np.linspace(low, high, n + 1))
-        self.acts_list = []
-        for high, low, n in zip(self.acts_high, self.acts_low, self.num_actions):
-            self.acts_list.append(np.linspace(low, high, n + 1))
-
+        obs_info = UncorrDiscretizationInfo(self.obs_high, self.obs_low, self.num_cells)
+        acts_info = UncorrDiscretizationInfo(self.acts_high, self.acts_low, self.num_actions)
+        super(TwoDWorldDisc, self).__init__(obs_info, acts_info)
         self.observation_space = gym.spaces.Box(low=self.obs_low, high=self.obs_high)
         self.action_space = gym.spaces.Box(low=self.acts_low, high=self.acts_high)
         self.seed()
-
-    @property
-    def disc_states(self):
-        return [(os[1:] + os[:-1]) / 2 for os in self.obs_list]
-
-    @property
-    def disc_actions(self):
-        return [(ts[1:] + ts[:-1]) / 2 for ts in self.acts_list]
-
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random()
-        return [seed]
 
     def step(self, action: np.ndarray):
         assert self.st is not None, "Can't step the environment before calling reset function"
@@ -74,58 +58,8 @@ class TwoDWorldDisc(gym.Env):
     def _get_obs(self):
         return self.st
 
-    def get_num_cells(self):
-        return self.num_cells
-
-    def get_vectorized(self):
-        s_vec = np.stack(np.meshgrid(*self.disc_states,
-                                     indexing='ij'),
-                         -1).reshape(-1, 2)
-        a_vec = np.stack(np.meshgrid(*self.disc_actions,
-                                     indexing='ij'),
-                         -1).reshape(-1, 2)
-
-        return s_vec, a_vec
-
     def get_init_vector(self):
         return self.get_vectorized()
-
-    def get_idx_from_obs(self, obs: np.ndarray):
-        if len(obs.shape) == 1:
-            obs = obs[None, :]
-        assert (np.max(obs, axis=0) <= self.obs_high + 1e-6).all() or (np.min(obs, axis=0) >= self.obs_low - 1e-6).all()
-        dims = self.get_num_cells()
-        idx = []
-        for i, whole_candi in enumerate(self.obs_list):
-            idx.append((obs[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
-        tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
-        return tot_idx.flatten()
-
-    def get_obs_from_idx(self, idx: np.ndarray):
-        assert len(idx.shape) == 1
-        s_vec = np.stack(np.meshgrid(*self.disc_states,
-                                     indexing='ij'),
-                         -1).reshape(-1, 2)
-        return s_vec[idx]
-
-    def get_idx_from_acts(self, acts: np.ndarray):
-        if len(acts.shape) == 1:
-            acts = acts[None, :]
-        assert (np.max(acts, axis=0) <= self.acts_high + 1e-6).all() or (np.min(acts, axis=0) >= self.acts_low - 1e-6).all()
-        dims = np.array(self.num_actions)
-        idx = []
-        for i, whole_candi in enumerate(self.acts_list):
-            idx.append((acts[:, [i]] - whole_candi[:-1] >= 0).sum(axis=-1) - 1)
-        tot_idx = np.ravel_multi_index(np.array(idx), dims, order='C')
-
-        return tot_idx.flatten()
-
-    def get_acts_from_idx(self, idx: np.ndarray):
-        assert len(idx.shape) == 1
-        a_vec = np.stack(np.meshgrid(*self.disc_actions,
-                                     indexing='ij'),
-                         -1).reshape(-1, 2)
-        return a_vec[idx]
 
     def get_trans_mat(self):
         s_vec, a_vec = self.get_vectorized()

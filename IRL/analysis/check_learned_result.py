@@ -1,62 +1,70 @@
 import os
 import time
 import pickle
+import torch as th
 
 from matplotlib import pyplot as plt
-from imitation.data.rollout import flatten_trajectories, types
-from scipy import io
+from matplotlib import gridspec
+from imitation.data.rollout import flatten_trajectories, make_sample_until, types
+from scipy import io, signal
 
 from algos.tabular.viter import FiniteSoftQiter
 from common.util import make_env, CPU_Unpickler
+from common.rollouts import generate_trajectories_without_shuffle
 from common.wrappers import *
+from IRL.src import *
 
 irl_path = os.path.abspath("..")
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
-def compare_obs(subj="sub01", actuation=1, learned_trial=1):
-    rendering = False
-    plotting = True
-
+def draw_trajs(subj="sub01", actuation=1, learned_trial=1):
     def feature_fn(x):
-        # return x
-        return x ** 2
-        # return th.cat([x, x ** 2], dim=1)
+        t, dt, u = th.split(x, 2, 1)
+        prev_u = th.cat([th.zeros(1, 2), u], dim=0)
+        u_diff = u - prev_u[:-1]
+        return th.cat([t, dt, u, u_diff], dim=-1)
+        # return x ** 2
+        # return th.cat([x ** 2, x ** 4], dim=-1)
 
-    env_type = "DiscretizedHuman"
-    name = f"{env_type}"
-    expt = f"19191919/{subj}_{actuation}"
+    env_type = "HPC"
+    name = f"{env_type}_custom"
+    expt = f"full/{subj}_{actuation}"
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
     with open(f"{irl_path}/demos/{env_type}/{expt}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
+    pltqs = []
     for traj in expert_trajs:
+        pltqs.append(traj.pltq)
         init_states.append(traj.obs[0])
 
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_handnorm_{expt}_{learned_trial}/model"
+    load_dir = f"{irl_path}/tmp/log/{name}/MaxEntIRL/xx_001alpha_{expt}_{learned_trial}/model/150"
     with open(load_dir + "/reward_net.pkl", "rb") as f:
-        reward_fn = CPU_Unpickler(f).load().to('cuda')
+        reward_fn = CPU_Unpickler(f).load().to('cpu')
     reward_fn.feature_fn = feature_fn
-    # env = make_env(f"{name}-v2", num_envs=1, wrapper=RewardWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    env = make_env(f"{name}-v2", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp,
-                   wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    d_env = make_env(env, num_envs=1, wrapper=DiscretizeWrapper)
+    # reward_fn.len_act_w = 1
+    venv = make_env(f"{name}-v2", num_envs=1, bsp=bsp, init_states=init_states, pltqs=pltqs,
+                    wrapper=RewardWrapper, wrapper_kwargs={'rwfn': reward_fn.eval()})
 
-    agent = FiniteSoftQiter(d_env, gamma=1., alpha=0.001, device='cuda', verbose=False)
+    agent = IDPDiffLQRPolicy(venv, gamma=1., alpha=0.001, device='cpu', verbose=False)
     agent.learn(0)
+    print(reward_fn.reward_layer.weight.square())
+    eval_venv = make_env(f"{name}-v0", num_envs=1, bsp=bsp, init_states=init_states, pltqs=pltqs)
 
-    eval_env = make_env(f"{name}-v0", N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, init_states=init_states,
-                        wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    # eval_env = make_env(f"{name}-v0", num_envs=1, init_states=init_states)
-
+    # for finite src
     agent_trajs = []
     for init_state in init_states:
         # traj = DiscEnvTrajectories()
         obs, acts, rews = agent.predict(init_state, deterministic=True)
-        data_dict = {'obs': obs, 'acts': acts, 'rews': rews.flatten(), 'infos': None}
-        traj = types.TrajectoryWithRew(**data_dict)
+        data_dict = {'obs': obs, 'acts': acts, 'infos': None}
+        traj = types.Trajectory(**data_dict)
         agent_trajs.append(traj)
+
+    # for infinite src
+    # sample_until = make_sample_until(n_timesteps=None, n_episodes=len(init_states))
+    # agent_trajs = generate_trajectories_without_shuffle(agent, eval_venv, sample_until, deterministic_policy=True)
 
     expt_obs = flatten_trajectories(expert_trajs).obs
     expt_acts = flatten_trajectories(expert_trajs).acts
@@ -67,115 +75,101 @@ def compare_obs(subj="sub01", actuation=1, learned_trial=1):
     print(f"Mean acts difference ({subj}_{actuation}): {np.abs(expt_acts - agent_acts).mean(axis=0)}")
 
     if plotting:
-        x_value = range(1, 51)
-        obs_fig = plt.figure(figsize=[27, 18], dpi=100.0)
-        acts_fig = plt.figure(figsize=[27, 9], dpi=100.0)
+        t = np.arange(0, 360) * venv.get_attr("dt")
         for ob_idx in range(4):
-            ax = obs_fig.add_subplot(2, 2, ob_idx + 1)
+            ax = fig.add_subplot(inner_grid[ob_idx])
             for traj_idx in range(len(expert_trajs)):
-                ax.plot(x_value, expert_trajs[traj_idx].obs[:-1, ob_idx], color='b')
-                ax.plot(x_value, agent_trajs[traj_idx].obs[:-1, ob_idx], color='k')
-            ax.legend(['expert', 'agent'], fontsize=28)
-            ax.tick_params(axis='both', which='major', labelsize=24)
+                ax.plot(t, expert_trajs[traj_idx].obs[:-1, ob_idx], color='b')
+                ax.plot(t, agent_trajs[traj_idx].obs[:-1, ob_idx], color='k')
+            if ob_idx == 3:
+                ax.legend(['human', 'controller'], fontsize=11)
+            ax.tick_params(axis='both', which='major', labelsize=11)
         for act_idx in range(2):
-            ax = acts_fig.add_subplot(1, 2, act_idx + 1)
+            ax = fig.add_subplot(inner_grid[act_idx + 4])
             for traj_idx in range(len(expert_trajs)):
-                ax.plot(x_value, expert_trajs[traj_idx].acts[:, act_idx], color='b')
-                ax.plot(x_value, agent_trajs[traj_idx].acts[:, act_idx], color='k')
-            ax.legend(['expert', 'agent'], fontsize=28)
-            ax.tick_params(axis='both', which='major', labelsize=24)
-        obs_fig.tight_layout()
-        acts_fig.tight_layout()
-        plt.show()
-
+                ax.plot(t, expert_trajs[traj_idx].acts[:, act_idx] * 300, color='b')
+                ax.plot(t, agent_trajs[traj_idx].acts[:, act_idx] * 300, color='k')
+            ax.tick_params(axis='both', which='major', labelsize=11)
+    # fig.axes[1].set_ylim([-0.02, 0.03])
+    # fig.axes[2].set_ylim([-0.1, 0.2])
+    # fig.axes[3].set_ylim([-40, 40])
     if rendering:
         for i in range(len(expert_trajs)):
             done = False
-            obs = eval_env.reset()
+            obs = eval_venv.reset()
             while not done:
                 act, _ = agent.predict(obs, deterministic=False)
-                obs, rew, done, _ = eval_env.step(act)
-                eval_env.render()
-                time.sleep(eval_env.get_attr("dt")[0])
-        eval_env.close()
+                obs, rew, done, _ = eval_venv.step(act)
+                eval_venv.render()
+                time.sleep(eval_venv.get_attr("dt")[0])
+        eval_venv.close()
 
 
-def compare_handtune_result_and_irl_result(subj="sub06", actuation=1, learned_trial=1):
+def compare_x1_vs_x2(subj, actuation, learned_trial):
     def feature_fn(x):
         return x ** 2
 
-    plotting = True
-
-    env_type = "DiscretizedHuman"
-    name = f"{env_type}"
-    expt = f"17171719_quadcost/{subj}_{actuation}"
+    env_type = "HPC"
+    name = f"{env_type}_custom"
+    expt = f"uncropped/{subj}_{actuation}"
     bsp = io.loadmat(os.path.join(irl_path, "demos", "HPC", subj, subj + "i1.mat"))['bsp']
 
-    load_dir = f"{irl_path}/tmp/log/{env_type}/MaxEntIRL/sq_handnorm_finite_{expt}_{learned_trial}"
+    load_dir = f"{irl_path}/tmp/log/{name}/MaxEntIRL/sq_001alpha_{expt}_{learned_trial}"
     with open(f"{load_dir}/{subj}_{actuation}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
+
+    pltqs = []
     init_states = []
     for traj in expert_trajs:
         init_states.append(traj.obs[0])
+        pltqs.append(traj.pltq)
+
     with open(load_dir + "/model/reward_net.pkl", "rb") as f:
         reward_fn = CPU_Unpickler(f).load()
-    state_dict = reward_fn.state_dict()
-    state_dict['layers.0.weight'] = state_dict['layers.0.weight']
-    reward_fn.load_state_dict(state_dict)
     reward_fn.feature_fn = feature_fn
-    reward_fn.to('cuda:3')
+    reward_fn.len_act_w = 2
 
-    irl_env = make_env(f"{name}-v2", N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp,
-                       wrapper=RewardInputNormalizeWrapper, wrapper_kwrags={'rwfn': reward_fn.eval()})
-    irl_env = make_env(irl_env, num_envs=1, wrapper=DiscretizeWrapper)
-    irl_agent = FiniteSoftQiter(irl_env, gamma=1, alpha=0.01, device='cuda:3', verbose=False)
-    irl_agent.learn(0)
+    venv = make_env(f"{name}-v0", bsp=bsp, init_states=init_states, pltqs=pltqs, num_envs=1,
+                    wrapper=RewardWrapper, wrapper_kwargs={'rwfn': reward_fn.eval()})
+    agent = IDPLQRPolicy(venv, gamma=1, alpha=0.001)
 
-    hand_env = make_env(f"{name}-v2", num_envs=1, wrapper=DiscretizeWrapper, N=[17, 17, 17, 19], NT=[11, 11], bsp=bsp)
-    hand_agent = FiniteSoftQiter(hand_env, gamma=1, alpha=0.001, device='cuda:2', verbose=False)
-    hand_agent.learn(0)
-
-    irl_obs, irl_acts = [], []
-    hand_obs, hand_acts = [], []
-    for init_state in init_states:
-        init_state = irl_env.reset()
-        i_ob, i_act, i_rew = irl_agent.predict(init_state, deterministic=False)
-        h_ob, h_act, h_rew = hand_agent.predict(init_state, deterministic=False)
-        irl_obs.append(i_ob)
-        irl_acts.append(i_act)
-        hand_obs.append(h_ob)
-        hand_acts.append(h_act)
-
-    irl_reward_mat = irl_env.env_method("get_reward_mat")[0].cpu()
-    hand_reward_mat = hand_env.env_method("get_reward_mat")[0]
-    print(f"Mean reward difference: {np.abs(irl_reward_mat - hand_reward_mat).mean()}")
-    print(f"Mean & std of reward: {irl_reward_mat.mean()}, {irl_reward_mat.std()}")
-    print(f"Mean obs difference ({subj}_{actuation}): {np.abs(np.vstack(irl_obs) - np.vstack(hand_obs)).mean(axis=0)}")
-    print(f"Mean acts difference ({subj}_{actuation}): {np.abs(np.vstack(irl_acts) - np.vstack(hand_acts)).mean(axis=0)}\n")
+    sample_until = make_sample_until(n_timesteps=None, n_episodes=len(expert_trajs))
+    agent_trajs = generate_trajectories_without_shuffle(
+        agent, venv, sample_until, deterministic_policy=True,
+    )
 
     if plotting:
-        x_value = range(1, 51)
-        obs_fig = plt.figure(figsize=[18, 12], dpi=150.0)
-        acts_fig = plt.figure(figsize=[18, 6], dpi=150.0)
-        for ob_idx in range(4):
-            ax = obs_fig.add_subplot(2, 2, ob_idx + 1)
-            for traj_idx in range(len(expert_trajs)):
-                ax.plot(x_value, hand_obs[traj_idx][:-1, ob_idx], color='k')
-                ax.plot(x_value, irl_obs[traj_idx][:-1, ob_idx], color='b')
-            ax.legend(['hand', 'learned'], fontsize=20)
-        for act_idx in range(2):
-            ax = acts_fig.add_subplot(1, 2, act_idx + 1)
-            for traj_idx in range(len(expert_trajs)):
-                ax.plot(x_value, hand_acts[traj_idx][:, act_idx], color='k')
-                ax.plot(x_value, irl_acts[traj_idx][:, act_idx], color='b')
-            ax.legend(['hand', 'learned'], fontsize=20)
-        obs_fig.tight_layout()
-        acts_fig.tight_layout()
-        plt.show()
+        ax1 = fig.add_subplot(inner_grid[0])
+        ax2 = fig.add_subplot(inner_grid[1])
+        for traj in expert_trajs:
+            ax1.plot(traj.obs[:, 0], traj.obs[:, 1])
+        for traj in agent_trajs:
+            ax2.plot(traj.obs[:, 0], traj.obs[:, 1])
 
 
 if __name__ == "__main__":
-    for subj in [f"sub{i:02d}" for i in [6]]:
-        for actuation in range(1, 2):
+    rendering = False
+    plotting = True
+    save_figs = False
+    figs = []
+    for subj in [f"sub{i:02d}" for i in [5]]:
+        fig = plt.figure(figsize=[7.35, 7.25])
+        outer_grid = gridspec.GridSpec(1, 1, wspace=0.3, hspace=0.2)
+        outer_grid_idx = 0
+        for actuation in range(3, 4):
             for learn_trial in range(1, 2):
-                compare_obs(subj, actuation, learn_trial)
+                ax_outer = fig.add_subplot(outer_grid[outer_grid_idx])
+                # ax_outer.set_title(f"{subj}_{actuation}_{learn_trial}", fontsize=24)
+                ax_outer.tick_params(axis='both', which='both', labelbottom=False, labelleft=False, bottom=False, left=False)
+                ax_outer.axis('off')
+                inner_grid = gridspec.GridSpecFromSubplotSpec(3, 2, subplot_spec=outer_grid[outer_grid_idx], wspace=0.2, hspace=0.2)
+                draw_trajs(subj, actuation, learn_trial)
+                outer_grid_idx += 1
+        fig.subplots_adjust(left=0.08, bottom=0.05, right=0.99, top=0.98)
+        if save_figs:
+            fig_name = f"figures/HPC_custom/MaxEntIRL/sq_005alpha_afpert/sub05_trajs_1_1.png"
+            os.makedirs(os.path.dirname(fig_name), exist_ok=True)
+            fig.savefig(fig_name)
+        figs.append(fig)
+    if plotting:
+        plt.show()

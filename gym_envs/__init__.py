@@ -23,6 +23,12 @@ register(
 )
 
 register(
+    id='DiscretizedPendulum-v1',
+    entry_point='gym_envs.envs:DiscretizedPendulumV1',
+    max_episode_steps=50,
+)
+
+register(
     id='DiscretizedPendulum-v0',
     entry_point='gym_envs.envs:DiscretizedPendulumDet',
     max_episode_steps=50,
@@ -67,7 +73,7 @@ register(
 register(
     id="2DWorld-v0",
     entry_point='gym_envs.envs:TwoDWorldDetOrder',
-    max_episode_steps=100,
+    max_episode_steps=1000,
 )
 
 register(
@@ -155,17 +161,9 @@ register(
 )
 
 # environments based on mujoco
-# expert: v0, agent: v1
-# v2 environment is not used yet
 register(
     id='IP_custom-v0',
-    entry_point='gym_envs.envs.mujoco:IPCustomExp',
-    max_episode_steps=50,
-)
-
-register(
-    id='IP_custom-v1',
-    entry_point='gym_envs.envs.mujoco:IPCustom',
+    entry_point='gym_envs.envs.mujoco:IPCustomDet',
     max_episode_steps=50,
 )
 
@@ -178,31 +176,49 @@ register(
 
 register(
     id='IDP_custom-v0',
+    entry_point='gym_envs.envs.mujoco:IDPCustomDet',
+    max_episode_steps=360,
+)
+
+register(
+    id='IDP_custom-v1',
     entry_point='gym_envs.envs.mujoco:IDPCustomExp',
-    max_episode_steps=50,
+    max_episode_steps=360,
 )
 
 register(
     id='IDP_custom-v2',
     entry_point='gym_envs.envs.mujoco:IDPCustom',
-    max_episode_steps=50,
+    max_episode_steps=360,
 )
 
 register(
     id='HPC_custom-v0',
-    entry_point='gym_envs.envs.mujoco:IDPHumanExp',
-    max_episode_steps=50,
+    entry_point='gym_envs.envs.mujoco:IDPHumanDet',
+    max_episode_steps=360,
 )
 
 register(
     id='HPC_custom-v2',
     entry_point='gym_envs.envs.mujoco:IDPHuman',
-    max_episode_steps=50,
+    max_episode_steps=360,
+)
+
+register(
+    id='IP_HPC-v0',
+    entry_point='gym_envs.envs.mujoco:IPHumanDet',
+    max_episode_steps=360,
+)
+
+register(
+    id='IP_HPC-v2',
+    entry_point='gym_envs.envs.mujoco:IPHuman',
+    max_episode_steps=360,
 )
 
 register(
     id="HPC_crop-v0",
-    entry_point='gym_envs.envs.mujoco:IDPHumanExp',
+    entry_point='gym_envs.envs.mujoco:IDPHumanDet',
     max_episode_steps=300,
 )
 

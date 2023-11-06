@@ -12,34 +12,6 @@ from common.util import make_env
 from algos.torch.MaxEntIRL import MaxEntIRL
 
 
-@pytest.fixture
-def irl_path():
-    return os.path.abspath("../../IRL")
-
-
-@pytest.fixture
-def pltqs(irl_path):
-    pltqs = []
-    for i in range(35):
-        file = f"{irl_path}/demos/HPC/sub01/sub01" + f"i{i + 1}.mat"
-        pltqs += [io.loadmat(file)['pltq']]
-    return pltqs
-
-
-@pytest.fixture
-def expert(irl_path):
-    expert_dir = os.path.join(irl_path, "demos", "2DWorld", "sac.pkl")
-    with open(expert_dir, "rb") as f:
-        expert_trajs = pickle.load(f)
-    return rollout.flatten_trajectories(expert_trajs)
-
-
-@pytest.fixture
-def env(irl_path):
-    subpath = os.path.join(irl_path, "demos", "HPC", "sub01", "sub01")
-    return make_env("2DWorld-v0", use_vec_env=False, num_envs=1, subpath=subpath)
-
-
 def test_learn(env, expert, policy_type="sac"):
     policy_kwargs = None
     if policy_type == "ppo":

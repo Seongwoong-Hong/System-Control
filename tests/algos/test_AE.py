@@ -9,12 +9,6 @@ from algos.torch.AE import VAE
 
 from imitation.data import rollout
 
-
-@pytest.fixture()
-def irl_path():
-    return os.path.abspath(os.path.join("..", "..", "IRL"))
-
-
 def test_AE(irl_path):
     expert_dir = os.path.join(irl_path, "demos", "HPC", "sub01.pkl")
     with open(expert_dir, "rb") as f:

@@ -24,16 +24,18 @@ def mapping(x: th.tensor):
     x_mid = (x_max + x_min) / 2
     return 2 * (x - x_mid) / (x_max - x_min)
 
+
 @pytest.mark.parametrize("trial", [1, 2, 3, 4])
 def test_weight_consistency(trial):
-    log_dir = f"{irl_path}/tmp/log/DiscretizedPendulum/MaxEntIRL/ext_01alpha_3939_51_lqr/quadcost_from_contlqr_{trial}/model"
+    log_dir = f"{irl_path}/tmp/log/IDP_custom/MaxEntIRL/sq_02alpha_uncropped_2/sub01_6_{trial}/model"
     with open(f"{log_dir}/reward_net.pkl", "rb") as f:
         weights = CPU_Unpickler(f).load().layers[-1].weight.detach()[0]
-    print("\n", weights)
+    print("\n", -np.square(weights))
     # print(weights[0]/0.4, weights[1]/2, weights[2]/10, weights[3]/0.16, weights[4]/4, weights[5]/100)
-    print(weights[0]/0.05, weights[1]/0.3, weights[2]/40 ,weights[3]/(0.05**2), weights[4]/(0.3**2), weights[5]/1600)
-    # print(weights[0]/0.05, weights[1]/0.2, weights[2]/0.3, weights[3]/0.4, weights[4]/40, weights[5]/30,
-    #       weights[6]/(0.05**2), weights[7]/(0.2**2), weights[8]/(0.3**2), weights[9]/(0.4**2), weights[10]/1600, weights[11]/900)
+    # print(weights[0]/0.05, weights[1]/0.3, weights[2]/40 ,weights[3]/(0.05**2), weights[4]/(0.3**2), weights[5]/1600)
+    # print(weights[0]/0.05, weights[1]/0.2, weights[2]/0.3, weights[3]/0.4, weights[4]/60, weights[5]/50,
+    #       weights[6]/(0.05**2), weights[7]/(0.2**2), weights[8]/(0.3**2), weights[9]/(0.4**2), weights[10]/3600, weights[11]/2500)
+
 
 @pytest.mark.parametrize("trial", [1, 2, 3, 4])
 def test_total_reward_fn_for_sqmany(trial):
@@ -121,16 +123,21 @@ class IDPLQRPolicy(LQRPolicy):
         self.gear = 100
 
 def test_reward_calculation():
-    from imitation.data import types
-    with open("../../IRL/demos/DiscretizedPendulum/quadcost_lqr_many.pkl", "rb") as f:
+    from gym_envs.envs import DataBasedDiscretizationInfo
+    with open("../../IRL/demos/DiscretizedDoublePendulum/quadcost_lqr.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
     for traj in expert_trajs:
         init_states += [traj.obs[0]]
-    bsp = io.loadmat("../../IRL/demos/HPC/sub05/sub05i1.mat")['bsp']
-    env = make_env("DiscretizedPendulum-v2", N=[39, 39], NT=[51])
-    with open("../../IRL/demos/DiscretizedPendulum/3939_51_softqiter/quadcost_det.pkl", "rb") as f:
+    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_softqiter/quadcost_500020.pkl", "rb") as f:
         agent_trajs = pickle.load(f)
+    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_5000.pkl", "rb") as f:
+        obs_info_tree = pickle.load(f)
+    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/acts_info_tree_20.pkl", "rb") as f:
+        acts_info_tree = pickle.load(f)
+    obs_info = DataBasedDiscretizationInfo([0.05, 0.05, 0.3, 0.35], [-0.05, -0.2, -0.08, -0.4], obs_info_tree)
+    acts_info = DataBasedDiscretizationInfo([60., 50.], [-60., -20., ], acts_info_tree)
+    env = make_env("DiscretizedDoublePendulum-v2", obs_info=obs_info, acts_info=acts_info)
     r_e, r_a = [], []
     for i in range(len(init_states)):
         r_e.append(env.get_reward(expert_trajs[i].obs[:-1], expert_trajs[i].acts).sum())

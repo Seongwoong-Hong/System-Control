@@ -1,12 +1,11 @@
-from os import path
-
 import gym
 import numpy as np
+from os import path
 from copy import deepcopy
 from scipy.sparse import csc_matrix
 
+from gym_envs.envs import BaseDiscEnv
 from gym_envs.envs.utils import calc_trans_mat_error, angle_normalize
-from gym_envs.envs import BaseDiscEnv, UncorrDiscreteInfo
 
 
 class DiscretizedDoublePendulum(BaseDiscEnv):
@@ -16,20 +15,20 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
     """
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 30}
 
-    def __init__(self, N=None, NT=np.array([11, 11])):
-        super(DiscretizedDoublePendulum, self).__init__()
-        self.dt = 0.025
+    def __init__(self, obs_info, acts_info):
+        super(DiscretizedDoublePendulum, self).__init__(obs_info, acts_info)
+        self.dt = 0.005
         self.g = 9.81
-        self.Is = [0.1, 0.1]
-        self.ms = [1., 1.]
-        self.lcs = [0.5, 0.5]
-        self.ls = [1., 1.]
+        self.Is = [0.878121, 1.047289]
+        self.ms = [17.2955, 34.5085]
+        self.lcs = [0.5084, 0.2814]
+        self.ls = [.790, 1.]
         # self.Q = np.diag([3.1139, 1.2872182, 0.14639979, 0.04540204])
         # self.Q = np.diag([3.5139, 1.2872182, 0.14639979, 0.10540204])
-        self.Q = np.diag([3.5139, 0.2872182, 0.24639979, 0.01540204])
+        self.Q = np.diag([3.5139, 0.7872182, 0.14639979, 0.07540204])
         # self.Q = np.diag([1.5139, 1.0872182, 0.7639979, 0.4540204])
         # self.R = np.diag([0.02537065, 0.01358577])
-        self.R = np.diag([0.02537065*2500/1600, 0.01358577*(65**2)/900])
+        self.R = np.diag([0.02537065, 0.01358577])
 
         self.max_angles = None
         self.max_speeds = None
@@ -39,29 +38,18 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
         self.state = None
         self.viewer = None
         self.last_a = None
-        if N is int:
-            assert N % 2, "N should be a odd number"
-            N = N * np.ones(4, dtype=int)
-        else:
-            N = np.array(N)
-            assert N is not None, "The number of discretization should be defined"
-            assert (N % 2).all(), "N should be consist of odd numbers"
-        self.num_cells = N
-        self.num_actions = NT
-        self.obs_info = UncorrDiscreteInfo(self.num_cells)
-        self.acts_info = UncorrDiscreteInfo(self.num_actions)
         self.set_bounds(
-            max_states=[0.05, 0.05, 0.3, 0.35],
-            min_states=[-0.05, -0.2, -0.08, -0.4],
-            # max_torques=[40., 30.],
-            max_torques=[50., 65.],
-            # min_torques=[-20., -10.,],
-            min_torques=[-30., -10.,],
+            max_states=obs_info.high,
+            min_states=obs_info.low,
+            max_torques=acts_info.high,
+            min_torques=acts_info.low,
         )
 
     def reset(self):
-        high = np.array([*self.max_angles, *self.max_speeds])
-        low = np.array([*self.min_angles, *self.min_speeds])
+        # high = np.array([*self.max_angles - 0.025, *self.max_speeds - 0.15])
+        # low = np.array([*self.min_angles + 0.025, *self.min_speeds + 0.05])
+        high = np.array([0.025, 0.025, 0.15, 0.2])
+        low = np.array([-0.025, -0.15, -0.1, -0.25])
         self.state = self.np_random.uniform(low=low, high=high)
 
         return self._get_obs()
@@ -111,6 +99,7 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
         return r
 
     def get_next_state(self, state, action):
+        # 시계 반대 방향이 +
         th0, th1, thd0, thd1 = np.split(np.copy(state), (1, 2, 3), axis=-1)
         T0, T1 = action.T[..., None, None]
         g, (I0, I1), (m0, m1), (lc0, lc1), (l0, l1), dt = \
@@ -169,16 +158,16 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
         state_backup = deepcopy(state)
         if len(state.shape) == 1:
             state = state[None, :]
-        dims = self.num_cells
+        tot_dims = self.obs_info.num_cells
         tot_idx = self.get_idx_from_obs(state)
 
         if state_backup.ndim == 1:
-            ind_vec = np.zeros(np.prod(dims)).astype('i')
+            ind_vec = np.zeros(tot_dims).astype('i')
             ind_vec[tot_idx] = 1
         else:
             batch_size = state.shape[0]
             ind_vec = csc_matrix((np.ones(batch_size), (np.arange(batch_size), tot_idx)),
-                                 shape=[batch_size, np.prod(dims)])
+                                 shape=[batch_size, tot_dims])
 
         return ind_vec
 
@@ -275,8 +264,8 @@ class DiscretizedDoublePendulum(BaseDiscEnv):
 
 
 class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
-    def __init__(self, N=None, init_states=None, NT=np.array([11, 11])):
-        super(DiscretizedDoublePendulumDet, self).__init__(N=N, NT=NT)
+    def __init__(self, obs_info, acts_info, init_states=None):
+        super(DiscretizedDoublePendulumDet, self).__init__(obs_info, acts_info)
         self._init_states = init_states
         self.n = 0
 
@@ -301,8 +290,8 @@ class DiscretizedDoublePendulumDet(DiscretizedDoublePendulum):
 
 
 class DiscretizedHuman(DiscretizedDoublePendulum):
-    def __init__(self, bsp=None, N=None, NT=np.array([19, 19])):
-        super(DiscretizedHuman, self).__init__(N=N, NT=NT)
+    def __init__(self, obs_info, acts_info, bsp=None):
+        super(DiscretizedHuman, self).__init__(obs_info, acts_info)
         if bsp is not None:
             m_u, l_u, com_u, I_u = bsp[6, :]
             m_s, l_s, com_s, I_s = bsp[2, :]
@@ -318,8 +307,8 @@ class DiscretizedHuman(DiscretizedDoublePendulum):
 
 
 class DiscretizedHumanDet(DiscretizedDoublePendulumDet):
-    def __init__(self, bsp=None, N=None, init_states=None, NT=np.array([19, 19])):
-        super(DiscretizedHumanDet, self).__init__(N=N, init_states=init_states, NT=NT)
+    def __init__(self, obs_info, acts_info, init_states=None, bsp=None):
+        super(DiscretizedHumanDet, self).__init__(obs_info, acts_info, init_states=init_states)
         if bsp is not None:
             m_u, l_u, com_u, I_u = bsp[6, :]
             m_s, l_s, com_s, I_s = bsp[2, :]

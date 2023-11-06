@@ -87,18 +87,12 @@ class RewardInputNormalizeWrapper(RewardWrapper):
 class ActionNormalizeRewardWrapper(RewardWrapper):
     def __init__(self, env, rwfn):
         super(ActionNormalizeRewardWrapper, self).__init__(env, rwfn)
-        self.coeff = 1 / self.env.max_torques
+        self.coeff = 100
 
     def reward(self, inp: np.ndarray) -> torch.tensor:
         if self.use_action_as_inp:
             n_acts = self.action_space.shape[0]
-            if isinstance(self.action_space, gym.spaces.MultiDiscrete):
-                high = (self.action_space.nvec[None, :] - 1)
-            elif isinstance(self.observation_space, gym.spaces.Box):
-                high = self.action_space.high[None, :]
-            else:
-                raise NotImplementedError
-            inp[:, -n_acts:] = inp[:, -n_acts:] / high
+            inp[:, -n_acts:] = inp[:, -n_acts:] / self.coeff
         return super().reward(inp)
 
 
