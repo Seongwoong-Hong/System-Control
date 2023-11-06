@@ -13,7 +13,7 @@ if __name__ == "__main__":
     env_type = "IDP"
     algo_type = "ppo"
     name = f"{env_type}_custom"
-    device = "cuda:3"
+    device = "cpu"
     env_id = f"{name}-v2"
     subj = "sub05"
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "IRL"))

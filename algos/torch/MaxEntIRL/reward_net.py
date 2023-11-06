@@ -127,41 +127,41 @@ class CNNRewardNet(RewardNet):
 class QuadraticRewardNet(RewardNet):
     def _build(self):
         self.len_act_w = 2
-        self._arch[0] -= 1
+        self._arch[0] -= self.len_act_w
         feature_layers = []
         for i in range(len(self._arch) - 1):
             feature_layers.append(nn.Linear(self._arch[i], self._arch[i + 1]))
             if self.act_fnc is not None:
                 feature_layers.append(self.act_fnc())
         self.feature_layers = nn.Sequential(*feature_layers)
-        self.reward_layer = nn.Linear(in_features=self._arch[-1] + 1, out_features=1, bias=False)
+        self.reward_layer = nn.Linear(in_features=self._arch[-1] + self.len_act_w, out_features=1, bias=False)
         self.optimizer = self.optim_cls(self.parameters(), **self.optim_kwargs)
         if self.lr_scheduler_cls:
             self.lr_scheduler = self.lr_scheduler_cls(self.optimizer, **self.lr_scheduler_kwargs)
         self.to(self._device)
 
     def forward(self, x: th.Tensor) -> th.Tensor:
-        u = self.feature_fn(x[:, -1:])
-        x_f = self.feature_layers(self.feature_fn(x[:, :-1]))
+        x_f = self.feature_layers(self.feature_fn(x[:, :-self.len_act_w]))
+        u_f = self.feature_fn(x[:, -self.len_act_w:])
         if self.trainmode:
             return -(th.sum(x_f * self.reward_layer.weight[:, :-self.len_act_w].square(), dim=-1)
-                     + th.sum(u * self.reward_layer.weight[:, -self.len_act_w:].square(), dim=-1))
+                     + th.sum(u_f * self.reward_layer.weight[:, -self.len_act_w:].square(), dim=-1))
         else:
             with th.no_grad():
                 return -(th.sum(x_f * self.reward_layer.weight[:, :-self.len_act_w].square(), dim=-1)
-                         + th.sum(u * self.reward_layer.weight[:, -self.len_act_w:].square(), dim=-1))
+                         + th.sum(u_f * self.reward_layer.weight[:, -self.len_act_w:].square(), dim=-1))
 
 
 class XXRewardNet(QuadraticRewardNet):
     def forward(self, x: th.Tensor) -> th.Tensor:
-        x_f, u = th.split(self.feature_fn(x), 4, dim=1)
+        x_f, u_f = th.split(self.feature_fn(x), 4, dim=1)
         if self.trainmode:
             return -(th.sum(x_f * self.reward_layer.weight[:, :-2*self.len_act_w].square(), dim=-1)
-                     + th.sum(u * self.reward_layer.weight[:, -2*self.len_act_w:].square(), dim=-1))
+                     + th.sum(u_f * self.reward_layer.weight[:, -2*self.len_act_w:].square(), dim=-1))
         else:
             with th.no_grad():
                 return -(th.sum(x_f * self.reward_layer.weight[:, :-2*self.len_act_w].square(), dim=-1)
-                         + th.sum(u * self.reward_layer.weight[:, -2*self.len_act_w:].square(), dim=-1))
+                         + th.sum(u_f * self.reward_layer.weight[:, -2*self.len_act_w:].square(), dim=-1))
 
 
 class LURewardNet(RewardNet):

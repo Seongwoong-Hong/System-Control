@@ -11,7 +11,7 @@ from scipy import io
 from common.util import make_env
 from common.callbacks import SaveCallback
 from common.wrappers import *
-from algos.torch.MaxEntIRL import ContMaxEntIRL
+from algos.torch.MaxEntIRL import APIRL
 from IRL.src import *
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -35,7 +35,7 @@ def main(
 ):
     # Setup Learner
     agent = agent_cls(**agent_kwargs, device=device)
-    learner = ContMaxEntIRL(
+    learner = APIRL(
         env,
         eval_env=eval_env,
         feature_fn=feature_fn,
@@ -77,7 +77,7 @@ def main(
 
 if __name__ == "__main__":
     env_type = "HPC"
-    algo_type = "MaxEntIRL"
+    algo_type = "APIRL"
     device = "cpu"
     name = f"{env_type}_custom"
 

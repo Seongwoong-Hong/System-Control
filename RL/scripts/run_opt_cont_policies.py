@@ -19,18 +19,18 @@ def draw_time_trajectories():
         trajs.append(Trajectory(obs=obs, acts=acts, infos=None))
 
     fig = plt.figure()
-    for i in range(3):
-        fig.add_subplot(3, 1, i+1)
-    # for traj in expt_trajs:
-    #     for i in range(2):
-    #         fig.axes[i].plot(traj.obs[:, i], color='b')
-    #     for j in range(1):
-    #         fig.axes[j + 2].plot(traj.acts[:, j], color='b')
+    for i in range(6):
+        fig.add_subplot(3, 2, i+1)
+    for traj in expt_trajs:
+        for i in range(4):
+            fig.axes[i].plot(traj.obs[:, i], color='b')
+        for j in range(2):
+            fig.axes[j + 4].plot(traj.acts[:, j], color='b')
     for traj in trajs:
-        for i in range(2):
+        for i in range(4):
             fig.axes[i].plot(traj.obs[:, i], color='k')
-        for j in range(1):
-            fig.axes[j + 2].plot(traj.acts[:, j], color='k')
+        for j in range(2):
+            fig.axes[j + 4].plot(traj.acts[:, j], color='k')
     fig.tight_layout()
     fig.show()
 
@@ -46,7 +46,7 @@ if __name__ == "__main__":
         init_states.append(traj.obs[0])
         pltqs.append(traj.pltq)
     env = make_env("HPC_custom-v0", bsp=bsp, init_states=init_states, pltqs=pltqs)
-    agent = IDPDiffLQRPolicy(env, gamma=1.0, alpha=0.01)
+    agent = IDPLQRPolicy(env, gamma=1.0, alpha=0.01)
     # print(agent.K)
     draw_time_trajectories()
     # clsys = signal.StateSpace(agent.A + agent.B @ agent.kks[0].numpy(), agent.B, np.eye(4), np.zeros([4, 2]), dt=agent.dt)

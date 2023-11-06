@@ -339,58 +339,38 @@ class GuidedCostLearning(ContMaxEntIRL):
 
 
 class APIRL(ContMaxEntIRL):
-    def collect_rollouts(self, n_episodes):
-        super().collect_rollouts(n_episodes)
-        self.agent_mean_features = self.traj_to_mean_feature(self.agent_trajectories)
-
-    def sample_and_cal_loss(self):
-        agent_rewards, _ = self.mean_transition_reward(self.agent_mean_features)
-        expert_rewards, _ = self.mean_transition_reward(self.expert_mean_features)
-        loss = th.mean(agent_rewards) - th.mean(expert_rewards)
-        return loss
-
     def traj_to_mean_feature(self, trajs: Sequence[Trajectory]) -> np.ndarray:
         """
         Calculate mean features of each agent or expert from trajectories
         :param traj: Collected trajectories
-        :param n_episodes: The number of input collected trajectories for each agent
         :return: The mean feature of trajectories for each agent
         """
-        mean_feature = 0
-        gammas = np.array([self.agent.gamma ** i for i in range(len(trajs[0]))]).reshape(-1, 1)
-        for traj in trajs:
-            obs_ft = self.reward_net.feature_fn(th.from_numpy(traj.obs[:-1]).float()).numpy()
-            acts_ft = self.reward_net.feature_fn(th.from_numpy(traj.acts).float()).numpy()
-            ft_array = np.append(obs_ft, acts_ft, axis=-1)
-            mean_feature += np.sum(gammas * ft_array, axis=0) / len(trajs)
+        gammas = np.array([self.agent.gamma ** i for i in range(len(trajs[0].acts))] * len(trajs)).reshape(-1, 1)
+        trans = flatten_trajectories(trajs)
+        inp = trans.obs
+        if self.use_action_as_input:
+            acts = trans.acts
+            if hasattr(self.wrap_eval_env, "action") and callable(self.wrap_eval_env.action):
+                acts = self.wrap_eval_env.action(acts)
+            inp = np.concatenate([inp, acts], axis=1)
+        ft_array = self.reward_net.feature_fn(th.from_numpy(inp)).numpy()
+        mean_feature = np.sum(gammas * ft_array, axis=0) / len(trajs)
         return mean_feature
 
-    def mean_transition_reward(
-            self,
-            trajectories: Sequence[np.ndarray],
-    ) -> Tuple[th.Tensor, None]:
-        """
-        Calculate mean of rewards of transitions from mean features of each agent
-        :param trajectories: List of Trajectories
-        :return: (agent mean reward, expert mean reward, None)
-        """
-        weight = self.reward_net.layers[0].weight.detach()
-        rewards = th.dot(weight, th.from_numpy(np.array(trajectories)).float())
-        return rewards, None
-
     def train_reward_fn(self, max_gradient_steps, min_gradient_steps):
-        self.collect_rollouts(75)
+        self.collect_rollouts(len(self.vec_eval_env.envs))
         t = cp.Variable()
-        mu_e = np.array(deepcopy(self.expert_mean_features))
-        mu = np.array(deepcopy(self.agent_mean_features))
-        G = mu_e - mu
+        mu_e = self.traj_to_mean_feature(self.expert_trajectories)
+        self.mu += [self.traj_to_mean_feature(self.agent_trajectories)]
         w = cp.Variable(mu_e.shape[0])
         obj = cp.Maximize(t)
-        constraints = [G @ w >= t, cp.quad_form(w, np.eye(mu_e.shape[0])) <= 1, w >= 1e-8]
+        constraints = [cp.quad_form(w, np.eye(mu_e.shape[0])) <= 1]
+        for mu in self.mu:
+            constraints += [(mu_e - mu) @ w >= t]
         prob = cp.Problem(obj, constraints)
         prob.solve()
         with th.no_grad():
-            self.reward_net.reward_layer.weight = th.nn.Parameter(th.from_numpy(w.value.reshape(1, -1)).float())
+            self.reward_net.reward_layer.weight = th.nn.Parameter(th.from_numpy(-w.value.reshape(1, -1)).float())
         logger.record("Reward diff (E - A)", t.value.item())
 
     def learn(
@@ -407,8 +387,7 @@ class APIRL(ContMaxEntIRL):
             n_episodes: int = 10,
             **kwargs
     ):
-        if isinstance(self.expert_trajectories[0], Trajectory):
-            self.expert_mean_features = self.traj_to_mean_feature(self.expert_trajectories)
+        self.mu = []
         self._reset_agent(**self.env_kwargs)
         for itr in range(total_iter):
             with logger.accumulate_means(f"reward"):

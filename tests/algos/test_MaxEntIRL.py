@@ -56,7 +56,7 @@ def test_maxentirl_scripts(env, eval_env, expert_trajs):
         t, dt, u = th.split(x, 2, 1)
         prev_u = th.cat([th.zeros(1, 2), u], dim=0)
         u_diff = u - prev_u[:-1]
-        return th.cat([t, dt, u, u_diff], dim=-1)
+        return th.cat([t ** 2, dt ** 2, u ** 2, u_diff ** 2], dim=-1)
         # return x ** 2
         # return th.cat([x, x ** 2], dim=-1)
     kwargs = {

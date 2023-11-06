@@ -79,13 +79,15 @@ class LQRPolicy(BasePolicy):
             self.Q = qu.T @ qu
             self.R = ru.T @ ru
         elif isinstance(self.env.envs[0].rwfn, XXRewardNet):
-            weights = np.square(reward_net.reward_layer.weight.cpu().detach().numpy().flatten())
+            # weights = np.square(reward_net.reward_layer.weight.cpu().detach().numpy().flatten())
+            weights = reward_net.reward_layer.weight.cpu().detach().numpy().flatten()
             self.Q = np.diag(weights[:self.observation_space.shape[0]])
             self.R1 = np.diag(weights[-2*self.action_space.shape[0]:-self.action_space.shape[0]])
             self.R2 = np.diag(weights[-self.action_space.shape[0]:])
         else:
             if isinstance(self.env.envs[0].rwfn, QuadraticRewardNet):
-                weights = np.square(reward_net.reward_layer.weight.cpu().detach().numpy().flatten())
+                # weights = np.square(reward_net.reward_layer.weight.cpu().detach().numpy().flatten())
+                weights = reward_net.reward_layer.weight.cpu().detach().numpy().flatten()
             else:
                 weights = reward_net.layers[0].weight.cpu().detach().numpy().flatten()
             self.Q = np.diag(weights[:self.observation_space.shape[0]])
@@ -109,9 +111,9 @@ class DiscreteLQRPolicy(LQRPolicy):
     def _get_gains(self):
         X = linalg.solve_discrete_are(self.A, self.B, self.Q, self.R)
         if self.R.shape[0] >= 2:
-            K = -(np.linalg.inv(self.B.T @ X @ self.B + self.R) @ (self.B.T @ X))
+            K = -(np.linalg.inv(self.B.T @ X @ self.B + self.R) @ (self.B.T @ X @ self.A))
         else:
-            K = -(1 / (self.B.T @ X @ self.B + self.R) * (self.B.T @ X))
+            K = -(1 / (self.B.T @ X @ self.B + self.R) * (self.B.T @ X @ self.A))
         self.K = th.from_numpy(K).float().to(self.device)
         self.COV = th.from_numpy(np.linalg.inv((self.B.T @ X @ self.B + self.R) / self.alpha)).float()
 
@@ -146,14 +148,14 @@ class FiniteLQRPolicy(LQRPolicy):
         self.ks = np.zeros(self.R.shape[0])[None, ...].repeat(self.max_t, axis=0)
         self.cov_series = np.zeros_like(self.R)[None, ...].repeat(self.max_t, axis=0)
         self.vvs[-1] = self.Q
-        # self.vs[-1] = self.q[-1]
+        self.vs[-1] = self.q[-1]
         for t in reversed(range(self.max_t)):
             inv_mat = np.linalg.inv(self.R + self.B.T @ self.vvs[t + 1] @ self.B)
             self.cov_series[t] = inv_mat / self.alpha
             self.kks[t] = -inv_mat @ self.B.T @ self.vvs[t + 1] @ self.A
-            # self.ks[t] = -(self.vs[t + 1] @ self.B + self.r[t]) @ inv_mat
-            # self.vs[t] = (self.q[t] - self.r[t] @ inv_mat @ self.B.T @ self.vvs[t + 1] @ self.A +
-            #               self.vs[t + 1] @ (self.A - self.B @ inv_mat @ self.B.T @ self.vvs[t + 1] @ self.A))
+            self.ks[t] = -(self.r[t] + self.vs[t + 1] @ self.B) @ inv_mat
+            self.vs[t] = (self.q[t] + self.vs[t + 1] @ self.A -
+                          (self.r[t] + self.vs[t + 1] @ self.B) @ inv_mat @ self.B.T @ self.vvs[t + 1] @ self.A)
             self.vvs[t] = (self.Q + self.A.T @ self.vvs[t + 1] @ self.A -
                            self.A.T @ self.vvs[t + 1] @ self.B @ inv_mat @ self.B.T @ self.vvs[t + 1] @ self.A)
 
@@ -236,13 +238,14 @@ class DiffLQRPolicy(FiniteLQRPolicy):
         t = 1
         while True:
             obs_list.append(observation.squeeze())
-            act_list.append(act)
             observation, reward, done, info = self.env.step([act / self.gear])
+            act_list.append(act)
+            rew_list.append(reward.flatten())
             if done:
                 observation = info[0]['terminal_observation']
                 obs_list.append(observation.flatten())
                 break
-            act = observation @ self.kks[t].T + act_list[-1] @ self.ks[t].T
+            act = observation @ self.kks[0].T + act @ self.ks[0].T
             if not deterministic:
                 eps = np.random.standard_normal(self.env.action_space.shape)
                 if np.any(np.linalg.eigvals(self.cov_series[t]) <= 0):
@@ -250,7 +253,6 @@ class DiffLQRPolicy(FiniteLQRPolicy):
                 act += eps @ np.linalg.cholesky(self.cov_series[t]).T
                 act = np.clip(act, a_min=-self.gear, a_max=self.gear)
             act = act.flatten()
-            rew_list.append(reward.flatten())
             t += 1
         return np.array(obs_list), np.array(act_list) / self.gear, np.array(rew_list)
 

@@ -1,8 +1,8 @@
+from algos.torch.OptCont import *
+
 import torch as th
 import numpy as np
 from scipy import signal
-
-from algos.torch.OptCont import *
 
 
 class IDPiterLQRPolicy(iterLQRPolicy):
@@ -52,10 +52,12 @@ class IDPLQRPolicy(FiniteLQRPolicy):
         self.B[2:, :] = np.linalg.inv(M) @ np.eye(2, 2)
         self.A, self.B, _, _, self.dt = signal.cont2discrete((self.A, self.B, np.eye(4), 0), self.env.envs[0].dt)
         self.max_t = 720
-        self.Q = np.diag([0.7139, 0.5872182, 1.0639979, 0.9540204])
-        self.R = np.diag([.061537065, .031358577])
-        # self.Q = np.diag([2, 1, 0.04, 0.04])
-        # self.R = np.diag([0.005, 0.005])
+        # self.Q = np.diag([9.32390029e-09, 9.66881524e-09, 8.40502097e-09, 1.01825418e-08,])
+        # self.R = np.diag([9.70784673e-09, 1.06213622e-08])
+        self.Q = np.diag([1.08932670e-00, 1.00035577e-01, 9.92401693e-02, 9.97238859e-02,])
+        self.R = np.diag([1.00052541e-06, 1.07954182e-07,])
+        self.q = np.array([1.08932670e-03, 1.00035577e-03, 0.0, 0.0,])
+        self.r = np.array([1.00052541e-06, 1.07954182e-07,])
         self.gear = 300
 
 
@@ -76,9 +78,10 @@ class IDPDiffLQRPolicy(DiffLQRPolicy):
         self.B[2:, :] = np.linalg.inv(M) @ np.eye(2, 2)
         self.A, self.B, _, _, self.dt = signal.cont2discrete((self.A, self.B, np.eye(4), 0), self.env.envs[0].dt)
         self.max_t = 720
-        self.Q = np.diag([0.7139, 0.5872182, 1.0639979, 0.9540204])
-        self.R1 = np.diag([.061537065, .031358577])
-        self.R2 = np.diag([0.1, 0.1])
+        self.Q = np.diag([1.08932670e-00, 1.00035577e-01, 9.92401693e-02, 9.97238859e-02,])
+        # self.R1 = np.diag([1.00052541e-03, 1.07954182e-04,])
+        self.R1 = np.diag([0, 0])
+        self.R2 = np.diag([7.27747447e-06, 3.29719842e-05])
         # self.Q = np.diag([2, 1, 0.04, 0.04])
         # self.R = np.diag([0.005, 0.005])
         self.gear = 300

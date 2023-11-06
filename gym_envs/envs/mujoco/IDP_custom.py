@@ -11,8 +11,8 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
     def __init__(self, bsp=None):
         self._order = 0
         self.timesteps = 0
-        self.high = np.array([0.5, 1.0, 2.0, 2.0])
-        self.low = np.array([-0.5, -1.0, -2.0, -2.0])
+        self.high = np.array([0.2, 0.3, 1.0, 1.0])
+        self.low = np.array([-0.2, -0.3, -1.0, -1.0])
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml")
         if bsp is not None:
             self._set_body_config(filepath, bsp)

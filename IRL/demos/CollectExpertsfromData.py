@@ -20,16 +20,6 @@ if __name__ == '__main__':
                 file = f"HPC/{sub}_full/{sub}i{5 * (actuation - 1) + exp_trial}.mat"
                 states = io.loadmat(file)['state'][None, ...]
                 Ts = io.loadmat(file)['tq'][None, ...]
-                import matplotlib.pyplot as plt
-                fig = plt.figure()
-                for i in range(6):
-                    fig.add_subplot(3, 2, i+1)
-                for i in range(4):
-                    fig.axes[i].plot(states[0, :, i])
-                for j in range(2):
-                    fig.axes[j+4].plot(Ts[0, :, j])
-                fig.tight_layout()
-                fig.show()
                 for idx in range(len(states)):
                     state = states[idx, :, :2].copy(order='C')
                     T = Ts[idx, :].copy(order='C') / act_coeff
