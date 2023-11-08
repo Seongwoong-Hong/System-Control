@@ -40,6 +40,14 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
                + 1.0639979 * prev_ob[2] ** 2 + 0.9540204 * prev_ob[3] ** 2
                + 1/3600 * 0.0061537065 * action[0] ** 2 + 1/2500 * 0.0031358577 * action[1] ** 2)
         r += 1
+
+        ddx = np.sin(2*np.pi*self.timesteps/360)
+        for idx, bodyName in enumerate(["leg", "body"]):
+            body_id = self.model.body_name2id(bodyName)
+            force_vector = np.array([-self.model.body_mass[body_id]*ddx, 0, 0])
+            point = self.data.subtree_com[body_id]
+            mujoco_py.functions.mj_applyFT(self.model, self.data, force_vector, np.zeros(3), point, body_id, self.sim.data.qfrc_applied)
+
         self.do_simulation(action, self.frame_skip)
         ob = self._get_obs()
         done = ((ob < self.low).any() or (ob > self.high).any()) and self.timesteps > 0

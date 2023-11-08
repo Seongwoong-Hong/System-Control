@@ -46,7 +46,15 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
                + 0.14639979 * prev_ob[2] ** 2 + 0.10540204 * prev_ob[3] ** 2
                + 0.02537065 * action[0] ** 2 + 0.01358577 * action[1])
         r += 1
-        self.do_simulation(action + self.plt_torque, self.frame_skip)
+
+        force_vector = np.array([0.0, 0.0, 0.0])
+        for idx, hingeName in enumerate(["hinge", "hinge2"]):
+            joint_id = self.unwrapped.model.joint_name2id(hingeName)
+            torque_vector = np.array([0.0, self.plt_torque[idx], 0.0])
+            body_id = self.unwrapped.model.jnt_bodyid[joint_id]
+            point = self.unwrapped.model.body_pos[body_id]
+            mujoco_py.functions.mj_applyFT(self.unwrapped.model, self.unwrapped.sim.data, force_vector, torque_vector, point, body_id, self.sim.data.qfrc_applied)
+        self.do_simulation(action, self.frame_skip)
         self._timesteps += 1
         ob = self._get_obs()
         done = ((ob < self.low).any() or (ob > self.high).any()) and self.timesteps > 0

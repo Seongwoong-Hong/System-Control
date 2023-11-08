@@ -38,7 +38,7 @@ def test_pltq():
     for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
         file = f"../../IRL/demos/HPC/sub01/sub01i{i+1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
-    env = make_env("HPC_custom-v1", pltqs=pltqs)
+    env = make_env("HPC_custom-v2", pltqs=pltqs)
     for pltq in pltqs:
         env.set_pltq(pltq)
         obs = env.reset()

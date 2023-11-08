@@ -12,15 +12,15 @@ def test_hpc_env_reset(hpc_env):
 
 
 def test_init():
-    env = make_env("IDP_custom-v1", subpath="../../IRL/demos/HPC/sub01/sub01")
-    env.render()
+    env = make_env("IP_custom-v2", subpath="../../IRL/demos/HPC/sub01/sub01")
+    # env.render()
     env.reset()
     # env.set_state(np.array([0.0, 0.3]), np.array([0.0, 0.0]))
     done = False
     for _ in range(1000):
-        env.set_state(np.array([0.3, 0.3]), np.array([0.0, 0.0]))
-        # _, _, _, _ = env.step(np.array([1., 1.]))
-        env.render()
+        env.set_state(np.array([0.3]), np.array([0]))
+        _, _, _, _ = env.step(np.array([.5]))
+        # env.render()
         print(env.current_obs)
         time.sleep(env.dt)
 
