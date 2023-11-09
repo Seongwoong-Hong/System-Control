@@ -5,7 +5,7 @@ from common.rollouts import TrajectoryWithPltqs
 from common.util import make_env
 
 if __name__ == '__main__':
-    env_type = "IP_HPC"
+    env_type = "HPC"
     env_id = f"{env_type}-v2"
     act_coeff = 300
     env = make_env(f"{env_id}")

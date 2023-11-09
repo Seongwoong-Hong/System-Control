@@ -2,7 +2,6 @@ import os
 import shutil
 from scipy import io
 
-from algos.tabular.viter import SoftQiter, FiniteSoftQiter
 # from algos.torch.sac import SAC, MlpPolicy
 from algos.torch.ppo import PPO, MlpPolicy
 from common.util import make_env
@@ -10,7 +9,7 @@ from common.wrappers import ActionWrapper, DiscretizeWrapper
 
 
 if __name__ == "__main__":
-    env_type = "IDP"
+    env_type = "IP"
     algo_type = "ppo"
     name = f"{env_type}_custom"
     device = "cpu"
@@ -19,7 +18,7 @@ if __name__ == "__main__":
     irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "IRL"))
     subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
     bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(env_id, bsp=bsp)
+    env = make_env(env_id)
     # env = make_env(env_id, num_envs=1, N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=ActionWrapper)
     # env = make_env(env_id, map_size=1)
     name += f"_{subj}"
