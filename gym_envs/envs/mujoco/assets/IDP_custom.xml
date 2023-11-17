@@ -10,12 +10,12 @@
     <geom name="floor" pos="0 0 -3" rgba="1 1 1 1" size="40 40 40" type="plane" />
     <body name="leg" pos="0 0 0">
       <joint axis="0 -1 0" limited="true" name="hinge" pos="0 0 0" range="-1.0 1.0" type="hinge" />
-      <geom fromto="0 0 0 0 0 0.7970" name="cpole" rgba="0.9 0.4 0.0 0.7" size="0.045" type="capsule" />
-      <inertial diaginertia="0.878121 0.878121 0.001" mass="17.2955" pos="0 0 0.5084" />
-      <body name="body" pos="0 0 0.7970">
+      <geom fromto="0 0 0 0 0 0.7750" name="cpole" rgba="0.9 0.4 0.0 0.7" size="0.045" type="capsule" />
+      <inertial diaginertia="1.085280 1.085280 0.001" mass="23.7953" pos="0 0 0.5184" />
+      <body name="body" pos="0 0 0.7750">
         <joint axis="0 -1 0" limited="true" name="hinge2" pos="0 0 0" range="-1.0 1.0" type="hinge" />
-        <geom fromto="0 0 0 0 0 0.7520" name="cpole2" rgba="0.8 0.4 0.0 0.7" size="0.045" type="capsule" />
-        <inertial diaginertia="1.047289 1.047289 0.001" mass="34.5085" pos="0 0 0.2814" />
+        <geom fromto="0 0 0 0 0 0.8400" name="cpole2" rgba="0.8 0.4 0.0 0.7" size="0.045" type="capsule" />
+        <inertial diaginertia="2.227466 2.227466 0.001" mass="53.9829" pos="0 0 0.3189" />
       </body>
     </body>
   </worldbody>

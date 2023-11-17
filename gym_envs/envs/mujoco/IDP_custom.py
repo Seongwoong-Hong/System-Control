@@ -1,4 +1,6 @@
 import os
+from abc import ABCMeta
+
 import mujoco_py
 import numpy as np
 from copy import deepcopy
@@ -6,42 +8,29 @@ from gym import utils, spaces
 from gym.envs.mujoco import mujoco_env
 from xml.etree.ElementTree import ElementTree, parse
 
+from gym_envs.envs.mujoco import BasePendulum
 
-class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self, bsp=None):
-        self._order = 0
-        self.timesteps = 0
-        self.high = np.array([0.2, 0.3, 1.0, 1.0])
-        self.low = np.array([-0.2, -0.3, -1.0, -1.0])
+
+class IDPCustomDet(BasePendulum):
+    def __init__(self, humanStates, bsp=None):
+        self.high = np.array([0.2, 0.2])
+        self.low = np.array([-0.2, -0.2])
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml")
         if bsp is not None:
             self._set_body_config(filepath, bsp)
-        mujoco_env.MujocoEnv.__init__(self, filepath, frame_skip=1)
-        utils.EzPickle.__init__(self)
-        # self.observation_space = spaces.Box(low=self.low, high=self.high)
-        self.timesteps = 0
-
-    def __deepcopy__(self, memo):
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-        result.__dict__.update(self.__dict__)
-        for k, v in self.__dict__.items():
-            if k not in ['model', 'sim', 'data']:
-                setattr(result, k, deepcopy(v, memo))
-        result.sim = mujoco_py.MjSim(result.model)
-        result.data = result.sim.data
-        result.seed()
-        return result
+        super(IDPCustomDet, self).__init__(filepath, humanStates)
+        self.observation_space = spaces.Box(low=self.low, high=self.high)
 
     def step(self, action: np.ndarray):
         prev_ob = self._get_obs()
-        r = - (0.7139 * prev_ob[0] ** 2 + 0.5872182 * prev_ob[1] ** 2
-               + 1.0639979 * prev_ob[2] ** 2 + 0.9540204 * prev_ob[3] ** 2
-               + 1/3600 * 0.0061537065 * action[0] ** 2 + 1/2500 * 0.0031358577 * action[1] ** 2)
-        r += 1
+        # r = -0.01 * np.sum(action ** 2)
+        r = np.exp(-2 * np.sum((prev_ob[:2] - self._humanData[self.timesteps, :2]) ** 2)) \
+            + np.exp(-0.1 * np.sum((prev_ob[2:] - self._humanData[self.timesteps, 2:]) ** 2)) \
+            - 0.01 * np.sum(action ** 2)
+        r += 0.1
 
-        ddx = np.sin(2*np.pi*self.timesteps/360)
+        ddx = self.ptb_acc[self.timesteps]
+        self.data.qfrc_applied[:] = 0
         for idx, bodyName in enumerate(["leg", "body"]):
             body_id = self.model.body_name2id(bodyName)
             force_vector = np.array([-self.model.body_mass[body_id]*ddx, 0, 0])
@@ -50,28 +39,17 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
 
         self.do_simulation(action, self.frame_skip)
         ob = self._get_obs()
-        done = ((ob < self.low).any() or (ob > self.high).any()) and self.timesteps > 0
+        done = ((ob[:2] < self.low).any() or (ob[:2] > self.high).any()) or (np.abs(action[0]) > 0.95)
+        done = done and not self.timesteps == 0
+        if done:
+            r -= 50
         # qpos = np.clip(ob[:2], a_min=self.low[:2], a_max=self.high[:2])
         # qvel = np.clip(ob[2:4], a_min=self.low[2:], a_max=self.high[2:])
         # self.set_state(qpos, qvel)
         # ob = self._get_obs()
         self.timesteps += 1
-        info = {'obs': prev_ob.reshape(1, -1), "acts": action.reshape(1, -1)}
-        return ob, r, False, info
-
-    @property
-    def order(self):
-        return self._order
-
-    def _get_obs(self):
-        return np.concatenate([
-            self.sim.data.qpos,  # link angles
-            self.sim.data.qvel,   # link angular velocities
-        ]).ravel()
-
-    @property
-    def current_obs(self):
-        return self._get_obs()
+        info = {'obs': prev_ob.reshape(1, -1), "acts": self.data.qfrc_actuator.copy()}
+        return ob, r, done, info
 
     def set_state(self, *args):
         if len(args) == 1:
@@ -108,46 +86,10 @@ class IDPCustom(mujoco_env.MujocoEnv, utils.EzPickle):
         m_tree.write(filepath + ".tmp")
         os.replace(filepath + ".tmp", filepath)
 
-    def reset_model(self):
-        high = np.array([0.025, 0.025, 0.15, 0.2])
-        low = -np.array([0.025, 0.075, 0.03, 0.3])
-        init_state = self.np_random.uniform(low=low, high=high)
-        self.set_state(init_state[:2], init_state[2:])
-        self.timesteps = 0
-        return self._get_obs()
 
-    def viewer_setup(self):
-        v = self.viewer
-        v.cam.trackbodyid = 0
-        v.cam.distance = self.model.stat.extent * 0.5
-        v.cam.lookat[2] = 0.5  # 0.12250000000000005  # v.model.stat.center[2]
-
-
-class IDPCustomExp(IDPCustom):
-    def __init__(self, init_states=None, bsp=None):
-        super().__init__(bsp=bsp)
-        self._init_states = init_states
-
-    @property
-    def init_states(self):
-        if self._init_states is None:
-            states = []
-            for _ in range(100):
-                states.append(self.observation_space.sample())
-            self._init_states = states
-        self._init_states = np.array(self._init_states)
-        return self._init_states
-
-    def reset_model(self):
-        idx = self.np_random.randint(len(self.init_states))
-        q = self.init_states[idx, :]
-        self.set_state(q[:2], q[2:])
-        return self._get_obs()
-
-
-class IDPCustomDet(IDPCustomExp):
-    def reset_model(self):
-        self._order += 1
-        q = self.init_states[self._order % len(self.init_states)]
-        self.set_state(q[:2], q[2:])
-        return self._get_obs()
+class IDPCustom(IDPCustomDet):
+    def reset_ptb(self):
+        super().reset_ptb()
+        st_time_dix = self.np_random.choice(range(self._epi_len))
+        self._ptb_acc = np.append(self._ptb_acc, self._ptb_acc, axis=0)[st_time_dix:st_time_dix+self._epi_len]
+        self._humanData = np.append(self._humanData, self._humanData, axis=0)[st_time_dix:st_time_dix+self._epi_len]

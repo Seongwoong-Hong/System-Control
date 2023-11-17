@@ -17,60 +17,6 @@ register(
 )
 
 register(
-    id='DiscretizedPendulum-v2',
-    entry_point='gym_envs.envs:DiscretizedPendulum',
-    max_episode_steps=50,
-)
-
-register(
-    id='DiscretizedPendulum-v1',
-    entry_point='gym_envs.envs:DiscretizedPendulumV1',
-    max_episode_steps=50,
-)
-
-register(
-    id='DiscretizedPendulum-v0',
-    entry_point='gym_envs.envs:DiscretizedPendulumDet',
-    max_episode_steps=50,
-)
-
-register(
-    id='DiscretizedPendulum_DataBased-v2',
-    entry_point='gym_envs.envs:DataBasedDiscretizedPendulum',
-    max_episode_steps=50,
-)
-
-register(
-    id='DiscretizedPendulum_DataBased-v0',
-    entry_point='gym_envs.envs:DataBasedDiscretizedPendulumDet',
-    max_episode_steps=50,
-)
-
-register(
-    id='DiscretizedDoublePendulum-v2',
-    entry_point='gym_envs.envs:DiscretizedDoublePendulum',
-    max_episode_steps=50,
-)
-
-register(
-    id='DiscretizedDoublePendulum-v0',
-    entry_point='gym_envs.envs:DiscretizedDoublePendulumDet',
-    max_episode_steps=50,
-)
-
-register(
-    id='DiscretizedHuman-v2',
-    entry_point='gym_envs.envs:DiscretizedHuman',
-    max_episode_steps=50,
-)
-
-register(
-    id='DiscretizedHuman-v0',
-    entry_point='gym_envs.envs:DiscretizedHumanDet',
-    max_episode_steps=50,
-)
-
-register(
     id="2DWorld-v0",
     entry_point='gym_envs.envs:TwoDWorldDetOrder',
     max_episode_steps=1000,
@@ -124,29 +70,6 @@ register(
     max_episode_steps=100,
 )
 
-register(
-    id='2DTarget_disc-v0',
-    entry_point='gym_envs.envs:TwoDTargetDiscDet',
-    max_episode_steps=200,
-)
-
-register(
-    id='2DTarget_disc-v2',
-    entry_point='gym_envs.envs:TwoDTargetDisc',
-    max_episode_steps=200,
-)
-
-register(
-    id='1DTarget_disc-v2',
-    entry_point='gym_envs.envs:OneDTargetDisc',
-    max_episode_steps=200,
-)
-
-register(
-    id='1DTarget_disc-v0',
-    entry_point='gym_envs.envs:OneDTargetDiscDet',
-    max_episode_steps=200,
-)
 
 register(
     id='2DTarget_cont-v0',
@@ -164,13 +87,13 @@ register(
 register(
     id='IP_custom-v0',
     entry_point='gym_envs.envs.mujoco:IPCustomDet',
-    max_episode_steps=50,
+    max_episode_steps=360,
 )
 
 register(
     id='IP_custom-v2',
     entry_point='gym_envs.envs.mujoco:IPCustom',
-    max_episode_steps=50,
+    max_episode_steps=360,
 )
 
 
