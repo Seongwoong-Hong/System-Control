@@ -1,1 +1,45 @@
 # policy를 사용해 시간 궤적을 그리는 코드
+import os
+import numpy as np
+from scipy import io
+from matplotlib import pyplot as plt
+from common.util import make_env
+from algos.torch.ppo import PPO
+from common.analyzer import exec_policy
+
+
+if __name__ == "__main__":
+    env_type = "IP"
+    env_id = f"{env_type}_custom"
+    subj = "sub04"
+    trial = 17
+    isPseudo = False
+    use_norm = True
+    policy_num = 1
+    tmp_num = 50
+
+    if isPseudo:
+        env_type = "Pseudo" + env_type
+    subpath = os.path.join("../..", "demos", env_type, subj, subj)
+    states = [np.nan for _ in range(35)]
+    humanData = io.loadmat(subpath + f"i{trial}.mat")
+    bsp = humanData['bsp']
+    states[trial - 1] = humanData['state']
+    if use_norm:
+        env_type += "_norm"
+        model_dir = os.path.join("..", "scripts", "tmp", "log", f"{env_type}", "ppo", f"policies_{policy_num}")
+        norm_pkl_path = model_dir + f"/normalization_{tmp_num}.pkl"
+    else:
+        model_dir = os.path.join("..", "scripts", "tmp", "log", f"{env_type}", "ppo", f"policies_{policy_num}")
+        norm_pkl_path = False
+
+    env = make_env(f"{env_id}-v0", bsp=bsp, humanStates=states, use_norm=norm_pkl_path)
+
+    agent = PPO.load(model_dir + f"/agent_{tmp_num}")
+
+    obs, acts, _, _ = exec_policy(env, agent, render="rgb_array", deterministic=True, repeat_num=1)
+    if use_norm:
+        obs = env.unnormalize_obs(obs)
+    plt.plot(obs[0][:, 0])
+    plt.plot(states[trial - 1][:, 0])
+    plt.show()

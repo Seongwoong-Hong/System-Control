@@ -1,11 +1,9 @@
 import os
-import time
 import numpy as np
 import torch as th
 from skvideo.io import FFmpegWriter
 from typing import Dict, List, Optional
 
-from copy import deepcopy
 from matplotlib import pyplot as plt
 from imitation.data.rollout import TrajectoryAccumulator, flatten_trajectories, make_sample_until
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -19,28 +17,20 @@ def video_record(imgs: List, filename: str, dt: float):
     writer.close()
 
 
-def verify_policy(environment, policy, render="human", deterministic=True, repeat_num=5):
-    if hasattr(policy, "max_t"):
-        assert render == "None"
-        obs_list, acts_list = [], []
-        for _ in range(repeat_num):
-            policy.set_env(deepcopy(environment))
-            ob = environment.reset().reshape(1, -1)
-            obs, acts = policy.predict(ob, deterministic=deterministic)
-            obs_list.append(obs)
-            acts_list.append(acts)
-        return np.array(acts_list), np.array(obs_list), None
-    from mujoco_py import GlfwContext
-    if render == 'rgb_array':
-        GlfwContext(offscreen=True)
+def exec_policy(environment, policy, render="rgb_array", deterministic=True, repeat_num=5):
+    if render == 'human':
+        raise Exception("현재 환경에서 rendering은 지원하지 않습니다.")
     imgs = []
     acts_list = []
     obs_list = []
+    rews_list = []
     for _ in range(repeat_num):
         actions = []
+        rewards = []
+        observs = []
         environment.render(mode=render)
         ob = environment.reset()
-        obs = deepcopy(ob.reshape(1, -1))
+        observs.append(ob.squeeze())
         done = False
         img = environment.render(mode=render)
         imgs.append(img)
@@ -50,14 +40,19 @@ def verify_policy(environment, policy, render="human", deterministic=True, repea
             img = environment.render(mode=render)
             if hasattr(environment, "action") and callable(environment.action):
                 act = environment.action(act)
-            actions.append(act)
-            obs = np.append(obs, ob.reshape(1, -1), axis=0)
-            if render == 'human':
-                time.sleep(environment.dt)
+            if type(info) == list:
+                info = info[0]
+            if "acts" in info:
+                actions.append(info["acts"])
+            else:
+                actions.append(act.squeeze())
+            observs.append(ob.squeeze())
+            rewards.append(rew.squeeze())
             imgs.append(img)
         acts_list.append(np.array(actions))
-        obs_list.append(obs)
-    return acts_list, obs_list, imgs
+        rews_list.append(np.array(rews_list))
+        obs_list.append(np.array(observs))
+    return obs_list, acts_list, rews_list, imgs
 
 
 class CostMap:
