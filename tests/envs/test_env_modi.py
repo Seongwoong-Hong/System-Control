@@ -36,7 +36,7 @@ def test_pltq():
     from scipy import io
     pltqs = []
     for i in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
-        file = f"../../IRL/demos/HPC/sub01/sub01i{i+1}.mat"
+        file = f"../../demos/HPC/sub01/sub01i{i + 1}.mat"
         pltqs += [io.loadmat(file)['pltq']]
     env = make_env("HPC_custom-v2", pltqs=pltqs)
     for pltq in pltqs:

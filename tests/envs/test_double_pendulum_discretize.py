@@ -40,7 +40,7 @@ def test_calc_trans_mat():
     계산 시간, 초기 상태에 대한 평균 에러 계산
     """
     from scipy import io
-    bsp = io.loadmat("../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
+    bsp = io.loadmat("../../demos/HPC/sub06/sub06i1.mat")['bsp']
     N = [17, 17, 17, 19]
     NT = [11, 11]
 
@@ -180,7 +180,7 @@ def test_adaptive_disc_value_error(init_state):
     from algos.tabular.viter import SoftQiter
     from imitation.data.rollout import make_sample_until, generate_trajectories
     from scipy import io
-    bsp = io.loadmat(f"../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
+    bsp = io.loadmat(f"../../demos/HPC/sub06/sub06i1.mat")['bsp']
     env = make_env("DiscretizedHuman-v2", num_envs=1, N=[21, 21, 21, 21], NT=[19, 19], bsp=bsp)
     # observation_space = gym.spaces.Box(
     #     low=np.array([-0.2, -0.6, -0.8, -2.4]), high=np.array([0.2, 0.6, 0.8, 2.4]), dtype=np.float64)

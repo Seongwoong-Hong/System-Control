@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 
 
 def test_svm():
-    with open("../../IRL/demos/1DTarget/viter_disc.pkl", "rb") as f:
+    with open("../../demos/1DTarget/viter_disc.pkl", "rb") as f:
         expt_trajs = pickle.load(f)
         expt_trans = flatten_trajectories(expt_trajs)
-    with open("../../IRL/demos/1DTarget/viter_disc0.pkl", "rb") as f:
+    with open("../../demos/1DTarget/viter_disc0.pkl", "rb") as f:
         agent_trajs = pickle.load(f)
         agent_trans = flatten_trajectories(agent_trajs)
     with open("../../IRL/tmp/log/1DTarget_disc/MaxEntIRL/ext_viter_disc_linear_svm_reset/model/000/reward_net.pkl", "rb") as f:

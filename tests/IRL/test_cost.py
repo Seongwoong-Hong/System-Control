@@ -6,7 +6,7 @@ import numpy as np
 
 from scipy import io
 from common.util import make_env, CPU_Unpickler
-from common.verification import CostMap
+from common.analyzer import CostMap
 from common.wrappers import *
 from algos.tabular.viter import FiniteSoftQiter
 from algos.torch.ppo import PPO
@@ -124,16 +124,16 @@ class IDPLQRPolicy(LQRPolicy):
 
 def test_reward_calculation():
     from gym_envs.envs import DataBasedDiscretizationInfo
-    with open("../../IRL/demos/DiscretizedDoublePendulum/quadcost_lqr.pkl", "rb") as f:
+    with open("../../demos/DiscretizedDoublePendulum/quadcost_lqr.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     init_states = []
     for traj in expert_trajs:
         init_states += [traj.obs[0]]
-    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_softqiter/quadcost_500020.pkl", "rb") as f:
+    with open("../../demos/DiscretizedDoublePendulum/databased_softqiter/quadcost_500020.pkl", "rb") as f:
         agent_trajs = pickle.load(f)
-    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_5000.pkl", "rb") as f:
+    with open("../../demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_5000.pkl", "rb") as f:
         obs_info_tree = pickle.load(f)
-    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/acts_info_tree_20.pkl", "rb") as f:
+    with open("../../demos/DiscretizedDoublePendulum/databased_lqr/acts_info_tree_20.pkl", "rb") as f:
         acts_info_tree = pickle.load(f)
     obs_info = DataBasedDiscretizationInfo([0.05, 0.05, 0.3, 0.35], [-0.05, -0.2, -0.08, -0.4], obs_info_tree)
     acts_info = DataBasedDiscretizationInfo([60., 50.], [-60., -20., ], acts_info_tree)

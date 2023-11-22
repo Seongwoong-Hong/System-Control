@@ -1,7 +1,6 @@
 import os
 import pickle
-from algos.torch.ppo import PPO
-from algos.tabular.viter import FiniteSoftQiter, FiniteViter, SoftQiter
+from algos.torch.ppo import PPO, MlpPolicy
 from common.util import make_env, CPU_Unpickler
 from common.wrappers import *
 import matplotlib.pyplot as plt
@@ -34,38 +33,6 @@ def test_get_gains_wrt_init_states(idpilqrpolicy, hpc_with_rwrap_env):
     env.close()
 
 
-def test_toy_disc_env():
-    name = "SpringBall"
-    env_id = f"{name}_disc"
-    env = make_env(f"{env_id}-v2", wrapper=DiscretizeWrapper)
-    algo = SoftQiter(env=env, gamma=0.99, alpha=0.01, device='cpu')
-    algo.learn(1000)
-    fig = plt.figure(figsize=[6.4, 6.4])
-    ax1 = fig.add_subplot(3, 1, 1)
-    ax2 = fig.add_subplot(3, 1, 2)
-    ax3 = fig.add_subplot(3, 1, 3)
-    for _ in range(10):
-        obs = []
-        acts = []
-        ob = env.reset()
-        done = False
-        # env.render()
-        while not done:
-            obs.append(ob)
-            act, _ = algo.predict(ob, deterministic=False)
-            ob, _, done, _ = env.step(act[0])
-            acts.append(act[0])
-            # env.render()
-            # time.sleep(env.dt)
-        obs = np.array(obs)
-        acts = np.array(acts)
-        ax1.plot(obs[:, 0])
-        ax2.plot(obs[:, 1])
-        ax3.plot(acts)
-    fig.tight_layout()
-    plt.show()
-
-
 def test_1d(rl_path):
     name = "1DTarget_disc"
     env_id = f"{name}"
@@ -80,29 +47,21 @@ def test_1d(rl_path):
     print('end')
 
 
-def test_total_reward(rl_path):
-    env_type = "HPC"
-    name = f"{env_type}_custom"
-    model_dir = os.path.join(rl_path, env_type, "tmp", "log", name, "ppo", "policies_4")
-    stats_path = None
-    if os.path.isfile(model_dir + "normalization.pkl"):
-        stats_path = model_dir + "normalization.pkl"
-    env = make_env(f"{name}-v1", subpath="../../IRL/demos/HPC/sub01/sub01", wrapper=ActionWrapper, use_norm=stats_path)
-    algo = PPO.load(model_dir + f"/agent")
+def test_total_reward(ip_env, proj_path):
+    env = ip_env
+
     ob = env.reset()
     done = False
-    actions = []
+    acts = []
     obs = []
     rewards = []
     while not done:
-        act, _ = algo.predict(ob, deterministic=False)
-        ob, reward, done, info = env.step(act)
+        # act, _ = algo.predict(ob, deterministic=False)
+        # ob, reward, done, info = env.step(-np.array([[1000, 200, 300, 50], [200, 200, 50, 50]]) @ ob.T/100)
+        ob, reward, done, info = env.step(-np.array([800, 300]) @ ob.T/100)
         rewards.append(reward)
-        actions.append(info['acts'])
-        obs.append(info['obs'])
-    # plt.plot(np.array(actions).reshape(-1, 2))
-    # plt.show()
-    # plt.plot(np.array(obs).reshape(-1, 6)[:, :2])
-    # plt.show()
-    plt.plot(rewards)
+        acts.append(info['acts'])
+        obs.append(ob)
+    plt.plot(np.array(acts)[:, 0])
+    # plt.plot(env.env.ptb_acc)
     plt.show()

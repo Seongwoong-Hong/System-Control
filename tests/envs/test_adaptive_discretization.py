@@ -13,7 +13,7 @@ from algos.torch.OptCont import LQRPolicy
 from algos.tabular.viter import FiniteSoftQiter
 from common.util import make_env
 from common.wrappers import DiscretizeWrapper
-from IRL.demos.MakeInfoTree import IPLQRPolicy, DiscIDPLQRPolicy
+from demos.MakeInfoTree import IPLQRPolicy, DiscIDPLQRPolicy
 
 
 def test_information_tree():
@@ -33,7 +33,7 @@ def test_dividing_nodes():
 
 
 def test_draw_discrete_node():
-    with open("../../IRL/demos/DiscretizedPendulum/databased_lqr/obs_info_tree_200.pkl", "rb") as f:
+    with open("../../demos/DiscretizedPendulum/databased_lqr/obs_info_tree_200.pkl", "rb") as f:
         info_tree = pickle.load(f)
     ax = plt.gca()
     for node in info_tree.data:
@@ -96,7 +96,7 @@ def test_divide_node():
 
 
 def test_import_info_tree():
-    with open("../../IRL/demos/DiscretizedPendulum/databased_lqr/obs_info_tree_1500.pkl", "rb") as f:
+    with open("../../demos/DiscretizedPendulum/databased_lqr/obs_info_tree_1500.pkl", "rb") as f:
         info_tree = pickle.load(f)
     obs_info = DataBasedDiscretizationInfo([0.05, 0.3], [-0.05, -0.08], info_tree)
     obs = obs_info.get_vectorized()
@@ -104,7 +104,7 @@ def test_import_info_tree():
 
 
 def test_compare_index():
-    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_5000.pkl", "rb") as f:
+    with open("../../demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_5000.pkl", "rb") as f:
         obs_info_tree = pickle.load(f)
     obs_high = np.array([0.05, 0.05, 0.3, 0.35])
     obs_low = np.array([-0.05, -0.2, -0.08, -0.4])
@@ -116,9 +116,9 @@ def test_compare_index():
 
 
 def test_learning_time():
-    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_15000.pkl", "rb") as f:
+    with open("../../demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_15000.pkl", "rb") as f:
         obs_info_tree = pickle.load(f)
-    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/acts_info_tree_60.pkl", "rb") as f:
+    with open("../../demos/DiscretizedDoublePendulum/databased_lqr/acts_info_tree_60.pkl", "rb") as f:
         acts_info_tree = pickle.load(f)
     s = time.time()
     obs_high = np.array([0.05, 0.05, 0.3, 0.35])

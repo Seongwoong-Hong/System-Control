@@ -1,3 +1,5 @@
+import copy
+import pickle
 import time
 import numpy as np
 from common.util import make_env
@@ -25,15 +27,21 @@ def test_init():
         time.sleep(env.dt)
 
 
-def test_2d_env():
-    env = make_env("SpringBall-v2")
-    for i in range(10):
-        env.reset()
-        done = False
-        env.render()
-        while not done:
-            action = env.action_space.sample()
-            st, r, done, _ = env.step(np.array([0]))
-            env.render()
-            time.sleep(env.dt)
+def test_env_init(ip_env):
+    env = ip_env
     env.close()
+
+
+def test_pickle(ip_env_norm):
+    env = ip_env_norm
+    pickled_env = pickle.dumps(env)
+    unpickled_env = pickle.loads(pickled_env)
+    print(unpickled_env)
+
+
+def test_deepcopy(ip_env_norm):
+    env = ip_env_norm
+    # getattr(ip_env_norm, "abc")
+    copied = copy.deepcopy(env)
+    copied2 = copy.deepcopy(copied)
+    print(copied.class_attributes)

@@ -97,12 +97,12 @@ def test_demo_state(demo_dir):
 def test_compare_demo_and_agent():
     env_type = "DiscretizedHuman"
     subj = f"sub03"
-    bsp = io.loadmat(f"../../IRL/demos/HPC/{subj}/{subj}i1.mat")['bsp']
+    bsp = io.loadmat(f"../../demos/HPC/{subj}/{subj}i1.mat")['bsp']
     init_states = []
     i = 2
     for j in range(1):
-        init_states += [io.loadmat(f"../../IRL/demos/HPC/{subj}_cropped/{subj}i{i + 1}_{j}.mat")['state'][0, :4]]
-    with open(f"../../IRL/demos/DiscretizedHuman/sub03_1_{i + 1}.pkl", "rb") as f:
+        init_states += [io.loadmat(f"../../demos/HPC/{subj}_cropped/{subj}i{i + 1}_{j}.mat")['state'][0, :4]]
+    with open(f"../../demos/DiscretizedHuman/sub03_1_{i + 1}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     env = make_env(f"{env_type}-v0", num_envs=1, h=[0.03, 0.03, 0.05, 0.08], bsp=bsp, init_states=init_states)
     algo_type = "MaxEntIRL"

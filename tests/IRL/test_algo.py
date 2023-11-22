@@ -3,7 +3,7 @@ import pickle
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from common.util import make_env, CPU_Unpickler
-from common.verification import verify_policy
+from common.analyzer import verify_policy
 from common.wrappers import *
 
 

@@ -53,9 +53,9 @@ def test_calculating_feature(trial):
     for traj in expt_trajs:
         init_states.append(traj.obs[0])
     reward_fn.feature_fn = feature_fn
-    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_4000.pkl", "rb") as f:
+    with open("../../demos/DiscretizedDoublePendulum/databased_lqr/obs_info_tree_4000.pkl", "rb") as f:
         obs_info_tree = pickle.load(f)
-    with open("../../IRL/demos/DiscretizedDoublePendulum/databased_lqr/acts_info_tree_80.pkl", "rb") as f:
+    with open("../../demos/DiscretizedDoublePendulum/databased_lqr/acts_info_tree_80.pkl", "rb") as f:
         acts_info_tree = pickle.load(f)
     obs_info = FaissDiscretizationInfo([0.05, 0.05, 0.3, 0.35], [-0.05, -0.2, -0.08, -0.4], obs_info_tree)
     acts_info = FaissDiscretizationInfo([60, 50], [-60, -20], acts_info_tree)

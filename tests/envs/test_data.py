@@ -20,7 +20,7 @@ def test_drawing_human_data():
     for subj in [f"sub{i:02d}" for i in [5]]:
         for actu in range(1, 2):
             for exp_trial in range(1, 6):
-                file = f"../../IRL/demos/HPC/{subj}/{subj}i{5 * (actu - 1) + exp_trial}.mat"
+                file = f"../../demos/HPC/{subj}/{subj}i{5 * (actu - 1) + exp_trial}.mat"
                 ax11.plot(-io.loadmat(file)['state'][:, 0])
                 ax12.plot(-io.loadmat(file)['state'][:, 1])
                 ax21.plot(-io.loadmat(file)['state'][:, 2])
@@ -43,7 +43,7 @@ def test_drawing_hist_of_human_obs():
         for actu in range(1, 7):
             for exp_trial in range(1, 6):
                 for part in range(3):
-                    file = f"../../IRL/demos/HPC/{subj}_half/{subj}i{5 * (actu - 1) + exp_trial}_{part}.mat"
+                    file = f"../../demos/HPC/{subj}_half/{subj}i{5 * (actu - 1) + exp_trial}_{part}.mat"
                     obs_stack.append(-io.loadmat(file)['tq'][:, 1])
     sorted_obs = np.sort(np.hstack(obs_stack))
     plt.hist(np.hstack(obs_stack), bins=17, range=(-2.4, 1.3))
@@ -76,7 +76,7 @@ def test_stepping_pkl_data():
     expert_dir = os.path.join("../../IRL", "demos", "DiscretizedPendulum", "301201_101_lqr", "quadcost_150050_from_contlqr.pkl")
     with open(expert_dir, "rb") as f:
         expert_trajs = pickle.load(f)
-    bsp = io.loadmat("../../IRL/demos/HPC/sub06/sub06i1.mat")['bsp']
+    bsp = io.loadmat("../../demos/HPC/sub06/sub06i1.mat")['bsp']
     env = make_env("DiscretizedPendulum-v2", N=[301, 201], NT=[101], wrapper=DiscretizeWrapper)
     for traj in expert_trajs:
         obs_list = []
