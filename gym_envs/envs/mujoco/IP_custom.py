@@ -43,9 +43,6 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
             force_vector = np.array([-self.model.body_mass[body_id]*ddx, 0, 0])
             point = self.data.subtree_com[body_id]
             mujoco_py.functions.mj_applyFT(self.model, self.data, force_vector, np.zeros(3), point, body_id, self.data.qfrc_applied)
-        # qpos = np.clip(ob[:1], a_min=np.array([-0.1]), a_max=np.array([0.1]))
-        # qvel = np.clip(ob[1:], a_min=np.array([-0.3]), a_max=np.array([0.3]))
-        # self.set_state(qpos, qvel)
         self.do_simulation(torque, self.frame_skip)
         done = False
         ob = self._get_obs()
