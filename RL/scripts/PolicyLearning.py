@@ -1,5 +1,4 @@
 import shutil
-import numpy as np
 from pathlib import Path
 
 from scipy import io
@@ -17,8 +16,7 @@ if __name__ == "__main__":
     subj = "sub04"
     isPseudo = True
     use_norm = True
-    PDgain = np.array([2000, 50])
-    name_tail = f"_DeepMimic_actionSkip_ptb3/PD{PDgain[0]}{PDgain[1]}"
+    name_tail = "_ptb3"
 
     if isPseudo:
         env_type = "Pseudo" + env_type
@@ -29,7 +27,7 @@ if __name__ == "__main__":
         humanData = io.loadmat(str(subpath) + f"i{i}.mat")
         bsp = humanData['bsp']
         states[i - 1] = humanData['state']
-    env = make_env(f"{env_id}-v2", bsp=bsp, humanStates=states, use_norm=use_norm, PDgain=PDgain)
+    env = make_env(f"{env_id}-v2", bsp=bsp, humanStates=states, use_norm=use_norm)
     if use_norm:
         env_type += "_norm"
     log_dir = (Path(__file__).parent / "tmp" / "log" / env_type / (algo_type + name_tail))
@@ -40,11 +38,11 @@ if __name__ == "__main__":
         n_steps=4096,
         batch_size=1024,
         learning_rate=0.0003,
-        n_epochs=20,
+        n_epochs=10,
         gamma=0.99,
         gae_lambda=0.95,
         vf_coef=0.5,
-        ent_coef=0.003,
+        ent_coef=0.001,
         tensorboard_log=str(log_dir),
         device=device,
         policy_kwargs={'net_arch': [dict(pi=[16, 16], vf=[32, 32])]},
@@ -55,7 +53,7 @@ if __name__ == "__main__":
         n += 1
     (log_dir / f"policies_{n}").mkdir(parents=True, exist_ok=False)
     shutil.copy(str(Path(__file__)), str(log_dir / f"policies_{n}"))
-    for i in range(15):
+    for i in range(50):
         algo.learn(total_timesteps=int(1e6), tb_log_name=f"extra_{n}", reset_num_timesteps=False)
         algo.save(str(log_dir / f"policies_{n}/agent_{i + 1}"))
         if use_norm:

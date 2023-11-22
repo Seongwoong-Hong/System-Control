@@ -16,7 +16,7 @@ class BasePendulum(mujoco_env.MujocoEnv):
         for self._humanData in self._humanStates:
             if self._humanData is not None:
                 break
-        if self._humanData is np.nan:
+        if not isinstance(self._humanData, np.ndarray):
             raise Exception("잘못된 실험 데이터 입력")
         mujoco_env.MujocoEnv.__init__(self, filepath, 1)
 
