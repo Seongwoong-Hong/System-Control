@@ -40,7 +40,7 @@ def main(env_id, config):
     elif env_id == "IP":
         subpath = (proj_path / "demos" / "IP" / "sub04" / "sub04")
         states = [None for _ in range(35)]
-        for i in range(6, 11):
+        for i in range(11, 16):
             humanData = io.loadmat(str(subpath) + f"i{i}.mat")
             bsp = humanData['bsp']
             states[i - 1] = humanData['state']

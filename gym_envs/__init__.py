@@ -87,13 +87,13 @@ register(
 register(
     id='IP_custom-v0',
     entry_point='gym_envs.envs.mujoco:IPCustomDet',
-    max_episode_steps=360,
+    max_episode_steps=90,
 )
 
 register(
     id='IP_custom-v2',
     entry_point='gym_envs.envs.mujoco:IPCustom',
-    max_episode_steps=360,
+    max_episode_steps=90,
 )
 
 

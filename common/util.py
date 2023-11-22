@@ -1,17 +1,13 @@
-import copy
-import inspect
 import os
-import torch
 import pickle
 import warnings
 import os.path as p
+import gym_envs
 import gym
-import gym_envs  # needs for custom environments
-from copy import deepcopy
 from io import BytesIO
 
 from scipy import io
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor
 
 from common.wrappers import ActionWrapper

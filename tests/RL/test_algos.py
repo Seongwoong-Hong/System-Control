@@ -59,3 +59,23 @@ def test_reward_norm(ip_env, proj_path, ip_env_norm):
     normd_reward = norm_env.normalize_reward(reward)
     print(norm_reward[0], normd_reward)
     print(norm_env.unnormalize_obs(norm_ob)[0], ob)
+
+
+def test_ppo_algo(ip_env):
+    env = ip_env
+    algo = PPO(
+        MlpPolicy,
+        env=env,
+        n_steps=4096,
+        batch_size=1024,
+        learning_rate=0.0003,
+        n_epochs=10,
+        gamma=0.99,
+        gae_lambda=0.95,
+        vf_coef=0.5,
+        ent_coef=0.001,
+        device='cpu',
+        policy_kwargs={'net_arch': [dict(pi=[16, 16], vf=[32, 32])]},
+        verbose=1,
+    )
+    algo.learn(total_timesteps=int(1e6))

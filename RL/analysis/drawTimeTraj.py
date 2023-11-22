@@ -13,8 +13,8 @@ if __name__ == "__main__":
     trial = 11
     isPseudo = True
     use_norm = True
-    policy_num = 3
-    tmp_num = 1
+    policy_num = 12
+    tmp_num = 8
     name_tail = "_DeepMimic_PD_ptb3"
 
     if isPseudo:
@@ -36,10 +36,10 @@ if __name__ == "__main__":
 
     agent = PPO.load(model_dir + f"/agent_{tmp_num}")
 
-    obs, acts, _, _ = exec_policy(env, agent, render="rgb_array", deterministic=True, repeat_num=1)
+    obs, acts, _, _ = exec_policy(env, agent, render="rgb_array", deterministic=False, repeat_num=1)
     if use_norm:
         obs = env.unnormalize_obs(obs)
-    plt.plot(obs[0][:, 0])
+    plt.plot(obs[0][:-1, 0])
     plt.plot(states[trial - 1][:, 0])
     plt.show()
     plt.plot(acts[0])
