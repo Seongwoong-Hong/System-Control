@@ -106,7 +106,7 @@ def reward_learning():
         sample_until = make_sample_until(n_timesteps=None, n_episodes=35)
         trajectories = generate_trajectories_without_shuffle(agent, vec_env, sample_until, deterministic_policy=False)
         agent_trans = flatten_trajectories(trajectories)
-        expert_dir = "../demos/HPC/sub01.pkl"
+        expert_dir = "../../demos/HPC/sub01.pkl"
         with open(expert_dir, "rb") as f:
             expert_trajs = pickle.load(f)
         expt_trans = flatten_trajectories(expert_trajs)

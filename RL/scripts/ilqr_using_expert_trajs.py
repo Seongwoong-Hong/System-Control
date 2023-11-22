@@ -4,10 +4,10 @@ import torch as th
 from scipy import io
 from matplotlib import pyplot as plt
 from common.util import make_env
-from RL.src import IDPLQRPolicy, IDPiterLQRPolicy
+from RL.policies import IDPLQRPolicy, IDPiterLQRPolicy
 
 
-with open("../../IRL/demos/HPC/full/sub05_4.pkl", "rb") as f:
+with open("../../demos/HPC/full/sub05_4.pkl", "rb") as f:
     expt_trajs = [pickle.load(f)[0]]
 tg_obs = np.append(expt_trajs[0].obs, np.zeros([360, 4]), axis=0)
 tg_acts = np.append(expt_trajs[0].acts, np.zeros([360, 2]), axis=0) * 300
@@ -25,7 +25,7 @@ class IDPLQRPolicyTime(IDPLQRPolicy):
 
 
 if __name__ == "__main__":
-    bsp = io.loadmat("../../IRL/demos/HPC/sub05/sub05i1.mat")['bsp']
+    bsp = io.loadmat("../../demos/HPC/sub05/sub05i1.mat")['bsp']
     init_states = []
     pltqs = []
     for traj in expt_trajs:

@@ -1,95 +1,97 @@
-import os
+import ray
 import numpy as np
 from datetime import datetime
-from functools import partial
+from pathlib import Path
+from scipy import io
+from ray import tune, train
 
-from ray import tune
-from ray.tune import CLIReporter
-from ray.tune.schedulers import ASHAScheduler
-
-from algos.torch.sac import SAC, MlpPolicy
+from algos.torch.ppo import PPO, MlpPolicy
 from common.util import make_env
 from common.wrappers import ActionWrapper
 
 
-def trial_str_creator(trial):
-    trialname = datetime.now().strftime('%Y-%m-%d_%H-%M-%S') + trial.trial_id
-    return trialname
-
-
 def try_train(config):
-    algo = SAC(config['policy'],
+    algo = PPO(config['policy'],
                env=config['env'],
+               n_steps=config['n_steps'],
                batch_size=config['batch_size'],
-               learning_starts=config['batch_size'] * 4,
+               n_epochs=config['n_epochs'],
                learning_rate=config['lr'],
-               train_freq=(config['accum_steps'], 'step'),
-               gradient_steps=config['gradient_steps'],
                gamma=config['gamma'],
+               gae_lambda=config['gae_lambda'],
                ent_coef=config['ent_coef'],
-               target_update_interval=1,
-               device='cuda')
+               policy_kwargs={'net_arch': [dict(pi=[16, 16], vf=[32, 32])]},
+               device='cpu')
 
-    for epoch in range(1000):
-        """ Learning """
-        algo.learn(total_timesteps=int(8.192e3), reset_num_timesteps=True)
+    """ Learning """
+    algo.learn(total_timesteps=int(config['total_steps']), reset_num_timesteps=True)
 
-        """ Testing """
-        mean_reward = np.mean([ep_info["r"] for ep_info in algo.ep_info_buffer])
+    """ Testing """
+    mean_reward = np.mean([ep_info["r"] for ep_info in algo.ep_info_buffer])
 
-        """ Temporally save a model"""
-        trial_dir = tune.get_trial_dir()
-        path = os.path.join(trial_dir, "agent")
-        algo.save(path)
-        # tune.report()
-        tune.report(mean_reward=mean_reward)
+    return {'mean_reward': mean_reward}
 
 
-def main(env_id):
+def main(env_id, config):
+    proj_path = Path(__file__).parent.parent.parent
     if env_id == "HPC":
-        subpath = os.path.abspath("../IRL/demos/HPC/sub01/sub01")
-        env = make_env(f"{env_id}_custom-v2", wrapper=ActionWrapper, subpath=subpath)
+        subpath = (proj_path / "demos" / "HPC" / "sub01" / "sub01")
+        env = make_env(f"{env_id}_custom-v2", wrapper=ActionWrapper, subpath=str(subpath))
+    elif env_id == "IP":
+        subpath = (proj_path / "demos" / "IP" / "sub04" / "sub04")
+        states = [None for _ in range(35)]
+        for i in range(6, 11):
+            humanData = io.loadmat(str(subpath) + f"i{i}.mat")
+            bsp = humanData['bsp']
+            states[i - 1] = humanData['state']
+        env = make_env(f"{env_id}_custom-v2", bsp=bsp, humanStates=states, use_norm=True)
     else:
         env = make_env(f"{env_id}_custom-v2")
-    config = {
-        'policy': MlpPolicy,
-        'env': env,
-        'batch_size': tune.choice([64, 128, 256]),
-        'accum_steps': tune.choice([512, 1024, 2048]),
-        'gradient_steps': tune.choice([1000, 1500, 2000]),
-        'gamma': tune.choice([0.99, 0.975, 0.95]),
-        'ent_coef': tune.choice([0.1, 0.15, 0.2, 0.25]),
-        'lr': tune.choice([1e-4, 3e-4, 5e-4]),
-    }
 
-    scheduler = ASHAScheduler(
-        metric="mean_reward",
-        mode="max",
-        max_t=100,
-        grace_period=10,
-        reduction_factor=2,
-    )
-    reporter = CLIReporter(metric_columns=["mean_reward", "training_iteration"])
-    result = tune.run(
-        partial(try_train),
-        name=env_id + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S'),
-        resources_per_trial={"cpu": 1, "gpu": 0.33},
-        config=config,
-        num_samples=200,
-        scheduler=scheduler,
-        progress_reporter=reporter,
-        checkpoint_at_end=True,
-        trial_name_creator=trial_str_creator,
-        local_dir=f"~/hsw/Control/RL/{env_id}/tmp/log/ray_result"
+    config['env'] = env
+
+    train_model = tune.with_resources(try_train, {"cpu": 1})
+    tune_config = tune.TuneConfig(**config['tune_config'])
+
+    reporter = tune.CLIReporter(metric_columns=["mean_reward", "training_iteration"])
+    storage_path = (Path(__file__).parent / "tmp" / "log" / (f"ray_{env_id}" + datetime.now().strftime('%Y-%m-%d_%H-%M-%S')))
+    storage_path.mkdir(parents=True, exist_ok=False)
+    run_config = train.RunConfig(progress_reporter=reporter, storage_path=str(storage_path), name="tuning")
+
+    tuner = tune.Tuner(
+        train_model,
+        param_space=config,
+        tune_config=tune_config,
+        run_config=run_config,
     )
 
-    best_trial = result.get_best_trial("mean_reward", "max", "last")
+    results = tuner.fit()
+
+    best_trial = results.get_best_result("mean_reward", "max", "last")
     print(f"Best trial config: {best_trial.config}")
-    print(f"Best trial final validation loss: {best_trial.last_result['mean_reward']:.4f}")
-
-    best_logdir = result.get_best_logdir(metric='mean_reward', mode='max')
-    print(best_logdir)
 
 
 if __name__ == "__main__":
-    main("IDP")
+    scheduler = tune.schedulers.ASHAScheduler(
+        max_t=100,
+        grace_period=1,
+    )
+    config = {
+        'total_steps': 5e6,
+        'policy': MlpPolicy,
+        'n_steps': tune.choice([2**7, 2**9, 2**11, 2**13, 2**15]),
+        'batch_size': tune.choice([256, 512, 1024]),
+        'n_epochs': tune.choice([10, 20]),
+        'lr': tune.choice([3e-4, 1e-3]),
+        'gamma': tune.choice([0.99, 0.995]),
+        'gae_lambda': 0.95,
+        'ent_coef': tune.choice([1e-3, 1e-4, 1e-2]),
+        'tune_config': {
+            'metric': "mean_reward",
+            'mode': "max",
+            'scheduler': scheduler,
+            'num_samples': 200,
+        }
+    }
+    ray.init(address='auto')
+    main("IP", config)

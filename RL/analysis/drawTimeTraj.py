@@ -12,25 +12,26 @@ if __name__ == "__main__":
     env_type = "IP"
     env_id = f"{env_type}_custom"
     subj = "sub04"
-    trial = 17
-    isPseudo = False
+    trial = 11
+    isPseudo = True
     use_norm = True
     policy_num = 1
-    tmp_num = 50
+    tmp_num = 2
+    name_tail = "_DeepMimic_PD_ptb3"
 
     if isPseudo:
         env_type = "Pseudo" + env_type
     subpath = os.path.join("../..", "demos", env_type, subj, subj)
-    states = [np.nan for _ in range(35)]
+    states = [None for _ in range(35)]
     humanData = io.loadmat(subpath + f"i{trial}.mat")
     bsp = humanData['bsp']
     states[trial - 1] = humanData['state']
     if use_norm:
         env_type += "_norm"
-        model_dir = os.path.join("..", "scripts", "tmp", "log", f"{env_type}", "ppo", f"policies_{policy_num}")
+        model_dir = os.path.join("..", "scripts", "tmp", "log", f"{env_type}", "ppo" + name_tail, f"policies_{policy_num}")
         norm_pkl_path = model_dir + f"/normalization_{tmp_num}.pkl"
     else:
-        model_dir = os.path.join("..", "scripts", "tmp", "log", f"{env_type}", "ppo", f"policies_{policy_num}")
+        model_dir = os.path.join("..", "scripts", "tmp", "log", f"{env_type}", "ppo" + name_tail, f"policies_{policy_num}")
         norm_pkl_path = False
 
     env = make_env(f"{env_id}-v0", bsp=bsp, humanStates=states, use_norm=norm_pkl_path)
@@ -42,4 +43,6 @@ if __name__ == "__main__":
         obs = env.unnormalize_obs(obs)
     plt.plot(obs[0][:, 0])
     plt.plot(states[trial - 1][:, 0])
+    plt.show()
+    plt.plot(acts[0])
     plt.show()

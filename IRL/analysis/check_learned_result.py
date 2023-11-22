@@ -53,7 +53,7 @@ def draw_trajs(subj="sub01", actuation=1, learned_trial=1):
     print(reward_fn.reward_layer.weight.square())
     eval_venv = make_env(f"{name}-v0", num_envs=1, bsp=bsp, init_states=init_states, pltqs=pltqs)
 
-    # for finite src
+    # for finite policies
     agent_trajs = []
     for init_state in init_states:
         # traj = DiscEnvTrajectories()
@@ -62,7 +62,7 @@ def draw_trajs(subj="sub01", actuation=1, learned_trial=1):
         traj = types.Trajectory(**data_dict)
         agent_trajs.append(traj)
 
-    # for infinite src
+    # for infinite policies
     # sample_until = make_sample_until(n_timesteps=None, n_episodes=len(init_states))
     # agent_trajs = generate_trajectories_without_shuffle(agent, eval_venv, sample_until, deterministic_policy=True)
 

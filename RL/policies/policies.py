@@ -87,7 +87,7 @@ class IDPDiffLQRPolicy(DiffLQRPolicy):
         self.gear = 300
 
 
-class IPLQRPolicy(DiscreteLQRPolicy):
+class IPLQRPolicy(LQRPolicy):
     def _build_env(self):
         I = self.env.envs[0].model.body_inertia[1, 0]
         lc = self.env.envs[0].model.body_ipos[1, 2]
@@ -95,9 +95,7 @@ class IPLQRPolicy(DiscreteLQRPolicy):
         g = 9.81
         self.A = np.array([[0, 1], [(m*g*lc)/(I + m*lc**2), 0]])
         self.B = np.array([[0], [1/(I + m*lc**2)]])
-        self.A, self.B, _, _, self.dt = signal.cont2discrete((self.A, self.B, np.eye(2), 0), self.env.envs[0].dt)
-        # self.max_t = self.env.get_attr("spec")[0].max_episode_steps // 2
         self.max_t = 360
         self.Q = np.diag([2.1465e-06, 2.3304e+00])
         self.R = np.diag([2.3219e+00 / 90000])
-        self.gear = 300
+        self.gear = 100

@@ -13,7 +13,7 @@ from imitation.algorithms import bc
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
 from common.util import make_env
-from common.verification import CostMap, verify_policy
+from common.analyzer import CostMap, verify_policy
 from common.wrappers import ActionWrapper
 
 
@@ -60,7 +60,7 @@ def draw_trajectories():
     # env = make_env(f"{env_type}-v0", wrapper=wrapper, pltqs=pltqs, init_states=init_states)
     name = f"{env_id}/{algo_type}/1hot_{subj}_linear_finite"
     model_dir = os.path.join("..", "tmp", "log", name, "model", "049")
-    with open(f"../demos/{env_type}/{subj}.pkl", "rb") as f:
+    with open(f"../../demos/{env_type}/{subj}.pkl", "rb") as f:
         expert_trajs = pickle.load(f)
     lnum = len(expert_trajs)
     expt_obs = [expert_trajs[i].obs[:-1, :] for i in range(lnum)]
@@ -91,7 +91,7 @@ def draw_costfigure():
     env_id = f"{env_type}"
     env_op = 1
     subj = f"sub07"
-    bsp = io.loadmat(f"../../IRL/demos/HPC/{subj}/{subj}i1.mat")['bsp']
+    bsp = io.loadmat(f"../../demos/HPC/{subj}/{subj}i1.mat")['bsp']
     subpath = os.path.abspath(os.path.join("..", "demos", env_type, subj))
     env = make_env(f"{env_id}-v2", subpath=subpath + f"/{subj}", h=[0.03, 0.03, 0.05, 0.08], bsp=bsp)
     algo_type = "MaxEntIRL"

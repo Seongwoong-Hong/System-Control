@@ -80,7 +80,7 @@ class IDPDiffLQRPolicy(DiffLQRPolicy):
         self.gear = 300
 
 
-class IPLQRPolicy(DiscreteLQRPolicy):
+class DiscreteIPLQRPolicy(DiscreteLQRPolicy):
     def _build_env(self):
         I = self.env.envs[0].model.body_inertia[1, 0]
         lc = self.env.envs[0].model.body_ipos[1, 2]

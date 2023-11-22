@@ -5,7 +5,7 @@ from imitation.data.rollout import make_sample_until, generate_trajectories
 from imitation.data.types import Trajectory
 from matplotlib import pyplot as plt
 
-from RL.src import IDPLQRPolicy, IDPDiffLQRPolicy
+from RL.policies import IDPLQRPolicy, IDPDiffLQRPolicy
 from common.util import make_env
 
 

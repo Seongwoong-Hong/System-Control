@@ -1,53 +1,61 @@
-import os
 import shutil
+from pathlib import Path
+
 from scipy import io
 
-# from algos.torch.sac import SAC, MlpPolicy
 from algos.torch.ppo import PPO, MlpPolicy
 from common.util import make_env
-from common.wrappers import ActionWrapper, DiscretizeWrapper
 
 
 if __name__ == "__main__":
+    # 환경 설정
     env_type = "IP"
     algo_type = "ppo"
-    name = f"{env_type}_custom"
+    env_id = f"{env_type}_custom"
     device = "cpu"
-    env_id = f"{name}-v2"
-    subj = "sub05"
-    irl_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "IRL"))
-    subpath = os.path.join(irl_dir, "demos", "HPC", subj, subj)
-    bsp = io.loadmat(subpath + f"i1.mat")['bsp']
-    env = make_env(env_id)
-    # env = make_env(env_id, num_envs=1, N=[19, 19, 19, 19], NT=[11, 11], bsp=bsp, wrapper=ActionWrapper)
-    # env = make_env(env_id, map_size=1)
-    name += f"_{subj}"
-    current_path = os.path.dirname(__file__)
-    log_dir = os.path.join(current_path, env_type, "tmp", "log", name, algo_type)
-    os.makedirs(log_dir, exist_ok=True)
-    # algo = FiniteSoftQiter(env, gamma=1, alpha=0.001, device=device)
+    subj = "sub04"
+    isPseudo = True
+    use_norm = True
+    name_tail = "_DeepMimic_PD_ptb3"
+
+    if isPseudo:
+        env_type = "Pseudo" + env_type
+    proj_dir = Path(__file__).parent.parent.parent
+    subpath = (proj_dir / "demos" / env_type / subj / subj)
+    states = [None for _ in range(35)]
+    for i in range(11, 16):
+        humanData = io.loadmat(str(subpath) + f"i{i}.mat")
+        bsp = humanData['bsp']
+        states[i - 1] = humanData['state']
+    env = make_env(f"{env_id}-v2", bsp=bsp, humanStates=states, use_norm=use_norm)
+    if use_norm:
+        env_type += "_norm"
+    log_dir = (Path(__file__).parent / "tmp" / "log" / env_type / (algo_type + name_tail))
+    log_dir.mkdir(parents=True, exist_ok=True)
     algo = PPO(
         MlpPolicy,
         env=env,
-        n_steps=2048*5,
-        batch_size=256,
+        n_steps=4096,
+        batch_size=1024,
+        learning_rate=0.0003,
         n_epochs=10,
         gamma=0.99,
-        gae_lambda=0.9,
+        gae_lambda=0.95,
         vf_coef=0.5,
-        ent_coef=0.0,
-        tensorboard_log=log_dir,
+        ent_coef=0.001,
+        tensorboard_log=str(log_dir),
         device=device,
+        policy_kwargs={'net_arch': [dict(pi=[16, 16], vf=[32, 32])]},
         verbose=1,
     )
     n = 1
-    while os.path.isdir(log_dir + f"/policies_{n}"):
+    while (log_dir / f"policies_{n}").is_dir():
         n += 1
-    os.makedirs(log_dir + f"/policies_{n}", exist_ok=False)
-    shutil.copy(os.path.abspath(__file__), log_dir + f"/policies_{n}")
-    for i in range(10):
+    (log_dir / f"policies_{n}").mkdir(parents=True, exist_ok=False)
+    shutil.copy(str(Path(__file__)), str(log_dir / f"policies_{n}"))
+    for i in range(50):
         algo.learn(total_timesteps=int(1e6), tb_log_name=f"extra_{n}", reset_num_timesteps=False)
-        algo.save(log_dir + f"/policies_{n}/agent_{i+1}")
-    # if algo.get_vec_normalize_env():
-    #     algo.env.save(log_dir + f"/policies_{n}/normalization.pkl")
-    print(f"saved as policies_{n}/agent.pkl")
+        algo.save(str(log_dir / f"policies_{n}/agent_{i + 1}"))
+        if use_norm:
+            algo.env.save(str(log_dir / f"policies_{n}/normalization_{i + 1}.pkl"))
+    print(f"Policy saved in policies_{n}")

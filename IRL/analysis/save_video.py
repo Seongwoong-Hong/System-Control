@@ -3,7 +3,7 @@ from scipy import io
 
 from algos.tabular.viter import FiniteSoftQiter
 from common.wrappers import RewardInputNormalizeWrapper, DiscretizeWrapper
-from common.verification import video_record
+from common.analyzer import video_record
 from common.util import make_env, CPU_Unpickler
 
 if __name__ == "__main__":

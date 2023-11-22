@@ -8,7 +8,7 @@ from gym_envs.envs import DataBasedDiscretizationInfo, FaissDiscretizationInfo, 
 from common.util import make_env
 from common.wrappers import *
 from common.rollouts import generate_trajectories_without_shuffle, TrajectoryWithPltqs
-from RL.src import IPLQRPolicy
+from RL.policies import IPLQRPolicy
 
 
 def main():
