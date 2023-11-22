@@ -30,11 +30,9 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
         torque = self.PDgain @ (self.obs_target - prev_ob).T / self.model.actuator_gear[0,0]
         torque = np.clip(torque, self.torque_space.low, self.torque_space.high)
 
-        # torque = action
-        # rew = - 0.01*np.sum(action**2)
-        rew = np.exp(-2*np.sum((prev_ob[:1] - self._humanData[self.timesteps, :1]) ** 2))\
-            + np.exp(-0.1*np.sum((prev_ob[1:] - self._humanData[self.timesteps, 1:]) ** 2))\
-            - 0.01 * np.sum(torque ** 2)
+        rew = np.exp(-10/np.linalg.norm(self._humanData[:, 0]) * (prev_ob[0] - self._humanData[self.timesteps, 0]) ** 2)\
+            + np.exp(-1/np.linalg.norm(self._humanData[:, 1]) * (prev_ob[1] - self._humanData[self.timesteps, 1]) ** 2)\
+            - torque[0] ** 2
         rew += 0.1
         ddx = self.ptb_acc[self.timesteps]
         self.data.qfrc_applied[:] = 0

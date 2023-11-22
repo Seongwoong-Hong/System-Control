@@ -50,7 +50,7 @@ def exec_policy(environment, policy, render="rgb_array", deterministic=True, rep
             rewards.append(rew.squeeze())
             imgs.append(img)
         acts_list.append(np.array(actions))
-        rews_list.append(np.array(rews_list))
+        rews_list.append(np.array(rewards))
         obs_list.append(np.array(observs))
     return obs_list, acts_list, rews_list, imgs
 

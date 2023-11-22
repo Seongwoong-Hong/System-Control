@@ -47,21 +47,15 @@ def test_1d(rl_path):
     print('end')
 
 
-def test_total_reward(ip_env, proj_path):
+def test_reward_norm(ip_env, proj_path, ip_env_norm):
     env = ip_env
+    norm_env = ip_env_norm
 
-    ob = env.reset()
-    done = False
-    acts = []
-    obs = []
-    rewards = []
-    while not done:
-        # act, _ = algo.predict(ob, deterministic=False)
-        # ob, reward, done, info = env.step(-np.array([[1000, 200, 300, 50], [200, 200, 50, 50]]) @ ob.T/100)
-        ob, reward, done, info = env.step(-np.array([800, 300]) @ ob.T/100)
-        rewards.append(reward)
-        acts.append(info['acts'])
-        obs.append(ob)
-    plt.plot(np.array(acts)[:, 0])
-    # plt.plot(env.env.ptb_acc)
-    plt.show()
+    prev_ob = env.reset()
+    norm_env.reset()
+
+    ob, reward, _, _ = env.step(-np.array([800, 300]) @ prev_ob.T/200)
+    norm_ob, norm_reward, _, _ = norm_env.step([-np.array([800, 300]) @ prev_ob.T/200])
+    normd_reward = norm_env.normalize_reward(reward)
+    print(norm_reward[0], normd_reward)
+    print(norm_env.unnormalize_obs(norm_ob)[0], ob)

@@ -98,22 +98,23 @@ def proj_path():
 def ip_env(proj_path):
     subpath = os.path.join(proj_path, "demos", "IP", "sub04", "sub04")
     states = [None for _ in range(35)]
-    for i in range(31, 36):
-        humanData = io.loadmat(subpath + f"i{i}.mat")
-        states[i - 1] = humanData['state']
-        bsp = humanData['bsp']
+    humanData = io.loadmat(subpath + f"i{11}.mat")
+    states[11 - 1] = humanData['state']
+    bsp = humanData['bsp']
     return make_env(f"IP_custom-v0", bsp=bsp, humanStates=states)
 
 
 @pytest.fixture
 def ip_env_norm(proj_path):
+    norm_path = os.path.join(proj_path, "RL", "scripts", "tmp", "log", "PseudoIP_norm", "ppo_DeepMimic_PD_ptb3", "policies_3", "normalization_2.pkl")
+    if norm_path is None:
+        norm_path = True
     subpath = os.path.join(proj_path, "demos", "IP", "sub04", "sub04")
     states = [None for _ in range(35)]
-    for i in range(31, 36):
-        humanData = io.loadmat(subpath + f"i{i}.mat")
-        states[i - 1] = humanData['state']
-        bsp = humanData['bsp']
-    return make_env(f"IP_custom-v0", bsp=bsp, humanStates=states, use_norm=True)
+    humanData = io.loadmat(subpath + f"i{11}.mat")
+    states[11 - 1] = humanData['state']
+    bsp = humanData['bsp']
+    return make_env(f"IP_custom-v0", bsp=bsp, humanStates=states, use_norm=norm_path)
 
 
 @pytest.fixture
