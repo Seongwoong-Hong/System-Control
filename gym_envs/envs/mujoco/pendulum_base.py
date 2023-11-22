@@ -1,12 +1,10 @@
-from copy import deepcopy
-
 import mujoco_py
 import numpy as np
-from gym import utils, spaces
+from copy import deepcopy
 from gym.envs.mujoco import mujoco_env
 
 
-class BasePendulum(mujoco_env.MujocoEnv, utils.EzPickle):
+class BasePendulum(mujoco_env.MujocoEnv):
     def __init__(self, filepath, humanStates):
         self.timesteps = 0
         self._epi_len = 360
@@ -16,12 +14,11 @@ class BasePendulum(mujoco_env.MujocoEnv, utils.EzPickle):
         self._ptbT = 1/3
         self._humanStates = humanStates
         for self._humanData in self._humanStates:
-            if self._humanData is not np.nan:
+            if self._humanData is not None:
                 break
         if self._humanData is np.nan:
             raise Exception("잘못된 실험 데이터 입력")
         mujoco_env.MujocoEnv.__init__(self, filepath, 1)
-        utils.EzPickle.__init__(self)
 
     def __deepcopy__(self, memo):
         cls = self.__class__
@@ -52,7 +49,7 @@ class BasePendulum(mujoco_env.MujocoEnv, utils.EzPickle):
     def reset_ptb(self):
         idx = self.np_random.choice(range(len(self._humanStates)))
         self._humanData = self._humanStates[idx]
-        while self._humanData is np.nan:
+        while self._humanData is None:
             idx = self.np_random.choice(range(len(self._humanStates)))
             self._humanData = self._humanStates[idx]
         x_max = self._ptb_range[idx // 5]

@@ -1,3 +1,5 @@
+import copy
+import inspect
 import os
 import torch
 import pickle
@@ -71,7 +73,7 @@ def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):
         else:
             env = VecNormalize(env, norm_obs=True, norm_reward=True)
     elif num_envs:
-        env = DummyVecEnv([lambda: define_env() for _ in range(num_envs)])
+        env = DummyVecEnv([lambda: Monitor(define_env()) for _ in range(num_envs)])
     else:
         env = define_env()
 

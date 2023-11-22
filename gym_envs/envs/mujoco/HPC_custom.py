@@ -23,7 +23,7 @@ class IDPHuman(mujoco_env.MujocoEnv, utils.EzPickle):
         if bsp is not None:
             self._set_body_config(filepath, bsp)
         mujoco_env.MujocoEnv.__init__(self, filepath, frame_skip=1)
-        utils.EzPickle.__init__(self)
+        utils.EzPickle.__init__(self, bsp, pltqs, init_states)
         self.init_qpos = np.array([0.0, 0.0])
         self.init_qvel = np.array([0.0, 0.0])
 

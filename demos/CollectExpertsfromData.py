@@ -5,19 +5,19 @@ from common.rollouts import TrajectoryWithPltqs
 from common.util import make_env
 
 if __name__ == '__main__':
-    env_type = "HPC"
-    env_id = f"{env_type}-v2"
-    act_coeff = 300
+    env_type = "IDP"
+    env_id = f"{env_type}_custom-v2"
+    act_coeff = 100
     env = make_env(f"{env_id}")
     # act_coeff = env.model.actuator_gear[0, 0]
-    for subi in range(5, 6):
+    for subi in range(1, 11):
         # subi = 3
         sub = f"sub{subi:02d}"
-        for actuation in range(4, 5):
+        for actuation in range(1, 8):
             trajectories = []
             for exp_trial in range(1, 6):
                 # for part in range(0):
-                file = f"HPC/{sub}_full/{sub}i{5 * (actuation - 1) + exp_trial}.mat"
+                file = f"IDP/{sub}_full/{sub}i{5 * (actuation - 1) + exp_trial}.mat"
                 states = io.loadmat(file)['state'][None, ...]
                 Ts = io.loadmat(file)['tq'][None, ...]
                 for idx in range(len(states)):

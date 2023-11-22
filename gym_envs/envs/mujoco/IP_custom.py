@@ -1,29 +1,40 @@
 import os
+
 import mujoco_py
 import numpy as np
 from gym import utils, spaces
-from gym.envs.mujoco import mujoco_env
 from xml.etree.ElementTree import ElementTree, parse
 
 from gym_envs.envs.mujoco import BasePendulum
 
 
-class IPCustomDet(BasePendulum):
+class IPCustomDet(BasePendulum, utils.EzPickle):
     def __init__(self, bsp=None, humanStates=None):
         self.high = np.array([0.25, 1.0])
         self.low = np.array([-0.25, -1.0])
+        self.PDgain = np.array([1000, 100])
+        self.action_frame = 0
+        self.obs_target = np.array([0, 0])
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml")
         super(IPCustomDet, self).__init__(filepath, humanStates)
         if bsp is not None:
             self._set_body_config(filepath, bsp)
         self.observation_space = spaces.Box(low=self.low, high=self.high)
+        utils.EzPickle.__init__(self, bsp, humanStates)
 
-    def step(self, action: np.ndarray):
+    def step(self, obs_query: np.ndarray):
         prev_ob = self._get_obs()
+        if self.action_frame % 4 == 0:
+            self.obs_target = obs_query
+            self.action_frame += 1
+        torque = self.PDgain @ (self.obs_target - prev_ob).T / self.model.actuator_gear[0,0]
+        torque = np.clip(torque, self.torque_space.low, self.torque_space.high)
+
+        # torque = action
         # rew = - 0.01*np.sum(action**2)
         rew = np.exp(-2*np.sum((prev_ob[:1] - self._humanData[self.timesteps, :1]) ** 2))\
             + np.exp(-0.1*np.sum((prev_ob[1:] - self._humanData[self.timesteps, 1:]) ** 2))\
-            - 0.01 * np.sum(action ** 2)
+            - 0.01 * np.sum(torque ** 2)
         rew += 0.1
         ddx = self.ptb_acc[self.timesteps]
         self.data.qfrc_applied[:] = 0
@@ -35,7 +46,7 @@ class IPCustomDet(BasePendulum):
         # qpos = np.clip(ob[:1], a_min=np.array([-0.1]), a_max=np.array([0.1]))
         # qvel = np.clip(ob[1:], a_min=np.array([-0.3]), a_max=np.array([0.3]))
         # self.set_state(qpos, qvel)
-        self.do_simulation(action, self.frame_skip)
+        self.do_simulation(torque, self.frame_skip)
         done = False
         ob = self._get_obs()
         if (ob[0] > (self.high[0] - 0.05)) or (ob[0] < (self.low[0] - 0.05)):
@@ -45,6 +56,11 @@ class IPCustomDet(BasePendulum):
         info = {"acts": self.data.qfrc_actuator.copy(), 'ptT': self.data.qfrc_applied.copy()}
         self.timesteps += 1
         return ob, rew, done, info
+
+    def reset_model(self):
+        self.action_frame = 0
+        self.obs_target = np.array([0, 0])
+        return super(IPCustomDet, self).reset_model()
 
     @staticmethod
     def _set_body_config(filepath, bsp):
@@ -69,6 +85,13 @@ class IPCustomDet(BasePendulum):
         m_tree = ElementTree(root)
         m_tree.write(filepath + ".tmp")
         os.replace(filepath + ".tmp", filepath)
+
+    def _set_action_space(self):
+        bounds = self.model.actuator_ctrlrange.copy().astype(np.float32)
+        low, high = bounds.T
+        self.torque_space = spaces.Box(low=low, high=high, dtype=np.float32)
+        self.action_space = spaces.Box(low=4 * self.low, high=4 * self.high, dtype=np.float32)
+        return self.action_space
 
 
 class IPCustom(IPCustomDet):
