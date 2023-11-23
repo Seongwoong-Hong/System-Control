@@ -21,9 +21,9 @@ if __name__ == "__main__":
     trial = 11
     isPseudo = True
     use_norm = True
-    policy_num = 12
-    tmp_num = 1
-    name_tail = "_DeepMimic_PD_ptb3"
+    policy_num = 1
+    tmp_num = 13
+    name_tail = "_DeepMimic_actionSkip_ptb3/PD1000200"
 
     if isPseudo:
         env_type = "Pseudo" + env_type
@@ -45,6 +45,6 @@ if __name__ == "__main__":
     agent = PPO.load(model_dir + f"/agent_{tmp_num}")
 
     obs, acts, nrews, _ = exec_policy(env, agent, render="rgb_array", deterministic=True, repeat_num=1)
-    # rews = reward_fn(env.unnormalize_obs(obs[0][:-1]), acts[0]/200, states[trial - 1])
-    rews = reward_fn(states[trial - 1], acts[0] / 200, states[trial - 1])
-    print(np.sum(nrews[0]), np.sum(env.normalize_reward(rews[0])))
+    rews = reward_fn(env.unnormalize_obs(obs[0][:-1]), acts[0] / 200, states[trial - 1])
+    human_rews = reward_fn(states[trial - 1], acts[0] / 200, states[trial - 1])
+    print(np.sum(rews[0]), np.sum(human_rews[0]))

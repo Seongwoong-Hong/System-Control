@@ -1,7 +1,7 @@
 import os
+import cv2
 import numpy as np
 import torch as th
-from skvideo.io import FFmpegWriter
 from typing import Dict, List, Optional
 
 from matplotlib import pyplot as plt
@@ -11,10 +11,15 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 def video_record(imgs: List, filename: str, dt: float):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    writer = FFmpegWriter(filename, outputdict={'-r': str(int(1 / dt))})
+    frame_height = imgs[0].shape[0]
+    frame_width = imgs[0].shape[1]
+    fps = int(1 / dt)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    writer = cv2.VideoWriter(filename, fourcc, fps, (frame_width, frame_height))
     for img in imgs:
-        writer.writeFrame(img)
-    writer.close()
+        img_bgr = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+        writer.write(img_bgr)
+    writer.release()
 
 
 def exec_policy(environment, policy, render="rgb_array", deterministic=True, repeat_num=5):

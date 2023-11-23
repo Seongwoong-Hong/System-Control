@@ -3,7 +3,7 @@ from scipy import io
 from matplotlib import pyplot as plt
 from common.util import make_env
 from algos.torch.ppo import PPO
-from common.analyzer import exec_policy
+from common.analyzer import exec_policy, video_record
 
 
 if __name__ == "__main__":
@@ -13,9 +13,10 @@ if __name__ == "__main__":
     trial = 11
     isPseudo = True
     use_norm = True
-    policy_num = 12
-    tmp_num = 8
-    name_tail = "_DeepMimic_PD_ptb3"
+    policy_num = 1
+    tmp_num = 13
+    name_tail = "_DeepMimic_actionSkip_ptb3/PD1000200"
+    save_video = "video1"
 
     if isPseudo:
         env_type = "Pseudo" + env_type
@@ -36,7 +37,7 @@ if __name__ == "__main__":
 
     agent = PPO.load(model_dir + f"/agent_{tmp_num}")
 
-    obs, acts, _, _ = exec_policy(env, agent, render="rgb_array", deterministic=False, repeat_num=1)
+    obs, acts, _, imgs = exec_policy(env, agent, render="rgb_array", deterministic=False, repeat_num=1)
     if use_norm:
         obs = env.unnormalize_obs(obs)
     plt.plot(obs[0][:-1, 0])
@@ -44,3 +45,6 @@ if __name__ == "__main__":
     plt.show()
     plt.plot(acts[0])
     plt.show()
+
+    if save_video is not None:
+        video_record(imgs, f"videos/{save_video}.mp4", env.get_attr("dt")[0])
