@@ -103,16 +103,11 @@ register(
     max_episode_steps=360,
 )
 
-register(
-    id='IDP_custom-v1',
-    entry_point='gym_envs.envs.mujoco:IDPCustomExp',
-    max_episode_steps=360,
-)
 
 register(
     id='IDP_custom-v2',
     entry_point='gym_envs.envs.mujoco:IDPCustom',
-    max_episode_steps=360,
+    max_episode_steps=90,
 )
 
 register(

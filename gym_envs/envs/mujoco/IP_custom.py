@@ -9,21 +9,16 @@ from gym_envs.envs.mujoco import BasePendulum
 
 
 class IPCustomDet(BasePendulum, utils.EzPickle):
-    def __init__(self, bsp=None, humanStates=None, PDgain=None):
+    def __init__(self, *args, **kwargs):
         self.high = np.array([0.25, 1.0])
         self.low = np.array([-0.25, -1.0])
         self.action_skip = 4
         self.action_frame = 0
-        self.PDgain = PDgain
-        if PDgain is None:
-            self.PDgain = np.array([1000, 100])
         self.obs_target = np.array([0, 0])
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml")
-        super(IPCustomDet, self).__init__(filepath, humanStates)
-        if bsp is not None:
-            self._set_body_config(filepath, bsp)
+        super(IPCustomDet, self).__init__(filepath, *args, **kwargs)
         self.observation_space = spaces.Box(low=self.low, high=self.high)
-        utils.EzPickle.__init__(self, bsp, humanStates)
+        utils.EzPickle.__init__(self, *args, **kwargs)
 
     def step(self, obs_query: np.ndarray):
         prev_ob = self._get_obs()
@@ -37,6 +32,9 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
             + 0.2*np.exp(-10/np.linalg.norm(self._humanData[:, 1]) * (prev_ob[1] - self._humanData[self.timesteps, 1]) ** 2)\
             - 0.1 * torque[0] ** 2
         rew += 0.1
+        if self.ankle_max is not None:
+            rew -= 1/((np.abs(torque)[0] - self.ankle_max/self.model.actuator_gear[0, 0])**2 + 1e-6)
+
         ddx = self.ptb_acc[self.timesteps]
         self.data.qfrc_applied[:] = 0
         for idx, bodyName in enumerate(["pole"]):
@@ -44,6 +42,7 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
             force_vector = np.array([-self.model.body_mass[body_id]*ddx, 0, 0])
             point = self.data.subtree_com[body_id]
             mujoco_py.functions.mj_applyFT(self.model, self.data, force_vector, np.zeros(3), point, body_id, self.data.qfrc_applied)
+
         self.do_simulation(torque, self.frame_skip)
         done = False
         ob = self._get_obs()
@@ -51,8 +50,8 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
             done = True
             rew -= 50
 
-        info = {"acts": self.data.qfrc_actuator.copy(), 'ptT': self.data.qfrc_applied.copy()}
         self.timesteps += 1
+        info = {"acts": self.data.qfrc_actuator.copy(), 'ptT': self.data.qfrc_applied.copy()}
         return ob, rew, done, info
 
     def reset_model(self):
@@ -104,6 +103,7 @@ class IPCustom(IPCustomDet):
                 + 0.2*np.exp(-10/np.linalg.norm(self._humanData[:, 1]) * (prev_ob[1] - self._humanData[self.timesteps, 1]) ** 2)\
                 - 0.1 * torque[0] ** 2
             rew += 0.1
+
             ddx = self.ptb_acc[self.timesteps]
             self.data.qfrc_applied[:] = 0
             for idx, bodyName in enumerate(["pole"]):
@@ -123,7 +123,11 @@ class IPCustom(IPCustomDet):
         return ob, rew, done, info
 
     def reset_ptb(self):
-        super().reset_ptb()
+        self._ptb_idx = self.np_random.choice(range(len(self._humanStates)))
+        self._humanData = self._humanStates[self._ptb_idx]
+        while self._humanData is None:
+            self._ptb_idx = self.np_random.choice(range(len(self._humanStates)))
+            self._humanData = self._humanStates[self._ptb_idx]
         st_time_dix = self.np_random.choice(range(self._epi_len))
         self._ptb_acc = np.append(self._ptb_acc, self._ptb_acc, axis=0)[st_time_dix:st_time_dix+self._epi_len]
         self._humanData = np.append(self._humanData, self._humanData, axis=0)[st_time_dix:st_time_dix+self._epi_len]
