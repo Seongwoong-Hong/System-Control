@@ -1,10 +1,9 @@
-import os
-import pickle
+from pathlib import Path
+
 from scipy import io, signal
 
 from imitation.data import rollout, types
 
-from gym_envs.envs import DataBasedDiscretizationInfo, FaissDiscretizationInfo, UncorrDiscretizationInfo
 from common.util import make_env
 from common.wrappers import *
 from common.rollouts import generate_trajectories_without_shuffle, TrajectoryWithPltqs

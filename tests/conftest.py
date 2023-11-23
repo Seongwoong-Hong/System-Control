@@ -133,9 +133,9 @@ def ip_env_vec(IPbsp, IPhumanStates):
 @pytest.fixture
 def idp_env(proj_path):
     subpath = os.path.join(proj_path, "demos", "IDP", "sub04", "sub04")
-    states = [np.nan for _ in range(35)]
+    states = [None for _ in range(35)]
     for i in range(31, 36):
         humanData = io.loadmat(subpath + f"i{i}.mat")
         states[i - 1] = humanData['state']
         bsp = humanData['bsp']
-    return make_env(f"IDP_custom-v0", bsp=bsp, humanStates=states)
+    return make_env("IDP_custom-v0", bsp=bsp, humanStates=states)

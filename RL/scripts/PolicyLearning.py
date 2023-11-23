@@ -10,26 +10,29 @@ from common.util import make_env
 
 if __name__ == "__main__":
     # 환경 설정
-    env_type = "IP"
+    env_type = "IDP"
     algo_type = "ppo"
     env_id = f"{env_type}_custom"
     device = "cpu"
     subj = "sub04"
     isPseudo = True
     use_norm = True
-    PDgain = np.array([2000, 10])
-    name_tail = f"_DeepMimic_actionSkip_ptb1to6/PD{PDgain[0]}{PDgain[1]}"
+    PDgain = np.array([1000, 10])
+    stptb = 1
+    edptb = 6
+    ankle_max = 100
+    name_tail = f"_DeepMimic_actionSkip_ptb{stptb}to{edptb}/PD{PDgain[0]}{PDgain[1]}_ankLim"
 
     if isPseudo:
         env_type = "Pseudo" + env_type
     proj_dir = Path(__file__).parent.parent.parent
     subpath = (proj_dir / "demos" / env_type / subj / subj)
     states = [None for _ in range(35)]
-    for i in range(1, 31):
+    for i in range(5*(stptb - 1) + 1, 5*edptb + 1):
         humanData = io.loadmat(str(subpath) + f"i{i}.mat")
         bsp = humanData['bsp']
         states[i - 1] = humanData['state']
-    env = make_env(f"{env_id}-v2", num_envs=4, bsp=bsp, humanStates=states, use_norm=use_norm, PDgain=PDgain)
+    env = make_env(f"{env_id}-v2", num_envs=8, bsp=bsp, humanStates=states, use_norm=use_norm, PDgain=PDgain, ankle_max=ankle_max)
     if use_norm:
         env_type += "_norm"
     log_dir = (Path(__file__).parent / "tmp" / "log" / env_type / (algo_type + name_tail))
@@ -37,7 +40,7 @@ if __name__ == "__main__":
     algo = PPO(
         MlpPolicy,
         env=env,
-        n_steps=1024,
+        n_steps=512,
         batch_size=1024,
         learning_rate=0.0003,
         n_epochs=20,
