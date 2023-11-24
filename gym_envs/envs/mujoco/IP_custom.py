@@ -1,5 +1,4 @@
 import os
-
 import mujoco_py
 import numpy as np
 from gym import utils, spaces
@@ -12,8 +11,6 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
     def __init__(self, *args, **kwargs):
         self.high = np.array([0.25, 1.0])
         self.low = np.array([-0.25, -1.0])
-        self.action_skip = 4
-        self.action_frame = 0
         self.obs_target = np.array([0, 0])
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml")
         super(IPCustomDet, self).__init__(filepath, *args, **kwargs)
@@ -23,17 +20,12 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
     def step(self, obs_query: np.ndarray):
         prev_ob = self._get_obs()
         rew = 0
-        if self.timesteps % self.action_skip == 0:
+        if self.timesteps % self._action_frame_skip == 0:
             self.obs_target[0] = obs_query
-        torque = self.PDgain @ (self.obs_target - prev_ob).T / self.model.actuator_gear[0,0]
+        torque = self.PDgain @ (self.obs_target - prev_ob).T / self.model.actuator_gear[0, 0]
         torque = np.clip(torque, self.torque_space.low, self.torque_space.high)
 
-        rew += np.exp(-100/np.linalg.norm(self._humanData[:, 0]) * (prev_ob[0] - self._humanData[self.timesteps, 0]) ** 2)\
-            + 0.2*np.exp(-10/np.linalg.norm(self._humanData[:, 1]) * (prev_ob[1] - self._humanData[self.timesteps, 1]) ** 2)\
-            - 0.1 * torque[0] ** 2
-        rew += 0.1
-        if self.ankle_max is not None:
-            rew -= 1/((np.abs(torque)[0] - self.ankle_max/self.model.actuator_gear[0, 0])**2 + 1e-6)
+        rew += self.reward_fn(prev_ob, torque)
 
         ddx = self.ptb_acc[self.timesteps]
         self.data.qfrc_applied[:] = 0
@@ -49,6 +41,9 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
         if (ob[0] > (self.high[0] - 0.05)) or (ob[0] < (self.low[0] - 0.05)):
             done = True
             rew -= 50
+        elif self.ankle_max is not None:
+            done = np.abs(torque)[0] >= (self.ankle_max/self.model.actuator_gear[0, 0])
+            rew -= 100
 
         self.timesteps += 1
         info = {"acts": self.data.qfrc_actuator.copy(), 'ptT': self.data.qfrc_applied.copy()}
@@ -57,6 +52,15 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
     def reset_model(self):
         self.obs_target = np.array([0, 0])
         return super(IPCustomDet, self).reset_model()
+
+    def reward_fn(self, ob, torque):
+        rew = 0
+        rew += np.exp(-200 * (ob[0] - self._humanData[self.timesteps, 0]) ** 2) \
+            + 0.2 * np.exp(-1 * (ob[1] - self._humanData[self.timesteps, 1]) ** 2)
+        rew += 0.1
+        if self.ankle_max is not None:
+            rew -= 1e-3 / ((np.abs(torque)[0] - self.ankle_max / self.model.actuator_gear[0, 0]) ** 2 + 1e-4)
+        return rew
 
     @staticmethod
     def _set_body_config(filepath, bsp):
@@ -94,15 +98,12 @@ class IPCustom(IPCustomDet):
     def step(self, obs_query: np.ndarray):
         rew = 0
         self.obs_target[0] = obs_query
-        for _ in range(self.action_skip):
+        for _ in range(self._action_frame_skip):
             prev_ob = self._get_obs()
             torque = self.PDgain @ (self.obs_target - prev_ob).T / self.model.actuator_gear[0,0]
             torque = np.clip(torque, self.torque_space.low, self.torque_space.high)
 
-            rew += np.exp(-100/np.linalg.norm(self._humanData[:, 0]) * (prev_ob[0] - self._humanData[self.timesteps, 0]) ** 2)\
-                + 0.2*np.exp(-10/np.linalg.norm(self._humanData[:, 1]) * (prev_ob[1] - self._humanData[self.timesteps, 1]) ** 2)\
-                - 0.1 * torque[0] ** 2
-            rew += 0.1
+            rew += self.reward_fn(prev_ob, torque)
 
             ddx = self.ptb_acc[self.timesteps]
             self.data.qfrc_applied[:] = 0
@@ -117,7 +118,8 @@ class IPCustom(IPCustomDet):
             if (ob[0] > (self.high[0] - 0.05)) or (ob[0] < (self.low[0] - 0.05)):
                 done = True
                 rew -= 50
-
+            if self.timesteps == 0:
+                done = False
             info = {"acts": self.data.qfrc_actuator.copy(), 'ptT': self.data.qfrc_applied.copy()}
             self.timesteps += 1
         return ob, rew, done, info

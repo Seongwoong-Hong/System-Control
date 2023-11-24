@@ -114,7 +114,7 @@ def IPbsp(IPhumanData):
 
 @pytest.fixture
 def ip_env(IPbsp, IPhumanStates):
-    return make_env(f"IP_custom-v0", bsp=IPbsp, humanStates=IPhumanStates)
+    return make_env(f"IP_custom-v2", bsp=IPbsp, humanStates=IPhumanStates)
 
 
 @pytest.fixture

@@ -12,18 +12,15 @@ class IDPCustomDet(BasePendulum, utils.EzPickle):
     def __init__(self, *args, **kwargs):
         self.high = np.array([0.2, 0.2, 1.0, 1.0])
         self.low = np.array([-0.2, -0.2, -1.0, -1.0])
-        self.action_skip = 4
-        self.action_frame = 0
         self.obs_target = np.zeros(4)
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml")
         super(IDPCustomDet, self).__init__(filepath, *args, **kwargs)
         self.observation_space = spaces.Box(low=self.low, high=self.high)
-        utils.EzPickle.__init__(self, *args, **kwargs)
 
     def step(self, obs_query: np.ndarray):
         prev_ob = self._get_obs()
         r = 0
-        if self.timesteps % self.action_skip == 0:
+        if self.timesteps % self._action_frame_skip == 0:
             self.obs_target[:2] = obs_query
 
         torque = np.array([0, 0])
@@ -33,12 +30,7 @@ class IDPCustomDet(BasePendulum, utils.EzPickle):
             torque[segi] /= self.model.actuator_gear[0, 0]
         torque = np.clip(torque, self.torque_space.low, self.torque_space.high)
 
-        r += np.exp(-200 * np.sum((prev_ob[:2] - self._humanData[self.timesteps, :2]) ** 2)) \
-            + 0.2 * np.exp(-1 * np.sum((prev_ob[2:] - self._humanData[self.timesteps, 2:]) ** 2)) \
-            - 0.1 * np.sum(torque ** 2)
-        r += 0.1
-        if self.ankle_max is not None:
-            r -= 1/((np.abs(torque[0]) - self.ankle_max/self.model.actuator_gear[0, 0])**2 + 1e-6)
+        r += self.reward_fn(prev_ob, torque)
 
         ddx = self.ptb_acc[self.timesteps]
         self.data.qfrc_applied[:] = 0
@@ -51,7 +43,6 @@ class IDPCustomDet(BasePendulum, utils.EzPickle):
         self.do_simulation(torque, self.frame_skip)
         ob = self._get_obs()
         done = ((ob[:2] < self.low[:2]).any() or (ob[:2] > self.high[:2]).any())
-        done = done and not self.timesteps == 0
         if done:
             r -= 50
 
@@ -62,6 +53,16 @@ class IDPCustomDet(BasePendulum, utils.EzPickle):
     def reset_model(self):
         self.obs_target = np.zeros(4)
         return super(IDPCustomDet, self).reset_model()
+
+    def reward_fn(self, ob, torque):
+        r = 0
+        r += np.exp(-200 * np.sum((ob[:2] - self._humanData[self.timesteps, :2]) ** 2)) \
+            + 0.2 * np.exp(-1 * np.sum((ob[2:] - self._humanData[self.timesteps, 2:]) ** 2)) \
+            - 0.1 * np.sum(torque ** 2)
+        r += 0.1
+        if self.ankle_max is not None:
+            r -= 1/((np.abs(torque[0]) - self.ankle_max/self.model.actuator_gear[0, 0])**2 + 1e-2)
+        return r
 
     @staticmethod
     def _set_body_config(filepath, bsp):
@@ -101,7 +102,7 @@ class IDPCustom(IDPCustomDet):
     def step(self, obs_query: np.ndarray):
         r = 0
         self.obs_target[:2] = obs_query
-        for _ in range(self.action_skip):
+        for _ in range(self._action_frame_skip):
             prev_ob = self._get_obs()
             torque = np.array([0, 0])
             for segi in range(2):
@@ -109,10 +110,7 @@ class IDPCustom(IDPCustomDet):
                                + self.PDgain[1] * (self.obs_target[segi + 2] - prev_ob[segi + 2])
             torque = np.clip(torque, self.torque_space.low, self.torque_space.high)
 
-            r += np.exp(-200 * np.sum((prev_ob[:2] - self._humanData[self.timesteps, :2]) ** 2)) \
-                + 0.2 * np.exp(-1 * np.sum((prev_ob[2:] - self._humanData[self.timesteps, 2:]) ** 2)) \
-                - 0.1 * np.sum(torque ** 2)
-            r += 0.1
+            r += self.reward_fn(prev_ob, torque)
 
             ddx = self.ptb_acc[self.timesteps]
             self.data.qfrc_applied[:] = 0
@@ -128,6 +126,8 @@ class IDPCustom(IDPCustomDet):
             done = ((ob[:2] < self.low[:2]).any() or (ob[:2] > self.high[:2]).any())
             if done:
                 r -= 50
+            if self.timesteps == 0:
+                done = False
             self.timesteps += 1
             info = {'obs': prev_ob.reshape(1, -1), "acts": self.data.qfrc_actuator.copy()}
         return ob, r, done, info

@@ -12,13 +12,13 @@ if __name__ == "__main__":
     env_type = "IP"
     env_id = f"{env_type}_custom"
     subj = "sub04"
-    trials = [15]
+    trials = [5, 10, 15, 20, 25, 30, 35]
     isPseudo = True
     use_norm = True
-    policy_num = 1
-    tmp_num = 1
-    PDgain = np.array([1000, 10])
-    name_tail = "_DeepMimic_actionSkip_ptb3to3/PD100010_ankLim"
+    policy_num = 2
+    tmp_num = 15
+    PDgain = np.array([1000, 200])
+    name_tail = f"_DeepMimic_actionSkip_ptb1to6/PD{PDgain[0]}{PDgain[1]}_ankLim"
     save_video = None
 
     if isPseudo:
@@ -41,7 +41,10 @@ if __name__ == "__main__":
 
     agent = PPO.load(model_dir + f"/agent_{tmp_num}")
 
-    obs, acts, _, imgs = exec_policy(env, agent, render="rgb_array", deterministic=False, repeat_num=10)
+    render = "rgb_array"
+    if save_video is None:
+        render = None
+    obs, acts, _, imgs = exec_policy(env, agent, render=render, deterministic=False, repeat_num=10)
     if use_norm:
         norm_obs = []
         for ob in obs:
