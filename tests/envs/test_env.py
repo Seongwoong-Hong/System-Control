@@ -28,8 +28,8 @@ def test_vecenv_state(ip_env_vec):
     print(obs)
 
 
-def test_env_time_idx(ip_env):
-    env = ip_env
+def test_env_time_idx(idp_env):
+    env = idp_env
     env.reset()
     done = False
     while not done:

@@ -25,16 +25,19 @@ def video_record(imgs: List, filename: str, dt: float):
 def exec_policy(environment, policy, render="rgb_array", deterministic=True, repeat_num=5):
     if render == 'human':
         raise Exception("현재 환경에서 rendering은 지원하지 않습니다.")
+    isvecenv = hasattr(environment, "venv")
     imgs = []
     acts_list = []
     obs_list = []
     rews_list = []
+    torq_list = []
+    ob = environment.reset()
     for _ in range(repeat_num):
         actions = []
         rewards = []
         observs = []
+        torques = []
         environment.render(mode=render)
-        ob = environment.reset()
         observs.append(ob.squeeze())
         done = False
         img = environment.render(mode=render)
@@ -45,19 +48,23 @@ def exec_policy(environment, policy, render="rgb_array", deterministic=True, rep
             img = environment.render(mode=render)
             if hasattr(environment, "action") and callable(environment.action):
                 act = environment.action(act)
-            if type(info) == list:
+            if isvecenv:
                 info = info[0]
-            if "acts" in info:
-                actions.append(info["acts"])
-            else:
-                actions.append(act.squeeze())
+            if "torque" in info:
+                torques.append(info["torque"].squeeze())
+            actions.append(act.squeeze())
             observs.append(ob.squeeze())
             rewards.append(rew.squeeze())
             imgs.append(img)
+            if "terminal_observation" in info:
+                ob = info["terminal_observation"]
+                if isvecenv:
+                    ob = np.array([ob])
+        torq_list.append(np.array(torques))
         acts_list.append(np.array(actions))
         rews_list.append(np.array(rewards))
         obs_list.append(np.array(observs))
-    return obs_list, acts_list, rews_list, imgs
+    return obs_list, acts_list, rews_list, imgs, torq_list
 
 
 class CostMap:

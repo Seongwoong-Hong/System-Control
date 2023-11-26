@@ -138,4 +138,4 @@ def idp_env(proj_path):
         humanData = io.loadmat(subpath + f"i{i}.mat")
         states[i - 1] = humanData['state']
         bsp = humanData['bsp']
-    return make_env("IDP_custom-v0", bsp=bsp, humanStates=states)
+    return make_env("IDP_custom-v0", bsp=bsp, humanStates=states, ankle_max=100)

@@ -10,18 +10,18 @@ from common.util import make_env
 
 if __name__ == "__main__":
     # 환경 설정
-    env_type = "IDP"
+    env_type = "IP"
     algo_type = "ppo"
     env_id = f"{env_type}_custom"
     device = "cpu"
     subj = "sub04"
-    isPseudo = True
+    isPseudo = False
     use_norm = True
     PDgain = np.array([1000, 200])
     stptb = 1
-    edptb = 6
+    edptb = 4
     ankle_max = 100
-    name_tail = f"_DeepMimic_ptb{stptb}to{edptb}/PD{PDgain[0]}{PDgain[1]}_ankLim"
+    name_tail = f"_DeepMimic_actionSkip_ptb{stptb}to{edptb}/PD{PDgain[0]}{PDgain[1]}_ankLim"
 
     if isPseudo:
         env_type = "Pseudo" + env_type
