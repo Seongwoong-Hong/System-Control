@@ -11,21 +11,26 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
     def __init__(self, *args, **kwargs):
         self.high = np.array([0.25, 1.0])
         self.low = np.array([-0.25, -1.0])
-        self.obs_target = np.array([0, 0])
+        self.obs_target = np.array([0.0, 0.0], dtype=np.float32)
+        self.prev_torque = np.array([0.0], dtype=np.float32)
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml")
         super(IPCustomDet, self).__init__(filepath, *args, **kwargs)
         self.observation_space = spaces.Box(low=self.low, high=self.high)
         utils.EzPickle.__init__(self, *args, **kwargs)
 
     def step(self, obs_query: np.ndarray):
-        prev_ob = self._get_obs()
-        rew = 0
         if self.timesteps % self._action_frame_skip == 0:
             self.obs_target[0] = obs_query
-        torque = self.PDgain @ (self.obs_target - prev_ob).T / self.model.actuator_gear[0, 0]
-        torque = np.clip(torque, self.torque_space.low, self.torque_space.high)
+        return self.step_once()
 
-        rew += self.reward_fn(prev_ob, torque)
+    def step_once(self):
+        rew = 0
+        prev_ob = self._get_obs()
+        torque = self.PDgain @ (self.obs_target - prev_ob).T
+
+        action = np.clip(torque / self.model.actuator_gear[0, 0], self.torque_space.low, self.torque_space.high)
+
+        rew += self.reward_fn(prev_ob, action)
 
         ddx = self.ptb_acc[self.timesteps]
         self.data.qfrc_applied[:] = 0
@@ -35,31 +40,34 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
             point = self.data.subtree_com[body_id]
             mujoco_py.functions.mj_applyFT(self.model, self.data, force_vector, np.zeros(3), point, body_id, self.data.qfrc_applied)
 
-        self.do_simulation(torque, self.frame_skip)
-        done = False
+        self.do_simulation(action, self.frame_skip)
         ob = self._get_obs()
+
+        done = False
         if (ob[0] > (self.high[0] - 0.05)) or (ob[0] < (self.low[0] - 0.05)):
             done = True
-            rew -= 50
-        elif self.ankle_max is not None:
-            done = np.abs(torque)[0] >= (self.ankle_max/self.model.actuator_gear[0, 0])
-            rew -= 100
+        if np.abs(self.prev_torque - torque) >= 7:
+            done = True
+        if self.timesteps < 10:
+            done = False
 
         self.timesteps += 1
-        info = {"acts": self.data.qfrc_actuator.copy(), 'ptT': self.data.qfrc_applied.copy()}
+        info = {"torque": self.data.qfrc_actuator.copy(), 'ptT': self.data.qfrc_applied.copy()}
+        self.prev_torque = torque
+
         return ob, rew, done, info
 
     def reset_model(self):
-        self.obs_target = np.array([0, 0])
+        self.obs_target = np.array([0.0, 0.0], dtype=np.float32)
         return super(IPCustomDet, self).reset_model()
 
-    def reward_fn(self, ob, torque):
+    def reward_fn(self, ob, action):
         rew = 0
         rew += np.exp(-200 * (ob[0] - self._humanData[self.timesteps, 0]) ** 2) \
             + 0.2 * np.exp(-1 * (ob[1] - self._humanData[self.timesteps, 1]) ** 2)
         rew += 0.1
-        if self.ankle_max is not None:
-            rew -= 1e-3 / ((np.abs(torque)[0] - self.ankle_max / self.model.actuator_gear[0, 0]) ** 2 + 1e-4)
+        if self.ankle_torque_max is not None:
+            rew -= 1e-5 / ((np.abs(action)[0] - self.ankle_torque_max/self.model.actuator_gear[0, 0])**2 + 1e-5)
         return rew
 
     @staticmethod
@@ -90,7 +98,7 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
         bounds = self.model.actuator_ctrlrange.copy().astype(np.float32)
         low, high = bounds.T
         self.torque_space = spaces.Box(low=low, high=high, dtype=np.float32)
-        self.action_space = spaces.Box(low=4 * self.low[[0]], high=4 * self.high[[0]], dtype=np.float32)
+        self.action_space = spaces.Box(low=np.array([-1]), high=np.array([1]), dtype=np.float32)
         return self.action_space
 
 
@@ -99,29 +107,8 @@ class IPCustom(IPCustomDet):
         rew = 0
         self.obs_target[0] = obs_query
         for _ in range(self._action_frame_skip):
-            prev_ob = self._get_obs()
-            torque = self.PDgain @ (self.obs_target - prev_ob).T / self.model.actuator_gear[0,0]
-            torque = np.clip(torque, self.torque_space.low, self.torque_space.high)
-
-            rew += self.reward_fn(prev_ob, torque)
-
-            ddx = self.ptb_acc[self.timesteps]
-            self.data.qfrc_applied[:] = 0
-            for idx, bodyName in enumerate(["pole"]):
-                body_id = self.model.body_name2id(bodyName)
-                force_vector = np.array([-self.model.body_mass[body_id]*ddx, 0, 0])
-                point = self.data.subtree_com[body_id]
-                mujoco_py.functions.mj_applyFT(self.model, self.data, force_vector, np.zeros(3), point, body_id, self.data.qfrc_applied)
-            self.do_simulation(torque, self.frame_skip)
-            done = False
-            ob = self._get_obs()
-            if (ob[0] > (self.high[0] - 0.05)) or (ob[0] < (self.low[0] - 0.05)):
-                done = True
-                rew -= 50
-            if self.timesteps == 0:
-                done = False
-            info = {"acts": self.data.qfrc_actuator.copy(), 'ptT': self.data.qfrc_applied.copy()}
-            self.timesteps += 1
+            ob, r, done, info = self.step_once()
+            rew += r
         return ob, rew, done, info
 
     def reset_ptb(self):

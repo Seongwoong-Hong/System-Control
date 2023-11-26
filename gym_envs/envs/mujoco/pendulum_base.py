@@ -9,8 +9,8 @@ class BasePendulum(mujoco_env.MujocoEnv):
         self.timesteps = 0
         self._epi_len = 360
         self._ptb_idx = 0
-        self._action_frame_skip = 1
-        self.ankle_max = ankle_max
+        self._action_frame_skip = 4
+        self.ankle_torque_max = ankle_max
         self.PDgain = PDgain
         if PDgain is None:
             self.PDgain = np.array([1000, 100])
