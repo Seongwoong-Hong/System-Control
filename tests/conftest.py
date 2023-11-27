@@ -119,10 +119,11 @@ def ip_env(IPbsp, IPhumanStates):
 
 @pytest.fixture
 def ip_env_norm(proj_path, IPbsp, IPhumanStates):
-    norm_path = os.path.join(proj_path, "RL", "scripts", "tmp", "log", "PseudoIP_norm", "ppo_DeepMimic_PD_ptb3", "policies_3", "normalization_2.pkl")
+    # norm_path = os.path.join(proj_path, "RL", "scripts", "tmp", "log", "PseudoIP_norm", "ppo_DeepMimic_PD_ptb3", "policies_3", "normalization_2.pkl")
+    norm_path = None
     if norm_path is None:
         norm_path = True
-    return make_env(f"IP_custom-v0", bsp=IPbsp, humanStates=IPhumanStates, use_norm=norm_path)
+    return make_env(f"IP_custom-v2", num_envs=8, bsp=IPbsp, humanStates=IPhumanStates, use_norm=norm_path)
 
 
 @pytest.fixture

@@ -13,6 +13,7 @@ class IDPCustomDet(BasePendulum, utils.EzPickle):
         self.high = np.array([0.25, 0.45, 2.0, 2.0])
         self.low = np.array([-0.25, -0.45, -2.0, -2.0])
         self.obs_target = np.zeros(4, dtype=np.float32)
+        self.prev_torque = np.zeros(2, dtype=np.float32)
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml")
         super(IDPCustomDet, self).__init__(filepath, *args, **kwargs)
         self.observation_space = spaces.Box(low=self.low, high=self.high)
@@ -46,17 +47,19 @@ class IDPCustomDet(BasePendulum, utils.EzPickle):
         self.do_simulation(action, self.frame_skip)
         ob = self._get_obs()
         done = np.any(ob[:2] < (self.low[:2] + 0.05)) or np.any(ob[:2] > (self.high[:2] - 0.05))
-        if done:
-            r -= 50
-        if self.timesteps == 0:
+        if (np.abs(self.prev_torque - torque) >= 7).any():
+            done = True
+        if self.timesteps < 10:
             done = False
         self.timesteps += 1
+        self.prev_torque = torque
         info = {'prev_ob': prev_ob.reshape(1, -1), "torque": self.data.qfrc_actuator.copy()}
 
         return ob, r, done, info
 
     def reset_model(self):
         self.obs_target = np.zeros(4, dtype=np.float32)
+        self.prev_torque = np.zeros(2, dtype=np.float32)
         return super(IDPCustomDet, self).reset_model()
 
     def reward_fn(self, ob, action):

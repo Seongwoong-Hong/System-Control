@@ -46,8 +46,8 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
         done = False
         if (ob[0] > (self.high[0] - 0.05)) or (ob[0] < (self.low[0] - 0.05)):
             done = True
-        if np.abs(self.prev_torque - torque) >= 7:
-            done = True
+        # if np.abs(self.prev_torque - torque) >= 10:
+        #     done = True
         if self.timesteps < 10:
             done = False
 
@@ -59,12 +59,13 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
 
     def reset_model(self):
         self.obs_target = np.array([0.0, 0.0], dtype=np.float32)
+        self.prev_torque = np.array([0.0], dtype=np.float32)
         return super(IPCustomDet, self).reset_model()
 
     def reward_fn(self, ob, action):
         rew = 0
-        rew += np.exp(-200 * (ob[0] - self._humanData[self.timesteps, 0]) ** 2) \
-            + 0.2 * np.exp(-1 * (ob[1] - self._humanData[self.timesteps, 1]) ** 2)
+        rew += np.exp(-20 * ((ob[0] - self._humanData[self.timesteps, 0]) / np.abs(self._humanData[:, 0]).max()) ** 2) \
+            + 0.2 * np.exp(-2 * ((ob[1] - self._humanData[self.timesteps, 1]) / np.abs(self._humanData[:, 1]).max()) ** 2)
         rew += 0.1
         if self.ankle_torque_max is not None:
             rew -= 1e-5 / ((np.abs(action)[0] - self.ankle_torque_max/self.model.actuator_gear[0, 0])**2 + 1e-5)
@@ -105,11 +106,13 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
 class IPCustom(IPCustomDet):
     def step(self, obs_query: np.ndarray):
         rew = 0
+        dones = False
         self.obs_target[0] = obs_query
         for _ in range(self._action_frame_skip):
             ob, r, done, info = self.step_once()
+            dones = dones or done
             rew += r
-        return ob, rew, done, info
+        return ob, rew, dones, info
 
     def reset_ptb(self):
         self._ptb_idx = self.np_random.choice(range(len(self._humanStates)))
@@ -119,4 +122,4 @@ class IPCustom(IPCustomDet):
             self._humanData = self._humanStates[self._ptb_idx]
         st_time_dix = self.np_random.choice(range(self._epi_len))
         self._ptb_acc = np.append(self._ptb_acc, self._ptb_acc, axis=0)[st_time_dix:st_time_dix+self._epi_len]
-        self._humanData = np.append(self._humanData, self._humanData, axis=0)[st_time_dix:st_time_dix+self._epi_len]
+        self._humanData = np.append(self._humanData, self._humanData[-1, :] + self._humanData - self._humanData[0, :], axis=0)[st_time_dix:st_time_dix+self._epi_len]

@@ -22,6 +22,7 @@ if __name__ == "__main__":
     edptb = 4
     ankle_max = 100
     name_tail = f"_DeepMimic_actionSkip_ptb{stptb}to{edptb}/PD{PDgain[0]}{PDgain[1]}_ankLim"
+    except_trials = [13]
 
     if isPseudo:
         env_type = "Pseudo" + env_type
@@ -32,6 +33,8 @@ if __name__ == "__main__":
         humanData = io.loadmat(str(subpath) + f"i{i}.mat")
         bsp = humanData['bsp']
         states[i - 1] = humanData['state']
+    for trial in except_trials:
+        states[trial - 1] = None
     env = make_env(f"{env_id}-v2", num_envs=8, bsp=bsp, humanStates=states, use_norm=use_norm, PDgain=PDgain, ankle_max=ankle_max)
     if use_norm:
         env_type += "_norm"
@@ -50,7 +53,7 @@ if __name__ == "__main__":
         ent_coef=0.003,
         tensorboard_log=str(log_dir),
         device=device,
-        policy_kwargs={'net_arch': [dict(pi=[16, 16], vf=[32, 32])]},
+        policy_kwargs={'net_arch': [dict(pi=[64, 64], vf=[64, 64])]},
         verbose=1,
     )
     n = 1
