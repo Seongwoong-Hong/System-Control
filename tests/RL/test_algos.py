@@ -1,10 +1,6 @@
-import os
-import pickle
 from algos.torch.ppo import PPO, MlpPolicy
-from common.util import make_env, CPU_Unpickler
 from common.wrappers import *
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 
 
 def test_finite_algo(idpdiffpolicy, hpc_env):
@@ -33,20 +29,6 @@ def test_get_gains_wrt_init_states(idpilqrpolicy, hpc_with_rwrap_env):
     env.close()
 
 
-def test_1d(rl_path):
-    name = "1DTarget_disc"
-    env_id = f"{name}"
-    map_size = 50
-    env = make_env(f"{env_id}-v2", map_size=map_size, num_envs=1)
-    model_dir = os.path.join(rl_path, name, "tmp", "log", env_id, "softqiter", "policies_1")
-    with open(model_dir + "/agent.pkl", "rb") as f:
-        algo = pickle.load(f)
-    # algo = PPO.load(model_dir + "/agent")
-    plt.imshow(algo.policy.policy_table, cmap=cm.rainbow)
-    plt.show()
-    print('end')
-
-
 def test_reward_norm(ip_env, proj_path, ip_env_norm):
     env = ip_env
     norm_env = ip_env_norm
@@ -61,8 +43,8 @@ def test_reward_norm(ip_env, proj_path, ip_env_norm):
     print(norm_env.unnormalize_obs(norm_ob)[0], ob)
 
 
-def test_ppo_algo(ip_env_norm):
-    env = ip_env_norm
+def test_ppo_algo(ip_env2_norm):
+    env = ip_env2_norm
     algo = PPO(
         MlpPolicy,
         env=env,

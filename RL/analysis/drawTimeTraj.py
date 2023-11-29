@@ -1,26 +1,27 @@
 import os
-
 import numpy as np
 from scipy import io
 from matplotlib import pyplot as plt
-from common.util import make_env
+
 from algos.torch.ppo import PPO
+from common.util import make_env
 from common.analyzer import exec_policy, video_record
 
 
 if __name__ == "__main__":
-    env_type = "IP"
+    env_type = "IDP"
     env_id = f"{env_type}_custom"
     subj = "sub04"
-    trials = range(1, 21)
+    trials = range(1,21)
     isPseudo = False
     use_norm = True
-    policy_num = 1
-    tmp_num = 14
+    policy_num = 2
+    tmp_num = 7
     curri_order = None
     PDgain = np.array([1000, 200])
     name_tail = f"_DeepMimic_actionSkip_ptb1to4/PD{PDgain[0]}{PDgain[1]}_ankLim"
     save_video = None
+    except_trials = [13]
 
     if isPseudo:
         env_type = "Pseudo" + env_type
@@ -31,6 +32,8 @@ if __name__ == "__main__":
         humanData = io.loadmat(subpath + f"i{trial}.mat")
         bsp = humanData['bsp']
         states[trial - 1] = humanData['state']
+    for trial in except_trials:
+        states[trial - 1] = None
 
     if use_norm:
         env_type += "_norm"
@@ -62,12 +65,12 @@ if __name__ == "__main__":
     ax2 = fig.add_subplot(3, 1, 2)
     ax3 = fig.add_subplot(3, 1, 3)
     for idx, trial in enumerate(trials):
-        ax1.plot(obs[idx][:-1, 0], 'b')
-        ax1.plot(states[trial - 1][:, 0], 'k')
-        ax2.plot(acts[idx][:], 'b')
-        # ax2.plot(acts[idx][:, 1], 'k')
-        ax3.plot(tqs[idx][:], 'b')
-        # ax3.plot(tqs[idx][:, 1], 'k')
+        if states[trial - 1] is not None:
+            ax1.plot(obs[idx][:, 0], 'b')
+            ax1.plot(states[trial - 1][:, 0], 'k')
+            ax2.plot(obs[idx][:, 1], 'b')
+            ax2.plot(states[trial - 1][:, 1], 'k')
+            ax3.plot(tqs[idx], 'b')
     plt.show()
 
     if save_video is not None:

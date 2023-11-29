@@ -127,6 +127,11 @@ def ip_env_norm(proj_path, IPbsp, IPhumanStates):
 
 
 @pytest.fixture
+def ip_env2_norm(IPbsp, IPhumanStates):
+    return make_env(f"IP_MinEffort-v2", num_envs=8, bsp=IPbsp, humanStates=IPhumanStates, use_norm=True)
+
+
+@pytest.fixture
 def ip_env_vec(IPbsp, IPhumanStates):
     return make_env(f"IP_custom-v2", num_envs=8, bsp=IPbsp, humanStates=IPhumanStates)
 
@@ -139,4 +144,4 @@ def idp_env(proj_path):
         humanData = io.loadmat(subpath + f"i{i}.mat")
         states[i - 1] = humanData['state']
         bsp = humanData['bsp']
-    return make_env("IDP_custom-v0", bsp=bsp, humanStates=states, ankle_max=100)
+    return make_env("IDP_custom-v2", num_envs=8, bsp=bsp, humanStates=states, ankle_max=100)

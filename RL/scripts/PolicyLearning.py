@@ -1,7 +1,6 @@
 import shutil
 import numpy as np
 from pathlib import Path
-
 from scipy import io
 
 from algos.torch.ppo import PPO, MlpPolicy
@@ -12,7 +11,7 @@ if __name__ == "__main__":
     # 환경 설정
     env_type = "IP"
     algo_type = "ppo"
-    env_id = f"{env_type}_custom"
+    env_id = f"{env_type}_MinEffort"
     device = "cpu"
     subj = "sub04"
     isPseudo = False
@@ -21,7 +20,7 @@ if __name__ == "__main__":
     stptb = 1
     edptb = 4
     ankle_max = 100
-    name_tail = f"_DeepMimic_actionSkip_ptb{stptb}to{edptb}/PD{PDgain[0]}{PDgain[1]}_ankLim"
+    name_tail = f"_MinEffort_ptb{stptb}to{edptb}/PD{PDgain[0]}{PDgain[1]}_ankLim"
     except_trials = [13]
 
     if isPseudo:
@@ -53,7 +52,7 @@ if __name__ == "__main__":
         ent_coef=0.003,
         tensorboard_log=str(log_dir),
         device=device,
-        policy_kwargs={'net_arch': [dict(pi=[64, 64], vf=[64, 64])]},
+        policy_kwargs={'net_arch': [dict(pi=[64, 64], vf=[64, 64])], 'log_std_range': [-10, None]},
         verbose=1,
     )
     n = 1
