@@ -53,13 +53,12 @@ def exec_policy(environment, policy, render="rgb_array", deterministic=True, rep
             if "torque" in info:
                 torques.append(info["torque"].squeeze())
             actions.append(act.squeeze())
-            observs.append(ob.squeeze())
             rewards.append(rew.squeeze())
             imgs.append(img)
             if "terminal_observation" in info:
-                ob = info["terminal_observation"]
-                if isvecenv:
-                    ob = np.array([ob])
+                observs.append(info["terminal_observation"].squeeze())
+            else:
+                observs.append(ob.squeeze())
         torq_list.append(np.array(torques))
         acts_list.append(np.array(actions))
         rews_list.append(np.array(rewards))
