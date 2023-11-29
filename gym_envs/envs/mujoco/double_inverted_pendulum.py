@@ -8,15 +8,16 @@ from xml.etree.ElementTree import ElementTree, parse
 from gym_envs.envs.mujoco import BasePendulum
 
 
-class IDPCustomDet(BasePendulum, utils.EzPickle):
+class IDPMimicHumanDet(BasePendulum, utils.EzPickle):
     def __init__(self, *args, **kwargs):
         self.high = np.array([0.25, 0.45, 2.0, 2.0])
         self.low = np.array([-0.25, -0.45, -2.0, -2.0])
         self.obs_target = np.zeros(4, dtype=np.float32)
         self.prev_torque = np.zeros(2, dtype=np.float32)
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml")
-        super(IDPCustomDet, self).__init__(filepath, *args, **kwargs)
+        super(IDPMimicHumanDet, self).__init__(filepath, *args, **kwargs)
         self.observation_space = spaces.Box(low=self.low, high=self.high)
+        # utils.EzPickle.__init__(self, *args, **kwargs)
 
     def step(self, obs_query: np.ndarray):
         if self.timesteps % self._action_frame_skip == 0:
@@ -26,7 +27,7 @@ class IDPCustomDet(BasePendulum, utils.EzPickle):
     def step_once(self):
         r = 0
         prev_ob = self._get_obs()
-        torque = np.array([0, 0])
+        torque = np.array([0.0, 0.0])
         for segi in range(2):
             torque[segi] = (self.PDgain[0] * (self.obs_target[segi] - prev_ob[segi])
                             + self.PDgain[1] * (self.obs_target[segi + 2] - prev_ob[segi + 2]))
@@ -36,10 +37,10 @@ class IDPCustomDet(BasePendulum, utils.EzPickle):
         r += self.reward_fn(prev_ob, action)
 
         ddx = self.ptb_acc[self.timesteps]
-        self.data.qfrc_applied[:] = 0
+        self.data.qfrc_applied[:] = 0.
         for idx, bodyName in enumerate(["leg", "body"]):
             body_id = self.model.body_name2id(bodyName)
-            force_vector = np.array([-self.model.body_mass[body_id]*ddx, 0, 0])
+            force_vector = np.array([-self.model.body_mass[body_id]*ddx, 0., 0.])
             point = self.data.subtree_com[body_id]
             mujoco_py.functions.mj_applyFT(
                 self.model, self.data, force_vector, np.zeros(3), point, body_id, self.sim.data.qfrc_applied)
@@ -60,12 +61,12 @@ class IDPCustomDet(BasePendulum, utils.EzPickle):
     def reset_model(self):
         self.obs_target = np.zeros(4, dtype=np.float32)
         self.prev_torque = np.zeros(2, dtype=np.float32)
-        return super(IDPCustomDet, self).reset_model()
+        return super(IDPMimicHumanDet, self).reset_model()
 
     def reward_fn(self, ob, action):
         r = 0
-        r += np.exp(-200 * np.sum((ob[:2] - self._humanData[self.timesteps, :2]) ** 2)) \
-            + 0.2 * np.exp(-1 * np.sum((ob[2:] - self._humanData[self.timesteps, 2:]) ** 2))
+        r += np.exp(-20 * np.sum((ob[:2] - self._humanData[self.timesteps, :2]) ** 2)) \
+            + 0.2 * np.exp(-2 * np.sum((ob[2:] - self._humanData[self.timesteps, 2:]) ** 2))
         r += 0.1
         if self.ankle_torque_max is not None:
             r -= 1e-5 / ((np.abs(action[0]) - self.ankle_torque_max/self.model.actuator_gear[0, 0])**2 + 1e-5)
@@ -105,14 +106,16 @@ class IDPCustomDet(BasePendulum, utils.EzPickle):
         return self.action_space
 
 
-class IDPCustom(IDPCustomDet):
+class IDPMimicHuman(IDPMimicHumanDet):
     def step(self, obs_query: np.ndarray):
         rew = 0
+        dones = False
         self.obs_target[:2] = obs_query
         for _ in range(self._action_frame_skip):
             ob, r, done, info = self.step_once()
+            dones = dones or done
             rew += r
-        return ob, rew, done, info
+        return ob, rew, dones, info
 
     def reset_ptb(self):
         self._ptb_idx = self.np_random.choice(range(len(self._humanStates)))
@@ -122,4 +125,4 @@ class IDPCustom(IDPCustomDet):
             self._humanData = self._humanStates[self._ptb_idx]
         st_time_dix = self.np_random.choice(range(self._epi_len))
         self._ptb_acc = np.append(self._ptb_acc, self._ptb_acc, axis=0)[st_time_dix:st_time_dix+self._epi_len]
-        self._humanData = np.append(self._humanData, self._humanData, axis=0)[st_time_dix:st_time_dix+self._epi_len]
+        self._humanData = np.append(self._humanData, self._humanData[-1, :] + self._humanData - self._humanData[0, :], axis=0)[st_time_dix:st_time_dix+self._epi_len]

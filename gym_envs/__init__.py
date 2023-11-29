@@ -35,30 +35,6 @@ register(
 )
 
 register(
-    id='2DWorld_disc-v0',
-    entry_point='gym_envs.envs:TwoDWorldDiscDet',
-    max_episode_steps=20,
-)
-
-register(
-    id='2DWorld_disc-v2',
-    entry_point='gym_envs.envs:TwoDWorldDisc',
-    max_episode_steps=20,
-)
-
-register(
-    id='SpringBall_disc-v2',
-    entry_point='gym_envs.envs:SpringBallDisc',
-    max_episode_steps=40,
-)
-
-register(
-    id='SpringBall_disc-v0',
-    entry_point='gym_envs.envs:SpringBallDiscDet',
-    max_episode_steps=40,
-)
-
-register(
     id='2DTarget-v2',
     entry_point='gym_envs.envs:TwoDTarget',
     max_episode_steps=100,
@@ -85,65 +61,40 @@ register(
 
 # environments based on mujoco
 register(
-    id='IP_custom-v0',
-    entry_point='gym_envs.envs.mujoco:IPCustomDet',
+    id='IP_MimicHuman-v0',
+    entry_point='gym_envs.envs.mujoco:IPMimicHumanDet',
     max_episode_steps=360,
 )
 
 register(
-    id='IP_custom-v2',
-    entry_point='gym_envs.envs.mujoco:IPCustom',
-    max_episode_steps=90,
-)
-
-
-register(
-    id='IDP_custom-v0',
-    entry_point='gym_envs.envs.mujoco:IDPCustomDet',
-    max_episode_steps=360,
-)
-
-
-register(
-    id='IDP_custom-v2',
-    entry_point='gym_envs.envs.mujoco:IDPCustom',
+    id='IP_MimicHuman-v2',
+    entry_point='gym_envs.envs.mujoco:IPMimicHuman',
     max_episode_steps=90,
 )
 
 register(
-    id='HPC_custom-v0',
-    entry_point='gym_envs.envs.mujoco:IDPHumanDet',
+    id='IP_MinEffort-v0',
+    entry_point='gym_envs.envs.mujoco:IPMinEffortDet',
     max_episode_steps=360,
 )
 
 register(
-    id='HPC_custom-v2',
-    entry_point='gym_envs.envs.mujoco:IDPHuman',
+    id='IP_MinEffort-v2',
+    entry_point='gym_envs.envs.mujoco:IPMinEffort',
+    max_episode_steps=90,
+)
+
+register(
+    id='IDP_MimicHuman-v0',
+    entry_point='gym_envs.envs.mujoco:IDPMimicHumanDet',
     max_episode_steps=360,
 )
 
-register(
-    id='IP_HPC-v0',
-    entry_point='gym_envs.envs.mujoco:IPHumanDet',
-    max_episode_steps=360,
-)
 
 register(
-    id='IP_HPC-v2',
-    entry_point='gym_envs.envs.mujoco:IPHuman',
-    max_episode_steps=360,
-)
-
-register(
-    id="HPC_crop-v0",
-    entry_point='gym_envs.envs.mujoco:IDPHumanDet',
-    max_episode_steps=300,
-)
-
-register(
-    id='HPC_crop-v1',
-    entry_point='gym_envs.envs.mujoco:IDPHuman',
-    max_episode_steps=300,
+    id='IDP_MimicHuman-v2',
+    entry_point='gym_envs.envs.mujoco:IDPMimicHuman',
+    max_episode_steps=90,
 )
 
 # environments based on pybullet

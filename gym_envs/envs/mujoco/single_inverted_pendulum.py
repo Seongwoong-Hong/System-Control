@@ -7,14 +7,14 @@ from xml.etree.ElementTree import ElementTree, parse
 from gym_envs.envs.mujoco import BasePendulum
 
 
-class IPCustomDet(BasePendulum, utils.EzPickle):
+class IPMimicHumanDet(BasePendulum, utils.EzPickle):
     def __init__(self, *args, **kwargs):
         self.high = np.array([0.25, 1.0])
         self.low = np.array([-0.25, -1.0])
         self.obs_target = np.array([0.0, 0.0], dtype=np.float32)
-        self.prev_torque = np.array([0.0], dtype=np.float32)
+        self.prev_action = np.array([0.0], dtype=np.float32)
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml")
-        super(IPCustomDet, self).__init__(filepath, *args, **kwargs)
+        super(IPMimicHumanDet, self).__init__(filepath, *args, **kwargs)
         self.observation_space = spaces.Box(low=self.low, high=self.high)
         utils.EzPickle.__init__(self, *args, **kwargs)
 
@@ -33,10 +33,10 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
         rew += self.reward_fn(prev_ob, action)
 
         ddx = self.ptb_acc[self.timesteps]
-        self.data.qfrc_applied[:] = 0
+        self.data.qfrc_applied[:] = 0.
         for idx, bodyName in enumerate(["pole"]):
             body_id = self.model.body_name2id(bodyName)
-            force_vector = np.array([-self.model.body_mass[body_id]*ddx, 0, 0])
+            force_vector = np.array([-self.model.body_mass[body_id]*ddx, 0., 0.])
             point = self.data.subtree_com[body_id]
             mujoco_py.functions.mj_applyFT(self.model, self.data, force_vector, np.zeros(3), point, body_id, self.data.qfrc_applied)
 
@@ -46,27 +46,28 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
         done = False
         if (ob[0] > (self.high[0] - 0.05)) or (ob[0] < (self.low[0] - 0.05)):
             done = True
-        # if np.abs(self.prev_torque - torque) >= 10:
-        #     done = True
+        if np.abs(self.prev_action - action) >= 0.2:
+            done = True
         if self.timesteps < 10:
             done = False
 
         self.timesteps += 1
         info = {"torque": self.data.qfrc_actuator.copy(), 'ptT': self.data.qfrc_applied.copy()}
-        self.prev_torque = torque
+        self.prev_action = action
 
         return ob, rew, done, info
 
     def reset_model(self):
         self.obs_target = np.array([0.0, 0.0], dtype=np.float32)
-        self.prev_torque = np.array([0.0], dtype=np.float32)
-        return super(IPCustomDet, self).reset_model()
+        self.prev_action = np.array([0.0], dtype=np.float32)
+        return super(IPMimicHumanDet, self).reset_model()
 
     def reward_fn(self, ob, action):
         rew = 0
         rew += np.exp(-20 * ((ob[0] - self._humanData[self.timesteps, 0]) / np.abs(self._humanData[:, 0]).max()) ** 2) \
             + 0.2 * np.exp(-2 * ((ob[1] - self._humanData[self.timesteps, 1]) / np.abs(self._humanData[:, 1]).max()) ** 2)
         rew += 0.1
+        rew -= 0.5e-5 / ((np.clip(np.abs(self.prev_action - action)[0], 0.0, 0.1) - 0.1) ** 2 + 1e-5)
         if self.ankle_torque_max is not None:
             rew -= 1e-5 / ((np.abs(action)[0] - self.ankle_torque_max/self.model.actuator_gear[0, 0])**2 + 1e-5)
         return rew
@@ -103,7 +104,7 @@ class IPCustomDet(BasePendulum, utils.EzPickle):
         return self.action_space
 
 
-class IPCustom(IPCustomDet):
+class IPMimicHuman(IPMimicHumanDet):
     def step(self, obs_query: np.ndarray):
         rew = 0
         dones = False
@@ -123,3 +124,20 @@ class IPCustom(IPCustomDet):
         st_time_dix = self.np_random.choice(range(self._epi_len))
         self._ptb_acc = np.append(self._ptb_acc, self._ptb_acc, axis=0)[st_time_dix:st_time_dix+self._epi_len]
         self._humanData = np.append(self._humanData, self._humanData[-1, :] + self._humanData - self._humanData[0, :], axis=0)[st_time_dix:st_time_dix+self._epi_len]
+
+
+class IPMinEffort(IPMimicHuman):
+    def reward_fn(self, ob, action):
+        w = 0.5
+        rew = 0
+        rew -= w*((ob[0] / np.max(np.abs(self._humanData[:, 0]))) ** 2)
+        rew -= (1 - w) * (((ob[1] / np.max(np.abs(self._humanData[:, 1]))) * action[0]) ** 2)
+        rew += 1
+        if self.ankle_torque_max is not None:
+            rew -= 1e-5 / ((np.abs(action)[0] - self.ankle_torque_max/self.model.actuator_gear[0, 0])**2 + 1e-5)
+        return rew
+
+
+class IPMinEffortDet(IPMimicHumanDet):
+    def reward_fn(self, ob, action):
+        return IPMinEffort.reward_fn(self, ob, action)
