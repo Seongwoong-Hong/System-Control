@@ -43,8 +43,8 @@ def test_reward_norm(ip_env, proj_path, ip_env_norm):
     print(norm_env.unnormalize_obs(norm_ob)[0], ob)
 
 
-def test_ppo_algo(ip_env2_norm):
-    env = ip_env2_norm
+def test_ppo_algo(idp_env2):
+    env = idp_env2
     algo = PPO(
         MlpPolicy,
         env=env,

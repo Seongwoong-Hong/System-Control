@@ -11,21 +11,24 @@ if __name__ == "__main__":
     # 환경 설정
     env_type = "IP"
     algo_type = "ppo"
-    env_id = f"{env_type}_custom"
+    env_id = f"{env_type}_MimicHuman"
     device = "cpu"
     subj = "sub04"
     isPseudo = False
     use_norm = True
-    policy_num = 1
-    tmp_num = 9
-    base_curri_order = 2
-    curri_order = 3
-    PDgain = np.array([1000, 200])
+    policy_num = 2
+    tmp_num = 10
+    base_curri_order = None
+    curri_order = 1
+    env_kwargs = {
+        'PDgain': np.array([1000, 200]),
+        'ankle_max': 100,
+        # 'w': 0.0,
+    }
     stptb = 1
     edptb = 4
-    ankle_max = 100
-    name_tail = f"_DeepMimic_actionSkip_ptb{stptb}to{edptb}/PD{PDgain[0]}{PDgain[1]}_ankLim"
-    except_trials = [13]
+    name_tail = f"_DeepMimic_ptb{stptb}to{edptb}/PD1000200_ankLim"
+    except_trials = [13, 16]
 
     if isPseudo:
         env_type = "Pseudo" + env_type
@@ -47,7 +50,7 @@ if __name__ == "__main__":
         prev_agent_dir = prev_agent_dir / f"curriculum_{base_curri_order}"
     if use_norm:
         use_norm = str((prev_agent_dir / f"normalization_{tmp_num}.pkl"))
-    env = make_env(f"{env_id}-v2", num_envs=8, bsp=bsp, humanStates=states, use_norm=use_norm, PDgain=PDgain, ankle_max=ankle_max)
+    env = make_env(f"{env_id}-v2", num_envs=8, bsp=bsp, humanStates=states, use_norm=use_norm, **env_kwargs)
 
     algo = PPO.load(str(prev_agent_dir / f"agent_{tmp_num}"))
 

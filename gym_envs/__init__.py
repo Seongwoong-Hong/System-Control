@@ -97,6 +97,18 @@ register(
     max_episode_steps=90,
 )
 
+register(
+    id='IDP_MinEffort-v0',
+    entry_point='gym_envs.envs.mujoco:IDPMinEffortDet',
+    max_episode_steps=360,
+)
+
+
+register(
+    id='IDP_MinEffort-v2',
+    entry_point='gym_envs.envs.mujoco:IDPMinEffort',
+    max_episode_steps=90,
+)
 # environments based on pybullet
 
 register(

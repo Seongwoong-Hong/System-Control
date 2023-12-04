@@ -58,6 +58,10 @@ class BasePendulum(mujoco_env.MujocoEnv):
             self._ptb_idx += 1
             self._ptb_idx %= len(self._humanStates)
             self._humanData = self._humanStates[self._ptb_idx]
+        self.set_ptb_acc()
+        self._ptb_idx += 1
+
+    def set_ptb_acc(self):
         x_max = -self._ptb_range[self._ptb_idx // 5]
         ptb_act_t = 1/3
 
@@ -75,7 +79,6 @@ class BasePendulum(mujoco_env.MujocoEnv):
         self._ptb_acc = np.zeros(int(self._ptbT / self.dt))
         self._ptb_acc = np.append(self._ptb_acc, fddx)
         self._ptb_acc = np.append(self._ptb_acc, np.zeros(int((self._maxT - self._ptbT - ptb_act_t)/self.dt)))
-        self._ptb_idx += 1
 
     @property
     def obs(self):

@@ -9,31 +9,34 @@ from common.analyzer import exec_policy, video_record
 
 
 if __name__ == "__main__":
-    env_type = "IDP"
-    env_id = f"{env_type}_custom"
+    env_type = "IP"
+    env_id = f"{env_type}_MinEffort"
     subj = "sub04"
-    trials = range(1,21)
+    trials = [1, 2, 3, 4, 5, 18, 19, 20]
     isPseudo = False
     use_norm = True
-    policy_num = 2
-    tmp_num = 7
+    policy_num = 1
+    tmp_num = 6
     curri_order = None
     PDgain = np.array([1000, 200])
-    name_tail = f"_DeepMimic_actionSkip_ptb1to4/PD{PDgain[0]}{PDgain[1]}_ankLim"
+    name_tail = f"_DeepMimic_ptb1to4/PD1000200"
     save_video = None
-    except_trials = [13]
+    except_trials = [13, 16]
 
     if isPseudo:
         env_type = "Pseudo" + env_type
 
     subpath = os.path.join("../..", "demos", env_type, subj, subj)
     states = [None for _ in range(35)]
+    torques = [None for _ in range(35)]
     for trial in trials:
         humanData = io.loadmat(subpath + f"i{trial}.mat")
         bsp = humanData['bsp']
         states[trial - 1] = humanData['state']
+        torques[trial - 1] = humanData['tq']
     for trial in except_trials:
         states[trial - 1] = None
+        torques[trial - 1] = None
 
     if use_norm:
         env_type += "_norm"
@@ -60,17 +63,32 @@ if __name__ == "__main__":
             norm_obs.append(env.unnormalize_obs(ob))
         del obs
         obs = norm_obs
-    fig = plt.figure(figsize=[6.4, 9.6])
-    ax1 = fig.add_subplot(3, 1, 1)
-    ax2 = fig.add_subplot(3, 1, 2)
-    ax3 = fig.add_subplot(3, 1, 3)
+    t = np.linspace(0, 3, 361)
+    fig = plt.figure(figsize=[4.4, 3.2])
+    ax11 = fig.add_subplot(2, 2, 1)
+    ax12 = fig.add_subplot(2, 2, 2)
+    ax21 = fig.add_subplot(2, 2, 3)
+    ax22 = fig.add_subplot(2, 2, 4)
     for idx, trial in enumerate(trials):
         if states[trial - 1] is not None:
-            ax1.plot(obs[idx][:, 0], 'b')
-            ax1.plot(states[trial - 1][:, 0], 'k')
-            ax2.plot(obs[idx][:, 1], 'b')
-            ax2.plot(states[trial - 1][:, 1], 'k')
-            ax3.plot(tqs[idx], 'b')
+            if trial <= 6:
+                ax11.plot(t[:len(obs[idx][:-1])], obs[idx][:-1, 0], color=[0, 29/255, 120/255])
+                ax12.plot(t[:len(states[trial - 1])], states[trial - 1][:, 0], color=[0, 29/255, 120/255])
+                ax21.plot(t[:len(tqs[idx])], tqs[idx], color=[0, 29/255, 120/255])
+                ax22.plot(t[:len(torques[trial - 1])], torques[trial - 1], color=[0, 29/255, 120/255])
+            else:
+                ax11.plot(t[:len(obs[idx][:-1])], obs[idx][:-1, 0], color=[60/255, 120/255, 210/255])
+                ax12.plot(t[:len(states[trial - 1])], states[trial - 1][:, 0], color=[60/255, 120/255, 210/255])
+                ax21.plot(t[:len(tqs[idx])], tqs[idx], color=[60/255, 120/255, 210/255])
+                ax22.plot(t[:len(torques[trial - 1])], torques[trial - 1], color=[60/255, 120/255, 210/255])
+    ax11.set_ylim(ax12.get_ylim())
+    ax21.set_ylim([-40, 110])
+    ax22.set_ylim([-40, 110])
+    for ax in [ax11, ax12, ax21, ax22]:
+        ax.set_xlim([0, 3])
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+    fig.tight_layout()
     plt.show()
 
     if save_video is not None:

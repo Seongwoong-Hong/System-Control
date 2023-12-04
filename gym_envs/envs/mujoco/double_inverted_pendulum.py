@@ -17,7 +17,7 @@ class IDPMimicHumanDet(BasePendulum, utils.EzPickle):
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IDP_custom.xml")
         super(IDPMimicHumanDet, self).__init__(filepath, *args, **kwargs)
         self.observation_space = spaces.Box(low=self.low, high=self.high)
-        # utils.EzPickle.__init__(self, *args, **kwargs)
+        utils.EzPickle.__init__(self, *args, **kwargs)
 
     def step(self, obs_query: np.ndarray):
         if self.timesteps % self._action_frame_skip == 0:
@@ -123,6 +123,37 @@ class IDPMimicHuman(IDPMimicHumanDet):
         while self._humanData is None:
             self._ptb_idx = self.np_random.choice(range(len(self._humanStates)))
             self._humanData = self._humanStates[self._ptb_idx]
+        self.set_ptb_acc()
         st_time_dix = self.np_random.choice(range(self._epi_len))
         self._ptb_acc = np.append(self._ptb_acc, self._ptb_acc, axis=0)[st_time_dix:st_time_dix+self._epi_len]
         self._humanData = np.append(self._humanData, self._humanData[-1, :] + self._humanData - self._humanData[0, :], axis=0)[st_time_dix:st_time_dix+self._epi_len]
+
+
+class IDPMinEffortDet(IDPMimicHumanDet, utils.EzPickle):
+    def __init__(self, w=None, *args, **kwargs):
+        self.cost_ratio = 0.5
+        if w is not None:
+            self.cost_ratio = w
+        super(IDPMinEffortDet, self).__init__(*args, **kwargs)
+        utils.EzPickle.__init__(self, w=self.cost_ratio, *args, **kwargs)
+
+    def reward_fn(self, ob, action):
+        rew = 0
+        rew -= self.cost_ratio*((ob[:2] / np.max(np.abs(self._humanData[:, :2]), axis=0)) ** 2).sum()
+        rew -= (1 - self.cost_ratio) * (((ob[2:] / np.max(np.abs(self._humanData[:, 2:]), axis=0)) * action) ** 2).sum()
+        rew += 1
+        if self.ankle_torque_max is not None:
+            rew -= 1e-5 / ((np.abs(action)[0] - self.ankle_torque_max/self.model.actuator_gear[0, 0])**2 + 1e-5)
+        return rew
+
+
+class IDPMinEffort(IDPMimicHuman, utils.EzPickle):
+    def __init__(self, w=None, *args, **kwargs):
+        self.cost_ratio = 0.5
+        if w is not None:
+            self.cost_ratio = w
+        super(IDPMinEffort, self).__init__(*args, **kwargs)
+        utils.EzPickle.__init__(self, w=self.cost_ratio, *args, **kwargs)
+
+    def reward_fn(self, ob, action):
+        return IDPMinEffortDet.reward_fn(self, ob, action)

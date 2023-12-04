@@ -7,21 +7,24 @@ from algos.torch.ppo import PPO, MlpPolicy
 from common.util import make_env
 
 
-if __name__ == "__main__":
+def main():
     # 환경 설정
-    env_type = "IP"
+    env_type = "IDP"
     algo_type = "ppo"
-    env_id = f"{env_type}_MinEffort"
+    env_id = f"{env_type}_MimicHuman"
     device = "cpu"
     subj = "sub04"
     isPseudo = False
     use_norm = True
-    PDgain = np.array([1000, 200])
+    env_kwargs = {
+        'PDgain': np.array([1000, 200]),
+        'ankle_max': 100,
+        # 'w': 0.5,
+    }
     stptb = 1
     edptb = 4
-    ankle_max = 100
-    name_tail = f"_MinEffort_ptb{stptb}to{edptb}/PD{PDgain[0]}{PDgain[1]}_ankLim"
-    except_trials = [13]
+    name_tail = f"_DeepMimic_ptb{stptb}to{edptb}/PD1000200_ankLim"
+    except_trials = [13, 16]
 
     if isPseudo:
         env_type = "Pseudo" + env_type
@@ -34,7 +37,7 @@ if __name__ == "__main__":
         states[i - 1] = humanData['state']
     for trial in except_trials:
         states[trial - 1] = None
-    env = make_env(f"{env_id}-v2", num_envs=8, bsp=bsp, humanStates=states, use_norm=use_norm, PDgain=PDgain, ankle_max=ankle_max)
+    env = make_env(f"{env_id}-v2", num_envs=8, bsp=bsp, humanStates=states, use_norm=use_norm, **env_kwargs)
     if use_norm:
         env_type += "_norm"
     log_dir = (Path(__file__).parent / "tmp" / "log" / env_type / (algo_type + name_tail))
@@ -66,3 +69,7 @@ if __name__ == "__main__":
         if use_norm:
             algo.env.save(str(log_dir / f"policies_{n}/normalization_{i + 1}.pkl"))
     print(f"Policy saved in policies_{n}")
+
+
+if __name__ == "__main__":
+    main()

@@ -114,7 +114,7 @@ def IPbsp(IPhumanData):
 
 @pytest.fixture
 def ip_env(IPbsp, IPhumanStates):
-    return make_env(f"IP_custom-v2", bsp=IPbsp, humanStates=IPhumanStates)
+    return make_env(f"IP_MimicHuman-v2", bsp=IPbsp, humanStates=IPhumanStates)
 
 
 @pytest.fixture
@@ -123,17 +123,22 @@ def ip_env_norm(proj_path, IPbsp, IPhumanStates):
     norm_path = None
     if norm_path is None:
         norm_path = True
-    return make_env(f"IP_custom-v2", num_envs=8, bsp=IPbsp, humanStates=IPhumanStates, use_norm=norm_path)
+    return make_env(f"IP_MimicHuman-v2", num_envs=8, bsp=IPbsp, humanStates=IPhumanStates, use_norm=norm_path)
 
 
 @pytest.fixture
 def ip_env2_norm(IPbsp, IPhumanStates):
-    return make_env(f"IP_MinEffort-v2", num_envs=8, bsp=IPbsp, humanStates=IPhumanStates, use_norm=True)
+    return make_env(f"IP_MinEffort-v2", num_envs=1, bsp=IPbsp, humanStates=IPhumanStates, use_norm=True, w=0.9)
 
 
 @pytest.fixture
 def ip_env_vec(IPbsp, IPhumanStates):
-    return make_env(f"IP_custom-v2", num_envs=8, bsp=IPbsp, humanStates=IPhumanStates)
+    return make_env(f"IP_MimicHuman-v2", num_envs=8, bsp=IPbsp, humanStates=IPhumanStates)
+
+
+@pytest.fixture
+def ip_env2_vec(IPbsp, IPhumanStates):
+    return make_env(f"IP_MinEffort-v2", num_envs=8, bsp=IPbsp, humanStates=IPhumanStates, w=0.9)
 
 
 @pytest.fixture
@@ -144,4 +149,15 @@ def idp_env(proj_path):
         humanData = io.loadmat(subpath + f"i{i}.mat")
         states[i - 1] = humanData['state']
         bsp = humanData['bsp']
-    return make_env("IDP_custom-v2", num_envs=8, bsp=bsp, humanStates=states, ankle_max=100)
+    return make_env("IDP_MimicHuman-v2", num_envs=8, bsp=bsp, humanStates=states, ankle_max=100)
+
+
+@pytest.fixture
+def idp_env2(proj_path):
+    subpath = os.path.join(proj_path, "demos", "IDP", "sub04", "sub04")
+    states = [None for _ in range(35)]
+    for i in range(31, 36):
+        humanData = io.loadmat(subpath + f"i{i}.mat")
+        states[i - 1] = humanData['state']
+        bsp = humanData['bsp']
+    return make_env("IDP_MinEffort-v2", num_envs=1, bsp=bsp, humanStates=states, ankle_max=100, w=0.9)

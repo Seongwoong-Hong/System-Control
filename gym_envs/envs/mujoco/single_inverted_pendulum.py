@@ -48,6 +48,8 @@ class IPMimicHumanDet(BasePendulum, utils.EzPickle):
             done = True
         if np.abs(self.prev_action - action) >= 0.2:
             done = True
+            if self.timesteps >= 10:
+                print("dT")
         if self.timesteps < 10:
             done = False
 
@@ -64,10 +66,10 @@ class IPMimicHumanDet(BasePendulum, utils.EzPickle):
 
     def reward_fn(self, ob, action):
         rew = 0
-        rew += np.exp(-20 * ((ob[0] - self._humanData[self.timesteps, 0]) / np.abs(self._humanData[:, 0]).max()) ** 2) \
-            + 0.2 * np.exp(-2 * ((ob[1] - self._humanData[self.timesteps, 1]) / np.abs(self._humanData[:, 1]).max()) ** 2)
+        rew += np.exp(-50 * ((ob[0] - self._humanData[self.timesteps, 0]) / np.abs(self._humanData[:, 0]).max()) ** 2) \
+            + 0.2 * np.exp(-5 * ((ob[1] - self._humanData[self.timesteps, 1]) / np.abs(self._humanData[:, 1]).max()) ** 2)
         rew += 0.1
-        rew -= 0.5e-5 / ((np.clip(np.abs(self.prev_action - action)[0], 0.0, 0.1) - 0.1) ** 2 + 1e-5)
+        # rew -= 0.5e-5 / ((np.clip(np.abs(self.prev_action - action)[0], 0.0, 0.1) - 0.1) ** 2 + 1e-5)
         if self.ankle_torque_max is not None:
             rew -= 1e-5 / ((np.abs(action)[0] - self.ankle_torque_max/self.model.actuator_gear[0, 0])**2 + 1e-5)
         return rew
@@ -121,23 +123,37 @@ class IPMimicHuman(IPMimicHumanDet):
         while self._humanData is None:
             self._ptb_idx = self.np_random.choice(range(len(self._humanStates)))
             self._humanData = self._humanStates[self._ptb_idx]
-        st_time_dix = self.np_random.choice(range(self._epi_len))
-        self._ptb_acc = np.append(self._ptb_acc, self._ptb_acc, axis=0)[st_time_dix:st_time_dix+self._epi_len]
-        self._humanData = np.append(self._humanData, self._humanData[-1, :] + self._humanData - self._humanData[0, :], axis=0)[st_time_dix:st_time_dix+self._epi_len]
+        self.set_ptb_acc()
+        st_time_idx = self.np_random.choice(range(self._epi_len))
+        self._ptb_acc = np.append(self._ptb_acc, self._ptb_acc, axis=0)[st_time_idx:st_time_idx+self._epi_len]
+        self._humanData = np.append(self._humanData, self._humanData[-1, :] + self._humanData - self._humanData[0, :], axis=0)[st_time_idx:st_time_idx+self._epi_len]
 
 
-class IPMinEffort(IPMimicHuman):
+class IPMinEffortDet(IPMimicHumanDet):
+    def __init__(self, w=None, *args, **kwargs):
+        self.cost_ratio = 0.5
+        if w is not None:
+            self.cost_ratio = w
+        super(IPMinEffortDet, self).__init__(*args, **kwargs)
+        utils.EzPickle.__init__(self, w=self.cost_ratio, *args, **kwargs)
+
     def reward_fn(self, ob, action):
-        w = 0.5
         rew = 0
-        rew -= w*((ob[0] / np.max(np.abs(self._humanData[:, 0]))) ** 2)
-        rew -= (1 - w) * (((ob[1] / np.max(np.abs(self._humanData[:, 1]))) * action[0]) ** 2)
+        rew -= self.cost_ratio*((ob[0] / np.max(np.abs(self._humanData[:, 0]))) ** 2)
+        rew -= (1 - self.cost_ratio) * (((ob[1] / np.max(np.abs(self._humanData[:, 1]))) * action[0]) ** 2)
         rew += 1
         if self.ankle_torque_max is not None:
             rew -= 1e-5 / ((np.abs(action)[0] - self.ankle_torque_max/self.model.actuator_gear[0, 0])**2 + 1e-5)
         return rew
 
 
-class IPMinEffortDet(IPMimicHumanDet):
+class IPMinEffort(IPMimicHuman):
+    def __init__(self, w=None, *args, **kwargs):
+        self.cost_ratio = 0.5
+        if w is not None:
+            self.cost_ratio = w
+        super(IPMinEffort, self).__init__(*args, **kwargs)
+        utils.EzPickle.__init__(self, w=self.cost_ratio, *args, **kwargs)
+
     def reward_fn(self, ob, action):
-        return IPMinEffort.reward_fn(self, ob, action)
+        return IPMinEffortDet.reward_fn(self, ob, action)
