@@ -36,3 +36,9 @@ def test_env_time_idx(idp_env):
     while not done:
         _, _, done, _ = env.step(env.action_space.sample())
     env.close()
+
+
+def test_env_acc(idp_env):
+    env = idp_env
+    env.reset()
+    assert (env.get_attr("ptb_acc")[0] != 0).sum() != 0

@@ -9,17 +9,17 @@ from common.analyzer import exec_policy, video_record
 
 
 if __name__ == "__main__":
-    env_type = "IP"
-    env_id = f"{env_type}_MinEffort"
+    env_type = "IDP"
+    env_id = f"{env_type}_MimicHuman"
     subj = "sub04"
-    trials = [1, 2, 3, 4, 5, 18, 19, 20]
+    trials = range(26, 31)
     isPseudo = False
     use_norm = True
-    policy_num = 1
-    tmp_num = 6
+    policy_num = 3
+    tmp_num = 15
     curri_order = None
-    PDgain = np.array([1000, 200])
-    name_tail = f"_DeepMimic_ptb1to4/PD1000200"
+    PDgain = np.array([500, 100])
+    name_tail = f"_DeepMimic_ptb1to4/PD500100_ankLim"
     save_video = None
     except_trials = [13, 16]
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
                 ax12.plot(t[:len(states[trial - 1])], states[trial - 1][:, 0], color=[60/255, 120/255, 210/255])
                 ax21.plot(t[:len(tqs[idx])], tqs[idx], color=[60/255, 120/255, 210/255])
                 ax22.plot(t[:len(torques[trial - 1])], torques[trial - 1], color=[60/255, 120/255, 210/255])
-    ax11.set_ylim(ax12.get_ylim())
+    # ax11.set_ylim(ax12.get_ylim())
     ax21.set_ylim([-40, 110])
     ax22.set_ylim([-40, 110])
     for ax in [ax11, ax12, ax21, ax22]:

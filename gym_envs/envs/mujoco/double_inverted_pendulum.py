@@ -48,7 +48,7 @@ class IDPMimicHumanDet(BasePendulum, utils.EzPickle):
         self.do_simulation(action, self.frame_skip)
         ob = self._get_obs()
         done = np.any(ob[:2] < (self.low[:2] + 0.05)) or np.any(ob[:2] > (self.high[:2] - 0.05))
-        if (np.abs(self.prev_torque - torque) >= 7).any():
+        if (np.abs(self.prev_torque - torque) >= 30).any():
             done = True
         if self.timesteps < 10:
             done = False
@@ -139,8 +139,8 @@ class IDPMinEffortDet(IDPMimicHumanDet, utils.EzPickle):
 
     def reward_fn(self, ob, action):
         rew = 0
-        rew -= self.cost_ratio*((ob[:2] / np.max(np.abs(self._humanData[:, :2]), axis=0)) ** 2).sum()
-        rew -= (1 - self.cost_ratio) * (((ob[2:] / np.max(np.abs(self._humanData[:, 2:]), axis=0)) * action) ** 2).sum()
+        rew -= self.cost_ratio*((ob[:2] / np.max(np.abs(self._humanData[:, :2]), axis=0)) ** 2).mean()
+        rew -= (1 - self.cost_ratio) * ((ob[2:] / np.max(np.abs(self._humanData[:, 2:]), axis=0) * action) ** 2).mean()
         rew += 1
         if self.ankle_torque_max is not None:
             rew -= 1e-5 / ((np.abs(action)[0] - self.ankle_torque_max/self.model.actuator_gear[0, 0])**2 + 1e-5)

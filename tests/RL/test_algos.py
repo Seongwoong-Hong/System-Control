@@ -57,7 +57,7 @@ def test_ppo_algo(idp_env2):
         vf_coef=0.5,
         ent_coef=0.001,
         device='cpu',
-        policy_kwargs={'net_arch': [dict(pi=[16, 16], vf=[32, 32])]},
+        policy_kwargs={'net_arch': [dict(pi=[64, 64], vf=[64, 64])]},
         verbose=1,
     )
     algo.learn(total_timesteps=int(1e6))

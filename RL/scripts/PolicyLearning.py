@@ -11,7 +11,7 @@ def main():
     # 환경 설정
     env_type = "IDP"
     algo_type = "ppo"
-    env_id = f"{env_type}_MimicHuman"
+    env_id = f"{env_type}_MinEffort"
     device = "cpu"
     subj = "sub04"
     isPseudo = False
@@ -19,11 +19,11 @@ def main():
     env_kwargs = {
         'PDgain': np.array([1000, 200]),
         'ankle_max': 100,
-        # 'w': 0.5,
+        'w': 0.5,
     }
     stptb = 1
     edptb = 4
-    name_tail = f"_DeepMimic_ptb{stptb}to{edptb}/PD1000200_ankLim"
+    name_tail = f"_MinEffort_ptb{stptb}to{edptb}/PD1000200_ankLim"
     except_trials = [13, 16]
 
     if isPseudo:

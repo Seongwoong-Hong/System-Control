@@ -9,7 +9,7 @@ from common.util import make_env
 
 if __name__ == "__main__":
     # 환경 설정
-    env_type = "IP"
+    env_type = "IDP"
     algo_type = "ppo"
     env_id = f"{env_type}_MimicHuman"
     device = "cpu"
@@ -17,17 +17,17 @@ if __name__ == "__main__":
     isPseudo = False
     use_norm = True
     policy_num = 2
-    tmp_num = 10
+    tmp_num = 8
     base_curri_order = None
     curri_order = 1
     env_kwargs = {
-        'PDgain': np.array([1000, 200]),
+        'PDgain': np.array([500, 100]),
         'ankle_max': 100,
         # 'w': 0.0,
     }
     stptb = 1
     edptb = 4
-    name_tail = f"_DeepMimic_ptb{stptb}to{edptb}/PD1000200_ankLim"
+    name_tail = f"_DeepMimic_ptb{stptb}to{edptb}/PD500100_ankLim"
     except_trials = [13, 16]
 
     if isPseudo:
