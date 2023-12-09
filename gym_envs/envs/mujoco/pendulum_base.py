@@ -58,10 +58,10 @@ class BasePendulum(mujoco_env.MujocoEnv):
             self._ptb_idx += 1
             self._ptb_idx %= len(self._humanStates)
             self._humanData = self._humanStates[self._ptb_idx]
-        self.set_ptb_acc()
+        self._set_ptb_acc()
         self._ptb_idx += 1
 
-    def set_ptb_acc(self):
+    def _set_ptb_acc(self):
         x_max = -self._ptb_range[self._ptb_idx // 5]
         ptb_act_t = 1/3
 
@@ -87,6 +87,10 @@ class BasePendulum(mujoco_env.MujocoEnv):
     @property
     def ptb_acc(self):
         return self._ptb_acc
+
+    @property
+    def ptb_idx(self):
+        return self._ptb_idx
 
     def viewer_setup(self):
         v = self.viewer

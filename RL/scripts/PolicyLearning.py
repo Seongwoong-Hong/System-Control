@@ -17,13 +17,13 @@ def main():
     isPseudo = False
     use_norm = True
     env_kwargs = {
-        'PDgain': np.array([1000, 200]),
+        'PDgain': np.array([500, 100]),
         'ankle_max': 100,
         'w': 0.5,
     }
     stptb = 1
     edptb = 4
-    name_tail = f"_MinEffort_ptb{stptb}to{edptb}/PD1000200_ankLim"
+    name_tail = f"_MinEffort_noTrate_ptb{stptb}to{edptb}/PD500100_5vs5_ankLim"
     except_trials = [13, 16]
 
     if isPseudo:
@@ -63,7 +63,7 @@ def main():
         n += 1
     (log_dir / f"policies_{n}").mkdir(parents=True, exist_ok=False)
     shutil.copy(str(Path(__file__)), str(log_dir / f"policies_{n}"))
-    for i in range(15):
+    for i in range(30):
         algo.learn(total_timesteps=int(1e6), tb_log_name=f"extra_{n}", reset_num_timesteps=False)
         algo.save(str(log_dir / f"policies_{n}/agent_{i + 1}"))
         if use_norm:
