@@ -18,13 +18,17 @@ def main():
     use_norm = True
     env_kwargs = {
         'PDgain': np.array([500, 100]),
-        'ankle_max': 100,
+        'ankle_max': None,
         'w': 0.5,
     }
-    stptb = 1
+    stptb = 4
     edptb = 4
-    name_tail = f"_MinEffort_noTrate_ptb{stptb}to{edptb}/PD500100_5vs5_ankLim"
     except_trials = [13, 16]
+
+    #########################################################################
+    # !!!!! You Need to Change this Name before you start the LEARNING!!!!! #
+    #########################################################################
+    name_tail = f"_MinEffort_linear_ptb{stptb}to{edptb}/PD500100_5vs5"
 
     if isPseudo:
         env_type = "Pseudo" + env_type
@@ -55,7 +59,7 @@ def main():
         ent_coef=0.003,
         tensorboard_log=str(log_dir),
         device=device,
-        policy_kwargs={'net_arch': [dict(pi=[64, 64], vf=[64, 64])], 'log_std_range': [-10, None]},
+        policy_kwargs={'net_arch': [dict(pi=[], vf=[64, 64])], 'log_std_range': [-10, None]},
         verbose=1,
     )
     n = 1

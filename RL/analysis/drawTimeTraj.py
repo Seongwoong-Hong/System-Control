@@ -16,10 +16,11 @@ if __name__ == "__main__":
     isPseudo = False
     use_norm = True
     policy_num = 1
-    tmp_num = 9
+    tmp_num = 15
     curri_order = None
     PDgain = np.array([500, 100])
-    name_tail = f"_MinEffort_noTrate_ptb1to4/PD500100_1vs9_ankLim"
+    # noTrate ptb1to7은 Trate 제한 있는 버전임. 네이밍 수정 실수
+    name_tail = f"_MinEffort_stidxFix_ptb1to7/PD500100_5vs5_ankLim"
     save_video = None
     except_trials = [13, 16]
 

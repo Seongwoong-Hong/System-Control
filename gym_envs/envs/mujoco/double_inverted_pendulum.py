@@ -48,8 +48,8 @@ class IDPMimicHumanDet(BasePendulum, utils.EzPickle):
         self.do_simulation(action, self.frame_skip)
         ob = self._get_obs()
         done = np.any(ob[:2] < (self.low[:2] + 0.05)) or np.any(ob[:2] > (self.high[:2] - 0.05))
-        # if (np.abs(self.prev_torque - torque) >= 30).any():
-        #     done = True
+        if (np.abs(self.prev_torque - torque) >= 30).any():
+            done = True
         if self.timesteps < 10:
             done = False
         self.timesteps += 1
@@ -124,9 +124,9 @@ class IDPMimicHuman(IDPMimicHumanDet):
             self._ptb_idx = self.np_random.choice(range(len(self._humanStates)))
             self._humanData = self._humanStates[self._ptb_idx]
         self._set_ptb_acc()
-        st_time_dix = self.np_random.choice(range(self._epi_len))
-        self._ptb_acc = np.append(self._ptb_acc, self._ptb_acc, axis=0)[st_time_dix:st_time_dix+self._epi_len]
-        self._humanData = np.append(self._humanData, self._humanData[-1, :] + self._humanData - self._humanData[0, :], axis=0)[st_time_dix:st_time_dix+self._epi_len]
+        st_time_idx = self.np_random.choice(range(self._epi_len))
+        self._ptb_acc = np.append(self._ptb_acc, self._ptb_acc, axis=0)[st_time_idx:st_time_idx+self._epi_len]
+        self._humanData = np.append(self._humanData, self._humanData[-1, :] + self._humanData - self._humanData[0, :], axis=0)[st_time_idx:st_time_idx+self._epi_len]
 
 
 class IDPMinEffortDet(IDPMimicHumanDet, utils.EzPickle):
