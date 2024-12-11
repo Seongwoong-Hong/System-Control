@@ -132,6 +132,7 @@ class IDPMimicHumanDet(BasePendulum, utils.EzPickle):
         if self._jnt_damping is not None:
             if not isinstance(self._jnt_damping, List):
                 self._jnt_damping = [self._jnt_damping, self._jnt_damping]
+
         if self.ankle_torque_max is not None:
             for motor in root.find('actuator').findall("motor"):
                 if motor.get('name') == 'ank':

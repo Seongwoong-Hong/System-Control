@@ -50,6 +50,7 @@ class IDPMinEffort(VecTask):
             self.lean_angle = 0.0
         self.lean_angle_torch = to_torch([self.lean_angle, 2*self.lean_angle], device=self.device)
 
+
         if "delayed_time" in cfg['env']:
             self.act_delay_time = cfg['env']['delayed_time']
         else:
