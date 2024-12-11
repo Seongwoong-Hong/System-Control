@@ -3,13 +3,12 @@ import os
 import numpy as np
 from scipy import signal
 
-from imitation.data.rollout import make_sample_until, flatten_trajectories
-from stable_baselines3.common.vec_env import DummyVecEnv
+from imitation.data.rollout import make_sample_until
 
 from algos.torch.ppo import PPO
 from algos.torch.OptCont import DiscreteLQRPolicy
-from common.util import make_env
-from common.rollouts import generate_trajectories_without_shuffle
+from common.sb3.util import make_env
+from common.sb3.rollouts import generate_trajectories_without_shuffle
 
 
 class IDPLQRPolicy(DiscreteLQRPolicy):

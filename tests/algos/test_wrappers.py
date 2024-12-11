@@ -3,7 +3,7 @@ import numpy as np
 import torch as th
 from algos.torch.MaxEntIRL import RewardNet
 from common.wrappers import *
-from common.util import make_env
+from common.sb3.util import make_env
 
 
 def test_reward_wrapper():

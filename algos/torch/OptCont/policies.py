@@ -5,15 +5,13 @@ from typing import Optional, Tuple
 from torch.distributions import MultivariateNormal
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv
-from algos.torch.MaxEntIRL.reward_net import *
 
 
-class LQRPolicy(BasePolicy):
+class LinearFeedbackPolicy(BasePolicy):
     def __init__(
             self,
             env,
-            gamma = 1.0,
-            alpha = 1.0,
+            gain=None,
             noise_lv: float = 0.1,
             observation_space=None,
             action_space=None,
@@ -24,21 +22,70 @@ class LQRPolicy(BasePolicy):
             observation_space = env.observation_space
         if action_space is None:
             action_space = env.action_space
-        super(LQRPolicy, self).__init__(observation_space, action_space)
+        self.norm_obs = False
+        if hasattr(env, 'norm_obs'):
+            if env.norm_obs:
+                self.norm_obs = True
+        super(LinearFeedbackPolicy, self).__init__(observation_space, action_space)
 
+        self.to(device)
         self.env = None
-        self.gamma = gamma
-        self.alpha = alpha
         self.set_env(env)
         self.noise_lv = noise_lv
-        self._build_env()
-        self._get_gains()
+        self.K = gain
+        if not isinstance(self.K, th.Tensor):
+            try:
+                self.K = th.tensor(self.K).float()
+            except:
+                print("pytorch tensor로 변환되지 않는 타입입니다")
 
     def set_env(self, env):
         if not isinstance(env, VecEnv):
             self.env = DummyVecEnv([lambda: env])
         else:
             self.env = env
+        self.model = self.env.get_attr("model")[0]
+        self.gear = self.env.get_attr("model")[0].actuator_gear[:, 0]
+        self.max_t = self.env.get_attr("spec")[0].max_episode_steps
+
+    def forward(self):
+        return None
+
+    def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
+        if self.K is None:
+            raise Exception("피드백 게인이 정의되지 않았습니다")
+        noise = 0
+        if not deterministic:
+            noise = self.noise_lv * np.random.randn(*self.K.shape)
+        if self.norm_obs:
+            observation = self.env.unnormalize_obs(observation).float()
+        return ((self.K + noise) @ observation.T).reshape(1, -1) * (-1 / self.gear)
+
+
+class LQRPolicy(LinearFeedbackPolicy):
+    def __init__(
+            self,
+            env,
+            gamma: float = 1.0,
+            alpha: float = 1.0,
+            noise_lv: float = 0.1,
+            observation_space=None,
+            action_space=None,
+            device='cpu',
+            **kwargs,
+    ):
+        super(LQRPolicy, self).__init__(
+            env=env,
+            noise_lv=noise_lv,
+            observation_space=observation_space,
+            action_space=action_space,
+            device=device,
+        )
+
+        self.gamma = gamma
+        self.alpha = alpha
+        self._build_env()
+        self._get_gains()
 
     def reset(self, env):
         self.set_env(env)
@@ -51,7 +98,7 @@ class LQRPolicy(BasePolicy):
             K = (np.linalg.inv(self.R) @ (self.B.T @ X))
         else:
             K = (1 / self.R * (self.B.T @ X)).reshape(-1)
-        self.K = th.from_numpy(K).double().to(self.device)
+        self.K = th.from_numpy(K).float().to(self.device)
 
     def get_vec_normalize_env(self):
         return None
@@ -61,45 +108,35 @@ class LQRPolicy(BasePolicy):
         # Their types are all numpy array even though they are 1-dim value.
         raise NotImplementedError
 
-    def forward(self):
-        return None
-
     def learn(self, *args, **kwargs):
         reward_net = self.env.envs[0].rwfn
-        if isinstance(self.env.envs[0].rwfn, LURewardNet):
-            w_th = reward_net.w_th.detach().cpu().numpy()
-            w_tq = reward_net.w_tq.detach().cpu().numpy()
-            qu, ru = np.zeros([4, 4]), np.zeros([2, 2])
-            qu[0, :] = w_th[:4]
-            qu[1, 1:] = w_th[4:7]
-            qu[2, 2:] = w_th[7:9]
-            qu[3, 3] = w_th[9]
-            ru[0, :] = w_tq[:2]
-            ru[1, 1] = w_tq[2]
-            self.Q = qu.T @ qu
-            self.R = ru.T @ ru
-        elif isinstance(self.env.envs[0].rwfn, XXRewardNet):
-            # weights = np.square(reward_net.reward_layer.weight.cpu().detach().numpy().flatten())
-            weights = reward_net.reward_layer.weight.cpu().detach().numpy().flatten()
-            self.Q = np.diag(weights[:self.observation_space.shape[0]])
-            self.R1 = np.diag(weights[-2*self.action_space.shape[0]:-self.action_space.shape[0]])
-            self.R2 = np.diag(weights[-self.action_space.shape[0]:])
-        else:
-            if isinstance(self.env.envs[0].rwfn, QuadraticRewardNet):
-                # weights = np.square(reward_net.reward_layer.weight.cpu().detach().numpy().flatten())
-                weights = reward_net.reward_layer.weight.cpu().detach().numpy().flatten()
-            else:
-                weights = reward_net.layers[0].weight.cpu().detach().numpy().flatten()
-            self.Q = np.diag(weights[:self.observation_space.shape[0]])
-            self.R = np.diag(weights[self.observation_space.shape[0]:]) / (self.gear ** 2)
+        # if isinstance(self.env.envs[0].rwfn, LURewardNet):
+        #     w_th = reward_net.w_th.detach().cpu().numpy()
+        #     w_tq = reward_net.w_tq.detach().cpu().numpy()
+        #     qu, ru = np.zeros([4, 4]), np.zeros([2, 2])
+        #     qu[0, :] = w_th[:4]
+        #     qu[1, 1:] = w_th[4:7]
+        #     qu[2, 2:] = w_th[7:9]
+        #     qu[3, 3] = w_th[9]
+        #     ru[0, :] = w_tq[:2]
+        #     ru[1, 1] = w_tq[2]
+        #     self.Q = qu.T @ qu
+        #     self.R = ru.T @ ru
+        # elif isinstance(self.env.envs[0].rwfn, XXRewardNet):
+        #     # weights = np.square(reward_net.reward_layer.weight.cpu().detach().numpy().flatten())
+        #     weights = reward_net.reward_layer.weight.cpu().detach().numpy().flatten()
+        #     self.Q = np.diag(weights[:self.observation_space.shape[0]])
+        #     self.R1 = np.diag(weights[-2*self.action_space.shape[0]:-self.action_space.shape[0]])
+        #     self.R2 = np.diag(weights[-self.action_space.shape[0]:])
+        # else:
+        #     if isinstance(self.env.envs[0].rwfn, QuadraticRewardNet):
+        #         # weights = np.square(reward_net.reward_layer.weight.cpu().detach().numpy().flatten())
+        #         weights = reward_net.reward_layer.weight.cpu().detach().numpy().flatten()
+        #     else:
+        #         weights = reward_net.layers[0].weight.cpu().detach().numpy().flatten()
+        #     self.Q = np.diag(weights[:self.observation_space.shape[0]])
+        #     self.R = np.diag(weights[self.observation_space.shape[0]:]) / (self.gear ** 2)
         self._get_gains()
-
-    def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
-        noise = 0
-        if not deterministic:
-            noise = self.noise_lv * np.random.randn(*self.K.shape)
-
-        return -1 / self.gear * ((self.K + noise) @ observation.T).reshape(1, -1)
 
 
 class DiscreteLQRPolicy(LQRPolicy):
@@ -287,7 +324,7 @@ class iterLQRPolicy(LQRPolicy):
 
     def learn(self, *args, **kwargs):
         reward_net = self.env.envs[0].rwfn
-        assert isinstance(reward_net, QuadraticRewardNet) or isinstance(reward_net, CNNRewardNet)
+        # assert isinstance(reward_net, QuadraticRewardNet) or isinstance(reward_net, CNNRewardNet)
         feature_layer = reward_net.feature_layers.eval()
         weights = reward_net.reward_layer.weight.detach().flatten().square()
         self.Q = weights[:-reward_net.len_act_w]

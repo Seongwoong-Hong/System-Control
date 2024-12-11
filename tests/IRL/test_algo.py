@@ -2,7 +2,7 @@ import os
 import pickle
 from algos.torch.ppo import PPO
 from algos.torch.sac import SAC
-from common.util import make_env, CPU_Unpickler
+from common.sb3.util import make_env, CPU_Unpickler
 from common.analyzer import verify_policy
 from common.wrappers import *
 

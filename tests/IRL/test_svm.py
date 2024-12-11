@@ -3,7 +3,7 @@ import pytest
 import torch as th
 import numpy as np
 import pickle
-from common.util import make_env
+from common.sb3.util import make_env
 from imitation.data.rollout import flatten_trajectories
 import matplotlib.pyplot as plt
 

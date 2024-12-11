@@ -1,0 +1,10 @@
+hydra:
+  launcher:
+    name: submitit_slurm
+    submitit_slurm:
+      timeout_min: 120      # 실행 제한 시간 (분 단위)
+      partition: compute    # SLURM 파티션 이름
+      gpus_per_node: 1      # 노드당 GPU 개수
+      tasks_per_node: 1     # 노드당 작업 수
+      cpus_per_task: 4      # 작업당 CPU 개수
+      mem_gb: 16            # 작업당 메모리 크기 (GB)

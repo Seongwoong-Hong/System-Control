@@ -1,12 +1,12 @@
 from pathlib import Path
 
-from scipy import io, signal
+from scipy import io
 
 from imitation.data import rollout, types
 
-from common.util import make_env
+from common.sb3.util import make_env
 from common.wrappers import *
-from common.rollouts import generate_trajectories_without_shuffle, TrajectoryWithPltqs
+from common.sb3.rollouts import generate_trajectories_without_shuffle, TrajectoryWithPltqs
 from RL.policies import IPLQRPolicy
 
 
@@ -36,7 +36,7 @@ def main():
     for idx, traj in enumerate(gen_trajs):
         trajectories.append(TrajectoryWithPltqs(obs=traj.obs, acts=traj.acts, pltq=pltqs[idx // 25], infos=traj.infos))
     save_name = f"{env_type}/quadcost_lqr/{subj}_{actuation}.pkl"
-    types.save(save_name, trajectories)
+    types.save(save_name)
     print(f"Expert Trajectories are saved in the {save_name}")
 
 

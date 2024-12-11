@@ -7,14 +7,14 @@ from xml.etree.ElementTree import ElementTree, parse
 from gym_envs.envs.mujoco import BasePendulum
 
 
-class IPMimicHumanDet(BasePendulum, utils.EzPickle):
+class IPPDMimicHumanDet(BasePendulum, utils.EzPickle):
     def __init__(self, *args, **kwargs):
         self.high = np.array([0.25, 1.0])
         self.low = np.array([-0.25, -1.0])
         self.obs_target = np.array([0.0, 0.0], dtype=np.float32)
         self.prev_action = np.array([0.0], dtype=np.float32)
         filepath = os.path.join(os.path.dirname(__file__), "assets", "IP_custom.xml")
-        super(IPMimicHumanDet, self).__init__(filepath, *args, **kwargs)
+        super(IPPDMimicHumanDet, self).__init__(filepath, *args, **kwargs)
         self.observation_space = spaces.Box(low=self.low, high=self.high)
         utils.EzPickle.__init__(self, *args, **kwargs)
 
@@ -48,8 +48,6 @@ class IPMimicHumanDet(BasePendulum, utils.EzPickle):
             done = True
         if np.abs(self.prev_action - action) >= 0.2:
             done = True
-            if self.timesteps >= 10:
-                print("dT")
         if self.timesteps < 10:
             done = False
 
@@ -62,7 +60,7 @@ class IPMimicHumanDet(BasePendulum, utils.EzPickle):
     def reset_model(self):
         self.obs_target = np.array([0.0, 0.0], dtype=np.float32)
         self.prev_action = np.array([0.0], dtype=np.float32)
-        return super(IPMimicHumanDet, self).reset_model()
+        return super(IPPDMimicHumanDet, self).reset_model()
 
     def reward_fn(self, ob, action):
         rew = 0
@@ -106,7 +104,7 @@ class IPMimicHumanDet(BasePendulum, utils.EzPickle):
         return self.action_space
 
 
-class IPMimicHuman(IPMimicHumanDet):
+class IPPDMimicHuman(IPPDMimicHumanDet):
     def step(self, obs_query: np.ndarray):
         rew = 0
         dones = False
@@ -129,12 +127,12 @@ class IPMimicHuman(IPMimicHumanDet):
         self._humanData = np.append(self._humanData, self._humanData[-1, :] + self._humanData - self._humanData[0, :], axis=0)[st_time_idx:st_time_idx+self._epi_len]
 
 
-class IPMinEffortDet(IPMimicHumanDet):
+class IPPDMinEffortDet(IPPDMimicHumanDet):
     def __init__(self, w=None, *args, **kwargs):
         self.cost_ratio = 0.5
         if w is not None:
             self.cost_ratio = w
-        super(IPMinEffortDet, self).__init__(*args, **kwargs)
+        super(IPPDMinEffortDet, self).__init__(*args, **kwargs)
         utils.EzPickle.__init__(self, w=self.cost_ratio, *args, **kwargs)
 
     def reward_fn(self, ob, action):
@@ -147,13 +145,13 @@ class IPMinEffortDet(IPMimicHumanDet):
         return rew
 
 
-class IPMinEffort(IPMimicHuman):
+class IPPDMinEffort(IPPDMimicHuman):
     def __init__(self, w=None, *args, **kwargs):
         self.cost_ratio = 0.5
         if w is not None:
             self.cost_ratio = w
-        super(IPMinEffort, self).__init__(*args, **kwargs)
+        super(IPPDMinEffort, self).__init__(*args, **kwargs)
         utils.EzPickle.__init__(self, w=self.cost_ratio, *args, **kwargs)
 
     def reward_fn(self, ob, action):
-        return IPMinEffortDet.reward_fn(self, ob, action)
+        return IPPDMinEffortDet.reward_fn(self, ob, action)

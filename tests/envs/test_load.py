@@ -1,6 +1,6 @@
 import os
 import pytest
-from common.util import make_env
+from common.sb3.util import make_env
 from scipy import io
 
 
@@ -26,3 +26,6 @@ def test_make_env(demo_dir):
     print(io.loadmat(file)['bsp'])
 
 
+def test_load_error(IDPbsp, IDPhumanStates):
+    for _ in range(100):
+        make_env("IDP_MinEffort-v2", num_envs=8, bsp=IDPbsp, humanStates=IDPhumanStates)

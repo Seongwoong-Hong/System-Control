@@ -1,0 +1,11 @@
+{
+  "num_samples": -1,
+  "n_steps": 256,
+  "batch_size": 1024,
+  "learning_rate": 0.0003,
+  "n_epochs": 10,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "vf_coef": 0.5,
+  "ent_coef": 0.001
+}

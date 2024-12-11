@@ -1,5 +1,5 @@
 import pickle
-from common.util import make_env
+from common.sb3.util import make_env
 from imitation.data import rollout
 from scipy import io
 

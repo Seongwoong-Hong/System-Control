@@ -38,7 +38,18 @@ def test_env_time_idx(idp_env):
     env.close()
 
 
-def test_env_acc(idp_env):
-    env = idp_env
+def test_env_acc(idp_env_vec):
+    env = idp_env_vec
     env.reset()
     assert (env.get_attr("ptb_acc")[0] != 0).sum() != 0
+    assert (len(env.get_attr("ptb_acc")[0]) == 360)
+
+
+def test_det_env_diff(idp_env, idp_det_env):
+    from matplotlib import pyplot as plt
+    for _ in range(10):
+        idp_env.reset()
+        idp_det_env.reset()
+        plt.plot(idp_det_env.ptb_acc)
+        plt.plot(idp_env.ptb_acc)
+        plt.show()

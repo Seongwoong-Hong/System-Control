@@ -1,5 +1,5 @@
 import os
-from common.util import make_env
+from common.sb3.util import make_env
 from algos.torch.sac import SAC, MlpPolicy
 
 

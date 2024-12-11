@@ -2,20 +2,14 @@ import os
 import pickle
 import pytest
 import torch as th
-import numpy as np
 
-from scipy import io
-from common.util import make_env, CPU_Unpickler
+from common.sb3.util import make_env, CPU_Unpickler
 from common.analyzer import CostMap
 from common.wrappers import *
 from algos.tabular.viter import FiniteSoftQiter
 from algos.torch.ppo import PPO
-from algos.torch.sac import SAC
 
-from imitation.algorithms import bc
 from matplotlib import pyplot as plt
-from matplotlib import cm
-
 
 irl_path = os.path.abspath(os.path.join("..", "..", "IRL"))
 def mapping(x: th.tensor):

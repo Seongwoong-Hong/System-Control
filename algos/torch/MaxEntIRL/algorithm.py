@@ -1,20 +1,17 @@
-from copy import deepcopy
-from typing import List, Dict, Optional, Union, Tuple, Sequence
+from typing import Dict, Optional, Union, Sequence
 
 import gym
 import numpy as np
 import cvxpy as cp
-import torch as th
-from scipy import signal
 from imitation.data.rollout import make_sample_until, flatten_trajectories
-from imitation.data.types import Trajectory, TrajectoryWithRew
+from imitation.data.types import Trajectory
 from imitation.util import logger
-from stable_baselines3.common.vec_env import DummyVecEnv, VecEnvWrapper
+from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 
 from algos.torch.MaxEntIRL.reward_net import *
 from common.wrappers import RewardInputNormalizeWrapper
-from common.rollouts import get_trajectories_probs, generate_trajectories_without_shuffle
+from common.sb3.rollouts import get_trajectories_probs, generate_trajectories_without_shuffle
 
 
 class weightConstraint(object):

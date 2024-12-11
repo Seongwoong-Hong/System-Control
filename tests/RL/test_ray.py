@@ -1,8 +1,6 @@
-import copy
-
 import ray
 from ray import tune
-from RL.scripts.ParameterTuning import main
+from RL.scripts.py.TuneAlgoParameter import main
 from algos.torch.ppo import MlpPolicy
 
 

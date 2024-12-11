@@ -1,8 +1,7 @@
 from scipy import io
 from imitation.data import types
-from gym_envs.envs import FaissDiscretizationInfo
-from common.rollouts import TrajectoryWithPltqs
-from common.util import make_env
+from common.sb3.rollouts import TrajectoryWithPltqs
+from common.sb3.util import make_env
 
 if __name__ == '__main__':
     env_type = "IDP"
@@ -26,5 +25,5 @@ if __name__ == '__main__':
                     pltq = io.loadmat(file)['pltq'] / act_coeff
                     trajectories += [TrajectoryWithPltqs(obs=state, acts=T, infos=None, pltq=pltq)]
             save_name = f"{env_type}/full/{sub}_{actuation}.pkl"
-            types.save(save_name, trajectories)
+            types.save(save_name)
             print(f"Expert Trajectory {save_name} is saved")

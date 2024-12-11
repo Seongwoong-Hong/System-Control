@@ -5,8 +5,6 @@ import torch as th
 from typing import Dict, List, Optional
 
 from matplotlib import pyplot as plt
-from imitation.data.rollout import TrajectoryAccumulator, flatten_trajectories, make_sample_until
-from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 def video_record(imgs: List, filename: str, dt: float):
@@ -22,21 +20,23 @@ def video_record(imgs: List, filename: str, dt: float):
     writer.release()
 
 
-def exec_policy(environment, policy, render="rgb_array", deterministic=True, repeat_num=5):
+def exec_policy(environment, policy, render="rgb_array", deterministic=True, repeat_num=1, infos=None):
+    if infos is None:
+        infos = []
     if render == 'human':
         raise Exception("현재 환경에서 rendering은 지원하지 않습니다.")
-    isvecenv = hasattr(environment, "venv")
+    isvecenv = hasattr(environment, "envs")
     imgs = []
     acts_list = []
     obs_list = []
     rews_list = []
-    torq_list = []
+    ivls_dict = {iname: [] for iname in infos}
     ob = environment.reset()
     for _ in range(repeat_num):
         actions = []
         rewards = []
         observs = []
-        torques = []
+        infovls = {iname: [] for iname in infos}
         environment.render(mode=render)
         observs.append(ob.squeeze())
         done = False
@@ -50,95 +50,104 @@ def exec_policy(environment, policy, render="rgb_array", deterministic=True, rep
                 act = environment.action(act)
             if isvecenv:
                 info = info[0]
-            if "torque" in info:
-                torques.append(info["torque"].squeeze())
-            actions.append(act.squeeze())
-            rewards.append(rew.squeeze())
+            for iname in infos:
+                infovls[iname].append(info[iname].squeeze())
+            actions.append(act.squeeze(0))
+            rewards.append(rew.squeeze(0))
             imgs.append(img)
             if "terminal_observation" in info:
-                observs.append(info["terminal_observation"].squeeze())
+                observs.append(info["terminal_observation"])
             else:
-                observs.append(ob.squeeze())
-        torq_list.append(np.array(torques))
+                observs.append(ob.squeeze(0))
+            if not isvecenv:
+                ob = environment.reset()
+        for iname in infos:
+            ivls_dict[iname].append(np.array(infovls[iname]))
         acts_list.append(np.array(actions))
-        rews_list.append(np.array(rewards))
-        obs_list.append(np.array(observs))
-    return obs_list, acts_list, rews_list, imgs, torq_list
+        if hasattr(environment, "norm_reward"):
+            rews_list.append(environment.unnormalize_reward(np.array(rewards)))
+        else:
+            rews_list.append(np.array(rewards))
+        if hasattr(environment, "norm_obs"):
+            obs_list.append(environment.unnormalize_obs(np.array(observs)))
+        else:
+            obs_list.append(np.array(observs))
+    return obs_list, acts_list, rews_list, imgs, ivls_dict
 
-
-class CostMap:
-    def __init__(self, cost_fn, agent_env, agent, expt_env: Optional = None, expt: Optional = None):
-        self.agent_dict = {'env': agent_env, 'cost_fn': cost_fn, 'algo': agent}
-        self.agents = self.process_agent(self.agent_dict)
-        if expt is not None:
-            self.expt_dict = {'env': expt_env, 'cost_fn': cost_fn, 'algo': expt}
-            self.agents += self.process_agent(self.expt_dict)
-        self.cost_accum = self.cal_cost(self.agents)
-        self.fig = self.draw_costmap(self.cost_accum)
-
-    @classmethod
-    def process_agent(cls, agent_dict: Dict):
-        trajectories = []
-        venv = agent_dict['env']
-        n_episodes = 10
-        if hasattr(venv, 'num_disturbs'):
-            n_episodes = venv.num_disturbs
-        sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
-        if not isinstance(venv, DummyVecEnv):
-            venv = DummyVecEnv([lambda: venv])
-        algo = agent_dict['algo']
-        trajectories_accum = TrajectoryAccumulator()
-        obs = venv.reset()
-        for env_idx, ob in enumerate(obs):
-            trajectories_accum.add_step(dict(obs=ob), env_idx)
-        active = True
-        while active:
-            act, _ = algo.predict(obs, deterministic=False)
-            obs, rew, done, info = venv.step(act)
-            done &= active
-            new_trajs = trajectories_accum.add_steps_and_auto_finish(
-                act, obs, rew, done, info
-            )
-            trajectories.extend(new_trajs)
-            if sample_until(trajectories):
-                active &= ~done
-        orders = [i+1 for i in range(len(trajectories))]
-        cost_fn = agent_dict['cost_fn']
-        transitions = [flatten_trajectories([traj]) for traj in trajectories]
-        return [{'transitions': transitions, 'cost_fn': cost_fn, 'orders': orders}]
-
-    @classmethod
-    def cal_cost(cls, agents: List[Dict]):
-        inputs = []
-        for agent in agents:
-            transitions = agent['transitions']
-            cost_fn = agent['cost_fn']
-            costs = []
-            for tran in transitions:
-                obs = th.from_numpy(tran.obs)
-                act = th.from_numpy(tran.acts)
-                next_obs = th.from_numpy(tran.next_obs)
-                done = tran.dones
-                cost = cost_fn(obs, act, next_obs, done).sum().item()
-                costs.append(cost)
-            orders = agent['orders']
-            inputs.append([orders, costs])
-        return inputs
-
-    @classmethod
-    def draw_costmap(cls, cost_accum: List[List]):
-        from matplotlib.ticker import FormatStrFormatter
-        fig = plt.figure(figsize=(7.5, 5.4*len(cost_accum)))
-        titles = ["agent", "expert"]
-        for i, (orders, costs) in enumerate(cost_accum):
-            ax = fig.add_subplot(len(cost_accum), 1, i + 1)
-            ax.plot(orders, costs)
-            ax.grid()
-            ax.set_xlabel("#", fontsize=20)
-            ax.set_ylabel("cost", fontsize=20)
-            ax.set_title(titles[i], fontsize=23)
-            ax.yaxis.set_major_formatter(FormatStrFormatter('%.2e'))
-            plt.xticks(fontsize=13)
-            plt.yticks(fontsize=13)
-        plt.show()
-        return fig
+#
+# class CostMap:
+#     def __init__(self, cost_fn, agent_env, agent, expt_env: Optional = None, expt: Optional = None):
+#         self.agent_dict = {'env': agent_env, 'cost_fn': cost_fn, 'algo': agent}
+#         self.agents = self.process_agent(self.agent_dict)
+#         if expt is not None:
+#             self.expt_dict = {'env': expt_env, 'cost_fn': cost_fn, 'algo': expt}
+#             self.agents += self.process_agent(self.expt_dict)
+#         self.cost_accum = self.cal_cost(self.agents)
+#         self.fig = self.draw_costmap(self.cost_accum)
+#
+#     @classmethod
+#     def process_agent(cls, agent_dict: Dict):
+#         trajectories = []
+#         venv = agent_dict['env']
+#         n_episodes = 10
+#         if hasattr(venv, 'num_disturbs'):
+#             n_episodes = venv.num_disturbs
+#         sample_until = make_sample_until(n_timesteps=None, n_episodes=n_episodes)
+#         if not isinstance(venv, DummyVecEnv):
+#             venv = DummyVecEnv([lambda: venv])
+#         algo = agent_dict['algo']
+#         trajectories_accum = TrajectoryAccumulator()
+#         obs = venv.reset()
+#         for env_idx, ob in enumerate(obs):
+#             trajectories_accum.add_step(dict(obs=ob), env_idx)
+#         active = True
+#         while active:
+#             act, _ = algo.predict(obs, deterministic=False)
+#             obs, rew, done, info = venv.step(act)
+#             done &= active
+#             new_trajs = trajectories_accum.add_steps_and_auto_finish(
+#                 act, obs, rew, done, info
+#             )
+#             trajectories.extend(new_trajs)
+#             if sample_until(trajectories):
+#                 active &= ~done
+#         orders = [i+1 for i in range(len(trajectories))]
+#         cost_fn = agent_dict['cost_fn']
+#         transitions = [flatten_trajectories([traj]) for traj in trajectories]
+#         return [{'transitions': transitions, 'cost_fn': cost_fn, 'orders': orders}]
+#
+#     @classmethod
+#     def cal_cost(cls, agents: List[Dict]):
+#         inputs = []
+#         for agent in agents:
+#             transitions = agent['transitions']
+#             cost_fn = agent['cost_fn']
+#             costs = []
+#             for tran in transitions:
+#                 obs = th.from_numpy(tran.obs)
+#                 act = th.from_numpy(tran.acts)
+#                 next_obs = th.from_numpy(tran.next_obs)
+#                 done = tran.dones
+#                 cost = cost_fn(obs, act, next_obs, done).sum().item()
+#                 costs.append(cost)
+#             orders = agent['orders']
+#             inputs.append([orders, costs])
+#         return inputs
+#
+#     @classmethod
+#     def draw_costmap(cls, cost_accum: List[List]):
+#         from matplotlib.ticker import FormatStrFormatter
+#         fig = plt.figure(figsize=(7.5, 5.4*len(cost_accum)))
+#         titles = ["agent", "expert"]
+#         for i, (orders, costs) in enumerate(cost_accum):
+#             ax = fig.add_subplot(len(cost_accum), 1, i + 1)
+#             ax.plot(orders, costs)
+#             ax.grid()
+#             ax.set_xlabel("#", fontsize=20)
+#             ax.set_ylabel("cost", fontsize=20)
+#             ax.set_title(titles[i], fontsize=23)
+#             ax.yaxis.set_major_formatter(FormatStrFormatter('%.2e'))
+#             plt.xticks(fontsize=13)
+#             plt.yticks(fontsize=13)
+#         plt.show()
+#         return fig

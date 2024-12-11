@@ -1,13 +1,12 @@
 import os
 import pickle
 import pytest
-import torch as th
 from scipy import io
 from imitation.util import logger
 
-from algos.torch.MaxEntIRL.algorithm import MaxEntIRL, GuidedCostLearning, APIRL, ContMaxEntIRL
-from algos.tabular.viter import FiniteSoftQiter, FiniteViter, SoftQiter
-from common.util import make_env
+from algos.torch.MaxEntIRL.algorithm import ContMaxEntIRL
+from algos.tabular.viter import FiniteSoftQiter, SoftQiter
+from common.sb3.util import make_env
 from common.wrappers import *
 from IRL.scripts.MaxEntIRL import main
 from IRL.src import *

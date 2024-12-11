@@ -1,14 +1,10 @@
 import os
+import isaacgym
 import pytest
-import pickle
-import numpy as np
-import torch as th
 from scipy import signal, io
 
-from algos.torch.MaxEntIRL import QuadraticRewardNet
 from algos.torch.OptCont import *
-from common.util import make_env
-from common.wrappers import RewardWrapper
+from common.sb3.util import make_env
 
 
 def feature_fn(x):
@@ -80,19 +76,23 @@ def idpdiffpolicy():
 
 
 @pytest.fixture
-def irl_path():
-    return os.path.abspath(os.path.join("..", "..", "IRL"))
-
-
-@pytest.fixture
-def rl_path():
-    return os.path.abspath(os.path.join("..", "..", "RL"))
-
-
-@pytest.fixture
 def proj_path():
-    return os.path.abspath(os.path.join("..", ".."))
+    return os.path.abspath(os.path.join(__file__, "..", ".."))
 
+
+@pytest.fixture
+def irl_path(proj_path):
+    return os.path.join(proj_path, "IRL")
+
+
+@pytest.fixture
+def rl_path(proj_path):
+    return os.path.join(proj_path, "RL")
+
+
+# ==============================
+# Single pendulum variables
+# ==============================
 
 @pytest.fixture
 def IPhumanData(proj_path):
@@ -137,23 +137,48 @@ def ip_env2_vec(IPbsp, IPhumanStates):
     return make_env(f"IP_MinEffort-v2", num_envs=8, bsp=IPbsp, humanStates=IPhumanStates, w=0.9)
 
 
+# ==============================
+# Double pendulum variables
+# ==============================
+
 @pytest.fixture
-def idp_env(proj_path):
+def IDPhumanData(proj_path):
     subpath = os.path.join(proj_path, "demos", "IDP", "sub04", "sub04")
-    states = [None for _ in range(35)]
-    for i in range(31, 36):
-        humanData = io.loadmat(subpath + f"i{i}.mat")
-        states[i - 1] = humanData['state']
-        bsp = humanData['bsp']
-    return make_env("IDP_MimicHuman-v2", num_envs=8, bsp=bsp, humanStates=states, ankle_max=100)
+    return io.loadmat(subpath + "i11.mat")
 
 
 @pytest.fixture
-def idp_env2(proj_path):
-    subpath = os.path.join(proj_path, "demos", "IDP", "sub04", "sub04")
+def IDPhumanStates(IDPhumanData):
     states = [None for _ in range(35)]
-    for i in range(31, 36):
-        humanData = io.loadmat(subpath + f"i{i}.mat")
-        states[i - 1] = humanData['state']
-        bsp = humanData['bsp']
-    return make_env("IDP_MinEffort-v2", num_envs=1, bsp=bsp, humanStates=states, ankle_max=100, w=0.9)
+    states[11 - 1] = IDPhumanData['state']
+    return states
+
+
+@pytest.fixture
+def IDPbsp(IDPhumanData):
+    return IDPhumanData['bsp']
+
+
+@pytest.fixture
+def idp_det_env(IDPbsp, IDPhumanStates):
+    return make_env("IDPPD_MinEffort-v0", bsp=IDPbsp, humanStates=IDPhumanStates)
+
+
+@pytest.fixture
+def idp_env(IDPbsp, IDPhumanStates):
+    return make_env("IDPPD_MinEffort-v2", bsp=IDPbsp, humanStates=IDPhumanStates)
+
+
+@pytest.fixture
+def idp_env_vec(IDPbsp, IDPhumanStates):
+    return make_env(
+        "IDP_MinMetCost-v2",
+        num_envs=8,
+        bsp=IDPbsp,
+        humanStates=IDPhumanStates,
+        ankle_limit='soft',
+        ankle_torque_max=120,
+        vel_ratio=0.01,
+        stiffness = [300, 50],
+        damping = [30, 20],
+    )

@@ -2,7 +2,7 @@ import os
 import json
 import pickle
 
-from common.util import make_env
+from common.sb3.util import make_env
 from common.wrappers import *
 
 from matplotlib import pyplot as plt

@@ -2,14 +2,13 @@ import os
 import pytest
 import time
 import pickle
-import numpy as np
 
 from scipy import io
 from matplotlib import pyplot as plt
 from imitation.data.rollout import flatten_trajectories, make_sample_until
-from common.rollouts import generate_trajectories_without_shuffle
+from common.sb3.rollouts import generate_trajectories_without_shuffle
 
-from common.util import make_env
+from common.sb3.util import make_env
 
 
 def run_traj(env, expert_dir):

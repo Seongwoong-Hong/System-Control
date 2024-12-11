@@ -7,7 +7,7 @@ from scipy import io
 from copy import deepcopy
 
 from gym_envs.envs import FaissDiscretizationInfo, UncorrDiscretizationInfo, DataBasedDiscretizationInfo
-from common.util import CPU_Unpickler, make_env
+from common.sb3.util import CPU_Unpickler, make_env
 from common.wrappers import *
 from algos.tabular.viter import FiniteSoftQiter
 

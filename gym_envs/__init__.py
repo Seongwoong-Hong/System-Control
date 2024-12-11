@@ -85,6 +85,45 @@ register(
 )
 
 register(
+    id='IDPPD_MimicHuman-v0',
+    entry_point='gym_envs.envs.mujoco:IDPPDMimicHumanDet',
+    max_episode_steps=360,
+)
+
+
+register(
+    id='IDPPD_MimicHuman-v2',
+    entry_point='gym_envs.envs.mujoco:IDPPDMimicHuman',
+    max_episode_steps=90,
+)
+
+register(
+    id='IDPPD_MinEffort-v0',
+    entry_point='gym_envs.envs.mujoco:IDPPDMinEffortDet',
+    max_episode_steps=360,
+)
+
+
+register(
+    id='IDPPD_MinEffort-v2',
+    entry_point='gym_envs.envs.mujoco:IDPPDMinEffort',
+    max_episode_steps=90,
+)
+
+register(
+    id='IDPPD_MinMetCost-v0',
+    entry_point='gym_envs.envs.mujoco:IDPPDMinEffortDet',
+    max_episode_steps=360,
+)
+
+register(
+    id='IDPPD_MinMetCost-v2',
+    entry_point='gym_envs.envs.mujoco:IDPPDMinMetCost',
+    max_episode_steps=90,
+)
+
+
+register(
     id='IDP_MimicHuman-v0',
     entry_point='gym_envs.envs.mujoco:IDPMimicHumanDet',
     max_episode_steps=360,
@@ -94,7 +133,7 @@ register(
 register(
     id='IDP_MimicHuman-v2',
     entry_point='gym_envs.envs.mujoco:IDPMimicHuman',
-    max_episode_steps=90,
+    max_episode_steps=360,
 )
 
 register(
@@ -107,8 +146,81 @@ register(
 register(
     id='IDP_MinEffort-v2',
     entry_point='gym_envs.envs.mujoco:IDPMinEffort',
-    max_episode_steps=90,
+    max_episode_steps=600,
 )
+
+register(
+    id='IDP_MinMetCost-v0',
+    entry_point='gym_envs.envs.mujoco:IDPMinEffortDet',
+    max_episode_steps=360,
+)
+
+register(
+    id='IDP_MinMetCost-v2',
+    entry_point='gym_envs.envs.mujoco:IDPMinMetCost',
+    max_episode_steps=600,
+)
+
+register(
+    id='IDP_ForwardPush-v0',
+    entry_point='gym_envs.envs.mujoco:IDPForwardPushDet',
+    max_episode_steps=360,
+)
+
+register(
+    id='IDP_HeadTrack-v2',
+    entry_point='gym_envs.envs.mujoco:IDPHeadTrack',
+    max_episode_steps=1200,
+)
+
+register(
+    id='IDP_HeadTrack-v0',
+    entry_point='gym_envs.envs.mujoco:IDPHeadTrackDet',
+    max_episode_steps=360,
+)
+
+register(
+    id='IDP_SinPtb-v2',
+    entry_point='gym_envs.envs.mujoco:IDPSinPtb',
+    max_episode_steps=360,
+)
+
+register(
+    id='IDP_SinPtb-v0',
+    entry_point='gym_envs.envs.mujoco:IDPSinPtbDet',
+    max_episode_steps=360,
+)
+
+register(
+    id='IDP_InitState-v2',
+    entry_point='gym_envs.envs.mujoco:IDPInitState',
+    max_episode_steps=360,
+)
+
+register(
+    id='IDP_InitState-v0',
+    entry_point='gym_envs.envs.mujoco:IDPInitState',
+    max_episode_steps=360,
+)
+
+register(
+    id='Cartpole-v2',
+    entry_point='gym_envs.envs.mujoco:CartpoleEnv',
+    max_episode_steps=500,
+)
+
+register(
+    id='Cartpole-v0',
+    entry_point='gym_envs.envs.mujoco:CartpoleEnv',
+    max_episode_steps=500,
+)
+
+register(
+    id='humanoid-v0',
+    entry_point='gym_envs.envs.mujoco:HumanoidEnv',
+    max_episode_steps=360,
+)
+
 # environments based on pybullet
 
 register(

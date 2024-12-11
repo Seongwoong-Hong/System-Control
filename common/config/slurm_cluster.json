@@ -1,0 +1,10 @@
+{
+  "conda": "baseline",
+  "report": "report.json",
+  "sbatch_kwargs": {
+    "partition": "hsw",
+    "ntasks": 1,
+    "cpu_per_task": 8,
+    "tres_per_node": "gres:mps:40"
+  }
+}

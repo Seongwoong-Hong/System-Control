@@ -6,7 +6,7 @@ from scipy import signal
 from imitation.data.rollout import flatten_trajectories
 
 from algos.torch.OptCont import DiscreteLQRPolicy
-from common.util import make_env
+from common.sb3.util import make_env
 
 
 class IDPLQRPolicy(DiscreteLQRPolicy):

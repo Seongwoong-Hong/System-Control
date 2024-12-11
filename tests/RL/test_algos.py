@@ -43,8 +43,8 @@ def test_reward_norm(ip_env, proj_path, ip_env_norm):
     print(norm_env.unnormalize_obs(norm_ob)[0], ob)
 
 
-def test_ppo_algo(idp_env2):
-    env = idp_env2
+def test_ppo_algo(idp_env_vec):
+    env = idp_env_vec
     algo = PPO(
         MlpPolicy,
         env=env,
@@ -57,7 +57,8 @@ def test_ppo_algo(idp_env2):
         vf_coef=0.5,
         ent_coef=0.001,
         device='cpu',
-        policy_kwargs={'net_arch': [dict(pi=[], vf=[64, 64])]},
+        policy_kwargs={'net_arch': [dict(pi=[64, 64], vf=[64, 64])]},
         verbose=1,
     )
-    algo.learn(total_timesteps=int(1e6))
+    for _ in range(5):
+        algo.learn(total_timesteps=int(1e4), reset_num_timesteps=False)

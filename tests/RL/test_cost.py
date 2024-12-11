@@ -4,12 +4,9 @@ import numpy as np
 import torch as th
 from matplotlib import pyplot as plt
 
-from imitation.data.rollout import make_sample_until, generate_trajectories, flatten_trajectories, types
-
-from gym_envs.envs import DataBasedDiscretizationInfo
 from algos.torch.OptCont import LQRPolicy
 from algos.tabular.viter import FiniteSoftQiter
-from common.util import make_env
+from common.sb3.util import make_env
 
 class DiscIPLQRPolicy(LQRPolicy):
     def _build_env(self):

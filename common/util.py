@@ -1,130 +1,18 @@
-import os
-import pickle
-import warnings
-import os.path as p
-import gym_envs
-import gym
-from io import BytesIO
-
-from scipy import io
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocVecEnv
-from stable_baselines3.common.monitor import Monitor
-
-from common.wrappers import ActionWrapper
+import argparse
 
 
-class CPU_Unpickler(pickle.Unpickler):
-    def find_class(self, module, name):
-        if module == 'torch.storage' and name == '_load_from_bytes':
-            return lambda b: torch.load(BytesIO(b), map_location='cpu')
-        else:
-            return super().find_class(module, name)
-
-
-def make_env(env_name, num_envs=None, use_norm=False, wrapper=None, **kwargs):
-    wrapper_kwargs = kwargs.pop('wrapper_kwargs', {})
-
-    def define_env():
-        if isinstance(env_name, gym.Env):
-            env = env_name
-        else:
-            if "HPC" in env_name:
-                subpath = kwargs.pop("subpath", None)
-                pltqs = kwargs.get("pltqs")
-                if pltqs is None and subpath is not None:
-                    pltqs, init_states = [], []
-                    i = 0
-                    while True:
-                        file = subpath + f"i{i + 1}.mat"
-                        if not p.isfile(file):
-                            break
-                        pltqs += [io.loadmat(file)['pltq']]
-                        init_states += [io.loadmat(file)['state'][0, :4]]
-                        kwargs['bsp'] = io.loadmat(file)['bsp']
-                        i += 1
-                    kwargs['pltqs'] = pltqs
-                    kwargs['init_states'] = init_states
-            else:
-                kwargs.pop('subpath', None)
-                kwargs.pop('pltqs', None)
-            env = gym.make(env_name, **kwargs)
-
-        if wrapper is not None:
-            if wrapper == "ActionWrapper":
-                env = ActionWrapper(env)
-            elif isinstance(wrapper, str):
-                warnings.warn("Not specified wrapper name so it's ignored")
-            else:
-                env = wrapper(env, **wrapper_kwargs)
-        return env
-
-    if use_norm:
-        if num_envs is None:
-            num_envs = 1
-        env = DummyVecEnv([lambda: Monitor(define_env()) for _ in range(num_envs)])
-        if isinstance(use_norm, str):
-            env = VecNormalize.load(use_norm, env)
-        else:
-            env = VecNormalize(env, norm_obs=True, norm_reward=True)
-    elif num_envs:
-        env = DummyVecEnv([lambda: Monitor(define_env()) for _ in range(num_envs)])
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
     else:
-        env = define_env()
-
-    return env
-
-
-def write_analyzed_result(
-        ana_fn,
-        ana_dir,
-        iter_name=None,
-        result_path: str = "/model/result.txt",
-        verbose=0
-):
-    if iter_name is not None:
-        filename = ana_dir + f"/{iter_name}" + result_path
-        assert p.isdir(p.abspath(p.join(filename, p.pardir))), "Directory doesn't exist"
-    else:
-        filename = ana_dir + result_path
-        assert p.isdir(p.abspath(p.join(filename, p.pardir))), "Directory doesn't exist"
-    if not p.isfile(filename):
-        ana_dict = ana_fn()
-        f = open(filename + ".tmp", "w")
-        for key, value in ana_dict.items():
-            f.write(f"{key}: {value}\n")
-            if verbose == 1:
-                print(f"{key}: {value}")
-        f.close()
-        os.replace(filename + ".tmp", filename)
-        if verbose == 1:
-            print("The result file saved successfully")
-    else:
-        if verbose == 1:
-            print("A result file already exists")
-
-
-def remove_analyzed_result(ana_dir, entire=True, folder_num=None):
-    if entire:
-        folder_num = 0
-        while True:
-            file = ana_dir + f"/{folder_num}/model/result.txt"
-            if not p.isdir(p.dirname(file)):
-                print(f"Break at the folder #{folder_num}")
-                break
-            if not p.isfile(file):
-                print(f"Pass the folder #{folder_num}")
-                folder_num += 1
-                continue
-            os.remove(file)
-            folder_num += 1
-    else:
-        assert folder_num is not None, "The folder number was not specified"
-        file = ana_dir + f"/{folder_num}/model/result.txt"
-        if p.isfile(file):
-            os.remove(file)
-            print(f"The result file in the folder #{folder_num} is removed successfully")
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 # code from Hyunho Jeong
+
 
 import collections
 import random

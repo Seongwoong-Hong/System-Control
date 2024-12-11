@@ -1,14 +1,10 @@
 import os
 import pickle
-import pytest
-from scipy import io
 
-from imitation.data import rollout
 from imitation.util import logger
 from imitation.algorithms import bc
 from matplotlib import pyplot as plt
 
-from common.util import make_env
 from algos.torch.MaxEntIRL import MaxEntIRL
 
 

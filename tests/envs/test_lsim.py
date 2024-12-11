@@ -3,7 +3,7 @@ import numpy as np
 from scipy import io, signal, linalg
 from matplotlib import pyplot as plt
 
-from common.util import make_env
+from common.sb3.util import make_env
 
 irl_path = os.path.abspath("../../IRL")
 basis_data = os.path.join(irl_path, "demos", "HPC", "sub01_full", "sub01i16.mat")
