@@ -360,7 +360,6 @@ class IDPMinEffort(VecTask):
         self.compute_observations()
         self.compute_reward()
 
-
     def _set_body_config(self, filepath, bsp):
         tl_f = bsp[0, 0] * 0.01
         m_f, l_f, com_f, I_f = bsp[1, :]
@@ -394,7 +393,9 @@ class IDPMinEffort(VecTask):
         u_body.find("inertial").attrib['mass'] = f"{m_u:.4f}"
 
         if self.ankle_torque_max is not None:
-            root.find('actuator').findall("motor")[0].attrib['gear'] = str(self.ankle_torque_max)
+            for motor in root.find('actuator').findall("motor"):
+                if motor.get('name') == 'ank':
+                    motor.attrib['gear'] = str(self.ankle_torque_max)
         m_tree = ElementTree(root)
 
         self.com = to_torch([com_f, com_l, com_u], device=self.device)
