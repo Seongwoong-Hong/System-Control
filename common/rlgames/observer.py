@@ -84,6 +84,7 @@ class DrawTimeTrajObserver(PlayerObserver):
         self.dones = None
         self.infos = {}
         self.fig = None
+        self.fig_path = None
 
     def before_run(self):
         if self.fig is None:
@@ -113,6 +114,9 @@ class DrawTimeTrajObserver(PlayerObserver):
         self.fig.tight_layout()
         if self.show_fig:
             self.fig.show()
+        if self.save_fig:
+            figpath = "result.png" if self.fig_path is None else self.fig_path
+            self.fig.savefig(figpath)
 
     def after_init(self, algo):
         self.algo = algo
