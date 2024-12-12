@@ -117,6 +117,7 @@ class DrawTimeTrajObserver(PlayerObserver):
     def after_init(self, algo):
         self.algo = algo
         self.show_fig = self.algo.player_config.get("show_fig", False)
+        self.save_fig = self.algo.player_config.get("save_fig", False)
 
     def after_steps(self):
         obs = torch.concat([self.algo.env.dof_pos, self.algo.env.dof_vel], dim=-1)
