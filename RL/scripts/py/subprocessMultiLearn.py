@@ -4,6 +4,8 @@ import random
 import subprocess
 import time
 
+from common.util import str2bool
+
 if __name__ == '__main__':
     with open(f"multi_learn_config.json", 'r') as f:
         config = json.load(f)
@@ -17,7 +19,7 @@ if __name__ == '__main__':
     all_combinations = list(itertools.product(*config["learn_config"].values()))
 
     # 조합에서 NUM_RUNS만큼 랜덤 샘플링
-    sampling = config["sampling"] if "sampling" in config else True
+    sampling = str2bool(config["sampling"]) if "sampling" in config else True
     if sampling:
         selected_combinations = random.choices(all_combinations, k=NUM_RUNS)
     else:
