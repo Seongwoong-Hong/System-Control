@@ -1,7 +1,1 @@
-/gym_envs/__pycache__
-/gym_envs/envs/__pycache__
-/gym_envs.egg-info/
-/.pytest_cache
-/.idea
-/demos/HPC
-/**/__pycache__
+*/__pycache__/*

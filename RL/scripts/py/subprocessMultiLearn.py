@@ -6,8 +6,8 @@ import time
 if __name__ == '__main__':
     # Python 스크립트 이름
     PYTHON_SCRIPT = "IsaacgymLearning.py"
-    NUM_RUNS = 8
-    NUM_THREADS = 8
+    NUM_RUNS = 1
+    NUM_THREADS = 1
     DEFAULT = ["test=False", "pipeline=gpu", "rl_device=cuda", "sim_device=cuda"]
     num_envs = [2048]
     gamma = [0.999]
