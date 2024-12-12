@@ -453,7 +453,7 @@ def compute_postural_reward(
     rew -= tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
     # up_tq_rate = torch.tensor(200., device=reset_buf.device)
     # rew -= tqrate_ratio * torch.sum((0.2 * (torch.max(torque_rate.abs(), up_tq_rate) / up_tq_rate - 1)) ** 2, dim=1)
-    rew -= tqrate_ratio * torch.sum(torch.clamp((torque_rate / 1000) ** 2, min=0.0, max=2.0), dim=1)
+    rew -= tqrate_ratio * torch.sum(torch.clamp((torque_rate / 1000) ** 2, min=0.0, max=1.0), dim=1)
     rew += 1
 
     if const_type == 0:
