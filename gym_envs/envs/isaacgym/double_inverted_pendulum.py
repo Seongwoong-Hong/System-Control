@@ -217,7 +217,7 @@ class IDPMinEffort(VecTask):
             self.actions * self.joint_gears / self.joint_gears[0],
             (self.actions - self.prev_actions) * self.joint_gears / self.dt,
             self.foot_forces,
-            self.reset_buf, self.progress_buf,
+            self.reset_buf, self.progress_buf, self.ptb_st_idx,
             self.stcost_ratio, self.tqcost_ratio, self.tqrate_ratio, self.const_ratio,
             self.ank_ratio, self.vel_ratio, self.tq_ratio,
             self.ankle_limit, self.limLevel,
@@ -391,9 +391,10 @@ class IDPMinEffortDet(IDPMinEffort):
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
         self.ptb_idx = to_torch(np.zeros(self.num_envs), dtype=torch.int64, device=self.device)
         self._ptb_act_time = self._ptb_act_time.item()
-        self._ptb_acc_range = to_torch(self._cal_ptb_acc(-np.array(
-            [0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15,
-             -0.03, -0.046, -0.06, -0.075, -0.09, -0.12, -0.15]).reshape(1, -1)), device=self.device)
+        self._ptb_acc_range = to_torch(
+            self._cal_ptb_acc(-np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15]).reshape(1, -1)),
+            device=self.device,
+        )
         self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.delayed_time = 0.1
         if "st_ptb_idx" in kwargs['cfg']['env'].keys():
@@ -438,13 +439,14 @@ class IDPMinEffortDet(IDPMinEffort):
 @torch.jit.script
 def compute_postural_reward(
         obs_buf, actions, torque_rate, foot_forces,
-        reset_buf, progress_buf,
+        reset_buf, progress_buf, ptb_st_idx,
         stcost_ratio, tqcost_ratio, tqrate_ratio, const_ratio,
         ank_ratio, vel_ratio, tq_ratio,
         ankle_limit_type, limLevel,
         high, low, max_episode_length,
         com_len, mass, seg_len, const_type,
 ):
+    update_or_not = progress_buf >= ptb_st_idx.view(-1)
     com = (mass[1] * com_len[1] * torch.sin(obs_buf[:, 0]) +
            mass[2] * (seg_len[1] * torch.sin(obs_buf[:, 0]) + com_len[2] * torch.sin(obs_buf[:, :2].sum(dim=1)))
            ) / mass[1:].sum()
@@ -458,7 +460,7 @@ def compute_postural_reward(
         pmax, nmax = 0.16, 0.08
         const_var = (foot_forces[:, 4] + 0.08*foot_forces[:, 0]) / -foot_forces[:, 2]
     elif const_type == 1:
-        pmax, nmax = 0.5, 1.0
+        pmax, nmax = 1.0, 1.0
         const_var = actions[:, 0]
     else:
         raise Exception("undefined constraint type")
@@ -490,7 +492,10 @@ def compute_postural_reward(
     reset = torch.where(fall_reset.to(torch.bool), torch.ones_like(reset), reset)
     reset = torch.where(progress_buf >= max_episode_length, torch.ones_like(reset), reset)
 
-    return rew - r_penalty, reset
+    rew -= r_penalty
+    rew[~update_or_not] = 0.0
+
+    return rew, reset
 
 
 @torch.jit.script
