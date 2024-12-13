@@ -95,7 +95,7 @@ class IDPMinEffort(VecTask):
             ptb_act_time: float = 1 / 3,
             ankle_limit: str = "satu",
             stptb: float = None,
-            num_ptb_steps: float = None,
+            edptb: float = None,
             ptb_step: float = None,
             stcost_ratio: float = 1.0,
             tqcost_ratio: float = 0.5,
@@ -148,7 +148,7 @@ class IDPMinEffort(VecTask):
         assert 0 <= self.ank_ratio <= 1 and 0 <= self.tq_ratio <= 1 and 0 <= self.vel_ratio <= 1
         self._ptb_range = self._ptb_data_range.copy()
         if stptb is not None:
-            self._ptb_range = np.arange(stptb, stptb + num_ptb_steps*ptb_step, ptb_step)
+            self._ptb_range = np.arange(0, round((edptb - stptb)/ptb_step) + 1)*ptb_step + stptb
 
     def create_sim(self):
         # set the up axis to be z-up given that assets are y-up by default
@@ -266,7 +266,7 @@ class IDPMinEffort(VecTask):
         act_delay_time = torch_rand_float(self.act_delay_time * 0.8, self.act_delay_time * 1.2, shape=(len(env_ids), 1), device=self.device)
         self.act_delay_idx[env_ids] = (act_delay_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
         noise_time = torch_rand_float(-self.act_delay_time, self.act_delay_time, shape=(len(env_ids), 1), device=self.device)
-        self.ptb_st_idx[env_ids] = (noise_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
+        self.ptb_st_idx[env_ids] += (noise_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
 
         self.delayed_act_buf[env_ids, ...] = fill_delayed_act_buf(
             self.dof_pos[env_ids, :],
@@ -451,8 +451,6 @@ def compute_postural_reward(
     # rew = -stcost_ratio * (com ** 2 + vel_ratio * torch.sum(obs_buf[:, 2:] ** 2, dim=1))
     rew = -stcost_ratio * torch.sum(((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
     rew -= tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
-    # up_tq_rate = torch.tensor(200., device=reset_buf.device)
-    # rew -= tqrate_ratio * torch.sum((0.2 * (torch.max(torque_rate.abs(), up_tq_rate) / up_tq_rate - 1)) ** 2, dim=1)
     rew -= tqrate_ratio * torch.sum(torch.clamp((torque_rate / 1000) ** 2, min=0.0, max=1.0), dim=1)
     rew += 1
 
@@ -460,7 +458,7 @@ def compute_postural_reward(
         pmax, nmax = 0.16, 0.08
         const_var = (foot_forces[:, 4] + 0.08*foot_forces[:, 0]) / -foot_forces[:, 2]
     elif const_type == 1:
-        pmax, nmax = 1.0, 1.0
+        pmax, nmax = 0.5, 1.0
         const_var = actions[:, 0]
     else:
         raise Exception("undefined constraint type")
@@ -520,7 +518,7 @@ def compute_current_action(
         jnt_stiffness, jnt_damping, joint_gears, lean_ang, delayed_idx
 ):
     update_or_not = progress_buf >= ptb_st_idx.view(-1)
-    # update_or_not = torch.logical_or(progress_buf >= st_time_idx.view(-1), progress_buf < st_time_idx.view(-1))
+    # update_or_not = torch.logical_or(progress_buf >= ptb_st_idx.view(-1), progress_buf < ptb_st_idx.view(-1))
     if is_act_delayed:
         assert actions.shape == delayed_act_buf[:, :, 0].shape
         delayed_action = delayed_act_buf[update_or_not, :, 0].clone()
@@ -528,7 +526,6 @@ def compute_current_action(
         i, j = torch.arange(tmp_buf.shape[0]).view(-1, 1, 1), torch.arange(tmp_buf.shape[1]).view(1, -1, 1)
         tmp_buf[i, j, delayed_idx[update_or_not].view(-1, 1, 1)] = actions[update_or_not].unsqueeze(-1)
         delayed_act_buf[update_or_not, :, :-1] = tmp_buf
-        # delayed_act_buf[update_or_not, :, :-1] = torch.cat([delayed_act_buf[update_or_not, :, 1:], actions[update_or_not, :, None].clone()], dim=-1)
         actions[update_or_not] = delayed_action
         actions[~update_or_not] = delayed_act_buf[~update_or_not, :, 0].clone()
     actions += -(jnt_stiffness * dof_pos + jnt_damping * dof_vel) / joint_gears
