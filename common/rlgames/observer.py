@@ -1,5 +1,6 @@
 import torch
 from matplotlib import pyplot as plt
+from rl_games.common.algo_observer import AlgoObserver
 
 
 class PlayerObserver:
@@ -93,15 +94,15 @@ class DrawTimeTrajObserver(PlayerObserver):
 
     def before_play(self):
         obs = torch.concat([self.algo.env.dof_pos, self.algo.env.dof_vel], dim=-1)
-        self.obs = obs[None, ...].clone().cpu()
+        self.obs = obs[None, ...].clone()
         if hasattr(self.algo.env, "actions"):
             acts = torch.clamp(self.algo.env.actions, min=-1.0, max=1.0)
         else:
             acts = self.algo.get_action(obs, self.algo.is_deterministic)
-        self.acts = acts[None, ...].clone().cpu()
-        self.rews = self.algo.env.rew_buf[None, ...].clone().cpu()
+        self.acts = acts[None, ...].clone()
+        self.rews = self.algo.env.rew_buf[None, ...].clone()
         for k, v in self.algo.env.extras.items():
-            self.infos[k] = v[None, ...].clone().cpu()
+            self.infos[k] = v[None, ...].clone()
 
     def after_play(self):
         for i in range(self.obs.shape[-1]):
@@ -125,14 +126,36 @@ class DrawTimeTrajObserver(PlayerObserver):
 
     def after_steps(self):
         obs = torch.concat([self.algo.env.dof_pos, self.algo.env.dof_vel], dim=-1)
-        self.obs = torch.concat([self.obs, obs[None, ...].clone().cpu()], dim=0)
+        self.obs = torch.concat([self.obs, obs[None, ...].clone()], dim=0)
         if hasattr(self.algo.env, "actions"):
             acts = torch.clamp(self.algo.env.actions, min=-1.0, max=1.0)
         else:
             acts = self.algo.get_action(obs, self.algo.is_deterministic)
-        self.acts = torch.concat([self.acts, acts[None, ...].clone().cpu()], dim=0)
-        self.rews = torch.concat([self.rews, self.algo.env.rew_buf[None, ...].clone().cpu()], dim=0)
+        self.acts = torch.concat([self.acts, acts[None, ...].clone()], dim=0)
+        self.rews = torch.concat([self.rews, self.algo.env.rew_buf[None, ...].clone()], dim=0)
         for k, v in self.algo.env.extras.items():
             if k == 'time_outs':
                 continue
-            self.infos[k] = torch.concat([self.infos[k], v[None, ...].clone().cpu()], dim=0)
+            self.infos[k] = torch.concat([self.infos[k], v[None, ...].clone()], dim=0)
+
+
+class RunnerTrajectoryObserver(AlgoObserver):
+    def __init__(self, player):
+        super().__init__()
+        self.player = player
+
+    def after_init(self, algo):
+        self.algo = algo
+
+    def after_print_stats(self, frame, epoch_num, total_time):
+        if (self.algo.save_freq > 0) and ((epoch_num + 1) % self.algo.save_freq == 0):
+            checkpoint = self.algo.get_full_state_weights()
+            self.player.model.load_state_dict(checkpoint['model'])
+            if self.player.normalize_input and 'running_mean_std' in checkpoint:
+                self.player.model.running_mean_std.load_state_dict(checkpoint['running_mean_std'])
+
+            env_state = checkpoint.get('env_state', None)
+            if self.player.env is not None and env_state is not None:
+                self.player.env.set_env_state(env_state)
+            self.player.run()
+            self.algo.writer.add_figure('performance/trajectories', self.player.player_observer.fig, frame)
