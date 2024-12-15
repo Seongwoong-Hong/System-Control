@@ -31,6 +31,9 @@ class IDPMinEffort(VecTask):
             self.max_episode_length = round(self.cfg['env']['exp_time'] / self.dt)
         else:
             self.max_episode_length = round(5 / self.dt)
+        self.obs_traj = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1, self.cfg['env']['numObservations']]), device=self.device)
+        self.act_traj = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1, self.cfg['env']['numActions']]), device=self.device)
+
         self.cuda_arange = to_torch(np.arange(self.max_episode_length), dtype=torch.int64, device=self.device)
         self._ptb_acc = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
@@ -239,6 +242,9 @@ class IDPMinEffort(VecTask):
             self.obs_buf[env_ids, 5] = self.actions[env_ids, 1].squeeze()
         self.gym.refresh_force_sensor_tensor(self.sim)
 
+        self.obs_traj[env_ids, self.progress_buf, :] = self.obs_buf
+        self.act_traj[env_ids, self.progress_buf, :] = self.actions
+
         return self.obs_buf
 
     def reset(self):
@@ -282,6 +288,8 @@ class IDPMinEffort(VecTask):
 
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
+        self.obs_traj[env_ids] = 0
+        self.act_traj[env_ids] = 0
 
     def _cal_ptb_acc(self, x_max):
         t = self._ptb_act_time * np.linspace(0, 1, round(self._ptb_act_time / self.dt))

@@ -1,3 +1,5 @@
+import random
+
 import torch
 from matplotlib import pyplot as plt
 from rl_games.common.algo_observer import AlgoObserver
@@ -138,24 +140,3 @@ class DrawTimeTrajObserver(PlayerObserver):
                 continue
             self.infos[k] = torch.concat([self.infos[k], v[None, ...].clone()], dim=0)
 
-
-class RunnerTrajectoryObserver(AlgoObserver):
-    def __init__(self, player):
-        super().__init__()
-        self.player = player
-
-    def after_init(self, algo):
-        self.algo = algo
-
-    def after_print_stats(self, frame, epoch_num, total_time):
-        if (self.algo.save_freq > 0) and ((epoch_num + 1) % self.algo.save_freq == 0):
-            checkpoint = self.algo.get_full_state_weights()
-            self.player.model.load_state_dict(checkpoint['model'])
-            if self.player.normalize_input and 'running_mean_std' in checkpoint:
-                self.player.model.running_mean_std.load_state_dict(checkpoint['running_mean_std'])
-
-            env_state = checkpoint.get('env_state', None)
-            if self.player.env is not None and env_state is not None:
-                self.player.env.set_env_state(env_state)
-            self.player.run()
-            self.algo.writer.add_figure('performance/trajectories', self.player.player_observer.fig, frame)
