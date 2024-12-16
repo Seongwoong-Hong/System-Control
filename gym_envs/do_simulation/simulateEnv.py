@@ -24,14 +24,16 @@ def record_video():
 
 def step_env():
     ob = env.reset()
-    obs = []
+    obs = [ob]
     tqs = []
-    for _ in range(500):
+    for _ in range(360):
         act, _ = agent.predict(ob.astype(np.float32), deterministic=True)
-        ob, _, _, info = env.step(act)
+        ob, _, done, info = env.step(act)
         # obs.append(np.rad2deg(info['prev_ob'].flatten()))
         obs.append(ob)
-        tqs.append(act)
+        tqs.append(info['torque'])
+        if done:
+            break
     return np.array(obs), np.array(tqs)
 
 def cal_correlation():
@@ -51,41 +53,57 @@ def cal_correlation():
     return R, ph
 
 def draw_figure():
+    fig = plt.figure(figsize=[8.0, 10.0])
     obs, tqs = step_env()
-    fig = plt.figure(figsize=[4.0, 9.6])
-    for i in range(3):
-        fig.add_subplot(3, 1, i+1)
-    Ti = 500
-    fig.axes[0].plot(obs[:Ti, :2])
-    # fig.axes[0].plot(humanData['state'][:Ti, :2], '--')
-    # fig.axes[0].set_xlim([0, 100])
-    fig.axes[1].plot(obs[:Ti, 2:])
-    # fig.axes[1].plot(humanData['state'][:Ti, 2:], '--')
-    # fig.axes[1].set_xlim([0, 100])
-    fig.axes[2].plot(tqs[:Ti])
-    # fig.axes[2].plot(humanData['tq'][:Ti], '--')
-    # fig.axes[2].set_xlim([0, 100])
+    x = np.arange(obs.shape[0] - 1)
+    rT, cT = 4, max(round(obs.shape[-1] / 2), tqs.shape[-1])
+    for i in range(rT * cT):
+        fig.add_subplot(rT, cT, i + 1)
+    for i in range(obs.shape[-1]):
+        fig.axes[i].plot(x, np.rad2deg(obs[:-1, i]))
+    for i in range(tqs.shape[-1]):
+        fig.axes[obs.shape[-1] + i].plot(x, tqs[:, i])
+    for _ in range(6):
+        obs, tqs = step_env()
+        x = np.arange(obs.shape[0] - 1)
+        for i in range(obs.shape[-1]):
+            fig.axes[i].plot(x, np.rad2deg(obs[:-1, i]))
+        for i in range(tqs.shape[-1]):
+            fig.axes[obs.shape[-1] + i].plot(x, tqs[:, i])
     fig.tight_layout()
     fig.show()
-    data = {
-        'hob': humanData['state'],
-        'htq': humanData['tq'],
-        'ob': obs,
-        'tq': tqs,
-    }
+    return fig
+    # data = {
+    #     'hob': humanData['state'],
+    #     'htq': humanData['tq'],
+    #     'ob': obs,
+    #     'tq': tqs,
+    # }
     # io.savemat(f"ank.mat", data)
 
 
 if __name__ == '__main__':
     subpath = os.path.join("..",  "..", "demos", "IDP", "sub10", "sub10")
     states = [None for _ in range(35)]
-    for i in [33]:
+    for i in [1, 6, 11, 16, 21, 26, 31]:
         humanData = io.loadmat(subpath + f"i{i}.mat")
         states[i - 1] = humanData['state']
+        states[i - 1][:] = 0.0
         bsp = humanData['bsp']
     Rs, phs = [], []
-    env = make_env("Cartpole-v2")
-    agent = LinearFeedbackPolicy(env, gain=np.array([[649.5891, 291.7391, 90.2365, 94.8697]]))
+    env = make_env(
+        "IDP_MinEffort-v0",
+        bsp = bsp,
+        ankle_torque_max=200,
+        stiffness=[500, 600],
+        damping=[200, 150],
+        delay=True,
+        ankle_limit="satu",
+        humanStates=states,
+    )
+    # agent = LinearFeedbackPolicy(env, gain=np.array([[580.4426, 59.0801, 66.9362, 98.6479], [128.4063, 119.9887, 9.5562, 28.1239]]))
+    agent = LinearFeedbackPolicy(env, gain=np.array([[0, 0, 0, 0], [0, 0, 0, 0]]))
+    # agent = LinearFeedbackPolicy(env, gain=2* np.array([[256.9201, 283.4496, 110.5109, 60.0833], [-22.1334, 188.7776, 30.5123, 22.1140]]))
     draw_figure()
     # frqs = np.arange(1.0, 10, 1.0)
     # for frq in frqs:

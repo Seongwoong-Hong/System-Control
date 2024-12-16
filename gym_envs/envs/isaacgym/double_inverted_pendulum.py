@@ -70,7 +70,13 @@ class IDPMinEffort(VecTask):
         self.const_type = to_torch(self.const_type, device=self.device)
         self.limLevel = to_torch(self.limLevel, device=self.device)
 
-        self.ankle_torque_max = self.ankle_torque_max / self.joint_gears[0]
+        if self.const_type == 0:
+            self.const_max_val = to_torch([0.16, -0.08], device=self.device)
+        elif self.const_type == 1:
+            self.const_max_val = to_torch(np.array([self.ankle_torque_max, -self.ankle_torque_max]), device=self.device)  / self.joint_gears[0]
+        else:
+            raise Exception("undefined constraint type")
+
         self.delayed_act_buf = to_torch(
             np.zeros([self.num_envs, self.action_space.shape[0], round(1.2 * self.act_delay_time / self.dt) + 1]), device=self.device)
 
@@ -216,13 +222,13 @@ class IDPMinEffort(VecTask):
     def compute_reward(self):
         self.rew_buf[:], self.reset_buf[:] = compute_postural_reward(
             self.obs_buf,
-            self.actions * self.joint_gears / self.joint_gears[0],
+            self.actions,
             (self.actions - self.prev_actions) * self.joint_gears / self.dt,
             self.foot_forces,
             self.reset_buf, self.progress_buf, self.ptb_st_idx,
             self.stcost_ratio, self.tqcost_ratio, self.tqrate_ratio, self.const_ratio,
             self.ank_ratio, self.vel_ratio, self.tq_ratio,
-            self.ankle_limit, self.ankle_torque_max, self.limLevel,
+            self.ankle_limit, self.const_max_val, self.limLevel,
             self.high, self.low, self.max_episode_length,
             self.com, self.mass, self.len, self.const_type,
         )
@@ -336,18 +342,6 @@ class IDPMinEffort(VecTask):
 
         self.compute_observations()
         self.compute_reward()
-        #
-        # from matplotlib import pyplot as plt
-        # idx = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
-        # if len(idx) > 0:
-        #     fig = plt.figure(figsize=[8.0, 8.0])
-        #     for i in range(4):
-        #         fig.add_subplot(3, 2, i+1)
-        #         fig.axes[i].plot(self.obs_traj[idx, :, i].T.cpu())
-        #     for i in range(2):
-        #         fig.add_subplot(3, 2, i+5)
-        #         fig.axes[i+4].plot(self.act_traj[idx, :, i].T.cpu())
-        #     plt.show()
 
 
     def _set_body_config(self, filepath, bsp):
@@ -382,6 +376,11 @@ class IDPMinEffort(VecTask):
         u_body.find("inertial").attrib['diaginertia'] = f"{I_u:.6f} {I_u:.6f} 0.001"
         u_body.find("inertial").attrib['mass'] = f"{m_u:.4f}"
 
+        if self.ankle_torque_max is not None:
+            hip_max = float(root.find('actuator').findall("motor")[1].attrib['gear'])
+            torque_max = max(self.ankle_torque_max, hip_max)
+            for motor in root.find('actuator').findall("motor"):
+                motor.attrib['gear'] = str(torque_max)
         m_tree = ElementTree(root)
 
         self.com = to_torch([com_f, com_l, com_u], device=self.device)
@@ -405,12 +404,12 @@ class IDPMinEffortDet(IDPMinEffort):
         self.max_episode_length = round(3 / self.dt)
         self._ptb_acc = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
-        self.ptb_idx = to_torch(np.zeros(self.num_envs), dtype=torch.int64, device=self.device)
         self._ptb_act_time = self._ptb_act_time.item()
         self._ptb_acc_range = to_torch(
             self._cal_ptb_acc(-np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15]).reshape(1, -1)),
             device=self.device,
         )
+        self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_acc_range.shape[0], dtype=torch.int64, device=self.device)
         self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.delayed_time = 0.1
         if "st_ptb_idx" in kwargs['cfg']['env'].keys():
@@ -422,7 +421,7 @@ class IDPMinEffortDet(IDPMinEffort):
         self.ptb_st_idx[...] = st_idx
         self._ptb_acc[...] = 0
         self._ptb_acc[env_ids, st_idx:ed_idx] = self._ptb_acc_range[self.ptb_idx[env_ids.unsqueeze(1)], np.arange(self._ptb_acc_range.shape[1])]
-        self.ptb_idx[env_ids] = (self.ptb_idx[env_ids] + 1) % self._ptb_acc_range.shape[0]
+        self.ptb_idx[env_ids] = (self.ptb_idx[env_ids] + self.num_envs) % self._ptb_acc_range.shape[0]
 
         self.dof_pos[env_ids, :] = self.lean_angle
         self.dof_vel[env_ids, :] = 0.0
@@ -458,7 +457,7 @@ def compute_postural_reward(
         reset_buf, progress_buf, ptb_st_idx,
         stcost_ratio, tqcost_ratio, tqrate_ratio, const_ratio,
         ank_ratio, vel_ratio, tq_ratio,
-        ankle_limit_type, ankle_torque_max, limLevel,
+        ankle_limit_type, const_max_val, limLevel,
         high, low, max_episode_length,
         com_len, mass, seg_len, const_type,
 ):
@@ -473,10 +472,8 @@ def compute_postural_reward(
     rew += 1
 
     if const_type == 0:
-        pmax, nmax = torch.tensor(0.16, device=actions.device), torch.tensor(0.08, device=actions.device)
         const_var = (foot_forces[:, 4] + 0.08*foot_forces[:, 0]) / -foot_forces[:, 2]
     elif const_type == 1:
-        pmax = nmax = ankle_torque_max
         const_var = actions[:, 0]
     else:
         raise Exception("undefined constraint type")
@@ -485,16 +482,16 @@ def compute_postural_reward(
     if ankle_limit_type == 0:
         reset = torch.zeros_like(reset_buf, dtype=torch.long)
     elif ankle_limit_type == 1:
-        reset = torch.where(-nmax >= const_var, torch.ones_like(reset_buf), reset_buf)
-        reset = torch.where(const_var >= pmax, torch.ones_like(reset_buf), reset)
-        poscop = torch.clamp(const_var, min=0., max=pmax)
-        negcop = torch.clamp(const_var, min=-nmax, max=0.)
+        reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
+        reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
+        poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
+        negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
 
         r_penalty = const_ratio * (-2*limLevel + limLevel * (
-                1 / ((poscop / pmax - 1) ** 2 + limLevel) + 1 / ((negcop / nmax + 1) ** 2 + limLevel)))
+                1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] + 1) ** 2 + limLevel)))
     elif ankle_limit_type == 2:
-        reset = torch.where(-nmax >= const_var, torch.ones_like(reset_buf), reset_buf)
-        reset = torch.where(const_var >= pmax, torch.ones_like(reset_buf), reset)
+        reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
+        reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
         r_penalty = const_ratio * torch.where(reset.to(torch.bool), torch.ones_like(rew), torch.zeros_like(rew))
     else:
         raise Exception(f"Unexpected ankle limit type")
@@ -539,7 +536,6 @@ def compute_current_action(
         jnt_stiffness, jnt_damping, joint_gears, lean_ang, delayed_idx
 ):
     update_or_not = progress_buf >= ptb_st_idx.view(-1)
-    # update_or_not = torch.logical_or(progress_buf >= ptb_st_idx.view(-1), progress_buf < ptb_st_idx.view(-1))
     if is_act_delayed:
         assert actions.shape == delayed_act_buf[:, :, 0].shape
         delayed_action = delayed_act_buf[update_or_not, :, 0].clone()
@@ -549,8 +545,9 @@ def compute_current_action(
         delayed_act_buf[update_or_not, :, :-1] = tmp_buf
         actions[update_or_not] = delayed_action
         actions[~update_or_not] = delayed_act_buf[~update_or_not, :, 0].clone()
-    actions += -(jnt_stiffness * dof_pos + jnt_damping * dof_vel) / joint_gears
-    actions[~update_or_not] += -(jnt_stiffness * (dof_pos[~update_or_not] - lean_ang) + jnt_damping * dof_vel[~update_or_not]) / joint_gears
+    actions += (-(jnt_stiffness * dof_pos + jnt_damping * dof_vel) / joint_gears)
+    actions[~update_or_not] += (-(jnt_stiffness * (dof_pos[~update_or_not] - lean_ang) + jnt_damping * dof_vel[~update_or_not]) / joint_gears)
+
     return actions, delayed_act_buf
 
 

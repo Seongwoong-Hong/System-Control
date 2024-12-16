@@ -116,23 +116,23 @@ if __name__ == "__main__":
             # "trials": [1, 2, 11, 12, 21, 22, 26, 27, 31, 33],
             "trials": [1, 6, 11, 16, 21, 26, 31],
             # "except_trials": [13, 16],
-            "ankle_torque_max": 200,
+            "ankle_torque_max": 100,
             "delay": False,
-            "stiffness": [800, 450],
-            "damping": [200, 150],
+            "stiffness": [0, 0],
+            "damping": [0, 0],
             "ankle_limit": "satu"
         },
     }
     save_video = None
 
-    env, agent, loaded_result = load_result(**load_kwargs)
+    env, _, loaded_result = load_result(**load_kwargs)
     # env.envs[0].env.env.env.delay = False
     # env.set_attr("delay", False)
     # Linear Feedback Controller를 사용할 때는 normalization 확인하기
 
-    # agent = LinearFeedbackPolicy(env, gain=np.array([[580.4426, 59.0801, 66.9362, 98.6479], [128.4063, 119.9887, 9.5562, 28.1239]]))
+    agent = LinearFeedbackPolicy(env, gain=np.array([[580.4426, 59.0801, 66.9362, 98.6479], [128.4063, 119.9887, 9.5562, 28.1239]]))
     # agent = LinearFeedbackPolicy(env, gain=np.array([[256.9201, 283.4496, 110.5109, 60.0833], [-22.1334, 188.7776, 30.5123, 22.1140]]))
-    agent = LinearFeedbackPolicy(env, gain=np.array([[0, 0, 0, 0], [0, 0, 0, 0]]))
+    # agent = LinearFeedbackPolicy(env, gain=np.array([[0, 0, 0, 0], [0, 0, 0, 0]]))
     # agent = HeadTrackLinearFeedback(env, gain=np.array([[100, 10], [100, 10]]))
     render = "rgb_array"
     if save_video is None:
@@ -143,8 +143,8 @@ if __name__ == "__main__":
                                              infos=['torque'])
                                              # infos=['torque', 'passive_torque', 'comx', 'comy', 'ptb_acc'])
     obs = np.array(obs)
-    # acts = np.array(acts)
-    tqs = np.array(ifs['torque'])
+    acts = np.array(acts) * np.array([100, 150])
+    # tqs = np.array(ifs['torque'])
     # ptqs = ifs['passive_torque']
     # comxs = ifs['comx']
     # comys = ifs['comy']
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     # title = load_kwargs['name_tail'][load_kwargs['name_tail'].rfind('/') + 1:]
     # fig = draw_time_trajs_with_humandata(load_kwargs['trials'], obs, tqs, loaded_result['states'], loaded_result['torques'], title=title)
     dt = env.get_attr("dt")[0]
-    fig = draw_time_trajs(obs, tqs, x=np.arange(0, tqs.shape[1])*dt)
+    fig = draw_time_trajs(obs, acts, x=np.arange(0, acts.shape[1])*dt)
     # _ = draw_passive_torque(load_kwargs['trials'], tqs, ptqs, title=title)
     # fig = draw_versus_graph(load_kwargs['trials'], [comxs, obs[:,:,0], tqs[:, :, 0]], [comys, obs[:,:,1], tqs[:, :, 1]])
     # _ = draw_versus_graph(load_kwargs['trials'], [[np.arange(len(ptb_forces[i])) for i in range(len(ptb_forces))]], [ptb_forces])

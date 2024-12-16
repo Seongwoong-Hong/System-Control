@@ -116,6 +116,8 @@ class DrawTimeTrajObserver(PlayerObserver):
         if self.save_fig:
             figpath = "result.png" if self.fig_path is None else self.fig_path
             self.fig.savefig(figpath)
+        for i in range(len(self.fig.axes)):
+            self.fig.axes[i].cla()
 
     def after_init(self, algo):
         self.algo = algo
