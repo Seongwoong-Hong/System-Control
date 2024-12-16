@@ -70,8 +70,7 @@ class IDPMinEffort(VecTask):
         self.const_type = to_torch(self.const_type, device=self.device)
         self.limLevel = to_torch(self.limLevel, device=self.device)
 
-        self.actions_limits_low = to_torch([-1.0, -1.0], device=self.device)
-        self.actions_limits_high = to_torch([1.0, 1.0], device=self.device)
+        self.ankle_torque_max = self.ankle_torque_max / self.joint_gears[0]
         self.delayed_act_buf = to_torch(
             np.zeros([self.num_envs, self.action_space.shape[0], round(1.2 * self.act_delay_time / self.dt) + 1]), device=self.device)
 
@@ -223,7 +222,7 @@ class IDPMinEffort(VecTask):
             self.reset_buf, self.progress_buf, self.ptb_st_idx,
             self.stcost_ratio, self.tqcost_ratio, self.tqrate_ratio, self.const_ratio,
             self.ank_ratio, self.vel_ratio, self.tq_ratio,
-            self.ankle_limit, self.limLevel,
+            self.ankle_limit, self.ankle_torque_max, self.limLevel,
             self.high, self.low, self.max_episode_length,
             self.com, self.mass, self.len, self.const_type,
         )
@@ -327,8 +326,8 @@ class IDPMinEffort(VecTask):
             self.act_delay_idx
         )
         self.actions = actions.to(self.device).clone()
-        self.extras['torque_rate'] = ((self.actions - self.prev_actions) * self.joint_gears) / self.dt
-        forces = tensor_clamp(self.actions, self.actions_limits_low, self.actions_limits_high) * self.joint_gears
+        self.extras['torque_rate'] = ((self.actions - self.prev_actions) * 100) / self.dt
+        forces = self.actions * self.joint_gears
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(forces))
 
@@ -337,6 +336,19 @@ class IDPMinEffort(VecTask):
 
         self.compute_observations()
         self.compute_reward()
+        #
+        # from matplotlib import pyplot as plt
+        # idx = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
+        # if len(idx) > 0:
+        #     fig = plt.figure(figsize=[8.0, 8.0])
+        #     for i in range(4):
+        #         fig.add_subplot(3, 2, i+1)
+        #         fig.axes[i].plot(self.obs_traj[idx, :, i].T.cpu())
+        #     for i in range(2):
+        #         fig.add_subplot(3, 2, i+5)
+        #         fig.axes[i+4].plot(self.act_traj[idx, :, i].T.cpu())
+        #     plt.show()
+
 
     def _set_body_config(self, filepath, bsp):
         tl_f = bsp[0, 0] * 0.01
@@ -370,10 +382,6 @@ class IDPMinEffort(VecTask):
         u_body.find("inertial").attrib['diaginertia'] = f"{I_u:.6f} {I_u:.6f} 0.001"
         u_body.find("inertial").attrib['mass'] = f"{m_u:.4f}"
 
-        if self.ankle_torque_max is not None:
-            for motor in root.find('actuator').findall("motor"):
-                if motor.get('name') == 'ank':
-                    motor.attrib['gear'] = str(self.ankle_torque_max)
         m_tree = ElementTree(root)
 
         self.com = to_torch([com_f, com_l, com_u], device=self.device)
@@ -450,7 +458,7 @@ def compute_postural_reward(
         reset_buf, progress_buf, ptb_st_idx,
         stcost_ratio, tqcost_ratio, tqrate_ratio, const_ratio,
         ank_ratio, vel_ratio, tq_ratio,
-        ankle_limit_type, limLevel,
+        ankle_limit_type, ankle_torque_max, limLevel,
         high, low, max_episode_length,
         com_len, mass, seg_len, const_type,
 ):
@@ -465,10 +473,10 @@ def compute_postural_reward(
     rew += 1
 
     if const_type == 0:
-        pmax, nmax = 0.16, 0.08
+        pmax, nmax = torch.tensor(0.16, device=actions.device), torch.tensor(0.08, device=actions.device)
         const_var = (foot_forces[:, 4] + 0.08*foot_forces[:, 0]) / -foot_forces[:, 2]
     elif const_type == 1:
-        pmax, nmax = 1.0, 1.0
+        pmax = nmax = ankle_torque_max
         const_var = actions[:, 0]
     else:
         raise Exception("undefined constraint type")

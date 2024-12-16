@@ -56,7 +56,7 @@ class BasePendulum(mujoco_env.MujocoEnv):
         if bsp is not None:
             os.remove(filepath)
         if self.delay:
-            self.delayed_act = np.zeros([round(delayed_time // self.dt), self.action_space.shape[0]])
+            self.delayed_act = np.zeros([round(delayed_time / self.dt), self.action_space.shape[0]])
 
     def __deepcopy__(self, memo):
         cls = self.__class__

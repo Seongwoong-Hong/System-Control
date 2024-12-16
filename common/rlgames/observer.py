@@ -1,8 +1,4 @@
-import random
-
 import torch
-from matplotlib import pyplot as plt
-from rl_games.common.algo_observer import AlgoObserver
 
 
 class PlayerObserver:
@@ -139,4 +135,3 @@ class DrawTimeTrajObserver(PlayerObserver):
             if k == 'time_outs':
                 continue
             self.infos[k] = torch.concat([self.infos[k], v[None, ...].clone()], dim=0)
-
