@@ -88,7 +88,9 @@ class DrawTimeTrajObserver(PlayerObserver):
     def before_run(self):
         if self.fig is None:
             raise AttributeError("figure 가 정의되지 않았습니다.")
-        pass
+
+        for i in range(len(self.fig.axes)):
+            self.fig.axes[i].cla()
 
     def before_play(self):
         obs = torch.concat([self.algo.env.dof_pos, self.algo.env.dof_vel], dim=-1)
@@ -116,8 +118,6 @@ class DrawTimeTrajObserver(PlayerObserver):
         if self.save_fig:
             figpath = "result.png" if self.fig_path is None else self.fig_path
             self.fig.savefig(figpath)
-        for i in range(len(self.fig.axes)):
-            self.fig.axes[i].cla()
 
     def after_init(self, algo):
         self.algo = algo
