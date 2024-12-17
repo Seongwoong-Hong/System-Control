@@ -51,6 +51,7 @@ class PpoPlayerCustom(PpoPlayerContinuous):
 
             cr = th.zeros(batch_size, dtype=th.float32)
             steps = th.zeros(batch_size, dtype=th.float32)
+            self.end_idx = th.zeros(batch_size, dtype=th.float32)
 
             print_game_res = False
 
@@ -67,9 +68,9 @@ class PpoPlayerCustom(PpoPlayerContinuous):
                 else:
                     action = self.get_action(obs, is_deterministic)
                 obs, r, done, info = self.env_step(self.env, action)
-                self.player_observer.after_steps()
                 cr += r
                 steps += 1
+                self.player_observer.after_steps()
 
                 if render:
                     self.env.render(mode='human')
@@ -88,6 +89,7 @@ class PpoPlayerCustom(PpoPlayerContinuous):
 
                     cur_rewards = cr[done_indices].sum().item()
                     cur_steps = steps[done_indices].sum().item()
+                    self.end_idx[done_indices] = steps[done_indices]
 
                     cr = cr * (1.0 - done.float())
                     steps = steps * (1.0 - done.float())
@@ -114,6 +116,7 @@ class PpoPlayerCustom(PpoPlayerContinuous):
                     sum_game_res += game_res
                     if batch_size//self.num_agents == 1 or games_played >= n_games:
                         break
+
             self.player_observer.after_play()
 
         self.player_observer.after_run()
