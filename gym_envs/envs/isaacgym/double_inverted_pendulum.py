@@ -47,7 +47,7 @@ class IDPMinEffort(VecTask):
             self.lean_angle = np.deg2rad(cfg['env']['upright_type'] * 1.0)
         else:
             self.lean_angle = 0.0
-        self.lean_angle_torch = to_torch([self.lean_angle, self.lean_angle], device=self.device)
+        self.lean_angle_torch = to_torch([self.lean_angle, 2*self.lean_angle], device=self.device)
 
         if "delayed_time" in cfg['env']:
             self.act_delay_time = cfg['env']['delayed_time']
@@ -266,7 +266,7 @@ class IDPMinEffort(VecTask):
             self.cuda_arange,
         )
 
-        self.dof_pos[env_ids, :] = self.lean_angle
+        self.dof_pos[env_ids, :] = self.lean_angle_torch
         self.dof_vel[env_ids, :] = 0.0
         env_ids_int32 = env_ids.to(dtype=torch.int32)
 
@@ -423,7 +423,7 @@ class IDPMinEffortDet(IDPMinEffort):
         self._ptb_acc[env_ids, st_idx:ed_idx] = self._ptb_acc_range[self.ptb_idx[env_ids.unsqueeze(1)], np.arange(self._ptb_acc_range.shape[1])]
         self.ptb_idx[env_ids] = (self.ptb_idx[env_ids] + self.num_envs) % self._ptb_acc_range.shape[0]
 
-        self.dof_pos[env_ids, :] = self.lean_angle
+        self.dof_pos[env_ids, :] = self.lean_angle_torch
         self.dof_vel[env_ids, :] = 0.0
         env_ids_int32 = env_ids.to(dtype=torch.int32)
 
