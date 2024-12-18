@@ -274,7 +274,7 @@ class IDPMinEffort(VecTask):
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
-        act_delay_time = torch_rand_float(self.act_delay_time * 0.8, self.act_delay_time * 1.2, shape=(len(env_ids), 1), device=self.device)
+        act_delay_time = torch_rand_float(self.act_delay_time*0.8, self.act_delay_time*1.2, shape=(len(env_ids), 1), device=self.device)
         self.act_delay_idx[env_ids] = (act_delay_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
         noise_time = torch_rand_float(-self.act_delay_time, self.act_delay_time, shape=(len(env_ids), 1), device=self.device)
         self.ptb_st_idx[env_ids] += (noise_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
@@ -468,7 +468,9 @@ def compute_postural_reward(
     # rew = -stcost_ratio * (com ** 2 + vel_ratio * torch.sum(obs_buf[:, 2:] ** 2, dim=1))
     rew = -stcost_ratio * torch.sum(((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
     rew -= tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
-    rew -= tqrate_ratio * torch.sum(torch.clamp((torque_rate / 2000) ** 2, min=0.0, max=1.0), dim=1)
+    # rew -= tqrate_ratio * torch.sum(torch.clamp((torque_rate / 2000) ** 2, min=0.0, max=1.0), dim=1)
+    clip_torque_rate = torch.clamp((torque_rate / 2000).abs(), 0., 1.)
+    rew -= tqrate_ratio * torch.sum(-limLevel + limLevel / ((1.0 / clip_torque_rate - 1) ** 2 + limLevel), dim=1)
     rew += 1
 
     if const_type == 0:

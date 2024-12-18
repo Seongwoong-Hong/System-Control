@@ -17,7 +17,7 @@ if __name__ == "__main__":
     div = np.logspace(-5, -2, 3)
     for limLevel in [0.0, 0.25, 0.5]:
         i = 10 ** (limLevel * ((-5) - (-2)) + (-2))
-        r_penalty = -(-2 * i + i * (1 / ((poscop / pmax - 1) ** 2 + i) + 1 / ((negcop / nmax + 1) ** 2 + i)))
+        r_penalty = -(-2 * i / (1 + i) + i * (1 / ((poscop / pmax - 1) ** 2 + i) + 1 / ((negcop / nmax + 1) ** 2 + i)))
         # ax1.plot(magst, -i / ((posmagst/pmax - 1)**2 + i), color='b')
         # ax1.plot(magst, -i / ((negmagst/nmax + 1)**2 + i), color='r')
         # ax1.plot(magst, 2*i - i *(1 / ((posmagst/pmax - 1)**2 + i) + 1 / ((negmagst/nmax + 1) ** 2 + i)), color=[50 / 255, 50 / 255, 50 / 255])
