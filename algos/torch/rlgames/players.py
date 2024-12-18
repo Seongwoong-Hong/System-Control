@@ -51,7 +51,7 @@ class PpoPlayerCustom(PpoPlayerContinuous):
 
             cr = th.zeros(batch_size, dtype=th.float32)
             steps = th.zeros(batch_size, dtype=th.float32)
-            self.end_idx = th.zeros(batch_size, dtype=th.float32)
+            self.end_idx = th.ones(batch_size, dtype=th.float32) * th.nan
 
             print_game_res = False
 
@@ -78,10 +78,10 @@ class PpoPlayerCustom(PpoPlayerContinuous):
 
                 all_done_indices = done.nonzero(as_tuple=False)
                 done_indices = all_done_indices[::self.num_agents]
-                done_count = len(done_indices)
+                done_count = th.logical_and(done, n > self.env.max_episode_length // 2).sum()
                 games_played += done_count
 
-                if done_count > 0:
+                if len(done_indices) > 0:
                     if self.is_rnn:
                         for s in self.states:
                             s[:, all_done_indices, :] = s[:,
