@@ -33,6 +33,7 @@ class IDPMinEffort(VecTask):
             self.max_episode_length = round(5 / self.dt)
         self.obs_traj = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1, self.cfg['env']['numObservations']]), device=self.device)
         self.act_traj = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1, self.cfg['env']['numActions']]), device=self.device)
+        self.tqr_traj = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1, self.cfg['env']['numActions']]), device=self.device)
 
         self.cuda_arange = to_torch(np.arange(self.max_episode_length), dtype=torch.int64, device=self.device)
         self._ptb_acc = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
@@ -249,6 +250,7 @@ class IDPMinEffort(VecTask):
 
         self.obs_traj[env_ids, self.progress_buf, :] = self.obs_buf
         self.act_traj[env_ids, self.progress_buf, :] = self.actions
+        self.tqr_traj[env_ids, self.progress_buf, :] = (self.actions - self.prev_actions) * self.joint_gears / self.dt
 
         return self.obs_buf
 
@@ -274,7 +276,7 @@ class IDPMinEffort(VecTask):
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
-        act_delay_time = torch_rand_float(self.act_delay_time*0.8, self.act_delay_time*1.2, shape=(len(env_ids), 1), device=self.device)
+        act_delay_time = torch_rand_float(self.act_delay_time, self.act_delay_time, shape=(len(env_ids), 1), device=self.device)
         self.act_delay_idx[env_ids] = (act_delay_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
         noise_time = torch_rand_float(-self.act_delay_time, self.act_delay_time, shape=(len(env_ids), 1), device=self.device)
         self.ptb_st_idx[env_ids] += (noise_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
@@ -295,6 +297,7 @@ class IDPMinEffort(VecTask):
         self.progress_buf[env_ids] = 0
         self.obs_traj[env_ids] = 0
         self.act_traj[env_ids] = 0
+        self.tqr_traj[env_ids] = 0
 
     def _cal_ptb_acc(self, x_max):
         t = self._ptb_act_time * np.linspace(0, 1, round(self._ptb_act_time / self.dt))
@@ -468,9 +471,8 @@ def compute_postural_reward(
     # rew = -stcost_ratio * (com ** 2 + vel_ratio * torch.sum(obs_buf[:, 2:] ** 2, dim=1))
     rew = -stcost_ratio * torch.sum(((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
     rew -= tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
-    # rew -= tqrate_ratio * torch.sum(torch.clamp((torque_rate / 2000) ** 2, min=0.0, max=1.0), dim=1)
-    clip_torque_rate = torch.clamp((torque_rate / 2000).abs(), 0., 1.)
-    rew -= tqrate_ratio * torch.sum(-limLevel + limLevel / ((1.0 / clip_torque_rate - 1) ** 2 + limLevel), dim=1)
+    clip_torque_rate = torch.clamp((torque_rate / 5000), min=0.0, max=1.0)
+    rew -= tqrate_ratio * torch.sum(clip_torque_rate ** 2, dim=1)
     rew += 1
 
     if const_type == 0:
@@ -489,7 +491,7 @@ def compute_postural_reward(
         poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
         negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
 
-        r_penalty = const_ratio * (-2*limLevel + limLevel * (
+        r_penalty = const_ratio * (-2*limLevel / (1 + limLevel) + limLevel * (
                 1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] + 1) ** 2 + limLevel)))
     elif ankle_limit_type == 2:
         reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
