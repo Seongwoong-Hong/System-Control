@@ -118,6 +118,7 @@ class IDPMinEffort(VecTask):
             use_seg_ang: bool = False,
             action_as_state: bool = False,
             delay: bool = False,
+            delay_randomize: float = None,
             ankle_torque_max: Union[int, float] = None,
             stiff_ank: float = 0.,
             damp_ank: float = 0.,
@@ -136,6 +137,12 @@ class IDPMinEffort(VecTask):
         self.use_seg_ang = use_seg_ang
         self.action_as_state = action_as_state
         self.is_act_delayed = delay
+        self.delay_randomize = delay_randomize
+        if self.delay_randomize is None:
+            self.delay_randomize = 0.0
+        elif not isinstance(self.delay_randomize, float):
+            raise TypeError("delay_randomize는 float type 입니다.")
+
         self._jnt_stiffness = [stiff_ank, stiff_hip]
         self._jnt_damping = [damp_ank, damp_hip]
         self.bsp = None
@@ -276,7 +283,11 @@ class IDPMinEffort(VecTask):
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
-        act_delay_time = torch_rand_float(self.act_delay_time, self.act_delay_time, shape=(len(env_ids), 1), device=self.device)
+        act_delay_time = torch_rand_float(
+            self.act_delay_time*(1 - self.delay_randomize),
+            self.act_delay_time*(1 + self.delay_randomize),
+            shape=(len(env_ids), 1), device=self.device,
+        )
         self.act_delay_idx[env_ids] = (act_delay_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
         noise_time = torch_rand_float(-self.act_delay_time, self.act_delay_time, shape=(len(env_ids), 1), device=self.device)
         self.ptb_st_idx[env_ids] += (noise_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
