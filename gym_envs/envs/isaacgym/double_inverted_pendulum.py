@@ -349,7 +349,7 @@ class IDPMinEffort(VecTask):
             self.act_delay_idx
         )
         self.actions = actions.to(self.device).clone()
-        self.extras['torque_rate'] = self.avg_coeff*((self.actions - self.prev_actions) * 100) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
+        self.extras['torque_rate'] = self.avg_coeff*((self.actions - self.prev_actions) * self.joint_gears) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
         forces = self.actions * self.joint_gears
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(forces))
@@ -394,10 +394,7 @@ class IDPMinEffort(VecTask):
         u_body.find("inertial").attrib['mass'] = f"{m_u:.4f}"
 
         if self.ankle_torque_max is not None:
-            hip_max = float(root.find('actuator').findall("motor")[1].attrib['gear'])
-            torque_max = max(self.ankle_torque_max, hip_max)
-            for motor in root.find('actuator').findall("motor"):
-                motor.attrib['gear'] = str(torque_max)
+            root.find('actuator').findall("motor")[0].attrib['gear'] = str(self.ankle_torque_max)
         m_tree = ElementTree(root)
 
         self.com = to_torch([com_f, com_l, com_u], device=self.device)
