@@ -311,6 +311,7 @@ class IDPMinEffort(VecTask):
         self.obs_traj[env_ids] = 0
         self.act_traj[env_ids] = 0
         self.tqr_traj[env_ids] = 0
+        self.extras['torque_rate'][env_ids] = 0
 
     def _cal_ptb_acc(self, x_max):
         t = self._ptb_act_time * np.linspace(0, 1, round(self._ptb_act_time / self.dt))
