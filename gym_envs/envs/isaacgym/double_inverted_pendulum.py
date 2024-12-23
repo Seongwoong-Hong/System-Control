@@ -113,6 +113,7 @@ class IDPMinEffort(VecTask):
             ank_ratio: float = 0.5,
             vel_ratio: float = 0.5,
             tq_ratio: float = 0.5,
+            avg_coeff: float = 1.0,
             const_type: str = "cop",
             limLevel: float = 0.0,
             use_seg_ang: bool = False,
@@ -161,6 +162,7 @@ class IDPMinEffort(VecTask):
         self.ank_ratio = ank_ratio
         self.vel_ratio = vel_ratio
         self.tq_ratio = tq_ratio
+        self.avg_coeff = avg_coeff
         assert 0 <= self.ank_ratio <= 1 and 0 <= self.tq_ratio <= 1 and 0 <= self.vel_ratio <= 1
         self._ptb_range = self._ptb_data_range.copy()
         if stptb is not None:
@@ -231,7 +233,7 @@ class IDPMinEffort(VecTask):
         self.rew_buf[:], self.reset_buf[:] = compute_postural_reward(
             self.obs_buf,
             self.actions,
-            (self.actions - self.prev_actions) * self.joint_gears / self.dt,
+            self.extras['torque_rate'],
             self.foot_forces,
             self.reset_buf, self.progress_buf, self.ptb_st_idx,
             self.stcost_ratio, self.tqcost_ratio, self.tqrate_ratio, self.const_ratio,
@@ -257,7 +259,7 @@ class IDPMinEffort(VecTask):
 
         self.obs_traj[env_ids, self.progress_buf, :] = self.obs_buf
         self.act_traj[env_ids, self.progress_buf, :] = self.actions
-        self.tqr_traj[env_ids, self.progress_buf, :] = (self.actions - self.prev_actions) * self.joint_gears / self.dt
+        self.tqr_traj[env_ids, self.progress_buf, :] = self.extras['torque_rate']
 
         return self.obs_buf
 
@@ -346,7 +348,7 @@ class IDPMinEffort(VecTask):
             self.act_delay_idx
         )
         self.actions = actions.to(self.device).clone()
-        self.extras['torque_rate'] = ((self.actions - self.prev_actions) * 100) / self.dt
+        self.extras['torque_rate'] = self.avg_coeff*((self.actions - self.prev_actions) * 100) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
         forces = self.actions * self.joint_gears
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(forces))
