@@ -1,1 +1,3 @@
 **/__pycache__/
+gym_envs/envs/assets/tmp
+**/*.mp4
