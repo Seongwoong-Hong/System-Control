@@ -349,7 +349,7 @@ class IDPMinEffort(VecTask):
             self.act_delay_idx
         )
         self.actions = actions.to(self.device).clone()
-        self.extras['torque_rate'] = self.avg_coeff*((self.actions - self.prev_actions) * self.joint_gears) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
+        self.extras['torque_rate'] = self.avg_coeff*(self.actions - self.prev_actions) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
         forces = self.actions * self.joint_gears
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(forces))
@@ -482,7 +482,7 @@ def compute_postural_reward(
     # rew = -stcost_ratio * (com ** 2 + vel_ratio * torch.sum(obs_buf[:, 2:] ** 2, dim=1))
     rew = -stcost_ratio * torch.sum(((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
     rew -= tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
-    clip_torque_rate = torch.clamp(torch.abs(torque_rate / 2000), min=0.0, max=1.0)
+    clip_torque_rate = torch.clamp(torch.abs(torque_rate / 30), min=0.0, max=1.0)
     rew -= tqrate_ratio * torch.sum(-limLevel / (1 + limLevel) + limLevel * (1 / ((clip_torque_rate - 1) ** 2 + limLevel)), dim=1)
     rew += 1
 
