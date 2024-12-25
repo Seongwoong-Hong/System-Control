@@ -487,7 +487,8 @@ def compute_postural_reward(
     rew = -stcost_ratio * torch.sum(((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
     rew -= tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
     clip_torque_rate = torch.clamp(torch.abs(torque_rate / 30), min=0.0, max=1.0)
-    rew -= tqrate_ratio * torch.sum(-limLevel / (1 + limLevel) + limLevel * (1 / ((clip_torque_rate - 1) ** 2 + limLevel)), dim=1)
+    # rew -= tqrate_ratio * torch.sum(-limLevel / (1 + limLevel) + limLevel * (1 / ((clip_torque_rate - 1) ** 2 + limLevel)), dim=1)
+    rew -= tqrate_ratio * torch.sum(clip_torque_rate ** 2, dim=1)
     rew += 1
 
     if const_type == 0:
