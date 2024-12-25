@@ -351,7 +351,7 @@ class IDPMinEffort(VecTask):
             self.act_delay_idx
         )
         self.actions = actions.to(self.device).clone()
-        self.extras['ddtq'] = (self.actions - self.prev_actions) / self.dt - self.extras['ddtq']
+        self.extras['ddtq'] = self.avg_coeff*((self.actions - self.prev_actions) / self.dt - self.extras['torque_rate']) + (1 - self.avg_coeff)*self.extras['ddtq']
         self.extras['torque_rate'] = self.avg_coeff*(self.actions - self.prev_actions) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
         forces = self.actions * self.joint_gears
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
