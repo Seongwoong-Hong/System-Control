@@ -96,7 +96,8 @@ class IDPMinEffort(VecTask):
         self.foot_forces = gymtorch.wrap_tensor(force_state_tensor)
         self.extras["foot_forces"] = self.foot_forces
         self.extras["ptb_forces"] = self.ptb_forces
-        self.extras["torque_rate"] = ((self.actions - self.prev_actions) * self.joint_gears) / self.dt
+        self.extras["torque_rate"] = (self.actions - self.prev_actions) / self.dt
+        self.extras["ddtq"] = (self.actions - self.prev_actions) / self.dt - self.extras["torque_rate"]
 
     def _set_env_cfg(
             self,
@@ -233,7 +234,7 @@ class IDPMinEffort(VecTask):
         self.rew_buf[:], self.reset_buf[:] = compute_postural_reward(
             self.obs_buf,
             self.actions,
-            self.extras['torque_rate'],
+            self.extras['ddtq'],
             self.foot_forces,
             self.reset_buf, self.progress_buf, self.ptb_st_idx,
             self.stcost_ratio, self.tqcost_ratio, self.tqrate_ratio, self.const_ratio,
@@ -312,6 +313,7 @@ class IDPMinEffort(VecTask):
         self.act_traj[env_ids] = 0
         self.tqr_traj[env_ids] = 0
         self.extras['torque_rate'][env_ids] = 0
+        self.extras['ddtq'][env_ids] = 0
 
     def _cal_ptb_acc(self, x_max):
         t = self._ptb_act_time * np.linspace(0, 1, round(self._ptb_act_time / self.dt))
@@ -349,6 +351,7 @@ class IDPMinEffort(VecTask):
             self.act_delay_idx
         )
         self.actions = actions.to(self.device).clone()
+        self.extras['ddtq'] = (self.actions - self.prev_actions) / self.dt - self.extras['ddtq']
         self.extras['torque_rate'] = self.avg_coeff*(self.actions - self.prev_actions) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
         forces = self.actions * self.joint_gears
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
