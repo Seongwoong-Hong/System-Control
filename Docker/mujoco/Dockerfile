@@ -1,7 +1,7 @@
 FROM python:3.7.10
 
 RUN mkdir /root/workspace
-ADD requirements.txt /root/workspace/requirements.txt
+ADD ../../requirements.txt /root/workspace/requirements.txt
 
 RUN apt-get update -q \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
