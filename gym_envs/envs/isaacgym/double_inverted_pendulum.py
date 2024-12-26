@@ -79,7 +79,7 @@ class IDPMinEffort(VecTask):
             raise Exception("undefined constraint type")
 
         self.delayed_act_buf = to_torch(
-            np.zeros([self.num_envs, self.action_space.shape[0], round(1.2 * self.act_delay_time / self.dt) + 1]), device=self.device)
+            np.zeros([self.num_envs, self.action_space.shape[0], round((1 + self.delay_randomize) * self.act_delay_time / self.dt) + 1]), device=self.device)
 
         if self.viewer != None:
             cam_pos = gymapi.Vec3(0.0, -2.0, 0.8)
