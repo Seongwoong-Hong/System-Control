@@ -564,7 +564,7 @@ def compute_current_action(
         tmp_buf[i, j, delayed_idx[update_or_not].view(-1, 1, 1)] = actions[update_or_not].unsqueeze(-1)
         delayed_act_buf[update_or_not, :, :-1] = tmp_buf
         actions[update_or_not] = delayed_action
-        actions[~update_or_not] = delayed_act_buf[~update_or_not, :, 0].clone()
+    actions[~update_or_not] = delayed_act_buf[~update_or_not, :, 0].clone()
     actions += (-(jnt_stiffness * dof_pos + jnt_damping * dof_vel) / joint_gears)
     actions[~update_or_not] += (-(jnt_stiffness * (dof_pos[~update_or_not] - lean_ang) + jnt_damping * dof_vel[~update_or_not]) / joint_gears)
 
