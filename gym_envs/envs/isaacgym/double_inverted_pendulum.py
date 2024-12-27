@@ -36,10 +36,10 @@ class IDPMinEffort(VecTask):
         self.tqr_traj = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1, self.cfg['env']['numActions']]), device=self.device)
 
         self.cuda_arange = to_torch(np.arange(self.max_episode_length), dtype=torch.int64, device=self.device)
-        self._ptb_acc = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
+        self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
         self.ptb_forces = to_torch(np.zeros([self.num_envs, self.num_bodies, 3]), device=self.device)
-        self._ptb_acc_range = to_torch(self._cal_ptb_acc(-self._ptb_range.reshape(1, -1)), device=self.device)
+        self._ptb_range = to_torch(self._cal_ptb_acc(-self._ptb_range.reshape(1, -1)), device=self.device)
         self._ptb_act_idx = to_torch(round(self._ptb_act_time / self.dt), dtype=torch.int64, device=self.device)
         self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.ptb_st_idx = to_torch(np.zeros([self.num_envs, 1]), dtype=torch.int64, device=self.device)
@@ -269,10 +269,10 @@ class IDPMinEffort(VecTask):
         return self.compute_observations()
 
     def reset_idx(self, env_ids):
-        self._ptb_acc[env_ids, :], self.ptb_st_idx[env_ids] = reset_ptb_acc(
+        self._ptb[env_ids, :], self.ptb_st_idx[env_ids] = reset_ptb_acc(
             env_ids,
-            self._ptb_acc[env_ids],
-            self._ptb_acc_range,
+            self._ptb[env_ids],
+            self._ptb_range,
             self._ptb_act_idx,
             self.max_episode_length,
             self.cuda_arange,
@@ -335,7 +335,7 @@ class IDPMinEffort(VecTask):
             self.reset_idx(env_ids)
 
         self.prev_actions = self.actions.clone()
-        self.ptb_forces[:, :, 0] = -self.mass.view(1, -1) * self._ptb_acc[np.arange(self.num_envs), self.progress_buf].view(-1, 1)
+        self.get_current_ptbs()
         actions, self.delayed_act_buf[...] = compute_current_action(
             self.dof_pos,
             self.dof_vel,
@@ -350,8 +350,7 @@ class IDPMinEffort(VecTask):
             self.lean_angle_torch,
             self.act_delay_idx
         )
-        # self.actions = actions.to(self.device).clone()
-        self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - 0.05, max=self.prev_actions + 0.05)
+        self.get_current_actions(actions.to(self.device).clone())
         self.extras['ddtq'] = self.avg_coeff*((self.actions - self.prev_actions) / self.dt - self.extras['torque_rate']) + (1 - self.avg_coeff)*self.extras['ddtq']
         self.extras['torque_rate'] = self.avg_coeff*(self.actions - self.prev_actions) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
         forces = self.actions * self.joint_gears
@@ -416,19 +415,25 @@ class IDPMinEffort(VecTask):
         m_tree.write(filepath)
         return filepath
 
+    def get_current_actions(self, actions):
+        self.actions = actions
+
+    def get_current_ptbs(self):
+        self.ptb_forces[:, :, 0] = -self.mass.view(1, -1) * self._ptb[np.arange(self.num_envs), self.progress_buf].view(-1, 1)
+
 
 class IDPMinEffortDet(IDPMinEffort):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_episode_length = round(3 / self.dt)
-        self._ptb_acc = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
+        self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
         self._ptb_act_time = self._ptb_act_time.item()
-        self._ptb_acc_range = to_torch(
+        self._ptb_range = to_torch(
             self._cal_ptb_acc(-np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15]).reshape(1, -1)),
             device=self.device,
         )
-        self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_acc_range.shape[0], dtype=torch.int64, device=self.device)
+        self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
         self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.delayed_time = 0.1
         if "st_ptb_idx" in kwargs['cfg']['env'].keys():
@@ -436,11 +441,11 @@ class IDPMinEffortDet(IDPMinEffort):
 
     def reset_idx(self, env_ids):
         st_idx = round(1 /(3 * self.dt))
-        ed_idx = st_idx + self._ptb_acc_range.shape[1]
+        ed_idx = st_idx + self._ptb_range.shape[1]
         self.ptb_st_idx[...] = st_idx
-        self._ptb_acc[...] = 0
-        self._ptb_acc[env_ids, st_idx:ed_idx] = self._ptb_acc_range[self.ptb_idx[env_ids.unsqueeze(1)], np.arange(self._ptb_acc_range.shape[1])]
-        self.ptb_idx[env_ids] = (self.ptb_idx[env_ids] + self.num_envs) % self._ptb_acc_range.shape[0]
+        self._ptb[...] = 0
+        self._ptb[env_ids, st_idx:ed_idx] = self._ptb_range[self.ptb_idx[env_ids.unsqueeze(1)], np.arange(self._ptb_range.shape[1])]
+        self.ptb_idx[env_ids] = (self.ptb_idx[env_ids] + self.num_envs) % self._ptb_range.shape[0]
 
         self.dof_pos[env_ids, :] = self.lean_angle_torch
         self.dof_vel[env_ids, :] = 0.0
@@ -465,6 +470,33 @@ class IDPMinEffortDet(IDPMinEffort):
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
 
+    def get_current_actions(self, actions):
+        self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - 0.05, max=self.prev_actions + 0.05)
+
+
+class IDPForwardPushDet(IDPMinEffortDet):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
+        self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
+        self._ptb_act_time = self._ptb_act_time.item()
+        self._ptb_range = to_torch(
+            self._cal_ptb_force(np.array([120, 140, 160, 180, 200]).reshape(-1, 1)),
+            device=self.device,
+        )
+        self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
+        self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
+        self.delayed_time = 0.1
+        if "st_ptb_idx" in kwargs['cfg']['env'].keys():
+            self.ptb_idx += kwargs['cfg']['env']["st_ptb_idx"]
+
+    def _cal_ptb_force(self, f_max):
+        wt = 2*np.pi*1/(2*self._ptb_act_time)*np.arange(0, round(self._ptb_act_time/self.dt)) * self.dt
+        force = f_max * np.sin(wt[None, :])
+        return force
+
+    def get_current_ptbs(self):
+        self.ptb_forces[:, 2, 0] = self._ptb[np.arange(self.num_envs), self.progress_buf]
 
 #####################################################################
 ###=========================jit functions=========================###
