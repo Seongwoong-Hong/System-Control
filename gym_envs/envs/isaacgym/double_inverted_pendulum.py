@@ -55,7 +55,7 @@ class IDPMinEffort(VecTask):
             self.act_delay_time = cfg['env']['delayed_time']
         else:
             self.act_delay_time = 0.1
-        self.act_delay_idx = to_torch(round(self.act_delay_time / self.dt) * np.ones([self.num_envs, 1]) - 1, dtype=torch.int64, device=self.device)
+        self.act_delay_idx = to_torch(round(self.act_delay_time / self.dt) * np.ones([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         self.is_act_delayed = to_torch(self.is_act_delayed, device=self.device)
         self._jnt_stiffness = to_torch(self._jnt_stiffness, device=self.device)
@@ -80,7 +80,7 @@ class IDPMinEffort(VecTask):
             raise Exception("undefined constraint type")
 
         self.delayed_act_buf = to_torch(
-            np.zeros([self.num_envs, self.action_space.shape[0], round((1 + self.delay_randomize) * self.act_delay_time / self.dt) + 1]), device=self.device)
+            np.zeros([self.num_envs, self.action_space.shape[0], round((1 + self.delay_randomize) * self.act_delay_time / self.dt) + 2]), device=self.device)
 
         if self.viewer != None:
             cam_pos = gymapi.Vec3(0.0, -2.0, 0.8)
@@ -292,7 +292,7 @@ class IDPMinEffort(VecTask):
             self.act_delay_time*(1 + self.delay_randomize),
             shape=(len(env_ids), 1), device=self.device,
         )
-        self.act_delay_idx[env_ids] = (act_delay_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
+        self.act_delay_idx[env_ids] = (act_delay_time / self.dt).round().to(dtype=torch.int64, device=self.device)
         noise_time = torch_rand_float(-self.act_delay_time, self.act_delay_time, shape=(len(env_ids), 1), device=self.device)
         self.ptb_st_idx[env_ids] += (noise_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
 
@@ -351,7 +351,8 @@ class IDPMinEffort(VecTask):
             self.lean_angle_torch,
             self.act_delay_idx
         )
-        self.actions = actions.to(self.device).clone()
+        # self.actions = actions.to(self.device).clone()
+        self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - 0.05, max=self.prev_actions + 0.05)
         self.extras['ddtq'] = self.avg_coeff*((self.actions - self.prev_actions) / self.dt - self.extras['torque_rate']) + (1 - self.avg_coeff)*self.extras['ddtq']
         self.extras['torque_rate'] = self.avg_coeff*(self.actions - self.prev_actions) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
         forces = self.actions * self.joint_gears
