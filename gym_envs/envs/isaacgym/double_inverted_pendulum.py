@@ -98,12 +98,14 @@ class IDPMinEffort(VecTask):
         self.extras["ptb_forces"] = self.ptb_forces
         self.extras["torque_rate"] = (self.actions - self.prev_actions) / self.dt
         self.extras["ddtq"] = (self.actions - self.prev_actions) / self.dt - self.extras["torque_rate"]
+        self.extras["dd_acts"] = (self.actions - self.prev_actions) / self.dt - self.extras["torque_rate"]
 
     def _set_env_cfg(
             self,
             bsp_path: Union[Path, str] = None,
             ptb_act_time: float = 1 / 3,
             ankle_limit: str = "satu",
+            tqr_regularize_type: str = "torque_rate",
             stptb: float = None,
             edptb: float = None,
             ptb_step: float = None,
@@ -135,6 +137,9 @@ class IDPMinEffort(VecTask):
         self._next_ptb_idx = self._ptb_idx
         self.ankle_limit = np.arange(3)[np.array(['satu', 'soft', 'hard']) == ankle_limit].item()
         self.const_type = np.arange(2)[np.array(['cop', 'ankle_torque']) == const_type].item()
+        if tqr_regularize_type not in ["torque_rate", "ddtq", "dd_acts"]:
+            raise Exception("undefined tqr_regularize_type")
+        self.tqr_regularize_type = tqr_regularize_type
         self.ankle_torque_max = ankle_torque_max
         self.use_seg_ang = use_seg_ang
         self.action_as_state = action_as_state
@@ -234,7 +239,7 @@ class IDPMinEffort(VecTask):
         self.rew_buf[:], self.reset_buf[:] = compute_postural_reward(
             self.obs_buf,
             self.actions,
-            self.extras['ddtq'],
+            self.extras[self.tqr_regularize_type],
             self.foot_forces,
             self.reset_buf, self.progress_buf, self.ptb_st_idx,
             self.stcost_ratio, self.tqcost_ratio, self.tqrate_ratio, self.const_ratio,
@@ -352,6 +357,12 @@ class IDPMinEffort(VecTask):
         )
         self.get_current_actions(actions.to(self.device).clone())
         self.extras['ddtq'] = self.avg_coeff*((self.actions - self.prev_actions) / self.dt - self.extras['torque_rate']) + (1 - self.avg_coeff)*self.extras['ddtq']
+        i, j = np.arange(self.delayed_act_buf.shape[0]).reshape(-1, 1, 1), np.arange(self.delayed_act_buf.shape[1]).reshape(1, -1, 1)
+        k = self.act_delay_idx.view(-1, 1, 1)
+        self.extras['dd_acts'] = self.avg_coeff*(
+                (self.delayed_act_buf[i, j, k] - self.delayed_act_buf[i, j, k-1]) / self.dt -
+                (self.delayed_act_buf[i, j, k-1] - self.delayed_act_buf[i, j, k-2]) / self.dt
+        ).squeeze(-1) + (1 - self.avg_coeff)*self.extras['dd_acts']
         self.extras['torque_rate'] = self.avg_coeff*(self.actions - self.prev_actions) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
         forces = self.actions * self.joint_gears
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
@@ -471,7 +482,7 @@ class IDPMinEffortDet(IDPMinEffort):
         self.progress_buf[env_ids] = 0
 
     def get_current_actions(self, actions):
-        self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - 0.05, max=self.prev_actions + 0.05)
+        self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - 0.06, max=self.prev_actions + 0.06)
 
 
 class IDPForwardPushDet(IDPMinEffortDet):
