@@ -437,6 +437,10 @@ class IDPMinEffort(VecTask):
 class IDPMinEffortDet(IDPMinEffort):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if 'tqr_limit' in kwargs:
+            self.tqr_limit = kwargs['tqr_limit']
+        else:
+            self.tqr_limit = None
         self.max_episode_length = round(3 / self.dt)
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
@@ -483,7 +487,10 @@ class IDPMinEffortDet(IDPMinEffort):
         self.progress_buf[env_ids] = 0
 
     def get_current_actions(self, actions):
-        self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - 0.06, max=self.prev_actions + 0.06)
+        if self.tqr_limit is not None:
+            self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - self.tqr_limit, max=self.prev_actions + self.tqr_limit)
+        else:
+            super(IDPMinEffortDet, self).get_current_actions(actions)
 
 
 class IDPForwardPushDet(IDPMinEffortDet):
