@@ -437,8 +437,8 @@ class IDPMinEffort(VecTask):
 class IDPMinEffortDet(IDPMinEffort):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if 'tqr_limit' in kwargs:
-            self.tqr_limit = kwargs['tqr_limit']
+        if 'tqr_limit' in self.cfg['env'] and isinstance(self.cfg['env']['tqr_limit'], float):
+            self.tqr_limit = self.cfg['env']['tqr_limit']
         else:
             self.tqr_limit = None
         self.max_episode_length = round(3 / self.dt)
