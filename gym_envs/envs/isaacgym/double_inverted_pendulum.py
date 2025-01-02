@@ -565,9 +565,9 @@ def compute_postural_reward(
     else:
         raise Exception(f"Unexpected ankle limit type")
 
-    clip_torque_rate = torch.abs(torque_rate / 30)
-    r_penalty += tqrate_ratio * torch.where(clip_torque_rate[:, 0] > 1/3, torch.ones_like(rew), -limLevel / (1 + limLevel) + limLevel * (1 / ((torque_rate[:, 0] - 1) ** 2 + limLevel)))
-    r_penalty += tqrate_ratio * torch.where(clip_torque_rate[:, 1] > 1/3, torch.ones_like(rew), -limLevel / (1 + limLevel) + limLevel * (1 / ((torque_rate[:, 1] - 1) ** 2 + limLevel)))
+    torque_rate = torch.abs(torque_rate / 30)
+    r_penalty += tqrate_ratio * torch.where(torque_rate[:, 0] > 1/2, torch.ones_like(rew), -limLevel / (1 + limLevel) + limLevel * (1 / ((torque_rate[:, 0] - 1) ** 2 + limLevel)))
+    r_penalty += tqrate_ratio * torch.where(torque_rate[:, 1] > 1/2, torch.ones_like(rew), -limLevel / (1 + limLevel) + limLevel * (1 / ((torque_rate[:, 1] - 1) ** 2 + limLevel)))
     reset = torch.where(torque_rate[:, 0] >= 1, torch.ones_like(reset), reset)
     reset = torch.where(torque_rate[:, 1] >= 1, torch.ones_like(reset), reset)
     # r_penalty += tqrate_ratio * torch.sum(-limLevel / (1 + limLevel) + limLevel * (1 / ((clip_torque_rate - 1) ** 2 + limLevel)), dim=1)
