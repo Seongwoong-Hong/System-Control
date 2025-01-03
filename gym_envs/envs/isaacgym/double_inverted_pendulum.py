@@ -297,7 +297,7 @@ class IDPMinEffort(VecTask):
             shape=(len(env_ids), 1), device=self.device,
         )
         self.act_delay_idx[env_ids] = (act_delay_time / self.dt).round().to(dtype=torch.int64, device=self.device)
-        noise_time = torch_rand_float(-self.act_delay_time, self.act_delay_time, shape=(len(env_ids), 1), device=self.device)
+        noise_time = torch_rand_float(-self.act_delay_time, 0, shape=(len(env_ids), 1), device=self.device)
         self.ptb_st_idx[env_ids] += (noise_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
 
         self.delayed_act_buf[env_ids, ...] = fill_delayed_act_buf(
@@ -567,8 +567,9 @@ def compute_postural_reward(
     torque_rate = torch.abs(torque_rate / 30)
     r_penalty += tqrate_ratio * torch.where(torque_rate[:, 0] > 1/2, torch.ones_like(rew), -limLevel / (1 + limLevel) + limLevel * (1 / ((torque_rate[:, 0] - 1) ** 2 + limLevel)))
     r_penalty += tqrate_ratio * torch.where(torque_rate[:, 1] > 1/2, torch.ones_like(rew), -limLevel / (1 + limLevel) + limLevel * (1 / ((torque_rate[:, 1] - 1) ** 2 + limLevel)))
-    reset = torch.where(torque_rate[:, 0] >= 1, torch.ones_like(reset), reset)
-    reset = torch.where(torque_rate[:, 1] >= 1, torch.ones_like(reset), reset)
+    if tqrate_ratio > 0:
+        reset = torch.where(torque_rate[:, 0] >= 1, torch.ones_like(reset), reset)
+        reset = torch.where(torque_rate[:, 1] >= 1, torch.ones_like(reset), reset)
     # r_penalty += tqrate_ratio * torch.sum(-limLevel / (1 + limLevel) + limLevel * (1 / ((clip_torque_rate - 1) ** 2 + limLevel)), dim=1)
     # r_penalty += tqrate_ratio * torch.sum(clip_torque_rate ** 2, dim=1)
 
