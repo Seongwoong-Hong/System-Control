@@ -571,10 +571,10 @@ def compute_postural_reward(
     # r_penalty += tqrate_ratio * torch.clamp(torch.sum(torque_rate**2, dim=1), max=1.0, min=0.0)
 
     torque_rate_const = (1 - (torque_rate / 30) ** 2)
-    r_penalty += -torch.sum(torque_rate_const, dim=1)
-    if tqrate_ratio > 0:
-        reset = torch.where(torque_rate[:, 0] >= 1, torch.ones_like(reset), reset)
-        reset = torch.where(torque_rate[:, 1] >= 1, torch.ones_like(reset), reset)
+    r_penalty += -tqrate_ratio * torch.sum(torque_rate_const, dim=1)
+    # if tqrate_ratio > 0:
+    #     reset = torch.where(torque_rate[:, 0] >= 1, torch.ones_like(reset), reset)
+    #     reset = torch.where(torque_rate[:, 1] >= 1, torch.ones_like(reset), reset)
 
     fall_reset = torch.where(low[0] > obs_buf[:, 0], torch.ones_like(reset), torch.zeros_like(reset))
     fall_reset = torch.where(obs_buf[:, 0] > high[0], torch.ones_like(reset), fall_reset)
