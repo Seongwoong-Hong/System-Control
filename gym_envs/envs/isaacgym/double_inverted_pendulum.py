@@ -427,6 +427,7 @@ class IDPMinEffort(VecTask):
         return filepath
 
     def get_current_actions(self, actions):
+        # self.actions = 0.2*actions + 0.8*self.prev_actions
         self.actions = actions
 
     def get_current_ptbs(self):
@@ -607,7 +608,7 @@ def fill_delayed_act_buf(
     return ((Ts - pTs) / joint_gears)[..., None]
 
 
-@torch.jit.script
+# @torch.jit.script
 def compute_current_action(
         dof_pos, dof_vel, actions, delayed_act_buf,
         is_act_delayed, ptb_st_idx, progress_buf,
@@ -616,10 +617,10 @@ def compute_current_action(
     update_or_not = progress_buf >= ptb_st_idx.view(-1)
     if is_act_delayed:
         assert actions.shape == delayed_act_buf[:, :, 0].shape
+        i, j = torch.arange(update_or_not.sum()).view(-1, 1, 1), torch.arange(delayed_act_buf.shape[1]).view(1, -1, 1)
+        delayed_act_buf[i, j, delayed_idx[update_or_not].view(-1, 1, 1)] = actions[update_or_not].unsqueeze(-1)
         delayed_action = delayed_act_buf[update_or_not, :, 0].clone()
         tmp_buf = delayed_act_buf[update_or_not, :, 1:].clone()
-        i, j = torch.arange(tmp_buf.shape[0]).view(-1, 1, 1), torch.arange(tmp_buf.shape[1]).view(1, -1, 1)
-        tmp_buf[i, j, delayed_idx[update_or_not].view(-1, 1, 1)] = actions[update_or_not].unsqueeze(-1)
         delayed_act_buf[update_or_not, :, :-1] = tmp_buf
         actions[update_or_not] = delayed_action
     actions[~update_or_not] = delayed_act_buf[~update_or_not, :, 0].clone()
