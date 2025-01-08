@@ -74,7 +74,7 @@ class IDPMinEffort(VecTask):
         if self.const_type == 0:
             self.const_max_val = to_torch([0.16, -0.08], device=self.device)
         elif self.const_type == 1:
-            self.const_max_val = to_torch(np.array([self.ankle_torque_max, -self.ankle_torque_max]), device=self.device)  / self.joint_gears[0]
+            self.const_max_val = to_torch(np.array([self.ankle_torque_max, -self.ankle_torque_max]), device=self.device) / self.joint_gears[0]
         else:
             raise Exception("undefined constraint type")
 
@@ -427,7 +427,6 @@ class IDPMinEffort(VecTask):
         return filepath
 
     def get_current_actions(self, actions):
-        # self.actions = 0.2*actions + 0.8*self.prev_actions
         self.actions = actions
 
     def get_current_ptbs(self):
@@ -551,13 +550,14 @@ def compute_postural_reward(
     if ankle_limit_type == 0:
         reset = torch.zeros_like(reset_buf, dtype=torch.long)
     elif ankle_limit_type == 1:
-        reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
-        reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
+        reset = torch.zeros_like(reset_buf, dtype=torch.long)
+        # reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
+        # reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
         poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
         negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
 
-        r_penalty = const_ratio * (-2*limLevel / (1 + limLevel) + limLevel * (
-                1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] + 1) ** 2 + limLevel)))
+        r_penalty = const_ratio * 1e-2 * (-2 / (1 + limLevel) + (
+                1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] - 1) ** 2 + limLevel)))
     elif ankle_limit_type == 2:
         reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
         reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
@@ -617,8 +617,8 @@ def compute_current_action(
     update_or_not = progress_buf >= ptb_st_idx.view(-1)
     if is_act_delayed:
         assert actions.shape == delayed_act_buf[:, :, 0].shape
-        i, j = torch.arange(update_or_not.sum()).view(-1, 1, 1), torch.arange(delayed_act_buf.shape[1]).view(1, -1, 1)
-        delayed_act_buf[i, j, delayed_idx[update_or_not].view(-1, 1, 1)] = actions[update_or_not].unsqueeze(-1)
+        i, j = torch.where(update_or_not)[0].view(-1, 1, 1), torch.arange(delayed_act_buf.shape[1]).view(1, -1, 1)
+        delayed_act_buf[i, j, delayed_idx[update_or_not].view(-1, 1, 1)] = actions[update_or_not].unsqueeze(-1).clone()
         delayed_action = delayed_act_buf[update_or_not, :, 0].clone()
         tmp_buf = delayed_act_buf[update_or_not, :, 1:].clone()
         delayed_act_buf[update_or_not, :, :-1] = tmp_buf
@@ -626,7 +626,6 @@ def compute_current_action(
     actions[~update_or_not] = delayed_act_buf[~update_or_not, :, 0].clone()
     actions += (-(jnt_stiffness * dof_pos + jnt_damping * dof_vel) / joint_gears)
     actions[~update_or_not] += (-(jnt_stiffness * (dof_pos[~update_or_not] - lean_ang) + jnt_damping * dof_vel[~update_or_not]) / joint_gears)
-
     return actions, delayed_act_buf
 
 
