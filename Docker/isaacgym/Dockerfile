@@ -1,9 +1,11 @@
 FROM nvcr.io/nvidia/pytorch:22.12-py3
-#FROM nvidia/cuda:12.6.2-cudnn-runtime-ubuntu22.04
-ENV DEBIAN_FRONTEND=noninteractive 
+ENV DEBIAN_FRONTEND=noninteractive
 
+ARG USERNAME=hsw
+ARG UID=1027
+ENV USERNAME=${USERNAME}
+ENV UID=${UID}
 # dependencies for gym
-#
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
  libxcursor-dev \
@@ -38,31 +40,31 @@ RUN rm /usr/lib/x86_64-linux-gnu/libEGL_mesa.so.0 /usr/lib/x86_64-linux-gnu/libE
 COPY nvidia_icd.json /usr/share/vulkan/icd.d/nvidia_icd.json
 COPY 10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json
 
-RUN useradd --create-home hsw
-RUN usermod -u 1027 hsw
-RUN usermod -aG sudo,users hsw
-RUN usermod -g 100 hsw
-USER hsw
+RUN useradd --create-home ${USERNAME}
+RUN usermod -u ${UID} ${USERNAME}
+RUN usermod -aG sudo,users ${USERNAME}
+RUN usermod -g 100 ${USERNAME}
+USER ${USERNAME}
 
-WORKDIR /home/hsw
-RUN mkdir -p /home/hsw/workspace/System-Control
+WORKDIR /home/${USERNAME}
+RUN mkdir -p /home/${USERNAME}/workspace/System-Control
 # copy gym repo to docker
-COPY --chown=hsw isaacgym isaacgym
-COPY IsaacGymEnvs IsaacGymEnvs
+COPY --chown=${USERNAME} isaacgym isaacgym
+COPY --chown=${USERNAME} IsaacGymEnvs IsaacGymEnvs
 
 # install gym modules
-ENV PATH="/home/hsw/.local/bin:$PATH"
-RUN cd /home/hsw/isaacgym/python && pip install -q -e .
+ENV PATH="/home/${USERNAME}/.local/bin:$PATH"
+RUN cd /home/${USERNAME}/isaacgym/python && pip install -q -e .
 
 ENV NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=all
 
-WORKDIR /home/hsw
+WORKDIR /home/${USERNAME}
 
-RUN cd /home/hsw/IsaacGymEnvs && pip install -q -e .
-WORKDIR /home/hsw
+RUN cd /home/${USERNAME}/IsaacGymEnvs && pip install -q -e .
+WORKDIR /home/${USERNAME}
 
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia:/home/hsw/isaacgym/python/isaacgym/_bindings/linux-x86_64
-ENV PYTHONPATH=$PYTHONPATH:/home/hsw/workspace/System-Control
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia:/home/${USERNAME}/isaacgym/python/isaacgym/_bindings/linux-x86_64
+ENV PYTHONPATH=$PYTHONPATH:/home/${USERNAME}/workspace/System-Control
 
 # run build.sh
-# 빌드 완료 후 root 계정으로 접속하여 hsw의 비밀번호 재설정 필요
+# 빌드 완료 후 root 계정으로 접속하여 $USERNAME의 비밀번호 설정 필요 (README.md)
