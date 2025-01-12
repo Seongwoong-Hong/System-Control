@@ -33,7 +33,7 @@ if __name__ == '__main__':
         for i in range(1, NUM_THREADS + 1):
             ARG = [f"{comb_keys[j]}={ARGS[i-1][j]}" for j in range(len(comb_keys))]
             EXPNAME = f"experiment_name={config['EXP_NAME']}/{comb_keys[0]}{ARGS[i - 1][0]}"
-            for namei in range(config['num_names_add'] - 1):
+            for namei in range(1, config['num_names_add'] - 1):
                 EXPNAME += f"_{comb_keys[namei]}{ARGS[i - 1][namei]}"
             ARG += [EXPNAME]
             process = subprocess.Popen(["python", PYTHON_SCRIPT] + DEFAULT + ARG)
