@@ -32,7 +32,10 @@ if __name__ == '__main__':
         # 병렬 실행
         for i in range(1, NUM_THREADS + 1):
             ARG = [f"{comb_keys[j]}={ARGS[i-1][j]}" for j in range(len(comb_keys))]
-            ARG += [f"experiment_name={config['EXP_NAME']}/{comb_keys[0]}{ARGS[i - 1][0]}_{comb_keys[1]}{ARGS[i - 1][1]}"]
+            EXPNAME = f"experiment_name={config['EXP_NAME']}/{comb_keys[0]}{ARGS[i - 1][0]}"
+            for namei in range(config['num_names_add'] - 1):
+                EXPNAME += f"_{comb_keys[namei]}{ARGS[i - 1][namei]}"
+            ARG += [EXPNAME]
             process = subprocess.Popen(["python", PYTHON_SCRIPT] + DEFAULT + ARG)
             processes.append(process)
             time.sleep(2)
