@@ -41,7 +41,7 @@ class IDPMinEffort(VecTask):
         self.ptb_forces = to_torch(np.zeros([self.num_envs, self.num_bodies, 3]), device=self.device)
         self._ptb_range = to_torch(self._cal_ptb_acc(-self._ptb_range.reshape(1, -1)), device=self.device)
         self._ptb_act_idx = to_torch(round(self._ptb_act_time / self.dt), dtype=torch.int64, device=self.device)
-        self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
+        # self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.ptb_st_idx = to_torch(np.zeros([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         if 'upright_type' in cfg['env']:
@@ -437,6 +437,10 @@ class IDPMinEffort(VecTask):
     def get_current_ptbs(self):
         self.ptb_forces[:, :, 0] = -self.mass.view(1, -1) * self._ptb[np.arange(self.num_envs), self.progress_buf].view(-1, 1)
 
+    def update_curriculum(self, stptb, edptb, ptb_step):
+        _ptb_range = np.arange(0, round((edptb - stptb) / ptb_step) + 1) * ptb_step + stptb
+        self._ptb_range = to_torch(self._cal_ptb_acc(-_ptb_range.reshape(1, -1)), device=self.device)
+
 
 class IDPMinEffortDet(IDPMinEffort):
     def __init__(self, *args, **kwargs):
@@ -448,7 +452,7 @@ class IDPMinEffortDet(IDPMinEffort):
         self.max_episode_length = round(3 / self.dt)
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
-        self._ptb_act_time = self._ptb_act_time.item()
+        # self._ptb_act_time = self._ptb_act_time.item()
         self._ptb_range = to_torch(
             self._cal_ptb_acc(-np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15]).reshape(1, -1)),
             device=self.device,
