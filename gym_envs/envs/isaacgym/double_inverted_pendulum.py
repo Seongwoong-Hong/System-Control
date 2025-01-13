@@ -90,6 +90,7 @@ class IDPMinEffort(VecTask):
         self.actions = to_torch(np.zeros([self.num_envs, 2]), device=self.device)
         self.passive_actions = to_torch(np.zeros([self.num_envs, 2]), device=self.device)
         self.prev_actions = self.actions.clone()
+        self.prev_passive_actions = self.actions.clone()
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
@@ -342,6 +343,7 @@ class IDPMinEffort(VecTask):
             self.reset_idx(env_ids)
 
         self.prev_actions = self.actions.clone()
+        self.prev_passive_actions = self.passive_actions.clone()
         self.get_current_ptbs()
         actions, passive_actions, self.delayed_act_buf[...] = compute_current_action(
             self.dof_pos,
@@ -368,7 +370,7 @@ class IDPMinEffort(VecTask):
                 (self.delayed_act_buf[i, j, k-1] - self.delayed_act_buf[i, j, k-2]) / self.dt
         ).squeeze(-1) + (1 - self.avg_coeff)*self.extras['dd_acts']
         # self.extras['torque_rate'] = self.avg_coeff*(self.actions - self.prev_actions) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
-        self.extras['torque_rate'] = (self.actions - self.prev_actions) / self.dt
+        self.extras['torque_rate'] = (self.actions + self.passive_actions - self.prev_actions - self.prev_passive_actions) / self.dt
         forces = (self.actions + self.passive_actions) * self.joint_gears
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(forces))
