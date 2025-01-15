@@ -70,6 +70,8 @@ class IDPMinEffort(VecTask):
         self.ankle_limit = to_torch(self.ankle_limit, device=self.device)
         self.const_type = to_torch(self.const_type, device=self.device)
         self.limLevel = to_torch(self.limLevel, device=self.device)
+        if self.tqr_limit is not None:
+            self.tqr_limit = to_torch([self.tqr_limit], device=self.device)
 
         if self.const_type == 0:
             self.const_max_val = to_torch([0.16, -0.08], device=self.device)
@@ -130,6 +132,7 @@ class IDPMinEffort(VecTask):
             damp_ank: float = 0.,
             stiff_hip: float = 0.,
             damp_hip: float = 0.,
+            tqr_limit: float = None,
             **kwargs
     ):
         self.limLevel = 10 ** (limLevel * ((-5) - (-2)) + (-2))
@@ -154,6 +157,7 @@ class IDPMinEffort(VecTask):
 
         self._jnt_stiffness = [stiff_ank, stiff_hip]
         self._jnt_damping = [damp_ank, damp_hip]
+        self.tqr_limit = tqr_limit
         self.bsp = None
         if bsp_path is not None:
             if isinstance(bsp_path, str):
@@ -248,7 +252,7 @@ class IDPMinEffort(VecTask):
             self.ank_ratio, self.vel_ratio, self.tq_ratio,
             self.ankle_limit, self.const_max_val, self.limLevel,
             self.high, self.low, self.max_episode_length,
-            self.com, self.mass, self.len, self.const_type,
+            self.com, self.mass, self.len, self.const_type, self.tqr_limit
         )
 
     def compute_observations(self, env_ids=None):
@@ -434,22 +438,19 @@ class IDPMinEffort(VecTask):
 
     def get_current_actions(self, actions):
         self.actions = actions * self.avg_coeff + (1 - self.avg_coeff) * self.prev_actions
+        # self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - self.tqr_limit*self.dt, max=self.prev_actions + self.tqr_limit*self.dt)
 
     def get_current_ptbs(self):
         self.ptb_forces[:, :, 0] = -self.mass.view(1, -1) * self._ptb[np.arange(self.num_envs), self.progress_buf].view(-1, 1)
 
-    def update_curriculum(self, stptb, edptb, ptb_step):
-        _ptb_range = np.arange(0, round((edptb - stptb) / ptb_step) + 1) * ptb_step + stptb
-        self._ptb_range = to_torch(self._cal_ptb_acc(-_ptb_range.reshape(1, -1)), device=self.device)
+    def update_curriculum(self, avg_coeff, tqr_limit):
+        self.avg_coeff = avg_coeff
+        self.tqr_limit[0] = tqr_limit
 
 
 class IDPMinEffortDet(IDPMinEffort):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if 'tqr_limit' in self.cfg['env'] and isinstance(self.cfg['env']['tqr_limit'], float):
-            self.tqr_limit = self.cfg['env']['tqr_limit']
-        else:
-            self.tqr_limit = None
         self.max_episode_length = round(3 / self.dt)
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
@@ -495,11 +496,11 @@ class IDPMinEffortDet(IDPMinEffort):
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
 
-    def get_current_actions(self, actions):
-        if self.tqr_limit is not None:
-            self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - self.tqr_limit, max=self.prev_actions + self.tqr_limit)
-        else:
-            super(IDPMinEffortDet, self).get_current_actions(actions)
+    # def get_current_actions(self, actions):
+    #     if self.tqr_limit is not None:
+    #         self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - self.tqr_limit, max=self.prev_actions + self.tqr_limit)
+    #     else:
+    #         super(IDPMinEffortDet, self).get_current_actions(actions)
 
 
 class IDPForwardPushDet(IDPMinEffortDet):
@@ -538,7 +539,7 @@ def compute_postural_reward(
         ank_ratio, vel_ratio, tq_ratio,
         ankle_limit_type, const_max_val, limLevel,
         high, low, max_episode_length,
-        com_len, mass, seg_len, const_type,
+        com_len, mass, seg_len, const_type, tqr_limit
 ):
     update_or_not = progress_buf >= ptb_st_idx.view(-1)
     com = (mass[1] * com_len[1] * torch.sin(obs_buf[:, 0]) +
@@ -579,11 +580,13 @@ def compute_postural_reward(
     # r_penalty += tqrate_ratio * torch.where(torque_rate[:, 0] > 1/3, torch.ones_like(rew), -limLevel / (1 + limLevel) + limLevel * (1 / ((torque_rate[:, 0] - 1) ** 2 + limLevel)))
     # r_penalty += tqrate_ratio * torch.where(torque_rate[:, 1] > 1/3, torch.ones_like(rew), -limLevel / (1 + limLevel) + limLevel * (1 / ((torque_rate[:, 1] - 1) ** 2 + limLevel)))
     # r_penalty += tqrate_ratio * torch.clamp(torch.sum(torque_rate**2, dim=1), max=1.0, min=0.0)
-    torque_rate_const = torch.min((1 / 9 - (torque_rate / 30) ** 2), torch.tensor(0.0))
+    torque_rate_const = torch.min(((tqr_limit / 60) ** 2 - (torque_rate / 30) ** 2), torch.tensor(0.0))
     r_penalty += -tqrate_ratio * torch.sum(torque_rate_const, dim=1)
     # if tqrate_ratio > 0:
     #     reset = torch.where(torque_rate[:, 0] >= 1, torch.ones_like(reset), reset)
     #     reset = torch.where(torque_rate[:, 1] >= 1, torch.ones_like(reset), reset)
+    # reset = torch.where(tqr_limit < (torque_rate[:, 0] / 30) ** 2, torch.ones_like(reset_buf), reset)
+    # reset = torch.where(tqr_limit < (torque_rate[:, 1] / 30) ** 2, torch.ones_like(reset_buf), reset)
 
     fall_reset = torch.where(low[0] > obs_buf[:, 0], torch.ones_like(reset), torch.zeros_like(reset))
     fall_reset = torch.where(obs_buf[:, 0] > high[0], torch.ones_like(reset), fall_reset)
