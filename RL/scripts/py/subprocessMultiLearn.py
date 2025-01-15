@@ -43,3 +43,4 @@ if __name__ == '__main__':
         # 모든 프로세스가 완료될 때까지 대기
         for i, process in enumerate(processes, start=1):
             process.wait()
+        time.sleep(2)
