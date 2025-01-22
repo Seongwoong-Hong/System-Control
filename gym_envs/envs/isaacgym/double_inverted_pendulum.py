@@ -41,14 +41,13 @@ class IDPMinEffort(VecTask):
         self.ptb_forces = to_torch(np.zeros([self.num_envs, self.num_bodies, 3]), device=self.device)
         self._ptb_range = to_torch(self._cal_ptb_acc(-self._ptb_range.reshape(1, -1)), device=self.device)
         self._ptb_act_idx = to_torch(round(self._ptb_act_time / self.dt), dtype=torch.int64, device=self.device)
-        # self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.ptb_st_idx = to_torch(np.zeros([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         if 'upright_type' in cfg['env']:
             self.lean_angle = np.deg2rad(cfg['env']['upright_type'] * 1.0)
         else:
             self.lean_angle = 0.0
-        self.lean_angle_torch = to_torch([self.lean_angle, 2*self.lean_angle], device=self.device)
+        self.lean_angle_torch = to_torch([self.lean_angle, -0.5*self.lean_angle], device=self.device)
 
         if "delayed_time" in cfg['env']:
             self.act_delay_time = cfg['env']['delayed_time']
@@ -364,7 +363,6 @@ class IDPMinEffort(VecTask):
         )
         self.get_current_actions(actions.to(self.device).clone())
         self.passive_actions = passive_actions.to(self.device).clone()
-        # self.extras['ddtq'] = self.avg_coeff*((self.actions - self.prev_actions) / self.dt - self.extras['torque_rate']) + (1 - self.avg_coeff)*self.extras['ddtq']
         self.extras['ddtq'] = (self.actions - self.prev_actions) / self.dt - self.extras['torque_rate']
         i, j = np.arange(self.delayed_act_buf.shape[0]).reshape(-1, 1, 1), np.arange(self.delayed_act_buf.shape[1]).reshape(1, -1, 1)
         k = self.act_delay_idx.view(-1, 1, 1)
@@ -372,7 +370,6 @@ class IDPMinEffort(VecTask):
                 (self.delayed_act_buf[i, j, k] - self.delayed_act_buf[i, j, k-1]) / self.dt -
                 (self.delayed_act_buf[i, j, k-1] - self.delayed_act_buf[i, j, k-2]) / self.dt
         ).squeeze(-1) + (1 - self.avg_coeff)*self.extras['dd_acts']
-        # self.extras['torque_rate'] = self.avg_coeff*(self.actions - self.prev_actions) / self.dt + (1-self.avg_coeff)*self.extras['torque_rate']
         self.extras['torque_rate'] = (self.actions + self.passive_actions - self.prev_actions - self.prev_passive_actions) / self.dt
         forces = (self.actions + self.passive_actions) * self.joint_gears
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
@@ -454,11 +451,16 @@ class IDPMinEffortDet(IDPMinEffort):
         self.max_episode_length = round(3 / self.dt)
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
-        # self._ptb_act_time = self._ptb_act_time.item()
-        self._ptb_range = to_torch(
-            self._cal_ptb_acc(-np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15]).reshape(1, -1)),
-            device=self.device,
-        )
+        if self.lean_angle > 0.0:
+            self._ptb_range = to_torch(
+                self._cal_ptb_acc(-np.array([0.012, 0.024, 0.036, 0.048, 0.07, 0.09, 0.12]).reshape(1, -1)),
+                device=self.device,
+            )
+        else:
+            self._ptb_range = to_torch(
+                self._cal_ptb_acc(-np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15]).reshape(1, -1)),
+                device=self.device,
+            )
         self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
         self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.delayed_time = 0.1
@@ -495,12 +497,6 @@ class IDPMinEffortDet(IDPMinEffort):
 
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
-
-    # def get_current_actions(self, actions):
-    #     if self.tqr_limit is not None:
-    #         self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - self.tqr_limit, max=self.prev_actions + self.tqr_limit)
-    #     else:
-    #         super(IDPMinEffortDet, self).get_current_actions(actions)
 
 
 class IDPForwardPushDet(IDPMinEffortDet):
