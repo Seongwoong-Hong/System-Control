@@ -133,6 +133,7 @@ class IDPMinEffort(VecTask):
             stiff_hip: float = 0.,
             damp_hip: float = 0.,
             tqr_limit: float = None,
+            use_curriculum = False,
             **kwargs
     ):
         self.limLevel = 10 ** (limLevel * ((-5) - (-2)) + (-2))
@@ -175,6 +176,7 @@ class IDPMinEffort(VecTask):
         self.vel_ratio = vel_ratio
         self.tq_ratio = tq_ratio
         self.avg_coeff = avg_coeff
+        self.use_curriculum = use_curriculum
         assert 0 <= self.ank_ratio <= 1 and 0 <= self.tq_ratio <= 1 and 0 <= self.vel_ratio <= 1
         self._ptb_range = self._ptb_data_range.copy()
         if stptb is not None:
