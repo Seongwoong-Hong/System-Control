@@ -19,10 +19,14 @@ class IDPMinEffort(VecTask):
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
         self.cfg = cfg
         self._set_env_cfg(**self.cfg['env'])
+        if "delayed_time" in cfg['env']:
+            self.act_delay_time = cfg['env']['delayed_time']
+        else:
+            self.act_delay_time = 0.1
         self.cfg["env"]["numObservations"] = 4
         self.cfg["env"]["numActions"] = 2
         if self.action_as_state:
-            self.cfg['env']['numObservations'] += self.cfg['env']['numActions']
+            self.cfg['env']['numObservations'] += self.cfg['env']['numActions'] * round(self.act_delay_time / self.cfg['sim']['dt'])
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
 
         self.high = to_torch(np.deg2rad([45, 120]), dtype=torch.float, device=self.device)
@@ -41,19 +45,14 @@ class IDPMinEffort(VecTask):
         self.ptb_forces = to_torch(np.zeros([self.num_envs, self.num_bodies, 3]), device=self.device)
         self._ptb_range = to_torch(self._cal_ptb_acc(-self._ptb_range.reshape(1, -1)), device=self.device)
         self._ptb_act_idx = to_torch(round(self._ptb_act_time / self.dt), dtype=torch.int64, device=self.device)
+        # self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.ptb_st_idx = to_torch(np.zeros([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         if 'upright_type' in cfg['env']:
             self.lean_angle = np.deg2rad(cfg['env']['upright_type'] * 1.0)
         else:
             self.lean_angle = 0.0
-        self.lean_angle_torch = to_torch([self.lean_angle, -0.5*self.lean_angle], device=self.device)
-
-
-        if "delayed_time" in cfg['env']:
-            self.act_delay_time = cfg['env']['delayed_time']
-        else:
-            self.act_delay_time = 0.1
+        self.lean_angle_torch = to_torch([self.lean_angle, 2*self.lean_angle], device=self.device)
         self.act_delay_idx = to_torch(round(self.act_delay_time / self.dt) * np.ones([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         self.is_act_delayed = to_torch(self.is_act_delayed, device=self.device)
@@ -81,7 +80,7 @@ class IDPMinEffort(VecTask):
             raise Exception("undefined constraint type")
 
         self.delayed_act_buf = to_torch(
-            np.zeros([self.num_envs, self.action_space.shape[0], round((1 + self.delay_randomize) * self.act_delay_time / self.dt) + 2]), device=self.device)
+            np.zeros([self.num_envs, self.action_space.shape[0], round((1 + self.delay_randomize) * self.act_delay_time / self.dt) + 1]), device=self.device)
 
         if self.viewer != None:
             cam_pos = gymapi.Vec3(0.0, -2.0, 0.8)
@@ -89,7 +88,6 @@ class IDPMinEffort(VecTask):
             self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
         self.actions = to_torch(np.zeros([self.num_envs, 2]), device=self.device)
-        self.passive_actions = to_torch(np.zeros([self.num_envs, 2]), device=self.device)
         self.prev_actions = self.actions.clone()
         self.prev_passive_actions = self.actions.clone()
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
@@ -246,7 +244,7 @@ class IDPMinEffort(VecTask):
     def compute_reward(self):
         self.rew_buf[:], self.reset_buf[:] = compute_postural_reward(
             self.obs_buf,
-            self.actions + self.passive_actions,
+            self.actions,
             self.extras[self.tqr_regularize_type],
             self.foot_forces,
             self.reset_buf, self.progress_buf, self.ptb_st_idx,
@@ -267,12 +265,11 @@ class IDPMinEffort(VecTask):
         self.obs_buf[env_ids, 2] = self.dof_vel[env_ids, 0].squeeze()
         self.obs_buf[env_ids, 3] = self.dof_vel[env_ids, 1].squeeze()
         if self.action_as_state:
-            self.obs_buf[env_ids, 4] = self.actions[env_ids, 0].squeeze()
-            self.obs_buf[env_ids, 5] = self.actions[env_ids, 1].squeeze()
+            self.obs_buf[env_ids, 4:] = self.delayed_act_buf[env_ids, :, :-1].permute(0, 2, 1).reshape(len(env_ids), -1)
         self.gym.refresh_force_sensor_tensor(self.sim)
 
         self.obs_traj[env_ids, self.progress_buf, :] = self.obs_buf
-        self.act_traj[env_ids, self.progress_buf, :] = self.actions + self.passive_actions
+        self.act_traj[env_ids, self.progress_buf, :] = self.actions
         self.tqr_traj[env_ids, self.progress_buf, :] = self.extras['torque_rate']
 
         return self.obs_buf
@@ -319,7 +316,8 @@ class IDPMinEffort(VecTask):
             self.joint_gears,
         )
         self.actions[env_ids] = self.delayed_act_buf[env_ids, :, 0].clone()
-
+        if self.action_as_state:
+            self.obs_buf[env_ids, 4:] = self.delayed_act_buf[env_ids, :, :-1].permute(0, 2, 1).reshape(len(env_ids), -1)
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
         self.obs_traj[env_ids] = 0
@@ -348,9 +346,9 @@ class IDPMinEffort(VecTask):
             self.reset_idx(env_ids)
 
         self.prev_actions = self.actions.clone()
-        self.prev_passive_actions = self.passive_actions.clone()
         self.get_current_ptbs()
-        actions, passive_actions, self.delayed_act_buf[...] = compute_current_action(
+        actions = self.process_actions(actions)
+        current_actions, self.delayed_act_buf[...] = compute_current_action(
             self.dof_pos,
             self.dof_vel,
             actions.to(self.device).clone(),
@@ -364,8 +362,7 @@ class IDPMinEffort(VecTask):
             self.lean_angle_torch,
             self.act_delay_idx
         )
-        self.get_current_actions(actions.to(self.device).clone())
-        self.passive_actions = passive_actions.to(self.device).clone()
+        self.actions = current_actions.to(self.device).clone()
         self.extras['ddtq'] = (self.actions - self.prev_actions) / self.dt - self.extras['torque_rate']
         i, j = np.arange(self.delayed_act_buf.shape[0]).reshape(-1, 1, 1), np.arange(self.delayed_act_buf.shape[1]).reshape(1, -1, 1)
         k = self.act_delay_idx.view(-1, 1, 1)
@@ -373,8 +370,8 @@ class IDPMinEffort(VecTask):
                 (self.delayed_act_buf[i, j, k] - self.delayed_act_buf[i, j, k-1]) / self.dt -
                 (self.delayed_act_buf[i, j, k-1] - self.delayed_act_buf[i, j, k-2]) / self.dt
         ).squeeze(-1) + (1 - self.avg_coeff)*self.extras['dd_acts']
-        self.extras['torque_rate'] = (self.actions + self.passive_actions - self.prev_actions - self.prev_passive_actions) / self.dt
-        forces = (self.actions + self.passive_actions) * self.joint_gears
+        self.extras['torque_rate'] = (self.actions - self.prev_actions) / self.dt
+        forces = self.actions * self.joint_gears
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(forces))
 
@@ -436,9 +433,9 @@ class IDPMinEffort(VecTask):
         m_tree.write(filepath)
         return filepath
 
-    def get_current_actions(self, actions):
-        self.actions = actions * self.avg_coeff + (1 - self.avg_coeff) * self.prev_actions
-        # self.actions = torch.clamp(actions.to(self.device).clone(), min=self.prev_actions - self.tqr_limit*self.dt, max=self.prev_actions + self.tqr_limit*self.dt)
+    def process_actions(self, actions):
+        i, j, k = np.arange(self.num_envs).reshape(-1, 1, 1), np.arange(2).reshape(1, -1, 1), self.act_delay_idx.reshape(-1, 1, 1) - 1
+        return actions * self.avg_coeff + (1 - self.avg_coeff) * self.delayed_act_buf[i, j, k].to(self.device).clone().squeeze(-1)
 
     def get_current_ptbs(self):
         self.ptb_forces[:, :, 0] = -self.mass.view(1, -1) * self._ptb[np.arange(self.num_envs), self.progress_buf].view(-1, 1)
@@ -501,7 +498,6 @@ class IDPMinEffortDet(IDPMinEffort):
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
 
-
 class IDPForwardPushDet(IDPMinEffortDet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -560,9 +556,9 @@ def compute_postural_reward(
     if ankle_limit_type == 0:
         reset = torch.zeros_like(reset_buf, dtype=torch.long)
     elif ankle_limit_type == 1:
-        # reset = torch.zeros_like(reset_buf, dtype=torch.long)
-        reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
-        reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
+        reset = torch.zeros_like(reset_buf, dtype=torch.long)
+        # reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
+        # reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
         poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
         negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
 
@@ -575,17 +571,8 @@ def compute_postural_reward(
     else:
         raise Exception(f"Unexpected ankle limit type")
 
-    # torque_rate = torch.min(torch.abs(torque_rate / 30), torch.tensor(1.0))
-    # r_penalty += tqrate_ratio * torch.where(torque_rate[:, 0] > 1/3, torch.ones_like(rew), -limLevel / (1 + limLevel) + limLevel * (1 / ((torque_rate[:, 0] - 1) ** 2 + limLevel)))
-    # r_penalty += tqrate_ratio * torch.where(torque_rate[:, 1] > 1/3, torch.ones_like(rew), -limLevel / (1 + limLevel) + limLevel * (1 / ((torque_rate[:, 1] - 1) ** 2 + limLevel)))
-    # r_penalty += tqrate_ratio * torch.clamp(torch.sum(torque_rate**2, dim=1), max=1.0, min=0.0)
     torque_rate_const = torch.min(((tqr_limit / 60) ** 2 - (torque_rate / 30) ** 2), torch.tensor(0.0))
     r_penalty += -tqrate_ratio * torch.sum(torque_rate_const, dim=1)
-    # if tqrate_ratio > 0:
-    #     reset = torch.where(torque_rate[:, 0] >= 1, torch.ones_like(reset), reset)
-    #     reset = torch.where(torque_rate[:, 1] >= 1, torch.ones_like(reset), reset)
-    # reset = torch.where(tqr_limit < (torque_rate[:, 0] / 30) ** 2, torch.ones_like(reset_buf), reset)
-    # reset = torch.where(tqr_limit < (torque_rate[:, 1] / 30) ** 2, torch.ones_like(reset_buf), reset)
 
     fall_reset = torch.where(low[0] > obs_buf[:, 0], torch.ones_like(reset), torch.zeros_like(reset))
     fall_reset = torch.where(obs_buf[:, 0] > high[0], torch.ones_like(reset), fall_reset)
@@ -636,9 +623,9 @@ def compute_current_action(
         delayed_act_buf[update_or_not, :, :-1] = tmp_buf
         actions[update_or_not] = delayed_action
     actions[~update_or_not] = delayed_act_buf[~update_or_not, :, 0].clone()
-    passive_actions = (-(jnt_stiffness * dof_pos + jnt_damping * dof_vel) / joint_gears)
-    passive_actions[~update_or_not] += (-(jnt_stiffness * (dof_pos[~update_or_not] - lean_ang) + jnt_damping * dof_vel[~update_or_not]) / joint_gears)
-    return actions, passive_actions, delayed_act_buf
+    actions += (-(jnt_stiffness * dof_pos + jnt_damping * dof_vel) / joint_gears)
+    actions[~update_or_not] += (-(jnt_stiffness * (dof_pos[~update_or_not] - lean_ang) + jnt_damping * dof_vel[~update_or_not]) / joint_gears)
+    return actions, delayed_act_buf
 
 
 @torch.jit.script
