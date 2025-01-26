@@ -68,6 +68,7 @@ class IDPMinEffort(VecTask):
         self.tq_ratio = to_torch([self.tq_ratio, 1 - self.tq_ratio], device=self.device)
         self.ankle_limit = to_torch(self.ankle_limit, device=self.device)
         self.const_type = to_torch(self.const_type, device=self.device)
+        self.cost_type = to_torch(self.cost_type, device=self.device)
         self.limLevel = to_torch(self.limLevel, device=self.device)
         if self.tqr_limit is not None:
             self.tqr_limit = to_torch([self.tqr_limit], device=self.device)
@@ -132,6 +133,7 @@ class IDPMinEffort(VecTask):
             damp_hip: float = 0.,
             tqr_limit: float = None,
             use_curriculum = False,
+            cost_type = None,
             **kwargs
     ):
         self.limLevel = 10 ** (limLevel * ((-5) - (-2)) + (-2))
@@ -141,6 +143,7 @@ class IDPMinEffort(VecTask):
         self._next_ptb_idx = self._ptb_idx
         self.ankle_limit = np.arange(3)[np.array(['satu', 'soft', 'hard']) == ankle_limit].item()
         self.const_type = np.arange(2)[np.array(['cop', 'ankle_torque']) == const_type].item()
+        self.cost_type = np.arange(3)[np.array(['normal', 'com', 'reduced']) == cost_type].item()
         if tqr_regularize_type not in ["torque_rate", "ddtq", "dd_acts"]:
             raise Exception("undefined tqr_regularize_type")
         self.tqr_regularize_type = tqr_regularize_type
@@ -252,7 +255,7 @@ class IDPMinEffort(VecTask):
             self.ank_ratio, self.vel_ratio, self.tq_ratio,
             self.ankle_limit, self.const_max_val, self.limLevel,
             self.high, self.low, self.max_episode_length,
-            self.com, self.mass, self.len, self.const_type, self.tqr_limit
+            self.com, self.mass, self.len, self.const_type, self.cost_type, self.tqr_limit
         )
 
     def compute_observations(self, env_ids=None):
@@ -534,14 +537,22 @@ def compute_postural_reward(
         ank_ratio, vel_ratio, tq_ratio,
         ankle_limit_type, const_max_val, limLevel,
         high, low, max_episode_length,
-        com_len, mass, seg_len, const_type, tqr_limit
+        com_len, mass, seg_len, const_type, cost_type, tqr_limit
 ):
     update_or_not = progress_buf >= ptb_st_idx.view(-1)
-    com = (mass[1] * com_len[1] * torch.sin(obs_buf[:, 0]) +
-           mass[2] * (seg_len[1] * torch.sin(obs_buf[:, 0]) + com_len[2] * torch.sin(obs_buf[:, :2].sum(dim=1)))
-           ) / mass[1:].sum()
-    # rew = -stcost_ratio * (com ** 2 + vel_ratio * torch.sum(obs_buf[:, 2:] ** 2, dim=1))
-    rew = -stcost_ratio * torch.sum(((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
+    if cost_type == 0:
+        rew = -stcost_ratio * torch.sum(
+            ((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
+    elif cost_type == 1:
+        com = (mass[1] * com_len[1] * torch.sin(obs_buf[:, 0]) +
+               mass[2] * (seg_len[1] * torch.sin(obs_buf[:, 0]) + com_len[2] * torch.sin(obs_buf[:, :2].sum(dim=1)))
+               ) / mass[1:].sum()
+        rew = -stcost_ratio * (com ** 2 + vel_ratio * torch.sum(obs_buf[:, 2:] ** 2, dim=1))
+    elif cost_type == 2:
+        rew = 0.0 * torch.sum(tq_ratio * actions ** 2, dim=1)
+    else:
+        raise Exception("undefined cost type")
+
     rew -= tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
     rew += 1
 
