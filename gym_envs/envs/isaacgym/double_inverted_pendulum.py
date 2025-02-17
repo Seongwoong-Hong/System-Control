@@ -143,7 +143,7 @@ class IDPMinEffort(VecTask):
         self._next_ptb_idx = self._ptb_idx
         self.ankle_limit = np.arange(3)[np.array(['satu', 'soft', 'hard']) == ankle_limit].item()
         self.const_type = np.arange(2)[np.array(['cop', 'ankle_torque']) == const_type].item()
-        self.cost_type = np.arange(3)[np.array(['normal', 'com', 'reduced']) == cost_type].item()
+        self.cost_type = np.arange(4)[np.array(['normal', 'com', 'reduced', 'cop']) == cost_type].item()
         if tqr_regularize_type not in ["torque_rate", "ddtq", "dd_acts"]:
             raise Exception("undefined tqr_regularize_type")
         self.tqr_regularize_type = tqr_regularize_type
@@ -443,9 +443,21 @@ class IDPMinEffort(VecTask):
     def get_current_ptbs(self):
         self.ptb_forces[:, :, 0] = -self.mass.view(1, -1) * self._ptb[np.arange(self.num_envs), self.progress_buf].view(-1, 1)
 
-    def update_curriculum(self, avg_coeff, tqr_limit):
-        self.avg_coeff = avg_coeff
-        self.tqr_limit[0] = tqr_limit
+    def update_curriculum(self, **kwargs):
+        for k, v in kwargs.items():
+            try:
+                if isinstance(getattr(self, k), torch.Tensor):
+                    if isinstance(v, (int, float)):
+                        setattr(self, k, to_torch(v, dtype=torch.float32, device=self.device))
+                    else:
+                        if v.shape == getattr(self, k).shape:
+                            setattr(self, k, to_torch(v, dtype=torch.float32, device=self.device))
+                        else:
+                            raise ValueError("Size didn't match")
+                else:
+                    setattr(self, k, v)
+            except AttributeError:
+                print(f"self.{k}: Attribute not found")
 
 
 class IDPMinEffortDet(IDPMinEffort):
@@ -540,6 +552,13 @@ def compute_postural_reward(
         com_len, mass, seg_len, const_type, cost_type, tqr_limit
 ):
     update_or_not = progress_buf >= ptb_st_idx.view(-1)
+    if const_type == 0:
+        const_var = (foot_forces[:, 4] + 0.08*foot_forces[:, 0]) / -foot_forces[:, 2]
+    elif const_type == 1:
+        const_var = actions[:, 0]
+    else:
+        raise Exception("undefined constraint type")
+
     if cost_type == 0:
         rew = -stcost_ratio * torch.sum(
             ((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
@@ -547,21 +566,22 @@ def compute_postural_reward(
         com = (mass[1] * com_len[1] * torch.sin(obs_buf[:, 0]) +
                mass[2] * (seg_len[1] * torch.sin(obs_buf[:, 0]) + com_len[2] * torch.sin(obs_buf[:, :2].sum(dim=1)))
                ) / mass[1:].sum()
-        rew = -stcost_ratio * (com ** 2 + vel_ratio * torch.sum(obs_buf[:, 2:] ** 2, dim=1))
+        rew = -0.5*stcost_ratio * (com ** 2 + vel_ratio * torch.sum(obs_buf[:, 2:] ** 2, dim=1))
+        rew -= 0.5*stcost_ratio * torch.sum(
+            ((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
     elif cost_type == 2:
         rew = 0.0 * torch.sum(tq_ratio * actions ** 2, dim=1)
+    elif cost_type == 3:
+        cop = (foot_forces[:, 4] + 0.08*foot_forces[:, 0]) / -foot_forces[:, 2]
+        rew = -0.5*stcost_ratio * (cop ** 2 + vel_ratio * torch.sum(obs_buf[:, 2:] ** 2, dim=1))
+        rew -= 0.5*stcost_ratio * torch.sum(
+            ((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
     else:
         raise Exception("undefined cost type")
 
     rew -= tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
     rew += 1
 
-    if const_type == 0:
-        const_var = (foot_forces[:, 4] + 0.08*foot_forces[:, 0]) / -foot_forces[:, 2]
-    elif const_type == 1:
-        const_var = actions[:, 0]
-    else:
-        raise Exception("undefined constraint type")
 
     r_penalty = torch.zeros_like(rew, dtype=torch.float)
     if ankle_limit_type == 0:
