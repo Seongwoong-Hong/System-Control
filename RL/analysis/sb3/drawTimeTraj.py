@@ -35,13 +35,13 @@ def draw_time_trajs_with_humandata(trials, obs, tqs, states, torques, showfig=Tr
         for actidx in range(2):
             fig.axes[2*actidx+8].plot(t[:len(tqs[idx])], tqs[idx][:, actidx], color=cs[cidx])
             fig.axes[2*actidx+9].plot(t[:len(torques[idx])], torques[idx][:, actidx], color=cs[cidx])
-    # fig.axes[0].set_ylim(fig.axes[1].get_ylim())
-    fig.axes[0].set_ylim([-15, 5])
-    fig.axes[2].set_ylim([fig.axes[3].get_ylim()[0], fig.axes[3].get_ylim()[1]*2])
-    fig.axes[3].set_ylim([fig.axes[3].get_ylim()[0], fig.axes[3].get_ylim()[1]*2])
+    fig.axes[0].set_ylim(fig.axes[1].get_ylim())
+    # fig.axes[0].set_ylim([-15, 5])
+    fig.axes[2].set_ylim([fig.axes[3].get_ylim()[0]*1.2, fig.axes[3].get_ylim()[1]*2])
+    fig.axes[3].set_ylim([fig.axes[3].get_ylim()[0]*1.2, fig.axes[3].get_ylim()[1]*2])
     fig.axes[4].set_ylim(fig.axes[5].get_ylim())
     fig.axes[6].set_ylim(fig.axes[7].get_ylim())
-    fig.axes[8].set_ylim(fig.axes[9].get_ylim()[0], fig.axes[9].get_ylim()[1]*1.5)
+    fig.axes[8].set_ylim(fig.axes[9].get_ylim()[0], fig.axes[9].get_ylim()[1])
     fig.axes[9].set_ylim(fig.axes[8].get_ylim()[0], fig.axes[8].get_ylim()[1])
     fig.axes[10].set_ylim([fig.axes[11].get_ylim()[0]*2, fig.axes[11].get_ylim()[1]])
     fig.axes[11].set_ylim([fig.axes[11].get_ylim()[0]*2, fig.axes[11].get_ylim()[1]])
@@ -113,24 +113,24 @@ if __name__ == "__main__":
         "algo_num": 80,
 
         "env_kwargs": {
-            # "trials": [1, 2, 11, 12, 21, 22, 26, 27, 31, 33],
-            "trials": [1, 6, 11, 16, 21, 26, 31],
-            # "except_trials": [13, 16],
+            "trials": [1, 2, 11, 12, 21, 22, 26, 27, 31, 33],
             "ankle_torque_max": 100,
-            "delay": False,
-            "stiffness": [0, 0],
-            "damping": [0, 0],
-            "ankle_limit": "satu"
+            'ptb_act_time': 0.275,
+            "stiffness": [300, 50],
+            "damping": [30, 20],
+            "delay": True,
+            "delayed_time": 0.1,
+            "ankle_limit": "soft"
         },
     }
     save_video = None
 
-    env, _, loaded_result = load_result(**load_kwargs)
+    env, agent, loaded_result = load_result(**load_kwargs)
     # env.envs[0].env.env.env.delay = False
     # env.set_attr("delay", False)
     # Linear Feedback Controller를 사용할 때는 normalization 확인하기
 
-    agent = LinearFeedbackPolicy(env, gain=np.array([[580.4426, 59.0801, 66.9362, 98.6479], [128.4063, 119.9887, 9.5562, 28.1239]]))
+    # agent = LinearFeedbackPolicy(env, gain=np.array([[580.4426, 59.0801, 66.9362, 98.6479], [128.4063, 119.9887, 9.5562, 28.1239]]))
     # agent = LinearFeedbackPolicy(env, gain=np.array([[256.9201, 283.4496, 110.5109, 60.0833], [-22.1334, 188.7776, 30.5123, 22.1140]]))
     # agent = LinearFeedbackPolicy(env, gain=np.array([[0, 0, 0, 0], [0, 0, 0, 0]]))
     # agent = HeadTrackLinearFeedback(env, gain=np.array([[100, 10], [100, 10]]))
@@ -139,25 +139,27 @@ if __name__ == "__main__":
         render = None
     obs, acts, rews, imgs, ifs = exec_policy(env, agent,
                                              render=render, deterministic=True,
-                                             repeat_num=7,
-                                             infos=['torque'])
-                                             # infos=['torque', 'passive_torque', 'comx', 'comy', 'ptb_acc'])
+                                             repeat_num=len(load_kwargs['env_kwargs']['trials']),
+                                             # infos=['torque'])
+                                             infos=['torque', 'passive_torque', 'comx', 'comy', 'ptb_acc'])
     obs = np.array(obs)
-    acts = np.array(acts) * np.array([100, 150])
-    # tqs = np.array(ifs['torque'])
-    # ptqs = ifs['passive_torque']
-    # comxs = ifs['comx']
-    # comys = ifs['comy']
-    # ptb_forces = ifs['ptb_acc']
+    # acts = np.array(acts) * np.array([100, 150])
+    tqs = np.array(ifs['torque'])
+    for i in range(tqs.shape[0]):
+        print(tqs[i].max(axis=0))
+    ptqs = ifs['passive_torque']
+    comxs = ifs['comx']
+    comys = ifs['comy']
+    ptb_forces = ifs['ptb_acc']
     # headxs = ifs['headx']
 
-    # title = load_kwargs['name_tail'][load_kwargs['name_tail'].rfind('/') + 1:]
-    # fig = draw_time_trajs_with_humandata(load_kwargs['trials'], obs, tqs, loaded_result['states'], loaded_result['torques'], title=title)
-    dt = env.get_attr("dt")[0]
-    fig = draw_time_trajs(obs, acts, x=np.arange(0, acts.shape[1])*dt)
-    # _ = draw_passive_torque(load_kwargs['trials'], tqs, ptqs, title=title)
+    title = name_tail[name_tail.rfind('/') + 1:]
+    fig = draw_time_trajs_with_humandata(load_kwargs['env_kwargs']['trials'], obs, tqs, loaded_result['states'], loaded_result['torques'], title=title)
+    # dt = env.get_attr("dt")[0]
+    # fig = draw_time_trajs(obs, tqs, x=np.arange(0, tqs.shape[1])*1/120)
+    # _ = draw_passive_torque(load_kwargs['env_kwargs']['trials'], tqs, ptqs, title=title)
     # fig = draw_versus_graph(load_kwargs['trials'], [comxs, obs[:,:,0], tqs[:, :, 0]], [comys, obs[:,:,1], tqs[:, :, 1]])
-    # _ = draw_versus_graph(load_kwargs['trials'], [[np.arange(len(ptb_forces[i])) for i in range(len(ptb_forces))]], [ptb_forces])
+    # _ = draw_versus_graph(load_kwargs['env_kwargs']['trials'], [[np.arange(len(ptb_forces[i])) for i in range(len(ptb_forces))]], [ptb_forces])
     # fig = draw_versus_graph(load_kwargs['trials'], [len(headxs)*[np.arange(360)], len(obs)*[np.arange(360)], tqs[:, :, 0]], [headxs, np.array(obs)[:,:-1,4], tqs[:, :, 1]])
 
     if save_video is not None:

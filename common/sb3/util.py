@@ -119,7 +119,6 @@ def load_result(
             humanData = io.loadmat(str(subpath) + f"i{trial}.mat")
             bsp = humanData['bsp']
             states[trial - 1] = humanData['state']
-            states[trial - 1][:] = 0
             torques[trial - 1] = humanData['tq']
 
         config['env_kwargs']['bsp'] = bsp
@@ -131,9 +130,9 @@ def load_result(
     env_kwargs = config.pop("env_kwargs", {})
     env = make_env(f"{env_id}-v0", num_envs=1, use_norm=norm_pkl_path, **env_kwargs)
 
-    # agent = PPO.load(str(log_dir / f"agent_{algo_num}"), device=device)
+    agent = PPO.load(str(log_dir / f"agent_{algo_num}"), device=device)
 
-    return env, None, loaded_result
+    return env, agent, loaded_result
 
 
 def write_analyzed_result(
@@ -185,5 +184,3 @@ def remove_analyzed_result(ana_dir, entire=True, folder_num=None):
         if p.isfile(file):
             os.remove(file)
             print(f"The result file in the folder #{folder_num} is removed successfully")
-
-

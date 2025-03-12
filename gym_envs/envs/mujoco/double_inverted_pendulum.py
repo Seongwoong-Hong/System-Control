@@ -45,6 +45,11 @@ class IDPMimicHumanDet(BasePendulum, utils.EzPickle):
             mujoco_py.functions.mj_applyFT(
                 self.model, self.data, force_vector, np.zeros(3), point, body_id, self.sim.data.qfrc_applied)
 
+        # passive_torque = -(np.array(self._jnt_stiffness) * prev_ob[:2] + np.array(self._jnt_damping) * prev_ob[2:])
+        # active_torque = action * self.model.actuator_gear[:, 0]
+        # torque = active_torque + passive_torque
+        # action = np.clip((torque / self.model.actuator_gear[:, 0]), a_min=-0.5, a_max=1.0)
+
         _action = -(np.array(self._jnt_stiffness)*prev_ob[:2] + np.array(self._jnt_damping)*prev_ob[2:]) / self.model.actuator_gear[:, 0]
         # torque = active_torque + passive_torque
         action = np.clip(_action + action, a_min=self.action_space.low, a_max=self.action_space.high)
@@ -77,13 +82,14 @@ class IDPMimicHumanDet(BasePendulum, utils.EzPickle):
         self.prev_torque = np.zeros(2, dtype=np.float32)
         ob = super(IDPMimicHumanDet, self).reset_model()
         if self.delay:
-            _, lc1, lc2 = self.model.body_ipos[:, -1]
-            _, m1, m2 = self.model.body_mass
-            l1 = self.model.body_pos[2, 2]
-            T2 = -m2*9.81*lc2*np.sin(ob[0] + ob[1])
-            T1 = T2 - m1*9.81*lc1*np.sin(ob[0]) - m2*9.81*l1*np.sin(ob[0])
-            pT = -(np.array(self._jnt_stiffness) * ob[:2] + np.array(self._jnt_damping) * ob[2:])
-            self.delayed_act[:] = (np.array([T1, T2]) - pT) / self.model.actuator_gear[:, 0]
+            # _, lc1, lc2 = self.model.body_ipos[:, -1]
+            # _, m1, m2 = self.model.body_mass
+            # l1 = self.model.body_pos[2, 2]
+            # T2 = -m2*9.81*lc2*np.sin(ob[0] + ob[1])
+            # T1 = T2 - m1*9.81*lc1*np.sin(ob[0]) - m2*9.81*l1*np.sin(ob[0])
+            # pT = -(np.array(self._jnt_stiffness) * ob[:2] + np.array(self._jnt_damping) * ob[2:])
+            # self.delayed_act[:] = (np.array([T1, T2]) - pT) / self.model.actuator_gear[:, 0]
+            self.delayed_act[:] = 0.
         return ob
 
     def reward_fn(self, ob, action):
@@ -183,10 +189,10 @@ class IDPMinEffortDet(IDPMimicHumanDet, utils.EzPickle):
         rew = 0.
         ahr = np.array([self.ank_ratio, 1 - self.ank_ratio])
         tahr = np.array([0.5, 1 - self.tq_ratio])
-        rew -= ((1 - self.vel_ratio) * (ahr * (ob[:2] ** 2)).sum() + self.vel_ratio * (ob[2:] ** 2).sum())
+        rew -= self.tqcost_ratio * ((1 - self.vel_ratio) * (ahr * (ob[:2] ** 2)).sum() + self.vel_ratio * (ob[2:] ** 2).sum())
         # rew -= ((1 - self.vel_ratio) * (ahr * (ob[:2] ** 2)).sum() + self.vel_ratio * (ob[2:] ** 2).sum())
         # rew -= ((1 - self.vel_ratio) * (self.data.subtree_com[0, 0] ** 2).sum() )
-        rew -= self.tqcost_ratio * (tahr * (action ** 2)).sum()
+        rew -= (tahr * (action ** 2)).sum()
         rew += 1
         return rew
 
@@ -250,8 +256,7 @@ class IDPMinEffort(IDPMimicHuman, utils.EzPickle):
         fddx = self._cal_ptb_acc(x_max)
         self._humanData = np.zeros([self._epi_len, 4])
         # st_time_idx = self.np_random.choice(range(self._epi_len - round(2.5 / self.dt)))
-        # st_time_idx = self.np_random.choice(range(round(self._epi_len - self._ptb_act_time/self.dt)))
-        st_time_idx = 0
+        st_time_idx = self.np_random.choice(range(round(self._epi_len - self._ptb_act_time/self.dt)))
         _ptb_acc = np.append(np.zeros(st_time_idx), fddx)
         _ptb_acc = np.append(_ptb_acc, np.zeros(self._epi_len))
         self._ptb_acc = _ptb_acc[:self._epi_len]
@@ -259,7 +264,7 @@ class IDPMinEffort(IDPMimicHuman, utils.EzPickle):
     def reset_model(self):
         self.timesteps = 0
         self.reset_ptb()
-        self.set_state(np.random.rand(self.model.nq) * np.deg2rad([2.5, 5]), np.zeros(self.model.nq))
+        self.set_state(np.zeros(self.model.nq), np.zeros(self.model.nq))
         return self._get_obs()
 
     def is_done(self, ob, torque):
@@ -277,7 +282,7 @@ class IDPForwardPushDet(IDPMinEffortDet, utils.EzPickle):
 
         self.data.qfrc_applied[:] = 0.
         ptb_force = self.ptb_force[self.timesteps]
-        for idx, bodyName in enumerate(["leg"]):
+        for idx, bodyName in enumerate(["body"]):
             body_id = self.model.body_name2id(bodyName)
             force_vector = np.array([ptb_force, 0., 0.])
             point = self.data.xipos[body_id]
