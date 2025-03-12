@@ -593,8 +593,6 @@ def compute_postural_reward(
         poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
         negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
 
-        # r_penalty = const_ratio * 1e-2 * (-2 / (1 + limLevel) + (
-        #         1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] - 1) ** 2 + limLevel)))
         r_penalty = const_ratio * limLevel * (-2 / (limLevel + 1) + (
                 1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] - 1) ** 2 + limLevel)))
     elif ankle_limit_type == 2:
@@ -604,14 +602,15 @@ def compute_postural_reward(
     else:
         raise Exception(f"Unexpected ankle limit type")
 
-    torque_rate_const = torch.min(((tqr_limit / 60) ** 2 - (torque_rate / 30) ** 2), torch.tensor(0.0))
-    r_penalty += -tqrate_ratio * torch.sum(torque_rate_const, dim=1)
 
     fall_reset = torch.where(low[0] > obs_buf[:, 0], torch.ones_like(reset), torch.zeros_like(reset))
     fall_reset = torch.where(obs_buf[:, 0] > high[0], torch.ones_like(reset), fall_reset)
     fall_reset = torch.where(low[1] > obs_buf[:, 1], torch.ones_like(reset), fall_reset)
     fall_reset = torch.where(obs_buf[:, 1] > high[1], torch.ones_like(reset), fall_reset)
-    r_penalty = torch.where(fall_reset.to(torch.bool), torch.ones_like(r_penalty) + r_penalty, r_penalty)
+    r_penalty = torch.where(fall_reset.to(torch.bool), 100*torch.ones_like(r_penalty) + r_penalty, r_penalty)
+
+    torque_rate_const = torch.min(((torque_rate / 30) ** 2 - (tqr_limit / 60) ** 2), torch.tensor(0.0))
+    r_penalty += -tqrate_ratio * torch.sum(torque_rate_const, dim=1)
 
     reset = torch.where(fall_reset.to(torch.bool), torch.ones_like(reset), reset)
     reset = torch.where(progress_buf >= max_episode_length, torch.ones_like(reset), reset)
