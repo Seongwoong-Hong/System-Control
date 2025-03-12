@@ -587,14 +587,15 @@ def compute_postural_reward(
     if ankle_limit_type == 0:
         reset = torch.zeros_like(reset_buf, dtype=torch.long)
     elif ankle_limit_type == 1:
-        reset = torch.zeros_like(reset_buf, dtype=torch.long)
-        # reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
-        # reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
+        # reset = torch.zeros_like(reset_buf, dtype=torch.long)
+        reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
+        reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
         poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
         negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
 
-        r_penalty = const_ratio * 1e-2 * (-2 / (1 + limLevel) + (
-                1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] - 1) ** 2 + limLevel)))
+        # r_penalty = const_ratio * 1e-2 * (-2 / (1 + limLevel) + (
+        #         1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] - 1) ** 2 + limLevel)))
+        r_penalty = const_ratio * limLevel * (-2 / (limLevel + 1) + (1 / ((poscop / const_max_val[0] - 1) ** 2 + i) + 1 / ((negcop / const_max_val[1] - 1) ** 2 + limLevel)))
     elif ankle_limit_type == 2:
         reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
         reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
