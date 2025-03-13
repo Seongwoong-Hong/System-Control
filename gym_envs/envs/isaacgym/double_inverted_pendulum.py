@@ -513,6 +513,19 @@ class IDPMinEffortDet(IDPMinEffort):
         self.reset_buf[env_ids] = 0
         self.progress_buf[env_ids] = 0
 
+
+class IDPMinEffortHumanDet(IDPMinEffortDet):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from common.path_config import MAIN_DIR
+        subpath = MAIN_DIR / "demos" / "IDP" / "sub10" / "sub10"
+        ptb_range = []
+        for i in range(7):
+            humanData = io.loadmat(str(subpath) + f"i{(i + 1)*5}.mat")
+            ptb_range.append(humanData["pltdd"][40:80].squeeze())
+        self._ptb_range = to_torch(ptb_range, device=self.device)
+
+
 class IDPForwardPushDet(IDPMinEffortDet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
