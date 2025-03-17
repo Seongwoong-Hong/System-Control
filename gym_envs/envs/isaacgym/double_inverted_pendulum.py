@@ -340,6 +340,7 @@ class IDPMinEffort(VecTask):
 
         t_con_mat = np.concatenate([np.ones([round(self._ptb_act_time/self.dt), 1]), t.reshape(-1, 1), (t**2).reshape(-1, 1)], axis=1)
         fddx = t*(t_con_mat @ np.diag(np.array([6.0, 12.0, 20.0])) @ a).T  # 가속도 5차 regression
+        # fddx = ((6 * (1 - 2*t / self._ptb_act_time) / self._ptb_act_time**2)[:,None] * x_max).T
         return fddx
 
     def pre_physics_step(self, actions):
@@ -606,7 +607,7 @@ def compute_postural_reward(
         poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
         negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
 
-        r_penalty = const_ratio * 1e-2 * (-2 / (limLevel + 1) + (
+        r_penalty = const_ratio * limLevel * (-2 / (limLevel + 1) + (
                 1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] - 1) ** 2 + limLevel)))
     elif ankle_limit_type == 2:
         reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
@@ -622,7 +623,7 @@ def compute_postural_reward(
     fall_reset = torch.where(obs_buf[:, 1] > high[1], torch.ones_like(reset), fall_reset)
     r_penalty = torch.where(fall_reset.to(torch.bool), torch.ones_like(r_penalty) + r_penalty, r_penalty)
 
-    # torque_rate_const = torch.min(((torque_rate / 30) ** 2 - (tqr_limit / 60) ** 2), torch.tensor(0.0))
+    # torque_rate_const = torch.max(((torque_rate / 300) ** 2 - (tqr_limit / 300) ** 2), torch.tensor(0.0))
     # r_penalty += tqrate_ratio * torch.sum(torque_rate_const, dim=1)
 
     reset = torch.where(fall_reset.to(torch.bool), torch.ones_like(reset), reset)
