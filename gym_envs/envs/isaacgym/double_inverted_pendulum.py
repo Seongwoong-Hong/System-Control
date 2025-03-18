@@ -685,7 +685,7 @@ def reset_ptb_acc(
 ):
     _ptb_idx = torch.randint(0, ptb_acc_range.shape[0], (len(env_ids), 1))
     # ptb_st_idx = torch.randint(0, 2 * ptb_act_idx, (len(env_ids), 1))
-    ptb_st_idx = torch.randint(0, max_episode_length - ptb_act_idx, (len(env_ids), 1))
+    ptb_st_idx = torch.randint(0, max_episode_length // 2 - ptb_act_idx, (len(env_ids), 1))
     offsets = torch.arange(ptb_act_idx).unsqueeze(0) + ptb_st_idx
     ptb_acc[:] = 0
     ptb_acc[torch.arange(len(env_ids)).unsqueeze(1), offsets] = ptb_acc_range[_ptb_idx, torch.arange(ptb_acc_range.shape[1]).unsqueeze(0)]
