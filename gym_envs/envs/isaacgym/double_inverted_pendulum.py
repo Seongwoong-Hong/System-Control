@@ -330,17 +330,27 @@ class IDPMinEffort(VecTask):
         self.extras['ddtq'][env_ids] = 0
 
     def _cal_ptb_acc(self, x_max):
-        t = self._ptb_act_time * np.linspace(0, 1, round(self._ptb_act_time / self.dt))
+        # t = self._ptb_act_time * np.linspace(0, 1, round(self._ptb_act_time / self.dt))
+        #
+        # A = np.array([[self._ptb_act_time ** 3, self._ptb_act_time ** 4, self._ptb_act_time ** 5],
+        #               [3, 4 * self._ptb_act_time, 5 * self._ptb_act_time ** 2],
+        #               [6, 12 * self._ptb_act_time, 20 * self._ptb_act_time ** 2]])
+        # b = np.concatenate([x_max, np.zeros_like(x_max), np.zeros_like(x_max)], axis=0)
+        # a = np.linalg.inv(A)@b
+        #
+        # t_con_mat = np.concatenate([np.ones([round(self._ptb_act_time/self.dt), 1]), t.reshape(-1, 1), (t**2).reshape(-1, 1)], axis=1)
+        # fddx = t*(t_con_mat @ np.diag(np.array([6.0, 12.0, 20.0])) @ a).T  # 가속도 5차 regression
+        # # fddx = ((6 * (1 - 2*t / self._ptb_act_time) / self._ptb_act_time**2)[:,None] * x_max).T
 
-        A = np.array([[self._ptb_act_time ** 3, self._ptb_act_time ** 4, self._ptb_act_time ** 5],
-                      [3, 4 * self._ptb_act_time, 5 * self._ptb_act_time ** 2],
-                      [6, 12 * self._ptb_act_time, 20 * self._ptb_act_time ** 2]])
-        b = np.concatenate([x_max, np.zeros_like(x_max), np.zeros_like(x_max)], axis=0)
+        t1 = self._ptb_act_time * 10/45
+        ts = np.arange(0, round(t1 / self.dt)) * self.dt
+        A = np.array([[t1**4 / 2 + 5*t1**3 / 24, 2*t1**3 / 3 + 5*t1**2 / 24], [3*t1**2, 2*t1]])
+        b = np.concatenate([x_max, np.zeros_like(x_max)], axis=0)
         a = np.linalg.inv(A)@b
+        t_con_mat = np.concatenate([3*(ts**2).reshape(-1,1), 2*ts.reshape(-1,1)], axis=1)
+        fddx1 = t_con_mat @ a
+        fddx = np.concatenate([fddx1, np.zeros([25, x_max.shape[1]]), -fddx1], axis=0).T
 
-        t_con_mat = np.concatenate([np.ones([round(self._ptb_act_time/self.dt), 1]), t.reshape(-1, 1), (t**2).reshape(-1, 1)], axis=1)
-        fddx = t*(t_con_mat @ np.diag(np.array([6.0, 12.0, 20.0])) @ a).T  # 가속도 5차 regression
-        # fddx = ((6 * (1 - 2*t / self._ptb_act_time) / self._ptb_act_time**2)[:,None] * x_max).T
         return fddx
 
     def pre_physics_step(self, actions):
