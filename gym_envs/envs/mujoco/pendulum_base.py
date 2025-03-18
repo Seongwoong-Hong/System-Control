@@ -5,6 +5,7 @@ from typing import List, Union
 import mujoco_py
 import numpy as np
 from copy import deepcopy
+from scipy import io
 from gym.envs.mujoco import mujoco_env
 
 
@@ -92,10 +93,11 @@ class BasePendulum(mujoco_env.MujocoEnv):
         self._next_ptb_idx = self._ptb_idx + 1
 
     def _set_ptb_acc(self):
+        from common.path_config import MAIN_DIR
+        subpath = MAIN_DIR / "demos" / "IDP" / "sub10" / "sub10"
+        humanData = io.loadmat(str(subpath) + f"i{self._ptb_idx + 1}.mat")
         st_time_idx = 40
-        x_max = -self._ptb_data_range[self._ptb_idx // 5]  # Backward direction(-)
-        # x_max = 0
-        fddx = self._cal_ptb_acc(x_max)
+        fddx = humanData["pltdd"][40:80].squeeze()
         self._ptb_acc = np.append(np.zeros(st_time_idx), fddx)
         self._ptb_acc = np.append(self._ptb_acc, np.zeros(self._epi_len - st_time_idx - len(fddx)))
 

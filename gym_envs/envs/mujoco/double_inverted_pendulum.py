@@ -185,6 +185,14 @@ class IDPMinEffortDet(IDPMimicHumanDet, utils.EzPickle):
         utils.EzPickle.__init__(self, tq_ratio=self.tq_ratio, tqcost_ratio=self.tqcost_ratio, const_ratio=self.const_ratio,
                                 ank_ratio=self.ank_ratio, vel_ratio=self.vel_ratio, ptb_range=self._ptb_range, *args, **kwargs)
 
+    # def _set_ptb_acc(self):
+    #     st_time_idx = 40
+    #     x_max = -self._ptb_data_range[self._ptb_idx // 5]  # Backward direction(-)
+    #     # x_max = 0
+    #     fddx = self._cal_ptb_acc(x_max)
+    #     self._ptb_acc = np.append(np.zeros(st_time_idx), fddx)
+    #     self._ptb_acc = np.append(self._ptb_acc, np.zeros(self._epi_len - st_time_idx - len(fddx)))
+
     def reward_fn(self, ob, action):
         rew = 0.
         ahr = np.array([self.ank_ratio, 1 - self.ank_ratio])
