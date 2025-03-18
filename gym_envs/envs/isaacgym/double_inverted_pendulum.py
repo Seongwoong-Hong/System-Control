@@ -623,8 +623,8 @@ def compute_postural_reward(
     fall_reset = torch.where(obs_buf[:, 1] > high[1], torch.ones_like(reset), fall_reset)
     r_penalty = torch.where(fall_reset.to(torch.bool), torch.ones_like(r_penalty) + r_penalty, r_penalty)
 
-    # torque_rate_const = torch.max(((torque_rate / 300) ** 2 - (tqr_limit / 300) ** 2), torch.tensor(0.0))
-    # r_penalty += tqrate_ratio * torch.sum(torque_rate_const, dim=1)
+    torque_rate_const = torch.max(((torque_rate / 100) ** 2 - (tqr_limit / 100) ** 2), torch.tensor(0.0))
+    r_penalty += tqrate_ratio * torch.sum(torque_rate_const, dim=1)
 
     reset = torch.where(fall_reset.to(torch.bool), torch.ones_like(reset), reset)
     reset = torch.where(progress_buf >= max_episode_length, torch.ones_like(reset), reset)
@@ -684,8 +684,8 @@ def reset_ptb_acc(
         cuda_arange,
 ):
     _ptb_idx = torch.randint(0, ptb_acc_range.shape[0], (len(env_ids), 1))
-    ptb_st_idx = torch.randint(0, 2 * ptb_act_idx, (len(env_ids), 1))
-    # ptb_st_idx = torch.randint(0, max_episode_length - ptb_act_idx, (len(env_ids), 1))
+    # ptb_st_idx = torch.randint(0, 2 * ptb_act_idx, (len(env_ids), 1))
+    ptb_st_idx = torch.randint(0, max_episode_length - ptb_act_idx, (len(env_ids), 1))
     offsets = torch.arange(ptb_act_idx).unsqueeze(0) + ptb_st_idx
     ptb_acc[:] = 0
     ptb_acc[torch.arange(len(env_ids)).unsqueeze(1), offsets] = ptb_acc_range[_ptb_idx, torch.arange(ptb_acc_range.shape[1]).unsqueeze(0)]
