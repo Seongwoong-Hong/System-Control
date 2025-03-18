@@ -527,6 +527,18 @@ class IDPMinEffortHumanDet(IDPMinEffortDet):
         self._ptb_range = to_torch(ptb_range, device=self.device)
 
 
+class IDPMinEffortHuman(IDPMinEffort):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from common.path_config import MAIN_DIR
+        subpath = MAIN_DIR / "demos" / "IDP" / "sub10" / "sub10"
+        ptb_range = []
+        for i in range(7):
+            humanData = io.loadmat(str(subpath) + f"i{(i + 1)*5}.mat")
+            ptb_range.append(humanData["pltdd"][40:80].squeeze())
+        self._ptb_range = to_torch(ptb_range, device=self.device)
+
+
 class IDPForwardPushDet(IDPMinEffortDet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -623,7 +635,7 @@ def compute_postural_reward(
     fall_reset = torch.where(obs_buf[:, 1] > high[1], torch.ones_like(reset), fall_reset)
     r_penalty = torch.where(fall_reset.to(torch.bool), torch.ones_like(r_penalty) + r_penalty, r_penalty)
 
-    torque_rate_const = torch.max((torque_rate / tqr_limit) ** 2 - 1, torch.tensor(0.0))
+    torque_rate_const = torch.max((torque_rate / (tqr_limit / 1.25)) ** 2 - 1, torch.tensor(0.0))
     r_penalty += tqrate_ratio * torch.sum(torque_rate_const, dim=1)
 
     reset = torch.where(fall_reset.to(torch.bool), torch.ones_like(reset), reset)
