@@ -112,6 +112,7 @@ class IDPMinEffort(VecTask):
             stptb: float = None,
             edptb: float = None,
             ptb_step: float = None,
+            ptb_type: str = "5th",
             stcost_ratio: float = 1.0,
             tqcost_ratio: float = 0.5,
             tqrate_ratio: float = 0.0,
@@ -168,6 +169,7 @@ class IDPMinEffort(VecTask):
             self.bsp = io.loadmat(str(bsp_path))['bsp']
         self._ptb_data_range = np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15])
         self._ptb_act_time = ptb_act_time
+        self._ptb_type = ptb_type
 
         self.stcost_ratio = stcost_ratio
         self.tqcost_ratio = tqcost_ratio
@@ -330,26 +332,32 @@ class IDPMinEffort(VecTask):
         self.extras['ddtq'][env_ids] = 0
 
     def _cal_ptb_acc(self, x_max):
-        # t = self._ptb_act_time * np.linspace(0, 1, round(self._ptb_act_time / self.dt))
-        #
-        # A = np.array([[self._ptb_act_time ** 3, self._ptb_act_time ** 4, self._ptb_act_time ** 5],
-        #               [3, 4 * self._ptb_act_time, 5 * self._ptb_act_time ** 2],
-        #               [6, 12 * self._ptb_act_time, 20 * self._ptb_act_time ** 2]])
-        # b = np.concatenate([x_max, np.zeros_like(x_max), np.zeros_like(x_max)], axis=0)
-        # a = np.linalg.inv(A)@b
-        #
-        # t_con_mat = np.concatenate([np.ones([round(self._ptb_act_time/self.dt), 1]), t.reshape(-1, 1), (t**2).reshape(-1, 1)], axis=1)
-        # fddx = t*(t_con_mat @ np.diag(np.array([6.0, 12.0, 20.0])) @ a).T  # 가속도 5차 regression
-        # # fddx = ((6 * (1 - 2*t / self._ptb_act_time) / self._ptb_act_time**2)[:,None] * x_max).T
+        if self._ptb_type == "exp":
+            t1 = self._ptb_act_time * 1 / 5
+            num_con_vel = round((self._ptb_act_time - 2 * t1) / self.dt)
+            ts = np.arange(0, round(t1 / self.dt)) * self.dt
+            A = np.array([[t1 ** 4 / 2 + 5 * t1 ** 3 / 24, 2 * t1 ** 3 / 3 + 5 * t1 ** 2 / 24], [3 * t1 ** 2, 2 * t1]])
+            b = np.concatenate([x_max, np.zeros_like(x_max)], axis=0)
+            a = np.linalg.inv(A) @ b
+            t_con_mat = np.concatenate([3 * (ts ** 2).reshape(-1, 1), 2 * ts.reshape(-1, 1)], axis=1)
+            fddx1 = t_con_mat @ a
+            fddx = np.concatenate([fddx1, np.zeros([num_con_vel, x_max.shape[1]]), -fddx1], axis=0).T
+            return fddx
 
-        t1 = self._ptb_act_time * 10/45
-        ts = np.arange(0, round(t1 / self.dt)) * self.dt
-        A = np.array([[t1**4 / 2 + 5*t1**3 / 24, 2*t1**3 / 3 + 5*t1**2 / 24], [3*t1**2, 2*t1]])
-        b = np.concatenate([x_max, np.zeros_like(x_max)], axis=0)
-        a = np.linalg.inv(A)@b
-        t_con_mat = np.concatenate([3*(ts**2).reshape(-1,1), 2*ts.reshape(-1,1)], axis=1)
-        fddx1 = t_con_mat @ a
-        fddx = np.concatenate([fddx1, np.zeros([25, x_max.shape[1]]), -fddx1], axis=0).T
+        t = self._ptb_act_time * np.linspace(0, 1, round(self._ptb_act_time / self.dt))
+        if self._ptb_type == "5th":
+            A = np.array([[self._ptb_act_time ** 3, self._ptb_act_time ** 4, self._ptb_act_time ** 5],
+                          [3, 4 * self._ptb_act_time, 5 * self._ptb_act_time ** 2],
+                          [6, 12 * self._ptb_act_time, 20 * self._ptb_act_time ** 2]])
+            b = np.concatenate([x_max, np.zeros_like(x_max), np.zeros_like(x_max)], axis=0)
+            a = np.linalg.inv(A)@b
+
+            t_con_mat = np.concatenate([np.ones([round(self._ptb_act_time/self.dt), 1]), t.reshape(-1, 1), (t**2).reshape(-1, 1)], axis=1)
+            fddx = t*(t_con_mat @ np.diag(np.array([6.0, 12.0, 20.0])) @ a).T  # 가속도 5차 regression
+        elif self._ptb_type == "3rd":
+            fddx = ((6 * (1 - 2*t / self._ptb_act_time) / self._ptb_act_time**2)[:,None] * x_max).T
+        else:
+            raise Exception("Perturbation type not supported")
 
         return fddx
 
