@@ -604,22 +604,31 @@ def compute_postural_reward(
         raise Exception("undefined constraint type")
 
     if cost_type == 0:
-        rew = -stcost_ratio * torch.sum(
-            ((1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2 + vel_ratio * obs_buf[:, 2:4] ** 2), dim=1)
+        rew = -stcost_ratio * torch.sum(torch.cat([
+            (1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2,
+            vel_ratio * obs_buf[:, 2:4] ** 2], dim=1),
+            dim=1)
     elif cost_type == 1:
-        com = (mass[1] * com_len[1] * torch.sin(obs_buf[:, 0]) +
-               mass[2] * (seg_len[1] * torch.sin(obs_buf[:, 0]) + com_len[2] * torch.sin(obs_buf[:, :2].sum(dim=1)))
+        com = (mass[1] * com_len[1] * torch.sin(obs_buf[:, [0]]) +
+               mass[2] * (seg_len[1] * torch.sin(obs_buf[:, [0]]) + com_len[2] * torch.sin(obs_buf[:, :2].sum(dim=1, keepdim=True)))
                ) / mass[1:].sum()
-        rew = -stcost_ratio * torch.sum(
-            (1 - vel_ratio) * (0.5 * com ** 2 + 0.5 * ank_ratio * obs_buf[:, :2] ** 2) +
-            vel_ratio * obs_buf[:, 2:4] ** 2, dim=1)
+        rew = -stcost_ratio * torch.sum(torch.cat([
+            (1 - vel_ratio) * 0.5 * com ** 2,
+            (1 - vel_ratio) * 0.5 * ank_ratio * obs_buf[:, :2] ** 2,
+            vel_ratio * obs_buf[:, 2:4] ** 2], dim=1),
+            dim=1)
     elif cost_type == 2:
-        rew = 0.0 * torch.sum(tq_ratio * actions ** 2, dim=1)
+        rew = 0.0 * torch.sum(torch.cat([
+            (1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2,
+            vel_ratio * obs_buf[:, 2:4] ** 2], dim=1),
+            dim=1)
     elif cost_type == 3:
-        cop = (foot_forces[:, 4] + 0.08*foot_forces[:, 0]) / -foot_forces[:, 2]
-        rew = -stcost_ratio * torch.sum(
-            (1 - vel_ratio) * (0.5 * cop ** 2 + 0.5 * ank_ratio * obs_buf[:, :2] ** 2) +
-            vel_ratio * obs_buf[:, 2:4] ** 2, dim=1)
+        cop = (foot_forces[:, [4]] + 0.08*foot_forces[:, [0]]) / -foot_forces[:, [2]]
+        rew = -stcost_ratio * torch.sum(torch.cat([
+            (1 - vel_ratio) * 0.5 * cop ** 2,
+            (1 - vel_ratio) * 0.5 * ank_ratio * obs_buf[:, :2] ** 2,
+            vel_ratio * obs_buf[:, 2:4] ** 2], dim=1),
+            dim=1)
     else:
         raise Exception("undefined cost type")
 
