@@ -496,7 +496,6 @@ class IDPMinEffortDet(IDPMinEffort):
                 device=self.device,
             )
         self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
-        self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.delayed_time = 0.1
         if "st_ptb_idx" in kwargs['cfg']['env'].keys():
             self.ptb_idx += kwargs['cfg']['env']["st_ptb_idx"]
@@ -557,18 +556,54 @@ class IDPMinEffortHuman(IDPMinEffort):
         self._ptb_range = to_torch(ptb_range, device=self.device)
 
 
+class IDPLeanAndReleaseDet(IDPMinEffortDet):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._ptb_range = to_torch(self._cal_ptb_acc(np.array([0.0]).reshape(1, -1)), device=self.device)
+        self.target_lean_angle = to_torch(np.array(np.deg2rad([[1.25, -0.625], [2.5, -1.25], [3.75, -1.875], [5, -2.5]])), device=self.device)
+        self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
+        self.lean_idx = to_torch(np.arange(self.num_envs) % self.target_lean_angle.shape[0], dtype=torch.int64, device=self.device)
+        self.lean_angle_torch = self.target_lean_angle[self.lean_idx.reshape(-1, 1), np.arange(2)]
+
+    def reset_idx(self, env_ids):
+        self.ptb_st_idx[...] = round(1 /(3 * self.dt))
+        self._ptb[...] = 0
+        self.lean_angle_torch[env_ids, :] = self.target_lean_angle[self.lean_idx[env_ids.unsqueeze(1)], np.arange(2)]
+
+        self.dof_pos[env_ids, :] = self.lean_angle_torch[env_ids, :]
+        self.dof_vel[env_ids, :] = 0.0
+        env_ids_int32 = env_ids.to(dtype=torch.int32)
+
+        self.gym.set_dof_state_tensor_indexed(self.sim,
+                                              gymtorch.unwrap_tensor(self.dof_state),
+                                              gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+
+        self.delayed_act_buf[env_ids, ...] = fill_delayed_act_buf(
+            self.dof_pos[env_ids, :],
+            self.dof_vel[env_ids, :],
+            self.mass,
+            self.com,
+            self.len,
+            self._jnt_stiffness,
+            self._jnt_damping,
+            self.joint_gears,
+        )
+        self.actions[env_ids] = self.delayed_act_buf[env_ids, :, 0].clone()
+
+        self.reset_buf[env_ids] = 0
+        self.progress_buf[env_ids] = 0
+
+
 class IDPForwardPushDet(IDPMinEffortDet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
-        self._ptb_act_time = self._ptb_act_time.item()
         self._ptb_range = to_torch(
             self._cal_ptb_force(np.array([120, 140, 160, 180, 200]).reshape(-1, 1)),
             device=self.device,
         )
         self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
-        self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.delayed_time = 0.1
         if "st_ptb_idx" in kwargs['cfg']['env'].keys():
             self.ptb_idx += kwargs['cfg']['env']["st_ptb_idx"]
@@ -709,7 +744,7 @@ def compute_current_action(
         actions[update_or_not] = delayed_action
     actions[~update_or_not] = delayed_act_buf[~update_or_not, :, 0].clone()
     actions += (-(jnt_stiffness * dof_pos + jnt_damping * dof_vel) / joint_gears)
-    actions[~update_or_not] += (-(jnt_stiffness * (dof_pos[~update_or_not] - lean_ang) + jnt_damping * dof_vel[~update_or_not]) / joint_gears)
+    # actions[~update_or_not] += (-(jnt_stiffness * (dof_pos[~update_or_not] - lean_ang) + jnt_damping * dof_vel[~update_or_not]) / joint_gears)
     return actions, delayed_act_buf
 
 
