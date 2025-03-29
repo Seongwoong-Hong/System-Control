@@ -81,11 +81,10 @@ class PpoPlayerCustom(PpoPlayerContinuous):
                 done_count = th.logical_and(done, (n > self.env.max_episode_length // 2).cpu()).sum()
                 games_played += done_count
 
-                if len(done_indices) > 0:
+                if done_count > 0:
                     if self.is_rnn:
                         for s in self.states:
-                            s[:, all_done_indices, :] = s[:,
-                                                          all_done_indices, :] * 0.0
+                            s[:, all_done_indices, :] = s[:, all_done_indices, :] * 0.0
 
                     cur_rewards = cr[done_indices].sum().item()
                     cur_steps = steps[done_indices].sum().item()

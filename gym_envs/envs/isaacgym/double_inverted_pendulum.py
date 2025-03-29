@@ -52,7 +52,7 @@ class IDPMinEffort(VecTask):
             self.lean_angle = np.deg2rad(cfg['env']['upright_type'] * 1.0)
         else:
             self.lean_angle = 0.0
-        self.lean_angle_torch = to_torch([self.lean_angle, -0.5*self.lean_angle], device=self.device)
+        self.lean_angle_torch = to_torch([self.lean_angle, -0.5*self.lean_angle], device=self.device).repeat(self.num_envs, 1)
         self.act_delay_idx = to_torch(round(self.act_delay_time / self.dt) * np.ones([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         self.is_act_delayed = to_torch(self.is_act_delayed, device=self.device)
@@ -76,7 +76,7 @@ class IDPMinEffort(VecTask):
         if self.const_type == 0:
             self.const_max_val = to_torch([0.16, -0.08], device=self.device)
         elif self.const_type == 1:
-            self.const_max_val = to_torch(np.array([self.ankle_torque_max, -self.ankle_torque_max]), device=self.device) / self.joint_gears[0]
+            self.const_max_val = to_torch(np.array([0.5*self.ankle_torque_max, -self.ankle_torque_max]), device=self.device) / self.joint_gears[0]
         else:
             raise Exception("undefined constraint type")
 
@@ -293,7 +293,10 @@ class IDPMinEffort(VecTask):
             self.cuda_arange,
         )
 
-        self.dof_pos[env_ids, :] = self.lean_angle_torch
+        lean_angle = torch_rand_float(0, self.lean_angle, shape=(len(env_ids), 1), device=self.device)
+        self.lean_angle_torch[env_ids, 0] = lean_angle[:, 0]
+        self.lean_angle_torch[env_ids, 1] = -0.5 * lean_angle[:, 0]
+        self.dof_pos[env_ids, :] = self.lean_angle_torch[env_ids, :]
         self.dof_vel[env_ids, :] = 0.0
         env_ids_int32 = env_ids.to(dtype=torch.int32)
 
@@ -503,12 +506,12 @@ class IDPMinEffortDet(IDPMinEffort):
     def reset_idx(self, env_ids):
         st_idx = round(1 /(3 * self.dt))
         ed_idx = st_idx + self._ptb_range.shape[1]
-        self.ptb_st_idx[...] = st_idx
-        self._ptb[...] = 0
+        self.ptb_st_idx[env_ids] = st_idx
+        self._ptb[env_ids] = 0
         self._ptb[env_ids, st_idx:ed_idx] = self._ptb_range[self.ptb_idx[env_ids.unsqueeze(1)], np.arange(self._ptb_range.shape[1])]
         self.ptb_idx[env_ids] = (self.ptb_idx[env_ids] + self.num_envs) % self._ptb_range.shape[0]
 
-        self.dof_pos[env_ids, :] = self.lean_angle_torch
+        self.dof_pos[env_ids, :] = self.lean_angle_torch[env_ids, :]
         self.dof_vel[env_ids, :] = 0.0
         env_ids_int32 = env_ids.to(dtype=torch.int32)
 
@@ -556,11 +559,70 @@ class IDPMinEffortHuman(IDPMinEffort):
         self._ptb_range = to_torch(ptb_range, device=self.device)
 
 
+class IDPLeanAndRelease(IDPMinEffort):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_episode_length = round(3 / self.dt)
+        self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
+        self.init_vel = 0
+
+    def reset_idx(self, env_ids):
+        self.ptb_st_idx[...] = 0
+        self._ptb[...] = 0
+
+        th1 = torch_rand_float(np.deg2rad(5), np.deg2rad(-5), shape=(len(env_ids), 1), device=self.device)
+        th2 = torch_rand_float(np.deg2rad(5), np.deg2rad(-5), shape=(len(env_ids), 1), device=self.device)
+        dth1 = torch_rand_float(np.deg2rad(self.init_vel), np.deg2rad(-self.init_vel), shape=(len(env_ids), 1), device=self.device)
+        dth2 = torch_rand_float(np.deg2rad(2*self.init_vel), np.deg2rad(-2*self.init_vel), shape=(len(env_ids), 1), device=self.device)
+        self.dof_pos[env_ids, 0] = th1[:, 0]
+        self.dof_pos[env_ids, 1] = th2[:, 0]
+        self.dof_vel[env_ids, 0] = dth1[:, 0]
+        self.dof_vel[env_ids, 1] = dth2[:, 0]
+
+        env_ids_int32 = env_ids.to(dtype=torch.int32)
+
+        self.gym.set_dof_state_tensor_indexed(self.sim,
+                                              gymtorch.unwrap_tensor(self.dof_state),
+                                              gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+
+        act_delay_time = torch_rand_float(
+            self.act_delay_time*(1 - self.delay_randomize),
+            self.act_delay_time*(1 + self.delay_randomize),
+            shape=(len(env_ids), 1), device=self.device,
+        )
+        self.act_delay_idx[env_ids] = (act_delay_time / self.dt).round().to(dtype=torch.int64, device=self.device)
+        noise_time = torch_rand_float(-self.act_delay_time, 0, shape=(len(env_ids), 1), device=self.device)
+        self.ptb_st_idx[env_ids] += (noise_time / self.dt - 1).round().to(dtype=torch.int64, device=self.device)
+
+        self.delayed_act_buf[env_ids, ...] = fill_delayed_act_buf(
+            self.dof_pos[env_ids, :],
+            self.dof_vel[env_ids, :],
+            self.mass,
+            self.com,
+            self.len,
+            self._jnt_stiffness,
+            self._jnt_damping,
+            self.joint_gears,
+        )
+        self.actions[env_ids] = self.delayed_act_buf[env_ids, :, 0].clone()
+        if self.action_as_state:
+            self.obs_buf[env_ids, 4:] = self.delayed_act_buf[env_ids, :, :-1].permute(0, 2, 1).reshape(len(env_ids), -1)
+        self.reset_buf[env_ids] = 0
+        self.progress_buf[env_ids] = 0
+        self.obs_traj[env_ids] = 0
+        self.act_traj[env_ids] = 0
+        self.tqr_traj[env_ids] = 0
+        self.extras['torque_rate'][env_ids] = 0
+        self.extras['ddtq'][env_ids] = 0
+
+
 class IDPLeanAndReleaseDet(IDPMinEffortDet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._ptb_range = to_torch(self._cal_ptb_acc(np.array([0.0]).reshape(1, -1)), device=self.device)
-        self.target_lean_angle = to_torch(np.array(np.deg2rad([[1.25, -0.625], [2.5, -1.25], [3.75, -1.875], [5, -2.5]])), device=self.device)
+        self.target_lean_angle = to_torch(np.array(np.deg2rad(
+            [[1.25, -0.625], [2.5, -1.25], [3.75, -1.875], [5, -2.5], [6.25, -3.125], [7.5, -3.75], [8.75, -4.375]]
+        )), device=self.device)
         self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
         self.lean_idx = to_torch(np.arange(self.num_envs) % self.target_lean_angle.shape[0], dtype=torch.int64, device=self.device)
         self.lean_angle_torch = self.target_lean_angle[self.lean_idx.reshape(-1, 1), np.arange(2)]
@@ -600,7 +662,7 @@ class IDPForwardPushDet(IDPMinEffortDet):
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
         self._ptb_range = to_torch(
-            self._cal_ptb_force(np.array([120, 140, 160, 180, 200]).reshape(-1, 1)),
+            self._cal_ptb_force(np.array([40, 60, 80, 100, 120]).reshape(-1, 1)),
             device=self.device,
         )
         self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
@@ -691,13 +753,16 @@ def compute_postural_reward(
         raise Exception(f"Unexpected ankle limit type")
 
 
-    fall_reset = torch.where(low[0] > obs_buf[:, 0], torch.ones_like(reset), torch.zeros_like(reset))
-    fall_reset = torch.where(obs_buf[:, 0] > high[0], torch.ones_like(reset), fall_reset)
-    fall_reset = torch.where(low[1] > obs_buf[:, 1], torch.ones_like(reset), fall_reset)
-    fall_reset = torch.where(obs_buf[:, 1] > high[1], torch.ones_like(reset), fall_reset)
+    # fall_reset = torch.where(low[0] > obs_buf[:, 0], torch.ones_like(reset), torch.zeros_like(reset))
+    # fall_reset = torch.where(obs_buf[:, 0] > high[0], torch.ones_like(reset), fall_reset)
+    # fall_reset = torch.where(low[1] > obs_buf[:, 1], torch.ones_like(reset), fall_reset)
+    # fall_reset = torch.where(obs_buf[:, 1] > high[1], torch.ones_like(reset), fall_reset)
+    comy_torso = mass[2] * (seg_len[1] * torch.cos(obs_buf[:, 0]) + com_len[2] * torch.cos(obs_buf[:, :2].sum(dim=1)))
+
+    fall_reset = torch.where(comy_torso < 1.0, torch.ones_like(reset), torch.zeros_like(reset))
     r_penalty = torch.where(fall_reset.to(torch.bool), torch.ones_like(r_penalty) + r_penalty, r_penalty)
 
-    torque_rate_const = torch.max((torque_rate / (tqr_limit / 1.25)) ** 2 - 1, torch.tensor(0.0))
+    torque_rate_const = torch.max((torque_rate / tqr_limit) ** 2 - 1, torch.tensor(0.0))
     r_penalty += tqrate_ratio * torch.sum(torque_rate_const, dim=1)
 
     reset = torch.where(fall_reset.to(torch.bool), torch.ones_like(reset), reset)
