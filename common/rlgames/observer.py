@@ -128,9 +128,9 @@ class DrawTimeTrajObserver(PlayerObserver):
         obs = torch.concat([self.algo.env.dof_pos, self.algo.env.dof_vel], dim=-1)
         self.obs = torch.concat([self.obs, obs[None, ...].clone()], dim=0)
         if hasattr(self.algo.env, "act_traj"):
-            acts = torch.clamp(self.algo.env.act_traj[torch.arange(self.algo.env.num_envs), self.algo.env.progress_buf, :], min=-1.0, max=1.0)
+            acts = torch.clamp(self.algo.env.act_traj[torch.arange(self.algo.env.num_envs), self.algo.env.progress_buf, :], min=-self.algo.env.clip_actions, max=self.algo.env.clip_actions)
         elif hasattr(self.algo.env, "actions"):
-            acts = torch.clamp(self.algo.env.actions, min=-1.0, max=1.0)
+            acts = torch.clamp(self.algo.env.actions, min=-self.algo.env.clip_actions, max=self.algo.env.clip_actions)
         else:
             acts = self.algo.get_action(obs, self.algo.is_deterministic)
         self.acts = torch.concat([self.acts, acts[None, ...].clone()], dim=0)
