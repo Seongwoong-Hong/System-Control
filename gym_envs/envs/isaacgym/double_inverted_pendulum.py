@@ -54,7 +54,7 @@ class IDPMinEffort(VecTask):
             self.lean_angle = np.deg2rad(cfg['env']['upright_type'] * 1.0)
         else:
             self.lean_angle = 0.0
-        self.lean_angle_torch = to_torch([self.lean_angle, -0.5*self.lean_angle], device=self.device).repeat(self.num_envs, 1)
+        self.lean_angle_torch = to_torch([self.lean_angle, 0.5*self.lean_angle], device=self.device).repeat(self.num_envs, 1)
         self.act_delay_idx = to_torch(round(self.act_delay_time / self.dt) * np.ones([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         self.is_act_delayed = to_torch(self.is_act_delayed, device=self.device)
@@ -507,6 +507,7 @@ class IDPMinEffortDet(IDPMinEffort):
         else:
             self._ptb_range = to_torch(
                 self._cal_ptb_acc(-np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15]).reshape(1, -1)),
+                # self._cal_ptb_acc(-np.array([0.12, 0.135, 0.15, 0.165, 0.18, 0.195, 0.21]).reshape(1, -1)),
                 device=self.device,
             )
         self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
@@ -572,7 +573,7 @@ class IDPLeanAndRelease(IDPMinEffort):
         super().__init__(*args, **kwargs)
         self.max_episode_length = round(3 / self.dt)
         self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
-        self.init_vel = 0
+        self.init_vel = 10
 
     def reset_idx(self, env_ids):
         self.ptb_st_idx[...] = 0
