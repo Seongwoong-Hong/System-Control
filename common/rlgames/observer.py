@@ -84,6 +84,7 @@ class DrawTimeTrajObserver(PlayerObserver):
         self.infos = {}
         self.fig = None
         self.fig_path = None
+        self.mat_path = None
 
     def before_run(self):
         if self.fig is None:
