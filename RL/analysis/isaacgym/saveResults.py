@@ -2,7 +2,8 @@ import subprocess
 
 from common.path_config import MAIN_DIR
 
-save_dir = MAIN_DIR / "RL" / "analysis" / "MATLAB" / "IDPMinEffort"
+figure_dir = MAIN_DIR / "RL" / "analysis" / "figure"
+matlab_dir = MAIN_DIR / "RL" / "analysis" / "MATLAB" / "IDPMinEffort"
 target_dir = MAIN_DIR / "RL" / "scripts" / "rlgames"
 
 
@@ -16,6 +17,14 @@ if __name__ == "__main__":
             checkpoint_format = checkpoint_base / sweep_type / "limLevel50_upright0" / "atm90_as250"
             file_paths = list(checkpoint_format.glob("IDP_*/nn/IDP.pth"))
             for idx, file_path in enumerate(file_paths):
-                mat_path = save_dir / trial_type / "upright" / f"{sweep_type}_{idx}" / "sub10"
+                fig_path = figure_dir / trial_type / "lean" / f"{sweep_type}_{idx}.png"
+                mat_path = matlab_dir / trial_type / "lean" / f"{sweep_type}_{idx}" / "sub10"
+
+                fig_path.parent.mkdir(parents=True, exist_ok=True)
                 mat_path.mkdir(parents=True, exist_ok=True)
-                subprocess.run(["python", script_path, f"checkpoint={str(file_path)}", f"avg_coeff=0.05", f"mat_path={str(mat_path)}", "save_mat=True", "show_fig=False"])
+
+                subprocess.run([
+                    "python", script_path, f"checkpoint={str(file_path)}", "show_fig=False",
+                     f"fig_path={str(fig_path)}", "save_fig=True",
+                     f"mat_path={str(mat_path)}", "save_mat=True",
+                ])
