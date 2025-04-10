@@ -298,7 +298,7 @@ class IDPMinEffort(VecTask):
 
         lean_angle = torch_rand_float(0, self.lean_angle, shape=(len(env_ids), 1), device=self.device)
         self.lean_angle_torch[env_ids, 0] = lean_angle[:, 0]
-        self.lean_angle_torch[env_ids, 1] = -0.5 * lean_angle[:, 0]
+        self.lean_angle_torch[env_ids, 1] = 0.5 * lean_angle[:, 0]
         self.dof_pos[env_ids, :] = self.lean_angle_torch[env_ids, :]
         self.dof_vel[env_ids, :] = 0.0
         env_ids_int32 = env_ids.to(dtype=torch.int32)
