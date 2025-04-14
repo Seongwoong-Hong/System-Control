@@ -54,7 +54,7 @@ class IDPMinEffort(VecTask):
             self.lean_angle = np.deg2rad(cfg['env']['upright_type'] * 1.0)
         else:
             self.lean_angle = 0.0
-        self.lean_angle_torch = to_torch([self.lean_angle, 0.5*self.lean_angle], device=self.device).repeat(self.num_envs, 1)
+        self.lean_angle_torch = to_torch([self.lean_angle, 2*self.lean_angle], device=self.device).repeat(self.num_envs, 1)
         self.act_delay_idx = to_torch(round(self.act_delay_time / self.dt) * np.ones([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         self.is_act_delayed = to_torch(self.is_act_delayed, device=self.device)
