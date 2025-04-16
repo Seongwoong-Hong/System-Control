@@ -94,9 +94,7 @@ if __name__ == '__main__':
     env = make_env(
         "IDP_MinEffort-v0",
         bsp = bsp,
-        ankle_torque_max=200,
-        stiffness=[500, 600],
-        damping=[200, 150],
+        ankle_torque_max=90,
         delay=True,
         ankle_limit="satu",
         humanStates=states,

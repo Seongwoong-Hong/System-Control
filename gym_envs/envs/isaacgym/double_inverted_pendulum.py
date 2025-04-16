@@ -556,16 +556,48 @@ class IDPMinEffortHumanDet(IDPMinEffortDet):
         self._ptb_range = to_torch(ptb_range, device=self.device)
 
 
-class IDPMinEffortHuman(IDPMinEffort):
+class IDPMinEffortHumanLeanDet(IDPMinEffortDet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from common.path_config import MAIN_DIR
-        subpath = MAIN_DIR / "demos" / "IDP" / "sub10" / "sub10"
-        ptb_range = []
-        for i in range(7):
-            humanData = io.loadmat(str(subpath) + f"i{(i + 1)*5}.mat")
-            ptb_range.append(humanData["pltdd"][40:85].squeeze())
-        self._ptb_range = to_torch(ptb_range, device=self.device)
+        subpath = MAIN_DIR / "demos" / "IDPLean" / "sub10" / "sub10"
+        init_state = []
+        for i in range(5):
+            for j in range(7):
+                humanData = io.loadmat(str(subpath) + f"i{(i + j*5 + 1)}.mat")
+                init_state.append(-humanData["state"][:40, :2].mean(axis=0).squeeze())
+        self.lean_angle_torch = to_torch(init_state, device=self.device)
+        self.trial_idx = to_torch(np.arange(self.num_envs) % 35, dtype=torch.int64, device=self.device)
+
+
+    def reset_idx(self, env_ids):
+        st_idx = round(1 /(3 * self.dt))
+        ed_idx = st_idx + self._ptb_range.shape[1]
+        self.ptb_st_idx[env_ids] = st_idx
+        self._ptb[env_ids] = 0
+        self._ptb[env_ids, st_idx:ed_idx] = self._ptb_range[self.trial_idx[env_ids.unsqueeze(1)] % 7, np.arange(self._ptb_range.shape[1])]
+
+        self.dof_pos[env_ids, :] = self.lean_angle_torch[self.trial_idx[env_ids], :]
+        self.dof_vel[env_ids, :] = 0.0
+
+        self.trial_idx[env_ids] = (self.trial_idx[env_ids] + self.num_envs) % self._ptb_range.shape[0]
+        env_ids_int32 = env_ids.to(dtype=torch.int32)
+
+        self.gym.set_dof_state_tensor_indexed(self.sim,
+                                              gymtorch.unwrap_tensor(self.dof_state),
+                                              gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+
+        self.delayed_act_buf[env_ids, ...] = fill_delayed_act_buf(
+            self.dof_pos[env_ids, :],
+            self.dof_vel[env_ids, :],
+            self.mass,
+            self.com,
+            self.len,
+            self._jnt_stiffness,
+            self._jnt_damping,
+            self.joint_gears,
+        )
+        self.reset_param_buffers(env_ids)
 
 
 class IDPLeanAndRelease(IDPMinEffort):
