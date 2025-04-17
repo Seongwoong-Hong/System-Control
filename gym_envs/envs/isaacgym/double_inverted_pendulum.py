@@ -54,7 +54,7 @@ class IDPMinEffort(VecTask):
             self.lean_angle = np.deg2rad(cfg['env']['upright_type'] * 1.0)
         else:
             self.lean_angle = 0.0
-        self.lean_angle_torch = to_torch([self.lean_angle, 2*self.lean_angle], device=self.device).repeat(self.num_envs, 1)
+        self.lean_angle_torch = to_torch([self.lean_angle, 0.5*self.lean_angle], device=self.device).repeat(self.num_envs, 1)
         self.act_delay_idx = to_torch(round(self.act_delay_time / self.dt) * np.ones([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         self.is_act_delayed = to_torch(self.is_act_delayed, device=self.device)
@@ -297,8 +297,9 @@ class IDPMinEffort(VecTask):
         )
 
         lean_angle = torch_rand_float(0, self.lean_angle, shape=(len(env_ids), 1), device=self.device)
+        hip_ratio = torch_rand_float(0.5, 2.0, shape=(len(env_ids), 1), device=self.device)
         self.lean_angle_torch[env_ids, 0] = lean_angle[:, 0]
-        self.lean_angle_torch[env_ids, 1] = 0.5 * lean_angle[:, 0]
+        self.lean_angle_torch[env_ids, 1] = hip_ratio[:, 0] * lean_angle[:, 0]
         self.dof_pos[env_ids, :] = self.lean_angle_torch[env_ids, :]
         self.dof_vel[env_ids, :] = 0.0
         env_ids_int32 = env_ids.to(dtype=torch.int32)
@@ -549,11 +550,13 @@ class IDPMinEffortHumanDet(IDPMinEffortDet):
         super().__init__(*args, **kwargs)
         from common.path_config import MAIN_DIR
         subpath = MAIN_DIR / "demos" / "IDP" / "sub10" / "sub10"
-        ptb_range = []
-        for i in range(7):
-            humanData = io.loadmat(str(subpath) + f"i{(i + 1)*5}.mat")
-            ptb_range.append(humanData["pltdd"][40:85].squeeze())
-        self._ptb_range = to_torch(ptb_range, device=self.device)
+        init_state = []
+        for i in range(5):
+            for j in range(7):
+                humanData = io.loadmat(str(subpath) + f"i{(i + j*5 + 1)}.mat")
+                init_state.append(-humanData["state"][:40, :2].mean(axis=0).squeeze())
+        self.lean_angle_torch = to_torch(init_state, device=self.device)
+        self.trial_idx = to_torch(np.arange(self.num_envs) % 35, dtype=torch.int64, device=self.device)
 
 
 class IDPMinEffortHumanLeanDet(IDPMinEffortDet):
