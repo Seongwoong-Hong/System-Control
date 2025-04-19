@@ -565,12 +565,14 @@ class IDPMinEffortHumanLeanDet(IDPMinEffortDet):
         from common.path_config import MAIN_DIR
         subpath = MAIN_DIR / "demos" / "IDPLean" / "sub10" / "sub10"
         init_state = []
-        for i in range(5):
-            for j in range(7):
-                humanData = io.loadmat(str(subpath) + f"i{(i + j*5 + 1)}.mat")
-                init_state.append(-humanData["state"][:40, :2].mean(axis=0).squeeze())
+        for i in range(7):
+            st = np.zeros(2)
+            for j in range(5):
+                humanData = io.loadmat(str(subpath) + f"i{(i*5 + j + 1)}.mat")
+                st += -humanData["state"][:40, :2].mean(axis=0).squeeze() / 5
+            init_state.append(st)
         self.lean_angle_torch = to_torch(init_state, device=self.device)
-        self.trial_idx = to_torch(np.arange(self.num_envs) % 35, dtype=torch.int64, device=self.device)
+        self.trial_idx = to_torch(np.arange(self.num_envs) % 7, dtype=torch.int64, device=self.device)
 
 
     def reset_idx(self, env_ids):
