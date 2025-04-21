@@ -548,6 +548,10 @@ class IDPMinEffortDet(IDPMinEffort):
 class IDPMinEffortHumanDet(IDPMinEffortDet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._ptb_range = to_torch(
+            self._cal_ptb_acc(-np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15]).reshape(1, -1)),
+            device=self.device,
+        )
         from common.path_config import MAIN_DIR
         subpath = MAIN_DIR / "demos" / "IDP" / "sub10" / "sub10"
         init_state = []
@@ -562,6 +566,10 @@ class IDPMinEffortHumanDet(IDPMinEffortDet):
 class IDPMinEffortHumanLeanDet(IDPMinEffortDet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._ptb_range = to_torch(
+            self._cal_ptb_acc(-np.array([0.012, 0.024, 0.036, 0.048, 0.07, 0.09, 0.12]).reshape(1, -1)),
+            device=self.device,
+        )
         from common.path_config import MAIN_DIR
         subpath = MAIN_DIR / "demos" / "IDPLean" / "sub10" / "sub10"
         init_state = []
