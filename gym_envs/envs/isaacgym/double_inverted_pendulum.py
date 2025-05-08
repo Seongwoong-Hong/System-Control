@@ -771,7 +771,7 @@ def compute_postural_reward(
     else:
         raise Exception("undefined cost type")
 
-    rew -= tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
+    rew -= (1 - tqrate_ratio) * tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
     rew += 1
 
     r_penalty = torch.zeros_like(rew, dtype=torch.float)
