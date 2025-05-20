@@ -297,7 +297,7 @@ class IDPMinEffort(VecTask):
         )
 
         lean_angle = torch_rand_float(0, self.lean_angle, shape=(len(env_ids), 1), device=self.device)
-        hip_ratio = torch_rand_float(1.0, 2.0, shape=(len(env_ids), 1), device=self.device)
+        hip_ratio = torch_rand_float(0.0, 2.0, shape=(len(env_ids), 1), device=self.device)
         self.lean_angle_torch[env_ids, 0] = lean_angle[:, 0]
         self.lean_angle_torch[env_ids, 1] = hip_ratio[:, 0] * lean_angle[:, 0]
         self.dof_pos[env_ids, :] = self.lean_angle_torch[env_ids, :]
@@ -666,7 +666,7 @@ class IDPLeanAndReleaseDet(IDPMinEffortDet):
         super().__init__(*args, **kwargs)
         self._ptb_range = to_torch(self._cal_ptb_acc(np.array([0.0]).reshape(1, -1)), device=self.device)
         self.target_lean_angle = to_torch(np.array(np.deg2rad(
-            [[1.25, -0.625], [2.5, -1.25], [3.75, -1.875], [5, -2.5], [6.25, -3.125], [7.5, -3.75], [8.75, -4.375]]
+            [[0.5, 1.0], [1.0, 2.0], [1.5, 3.0], [2, 4], [2.5, 5], [3.0, 6.0], [3.5, 7]]
         )), device=self.device)
         self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
         self.lean_idx = to_torch(np.arange(self.num_envs) % self.target_lean_angle.shape[0], dtype=torch.int64, device=self.device)
@@ -776,7 +776,7 @@ def compute_postural_reward(
 
     r_penalty = torch.zeros_like(rew, dtype=torch.float)
     if ankle_limit_type == 0:
-        reset = torch.zeros_like(reset_buf, dtype=torch.long)
+        reset = reset_buf.clone()
     elif ankle_limit_type == 1:
         # reset = torch.zeros_like(reset_buf, dtype=torch.long)
         reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
