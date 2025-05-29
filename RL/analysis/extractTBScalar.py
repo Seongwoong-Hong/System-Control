@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 from tensorboard.backend.event_processing import event_accumulator
 
 log_dir = "/home/hsw/workspace/System-Control/RL/scripts/rlgames/runs/TorqueSweepSlow/limLevel50_upright0/atm90_as250/IDP_2025-04-20_08-16-17/summaries/events.out.tfevents.1745136977.lab7040"
@@ -16,6 +17,7 @@ if __name__ == "__main__":
             sweep_type = f"avg_coeff{sw1:.2f}_tqrate_ratio{sw2:.2f}"
             checkpoint_format = checkpoint_base / sweep_type / "limLevel50_upright0" / "atm90_as250"
             file_paths = list(checkpoint_format.glob("IDP_*/summaries/events.out.tfevents.*"))
+            trial_values = []
             for idx, file_path in enumerate(file_paths):
                 ea = event_accumulator.EventAccumulator(str(file_path))
                 ea.Reload()
@@ -25,3 +27,5 @@ if __name__ == "__main__":
                 for e in events:
                     values.append(e.value)
                     steps.append(e.step)
+                trial_values.append(values)
+
