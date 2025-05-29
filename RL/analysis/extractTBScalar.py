@@ -1,7 +1,6 @@
 from matplotlib import pyplot as plt
+from scipy import io
 from tensorboard.backend.event_processing import event_accumulator
-
-log_dir = "/home/hsw/workspace/System-Control/RL/scripts/rlgames/runs/TorqueSweepSlow/limLevel50_upright0/atm90_as250/IDP_2025-04-20_08-16-17/summaries/events.out.tfevents.1745136977.lab7040"
 
 from common.path_config import MAIN_DIR
 
@@ -19,13 +18,20 @@ if __name__ == "__main__":
             file_paths = list(checkpoint_format.glob("IDP_*/summaries/events.out.tfevents.*"))
             trial_values = []
             for idx, file_path in enumerate(file_paths):
+                mat_path = matlab_dir / trial_type / "upright" / f"{sweep_type}_{idx}" / "sub10"
+                if not mat_path.is_dir():
+                    mat_path.mkdir(exist_ok=True, parents=True)
                 ea = event_accumulator.EventAccumulator(str(file_path))
                 ea.Reload()
-                events = ea.Scalars("rewards/step")
+                events = ea.Scalars("episode_lengths/step")
                 values = []
                 steps = []
                 for e in events:
                     values.append(e.value)
                     steps.append(e.step)
-                trial_values.append(values)
 
+                data = {
+                    'episode_length': values,
+                    'steps': steps,
+                }
+                io.savemat(f"{mat_path}/tensorboard.mat", data)
