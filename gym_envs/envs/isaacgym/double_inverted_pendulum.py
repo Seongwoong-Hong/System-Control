@@ -382,14 +382,17 @@ class IDPMinEffort(VecTask):
             self.act_delay_idx
         )
         self.actions = current_actions.to(self.device).clone()
-        self.extras['ddtq'] = (self.actions - self.prev_actions) / self.dt - self.extras['torque_rate']
-        i, j = np.arange(self.delayed_act_buf.shape[0]).reshape(-1, 1, 1), np.arange(self.delayed_act_buf.shape[1]).reshape(1, -1, 1)
-        k = self.act_delay_idx.view(-1, 1, 1)
-        self.extras['dd_acts'] = self.avg_coeff*(
-                (self.delayed_act_buf[i, j, k] - self.delayed_act_buf[i, j, k-1]) / self.dt -
-                (self.delayed_act_buf[i, j, k-1] - self.delayed_act_buf[i, j, k-2]) / self.dt
-        ).squeeze(-1) + (1 - self.avg_coeff)*self.extras['dd_acts']
-        self.extras['torque_rate'] = (self.actions - self.prev_actions) / self.dt
+        self.extras['ddtq'], self.extras['dd_acts'], self.extras['torque_rate'] = _compute_extras_jit(
+            self.delayed_act_buf,
+            self.act_delay_idx,
+            self.actions,
+            self.prev_actions,
+            self.extras['torque_rate'],
+            self.extras['dd_acts'],
+            self.dt,
+            self.avg_coeff,
+            self.device
+        )
         forces = self.actions * self.joint_gears
         self.prev_actions = self.actions.clone()
         self.gym.apply_rigid_body_force_tensors(self.sim, gymtorch.unwrap_tensor(self.ptb_forces), None, gymapi.ENV_SPACE)
@@ -454,12 +457,21 @@ class IDPMinEffort(VecTask):
         return filepath
 
     def process_actions(self, actions):
-        i, j, k = np.arange(self.num_envs).reshape(-1, 1, 1), np.arange(2).reshape(1, -1, 1), self.act_delay_idx.reshape(-1, 1, 1) - 1
+        # i, j, k = np.arange(self.num_envs).reshape(-1, 1, 1), np.arange(2).reshape(1, -1, 1), self.act_delay_idx.reshape(-1, 1, 1) - 1
+        # self.extras['sampled_action'] = actions.clone()
+        # return actions * self.avg_coeff + (1 - self.avg_coeff) * self.delayed_act_buf[i, j, k].to(self.device).clone().squeeze(-1)
         self.extras['sampled_action'] = actions.clone()
-        return actions * self.avg_coeff + (1 - self.avg_coeff) * self.delayed_act_buf[i, j, k].to(self.device).clone().squeeze(-1)
+        return _process_actions_jit(
+            actions,
+            self.delayed_act_buf,
+            self.act_delay_idx,
+            self.avg_coeff,
+            self.num_envs,
+            self.device
+        )
 
     def get_current_ptbs(self):
-        self.ptb_forces[:, :, 0] = -self.mass.view(1, -1) * self._ptb[np.arange(self.num_envs), self.progress_buf].view(-1, 1)
+        self.ptb_forces = _get_current_ptbs_jit(self.mass, self._ptb, self.progress_buf, self.ptb_forces)
 
     def reset_param_buffers(self, env_ids):
         self.actions[env_ids] = self.delayed_act_buf[env_ids, :, 0].clone() - (self._jnt_stiffness*self.dof_pos[env_ids] + self._jnt_damping*self.dof_vel[env_ids])/self.joint_gears
@@ -778,9 +790,9 @@ def compute_postural_reward(
     if ankle_limit_type == 0:
         reset = reset_buf.clone()
     elif ankle_limit_type == 1:
-        # reset = torch.zeros_like(reset_buf, dtype=torch.long)
-        reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
-        reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
+        reset = torch.zeros_like(reset_buf, dtype=torch.long)
+        # reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
+        # reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
         poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
         negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
 
@@ -788,6 +800,7 @@ def compute_postural_reward(
         #         1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] - 1) ** 2 + limLevel)))
         r_penalty = const_ratio * limLevel * (-1 / (limLevel + 1) + 1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel))
     elif ankle_limit_type == 2:
+        # reset = torch.zeros_like(reset_buf, dtype=torch.long)
         reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
         reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
         r_penalty = const_ratio * torch.where(reset.to(torch.bool), torch.ones_like(rew), torch.zeros_like(rew))
@@ -804,6 +817,8 @@ def compute_postural_reward(
     r_penalty = torch.where(fall_reset.to(torch.bool), torch.ones_like(r_penalty) + r_penalty, r_penalty)
 
     torque_rate_const = torch.max((torque_rate / tqr_limit) ** 2 - 1, torch.tensor(0.0))
+    # reset = torch.where(torque_rate[:, 0] >= 3, torch.ones_like(reset), reset)
+    # reset = torch.where(torque_rate[:, 1] >= 3, torch.ones_like(reset), reset)
     r_penalty += tqrate_ratio * torch.sum(torque_rate_const, dim=1)
 
     reset = torch.where(fall_reset.to(torch.bool), torch.ones_like(reset), reset)
@@ -869,3 +884,50 @@ def reset_ptb_acc(
     ptb_acc[:] = 0
     ptb_acc[torch.arange(len(env_ids)).unsqueeze(1), offsets] = ptb_acc_range[_ptb_idx, torch.arange(ptb_acc_range.shape[1]).unsqueeze(0)]
     return ptb_acc, cuda_arange[ptb_st_idx]
+
+
+@torch.jit.script
+def _compute_extras_jit(delayed_act_buf, act_delay_idx, actions, prev_actions, old_torque_rate, old_dd_acts, dt: float,
+                        avg_coeff: float, device: torch.device):
+    # ddtq와 torque_rate 계산
+    torque_rate = (actions - prev_actions) / dt
+    ddtq = torque_rate - old_torque_rate
+
+    # dd_acts 계산, np.arange를 torch.arange로 변경
+    i = torch.arange(delayed_act_buf.shape[0]).to(device).view(-1, 1, 1)
+    j = torch.arange(delayed_act_buf.shape[1]).to(device).view(1, -1, 1)
+    k = act_delay_idx.view(-1, 1, 1)
+
+    # delayed_act_buf에서 값을 가져올 때 인덱싱 범위 확인
+    # k-2가 0보다 작아지는 것을 방지하기 위해 k를 2 이상으로 클램핑하여 인덱싱
+    k_safe = torch.clamp(k, min=2)
+
+    dd_acts_new = (
+            (delayed_act_buf[i, j, k_safe] - delayed_act_buf[i, j, k_safe - 1]) / dt -
+            (delayed_act_buf[i, j, k_safe - 1] - delayed_act_buf[i, j, k_safe - 2]) / dt
+    ).squeeze(-1)
+
+    # k가 2보다 작은 경우, 원래 dd_acts 값을 유지하여 오류 방지
+    # k<2인 인덱스를 찾아서 해당 위치의 dd_acts_new 값을 old_dd_acts 값으로 대체
+    mask = (k < 2).squeeze()
+    dd_acts_new[mask] = old_dd_acts[mask]
+
+    dd_acts = avg_coeff * dd_acts_new + (1 - avg_coeff) * old_dd_acts
+
+    return ddtq, dd_acts, torque_rate
+
+
+@torch.jit.script
+def _process_actions_jit(actions, delayed_act_buf, act_delay_idx, avg_coeff: float, num_envs: int, device: torch.device):
+    i = torch.arange(num_envs).to(device).view(-1, 1, 1)
+    j = torch.arange(actions.shape[1]).to(device).view(1, -1, 1)
+    k = act_delay_idx.view(-1, 1, 1) - 1
+
+    processed_actions = actions * avg_coeff + (1 - avg_coeff) * delayed_act_buf[i, j, k].clone().squeeze(-1)
+    return processed_actions
+
+@torch.jit.script
+def _get_current_ptbs_jit(mass, ptb_buf, progress_buf, ptb_forces):
+    env_ids = torch.arange(ptb_buf.shape[0]).to(ptb_buf.device)
+    ptb_forces[:, :, 0] = -mass.view(1, -1) * ptb_buf[env_ids, progress_buf].view(-1, 1)
+    return ptb_forces
