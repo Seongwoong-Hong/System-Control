@@ -790,9 +790,9 @@ def compute_postural_reward(
     if ankle_limit_type == 0:
         reset = reset_buf.clone()
     elif ankle_limit_type == 1:
-        reset = torch.zeros_like(reset_buf, dtype=torch.long)
-        # reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
-        # reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
+        # reset = torch.zeros_like(reset_buf, dtype=torch.long)
+        reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
+        reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
         poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
         negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
 
