@@ -1,10 +1,4 @@
 # System-Control
 
-System-Control is intended to implement well-known control theories in the simulation environments such as gym, pybullet, etc.
-
-The Optimal Contorl, Reinforcement Learning and Inverse Reinforcement Learning are main themes of this project. This project may contain typical control systems such as robots, but the most interest in this project is about human control systems.
-
-Goals of this project:
-
-- Find the objective of human behaviour through IRL
-- Show the optimal control policy and RL optimal policy are same when use same objective 
+This project explores the principles of human motor control by modeling them through the lens of deep reinforcement learning.
+We aim to demonstrate that complex, efficient, and robust human-like control strategies can emerge from training an agent with simple, well-defined objectives in a physically realistic simulation.
