@@ -78,7 +78,9 @@ class PpoPlayerCustom(PpoPlayerContinuous):
 
                 all_done_indices = done.nonzero(as_tuple=False)
                 done_indices = all_done_indices[::self.num_agents]
-                done_count = th.logical_and(done, (n > self.env.max_episode_length // 2).cpu()).sum()
+                done_count = 0
+                if n > self.env.max_episode_length // 2:
+                    done_count = done.sum()
                 games_played += done_count
 
                 if done_count > 0:

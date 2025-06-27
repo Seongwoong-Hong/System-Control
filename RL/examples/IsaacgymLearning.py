@@ -337,11 +337,9 @@ def launch_rlg_hydra(cfg: DictConfig):
     if "IDP" in cfg.task.name:
         cfg_task_dict['env']['bsp_path'] = (MAIN_DIR / "demos" / cfg.task.env_type / cfg.task.subj / f"{cfg.task.subj}i1.mat")
         if cfg.task.env.ankle_limit == "satu":
-            name_head = "limSatu"
+            name_head = f"limSatuLevel{int(100*cfg.task.env.limLevel)}"
         elif cfg.task.env.ankle_limit == "hard":
-            name_head = "limHard"
-        elif cfg.task.env.ankle_limit == "soft":
-            name_head = f"limLevel{int(100*cfg.task.env.limLevel)}"
+            name_head = f"limHardLevel{int(100*cfg.task.env.limLevel)}"
         else:
             raise ValueError(f"Unknown ankle limit {cfg.task.env.ankle_limit}")
         name_head += f"_upright{cfg.task.env.curriculum.max_lean_angle}/atm{cfg.task.env.ankle_torque_max}_as{cfg.task.env.stiff_ank}"
