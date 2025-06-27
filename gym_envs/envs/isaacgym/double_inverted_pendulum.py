@@ -43,7 +43,6 @@ class IDPMinEffort(VecTask):
 
         self.cuda_arange = to_torch(np.arange(self.max_episode_length), dtype=torch.int64, device=self.device)
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
-        self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
         self.ptb_forces = to_torch(np.zeros([self.num_envs, self.num_bodies, 3]), device=self.device)
         self._ptb_range = to_torch(self._cal_ptb_acc(-self._ptb_range.reshape(1, -1)), device=self.device)
         self._ptb_act_idx = to_torch(round(self._ptb_act_time / self.dt), dtype=torch.int64, device=self.device)
@@ -61,23 +60,9 @@ class IDPMinEffort(VecTask):
         self._jnt_stiffness = to_torch(self._jnt_stiffness, device=self.device)
         self._jnt_damping = to_torch(self._jnt_damping, device=self.device)
 
-        self.stcost_ratio = to_torch(self.stcost_ratio, device=self.device)
-        self.tqcost_ratio = to_torch(self.tqcost_ratio, device=self.device)
-        self.tqrate_ratio = to_torch(self.tqrate_ratio, device=self.device)
-        self.const_ratio = to_torch(self.const_ratio, device=self.device)
-        self.ank_ratio = to_torch([self.ank_ratio, 1 - self.ank_ratio], device=self.device)
-        self.vel_ratio = to_torch(self.vel_ratio, device=self.device)
-        self.tq_ratio = to_torch([self.tq_ratio, 1 - self.tq_ratio], device=self.device)
-        self.ankle_limit = to_torch(self.ankle_limit, device=self.device)
-        self.const_type = to_torch(self.const_type, device=self.device)
-        self.cost_type = to_torch(self.cost_type, device=self.device)
-        self.limLevel = to_torch(self.limLevel, device=self.device)
-        if self.tqr_limit is not None:
-            self.tqr_limit = to_torch([self.tqr_limit], device=self.device)
-
-        if self.const_type == 0:
+        if self.const_type == "cop":
             self.const_max_val = to_torch([0.16, -0.04], device=self.device)
-        elif self.const_type == 1:
+        elif self.const_type == "ankle_torque":
             self.const_max_val = to_torch(self.clip_actions * np.array([0.4*self.ankle_torque_max, -self.ankle_torque_max]), device=self.device) / self.joint_gears[0]
         else:
             raise Exception("undefined constraint type")
@@ -125,7 +110,7 @@ class IDPMinEffort(VecTask):
             tq_ratio: float = 0.5,
             avg_coeff: float = 1.0,
             const_type: str = "cop",
-            limLevel: float = 0.0,
+            lim_level: float = 0.0,
             use_seg_ang: bool = False,
             action_as_state: bool = False,
             delay: bool = False,
@@ -140,14 +125,12 @@ class IDPMinEffort(VecTask):
             cost_type = None,
             **kwargs
     ):
-        self.limLevel = 10 ** (limLevel * ((-5) - (-2)) + (-2))
+        self.limLevel = 10 ** (lim_level * ((-5) - (-2)) + (-2))
         self.asset_path = os.path.join(os.path.dirname(__file__), "..", "assets", "IDP_isaacgym.xml")
 
         self._ptb_idx = 0
         self._next_ptb_idx = self._ptb_idx
-        self.ankle_limit = np.arange(3)[np.array(['satu', 'soft', 'hard']) == ankle_limit].item()
-        self.const_type = np.arange(2)[np.array(['cop', 'ankle_torque']) == const_type].item()
-        self.cost_type = np.arange(4)[np.array(['normal', 'com', 'reduced', 'cop']) == cost_type].item()
+
         if tqr_regularize_type not in ["torque_rate", "ddtq", "dd_acts"]:
             raise Exception("undefined tqr_regularize_type")
         self.tqr_regularize_type = tqr_regularize_type
@@ -174,6 +157,9 @@ class IDPMinEffort(VecTask):
         self._ptb_act_time = ptb_act_time
         self._ptb_type = ptb_type
 
+        self.ankle_limit = ankle_limit
+        self.const_type = const_type
+        self.cost_type = cost_type
         self.stcost_ratio = stcost_ratio
         self.tqcost_ratio = tqcost_ratio
         self.tqrate_ratio = tqrate_ratio
@@ -511,7 +497,6 @@ class IDPMinEffortDet(IDPMinEffort):
         super().__init__(*args, **kwargs)
         self.max_episode_length = round(3 / self.dt)
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
-        self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
         if self.lean_angle > 0.0:
             self._ptb_range = to_torch(
                 self._cal_ptb_acc(-np.array([0.012, 0.024, 0.036, 0.048, 0.07, 0.09, 0.12]).reshape(1, -1)),
@@ -629,7 +614,6 @@ class IDPLeanAndRelease(IDPMinEffort):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_episode_length = round(3 / self.dt)
-        self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
         self.init_vel = 10
 
     def reset_idx(self, env_ids):
@@ -714,7 +698,6 @@ class IDPForwardPushDet(IDPMinEffortDet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
-        self.max_episode_length = to_torch(self.max_episode_length, dtype=torch.int64, device=self.device)
         self._ptb_range = to_torch(
             self._cal_ptb_force(np.array([40, 60, 80, 100, 120]).reshape(-1, 1)),
             device=self.device,
@@ -740,26 +723,27 @@ class IDPForwardPushDet(IDPMinEffortDet):
 def compute_postural_reward(
         obs_buf, actions, torque_rate, foot_forces,
         reset_buf, progress_buf, ptb_st_idx,
-        stcost_ratio, tqcost_ratio, tqrate_ratio, const_ratio,
-        ank_ratio, vel_ratio, tq_ratio,
-        ankle_limit_type, const_max_val, limLevel,
-        high, low, max_episode_length,
-        com_len, mass, seg_len, const_type, cost_type, tqr_limit
+        stcost_ratio: float, tqcost_ratio: float, tqrate_ratio: float, const_ratio: float,
+        ank_ratio: float, vel_ratio: float, tq_ratio: float,
+        ankle_limit_type: str, const_max_val, lim_level: float,
+        high, low, max_episode_length: int,
+        com_len, mass, seg_len, const_type: str, cost_type: str, tqr_limit: float
 ):
     need_update = progress_buf >= ptb_st_idx.view(-1)
-    if const_type == 0:
+
+    if const_type == "cop":
         const_var = (foot_forces[:, 4] + 0.08*foot_forces[:, 0]) / -foot_forces[:, 2]
-    elif const_type == 1:
+    elif const_type == "ankle_torque":
         const_var = actions[:, 0]
     else:
         raise Exception("undefined constraint type")
 
-    if cost_type == 0:
+    if cost_type == 'normal':
         rew = -stcost_ratio * torch.sum(torch.cat([
             (1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2,
             vel_ratio * obs_buf[:, 2:4] ** 2], dim=1),
             dim=1)
-    elif cost_type == 1:
+    elif cost_type == 'com':
         com = (mass[1] * com_len[1] * torch.sin(obs_buf[:, [0]]) +
                mass[2] * (seg_len[1] * torch.sin(obs_buf[:, [0]]) + com_len[2] * torch.sin(obs_buf[:, :2].sum(dim=1, keepdim=True)))
                ) / mass[1:].sum()
@@ -768,12 +752,12 @@ def compute_postural_reward(
             (1 - vel_ratio) * 0.5 * ank_ratio * obs_buf[:, :2] ** 2,
             vel_ratio * obs_buf[:, 2:4] ** 2], dim=1),
             dim=1)
-    elif cost_type == 2:
+    elif cost_type == 'reduced':
         rew = 0.0 * torch.sum(torch.cat([
             (1 - vel_ratio) * ank_ratio * obs_buf[:, :2] ** 2,
             vel_ratio * obs_buf[:, 2:4] ** 2], dim=1),
             dim=1)
-    elif cost_type == 3:
+    elif cost_type == 'cop':
         cop = (foot_forces[:, [4]] + 0.08*foot_forces[:, [0]]) / -foot_forces[:, [2]]
         rew = -stcost_ratio * torch.sum(torch.cat([
             (1 - vel_ratio) * 0.5 * cop ** 2,
@@ -786,39 +770,26 @@ def compute_postural_reward(
     rew -= (1 - tqrate_ratio) * tqcost_ratio * torch.sum(tq_ratio * actions ** 2, dim=1)
     rew += 1
 
-    r_penalty = torch.zeros_like(rew, dtype=torch.float)
-    if ankle_limit_type == 0:
+    if ankle_limit_type == "satu":
         reset = reset_buf.clone()
-    elif ankle_limit_type == 1:
-        # reset = torch.zeros_like(reset_buf, dtype=torch.long)
+    elif ankle_limit_type == "hard":
         reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
         reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
-        poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
-        negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
-
-        # r_penalty = const_ratio * limLevel * (-2 / (limLevel + 1) + (
-        #         1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel) + 1 / ((negcop / const_max_val[1] - 1) ** 2 + limLevel)))
-        r_penalty = const_ratio * limLevel * (-1 / (limLevel + 1) + 1 / ((poscop / const_max_val[0] - 1) ** 2 + limLevel))
-    elif ankle_limit_type == 2:
-        # reset = torch.zeros_like(reset_buf, dtype=torch.long)
-        reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
-        reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
-        r_penalty = const_ratio * torch.where(reset.to(torch.bool), torch.ones_like(rew), torch.zeros_like(rew))
     else:
         raise Exception(f"Unexpected ankle limit type")
+
+    poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
+    negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
+    r_penalty = const_ratio * lim_level * (-1 / (lim_level + 1) + 1 / ((poscop / const_max_val[0] - 1) ** 2 + lim_level))
 
     fall_reset = torch.where(low[0] > obs_buf[:, 0], torch.ones_like(reset), torch.zeros_like(reset))
     fall_reset = torch.where(obs_buf[:, 0] > high[0], torch.ones_like(reset), fall_reset)
     fall_reset = torch.where(low[1] > obs_buf[:, 1], torch.ones_like(reset), fall_reset)
     fall_reset = torch.where(obs_buf[:, 1] > high[1], torch.ones_like(reset), fall_reset)
-    # comy_torso = seg_len[1] * torch.cos(obs_buf[:, 0]) + com_len[2] * torch.cos(obs_buf[:, :2].sum(dim=1))
 
-    # fall_reset = torch.where(comy_torso < 1., torch.ones_like(reset), torch.zeros_like(reset))
     r_penalty = torch.where(fall_reset.to(torch.bool), torch.ones_like(r_penalty) + r_penalty, r_penalty)
 
     torque_rate_const = torch.max((torque_rate / tqr_limit) ** 2 - 1, torch.tensor(0.0))
-    # reset = torch.where(torque_rate[:, 0] >= 3, torch.ones_like(reset), reset)
-    # reset = torch.where(torque_rate[:, 1] >= 3, torch.ones_like(reset), reset)
     r_penalty += tqrate_ratio * torch.sum(torque_rate_const, dim=1)
 
     reset = torch.where(fall_reset.to(torch.bool), torch.ones_like(reset), reset)
@@ -874,7 +845,7 @@ def reset_ptb_acc(
         ptb_acc,
         ptb_acc_range,
         ptb_act_idx,
-        max_episode_length,
+        max_episode_length: int,
         cuda_arange,
 ):
     _ptb_idx = torch.randint(0, ptb_acc_range.shape[0], (len(env_ids), 1))
