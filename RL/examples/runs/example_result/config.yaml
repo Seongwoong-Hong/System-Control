@@ -1,0 +1,224 @@
+task:
+  name: ${..task_name}
+  env_type: IDP
+  subj: sub10
+  physics_engine: ${..physics_engine}
+  env:
+    numEnvs: ${resolve_default:2048,${...num_envs}}
+    envSpacing: 2.0
+    ptb_act_time: ${resolve_default:0.275,${...ptb_act_time}}
+    ankle_limit: ${resolve_default:"satu",${...ankle_limit}}
+    stptb: ${resolve_default:0.0,${...stptb}}
+    edptb: ${resolve_default:0.165,${...edptb}}
+    ptb_step: 0.005
+    st_ptb_idx: 0
+    ptb_type: ${resolve_default:'5th',${...ptb_type}}
+    stcost_ratio: ${resolve_default:1.0,${...stcost_ratio}}
+    tqcost_ratio: ${resolve_default:1.0,${...tqcost_ratio}}
+    tqrate_ratio: ${resolve_default:0.1,${...tqrate_ratio}}
+    const_ratio: 1.0
+    ank_ratio: ${resolve_default:0.5,${...ank_ratio}}
+    vel_ratio: ${resolve_default:0.1,${...vel_ratio}}
+    tq_ratio: ${resolve_default:0.5,${...tq_ratio}}
+    avg_coeff: ${resolve_default:1.0,${...avg_coeff}}
+    const_type: ${resolve_default:'ankle_torque',${...const_type}}
+    cost_type: ${resolve_default:normal,${...cost_type}}
+    tqr_regularize_type: ${resolve_default:torque_rate,${...tqr_regularize_type}}
+    limLevel: ${resolve_default:0.0,${...lim_level}}
+    use_seg_ang: false
+    action_as_state: ${resolve_default:False,${...action_as_state}}
+    delay: ${resolve_default:True,${...delay}}
+    delayed_time: ${resolve_default:0.1,${...delayed_time}}
+    delay_randomize: ${resolve_default:0.0,${...delay_randomize}}
+    clipActions: ${resolve_default:1.0,${...clipActions}}
+    ankle_torque_max: ${resolve_default:100,${...ankle_torque_max}}
+    stiff_ank: ${resolve_default:250,${...stiff_ank}}
+    damp_ank: 20
+    stiff_hip: 50
+    damp_hip: 5
+    tqr_limit: ${resolve_default:300,${...tqr_limit}}
+    use_curriculum: ${resolve_default:False,${...use_curriculum}}
+    upright_type: ${resolve_default:0,${...upright_type}}
+    exp_time: ${resolve_default:5,${...exp_time}}
+    curriculum:
+      min_tqr_limit: ${resolve_default:0.1,${....min_tqr_limit}}
+      min_avg_coeff: ${resolve_default:0.01,${....min_avg_coeff}}
+      max_lean_angle: ${resolve_default:10,${....max_lean_angle}}
+      max_edptb: ${resolve_default:0.165,${....max_edptb}}
+      end_epoch: ${resolve_default:1500,${....end_epoch}}
+  sim:
+    dt: 0.00833333333333
+    up_axis: z
+    use_gpu_pipeline: ${eq:${...pipeline},"gpu"}
+    gravity:
+    - 0.0
+    - 0.0
+    - -9.81
+    physx:
+      num_threads: ${....num_threads}
+      solver_type: ${....solver_type}
+      use_gpu: ${contains:"cuda",${....sim_device}}
+      num_position_iterations: 4
+      num_velocity_iterations: 0
+      contact_offset: 0.01
+      rest_offset: 0.001
+      bounce_threshold_velocity: 0.2
+      max_depenetration_velocity: 100.0
+      default_buffer_size_multiplier: 2.0
+      max_gpu_contact_pairs: 1048576
+      num_subscenes: ${....num_subscenes}
+      contact_collection: 2
+train:
+  params:
+    seed: ${...seed}
+    algo:
+      name: a2c_continuous
+    model:
+      name: continuous_a2c_logstd
+    network:
+      name: actor_critic
+      separate: false
+      space:
+        continuous:
+          mu_activation: None
+          sigma_activation: None
+          mu_init:
+            name: default
+          sigma_init:
+            name: const_initializer
+            val: 0
+          fixed_sigma: ${resolve_default:True,${......fixed_sigma}}
+      mlp:
+        units:
+        - 128
+        - 128
+        activation: relu
+        d2rl: false
+        initializer:
+          name: default
+        regularizer:
+          name: None
+    load_checkpoint: ${...load_checkpoint}}
+    load_path: ${...checkpoint}
+    config:
+      name: ${resolve_default:IDP,${....experiment}}
+      full_experiment_name: ${.name}
+      env_name: rlgpu
+      multi_gpu: ${....multi_gpu}
+      ppo: true
+      mixed_precision: true
+      normalize_input: true
+      normalize_value: true
+      value_bootstrap: true
+      num_actors: ${....task.env.numEnvs}
+      reward_shaper:
+        scale_value: 0.01
+      normalize_advantage: true
+      gamma: ${resolve_default:0.999,${....gamma}}
+      tau: ${resolve_default:0.99,${....tau}}
+      learning_rate: ${resolve_default:1e-4,${....lr}}
+      lr_schedule: ${resolve_default:None,${....lr_schedule}}
+      schedule_type: standard
+      kl_threshold: ${resolve_default:0.002,${....kl_threshold}}
+      score_to_win: 20000
+      max_epochs: ${resolve_default:3000,${....max_iterations}}
+      save_best_after: ${resolve_default:1500,${....end_epoch}}
+      save_frequency: 50
+      grad_norm: 1.0
+      entropy_coef: ${resolve_default:0.003,${....entropy_coef}}
+      truncate_grads: false
+      e_clip: 0.2
+      horizon_length: ${resolve_default:64,${....horizon_length}}
+      minibatch_size: ${resolve_default:8192,${....minibatch_size}}
+      mini_epochs: 4
+      critic_coef: 2
+      clip_value: true
+      bounds_loss_coef: 0.0001
+      player:
+        games_num: 7
+        n_game_life: 1
+        save_mat: ${resolve_default:False,${.....save_mat}}
+        show_fig: ${resolve_default:True,${.....show_fig}}
+        save_fig: ${resolve_default:False,${.....save_fig}}
+        deterministic: true
+pbt:
+  enabled: false
+task_name: IDPMinEffort
+experiment: IDP
+experiment_name: TorqueSweepSlow/noCurriculum90ATMax/avg_coeff0.01_tqrate_ratio0.0
+num_envs: ''
+gamma: ''
+tau: ''
+kl_threshold: ''
+horizon_length: ''
+minibatch_size: ''
+exp_time: ''
+entropy_coef: ''
+fixed_sigma: ''
+lr_schedule: ''
+lr: ''
+lim_level: 0.5
+tqrate_ratio: 0.0
+tqcost_ratio: 1.0
+stcost_ratio: 1.0
+ank_ratio: 0.5
+vel_ratio: 0.01
+tq_ratio: 0.5
+ankle_limit: soft
+stptb: ''
+edptb: 0.16
+ptb_act_time: 0.33333
+ptb_type: 5th
+delay_randomize: 0.2
+delay: true
+delayed_time: 0.1
+tqr_regularize_type: torque_rate
+action_as_state: false
+use_curriculum: false
+cost_type: ''
+tqr_limit: 1
+min_tqr_limit: 1
+min_avg_coeff: 0.07
+max_lean_angle: 0
+max_edptb: 0.16
+end_epoch: 1000
+seed: 5448
+torch_deterministic: false
+max_iterations: 3000
+physics_engine: physx
+pipeline: gpu
+sim_device: cuda
+rl_device: cuda
+graphics_device_id: 0
+num_threads: 4
+solver_type: 1
+num_subscenes: 4
+test: false
+load_checkpoint: false
+checkpoint: ''
+const_type: ankle_torque
+stiff_ank: 250
+ankle_torque_max: 90
+clipActions: 1.0
+avg_coeff: 0.01
+upright_type: 0.0
+save_mat: false
+save_fig: false
+show_fig: true
+fig_path: ''
+mat_path: ''
+sigma: ''
+multi_gpu: false
+full_experiment_name: TorqueSweepSlow/noCurriculum90ATMax/avg_coeff0.01_tqrate_ratio0.0/limLevel50_upright0/atm90_as250/example_result
+wandb_activate: false
+wandb_group: ''
+wandb_name: ${train.params.config.name}
+wandb_entity: ''
+wandb_project: isaacgymenvs
+wandb_tags: []
+wandb_logcode_dir: ''
+capture_video: false
+capture_video_freq: 3200
+capture_video_len: 600
+force_render: false
+headless: true
