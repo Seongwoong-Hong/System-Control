@@ -1,3 +1,12 @@
+# ==============================================================================
+# IMPORTANT: Angle Convention Note
+# ------------------------------------------------------------------------------
+# The angle configuration used in this implementation is the REVERSE of what is
+# described in the paper or presentation materials.
+#
+# - In the paper: Positive angles represent extension.
+# - In this code: Positive angles represent flexion.
+# ==============================================================================
 import random
 import string
 from pathlib import Path
@@ -60,6 +69,8 @@ class IDPMinEffort(VecTask):
         self._jnt_stiffness = to_torch(self._jnt_stiffness, device=self.device)
         self._jnt_damping = to_torch(self._jnt_damping, device=self.device)
 
+        # displacement: Anterior(+), Ventral(-)
+        # angle: Flexion(+), Extension(-) (WARNING: Sign convention is inverted from the paper)
         if self.const_type == "cop":
             self.const_max_val = to_torch([0.16, -0.04], device=self.device)
         elif self.const_type == "ankle_torque":
@@ -778,9 +789,9 @@ def compute_postural_reward(
     else:
         raise Exception(f"Unexpected ankle limit type")
 
-    poscop = torch.clamp(const_var, min=0., max=const_max_val[0])
-    negcop = torch.clamp(const_var, min=const_max_val[1], max=0.)
-    r_penalty = const_ratio * lim_level * (-1 / (lim_level + 1) + 1 / ((poscop / const_max_val[0] - 1) ** 2 + lim_level))
+    ventral_const = torch.clamp(const_var, min=0., max=const_max_val[0])
+    anterior_const = torch.clamp(const_var, min=const_max_val[1], max=0.)
+    r_penalty = const_ratio * lim_level * (-1 / (lim_level + 1) + 1 / ((anterior_const / const_max_val[1] - 1) ** 2 + lim_level))
 
     fall_reset = torch.where(low[0] > obs_buf[:, 0], torch.ones_like(reset), torch.zeros_like(reset))
     fall_reset = torch.where(obs_buf[:, 0] > high[0], torch.ones_like(reset), fall_reset)
@@ -849,7 +860,6 @@ def reset_ptb_acc(
         cuda_arange,
 ):
     _ptb_idx = torch.randint(0, ptb_acc_range.shape[0], (len(env_ids), 1))
-    # ptb_st_idx = torch.randint(0, 2 * ptb_act_idx, (len(env_ids), 1))
     ptb_st_idx = torch.randint(0, max_episode_length // 2 - ptb_act_idx, (len(env_ids), 1))
     offsets = torch.arange(ptb_act_idx).unsqueeze(0) + ptb_st_idx
     ptb_acc[:] = 0
@@ -858,13 +868,19 @@ def reset_ptb_acc(
 
 
 @torch.jit.script
-def _compute_extras_jit(delayed_act_buf, act_delay_idx, actions, prev_actions, old_torque_rate, old_dd_acts, dt: float,
-                        avg_coeff: float, device: torch.device):
-    # ddtq와 torque_rate 계산
+def _compute_extras_jit(
+        delayed_act_buf,
+        act_delay_idx,
+        actions,
+        prev_actions,
+        old_torque_rate,
+        old_dd_acts,
+        dt: float,
+        avg_coeff: float, device: torch.device
+):
     torque_rate = (actions - prev_actions) / dt
     ddtq = torque_rate - old_torque_rate
 
-    # dd_acts 계산, np.arange를 torch.arange로 변경
     i = torch.arange(delayed_act_buf.shape[0]).to(device).view(-1, 1, 1)
     j = torch.arange(delayed_act_buf.shape[1]).to(device).view(1, -1, 1)
     k = act_delay_idx.view(-1, 1, 1)
