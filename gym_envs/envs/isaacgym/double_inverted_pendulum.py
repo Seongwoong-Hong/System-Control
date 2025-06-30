@@ -55,7 +55,6 @@ class IDPMinEffort(VecTask):
         self.ptb_forces = to_torch(np.zeros([self.num_envs, self.num_bodies, 3]), device=self.device)
         self._ptb_range = to_torch(self._cal_ptb_acc(-self._ptb_range.reshape(1, -1)), device=self.device)
         self._ptb_act_idx = to_torch(round(self._ptb_act_time / self.dt), dtype=torch.int64, device=self.device)
-        # self._ptb_act_time = to_torch(self._ptb_act_time, device=self.device)
         self.ptb_st_idx = to_torch(np.zeros([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         if 'upright_type' in cfg['env']:
@@ -375,7 +374,6 @@ class IDPMinEffort(VecTask):
             self._jnt_stiffness,
             self._jnt_damping,
             self.joint_gears,
-            self.lean_angle_torch,
             self.act_delay_idx
         )
         self.actions = current_actions.to(self.device).clone()
@@ -454,9 +452,6 @@ class IDPMinEffort(VecTask):
         return filepath
 
     def process_actions(self, actions):
-        # i, j, k = np.arange(self.num_envs).reshape(-1, 1, 1), np.arange(2).reshape(1, -1, 1), self.act_delay_idx.reshape(-1, 1, 1) - 1
-        # self.extras['sampled_action'] = actions.clone()
-        # return actions * self.avg_coeff + (1 - self.avg_coeff) * self.delayed_act_buf[i, j, k].to(self.device).clone().squeeze(-1)
         self.extras['sampled_action'] = actions.clone()
         return _process_actions_jit(
             actions,
@@ -516,7 +511,6 @@ class IDPMinEffortDet(IDPMinEffort):
         else:
             self._ptb_range = to_torch(
                 self._cal_ptb_acc(-np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15]).reshape(1, -1)),
-                # self._cal_ptb_acc(-np.array([0.12, 0.135, 0.15, 0.165, 0.18, 0.195, 0.21]).reshape(1, -1)),
                 device=self.device,
             )
         self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
@@ -834,7 +828,7 @@ def fill_delayed_act_buf(
 def compute_current_action(
         dof_pos, dof_vel, actions, delayed_act_buf,
         is_act_delayed, ptb_st_idx, progress_buf,
-        jnt_stiffness, jnt_damping, joint_gears, lean_ang, delayed_idx
+        jnt_stiffness, jnt_damping, joint_gears, delayed_idx
 ):
     need_update = progress_buf >= ptb_st_idx.view(-1)
     if is_act_delayed:
