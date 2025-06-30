@@ -28,8 +28,8 @@ from common.path_config import MAIN_DIR
 from common.rlgames.observer import DrawTimeTrajObserver
 from gym_envs.envs.isaacgym import *
 
-load_dir = MAIN_DIR / "RL" / "examples" / "cfg"
-target_dir = MAIN_DIR / "RL" / "examples"
+load_dir = MAIN_DIR / "RL" / "examples" / "scripts" / "cfg"
+target_dir = MAIN_DIR / "RL" / "examples" / "scripts"
 
 class CurriculumUpdator(AlgoObserver):
     def after_init(self, algo):
