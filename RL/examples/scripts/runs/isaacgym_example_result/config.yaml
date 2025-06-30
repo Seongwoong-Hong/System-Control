@@ -209,7 +209,7 @@ fig_path: ''
 mat_path: ''
 sigma: ''
 multi_gpu: false
-full_experiment_name: TorqueSweepSlow/noCurriculum90ATMax/avg_coeff0.01_tqrate_ratio0.0/limLevel50_upright0/atm90_as250/example_result
+full_experiment_name: TorqueSweepSlow/noCurriculum90ATMax/avg_coeff0.01_tqrate_ratio0.0/limLevel50_upright0/atm90_as250/isaacgym_example_result
 wandb_activate: false
 wandb_group: ''
 wandb_name: ${train.params.config.name}

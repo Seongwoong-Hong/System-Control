@@ -118,7 +118,7 @@ if __name__ == "__main__":
         "subj": "sub10",
         "use_norm": "True",
         "isPseudo": "False",
-        "log_dir": MAIN_DIR / "RL" / "examples" / "runs" / "mujoco_example_result" / crt_time,
+        "log_dir": MAIN_DIR / "RL" / "examples" / "scripts" / "runs" / "mujoco_example_result" / crt_time,
         "tags": [],
         'stiffness1': 300,
         'stiffness2': 100,

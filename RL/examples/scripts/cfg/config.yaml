@@ -78,7 +78,7 @@ num_subscenes: 4 # Splits the simulation into N physics scenes and runs each one
 test: True
 load_checkpoint: False
 # used to set checkpoint path
-checkpoint: 'runs/example_result/nn/IDP.pth'
+checkpoint: 'runs/isaacgym_example_result/nn/IDP.pth'
 const_type: 'ankle_torque'
 stiff_ank: 250
 ankle_torque_max: 100
