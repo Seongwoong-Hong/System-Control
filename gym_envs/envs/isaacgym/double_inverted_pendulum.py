@@ -870,7 +870,8 @@ def _compute_extras_jit(
         old_torque_rate,
         old_dd_acts,
         dt: float,
-        avg_coeff: float, device: torch.device
+        avg_coeff: float,
+        device: torch.device
 ):
     torque_rate = (actions - prev_actions) / dt
     ddtq = torque_rate - old_torque_rate

@@ -29,7 +29,7 @@ const_ratio: 1.0
 ank_ratio: ''
 vel_ratio: ''
 tq_ratio: ''
-ankle_limit: 'soft'
+ankle_limit: 'satu'
 stptb: ''
 edptb: ''
 ptb_act_time: 0.275
