@@ -68,7 +68,7 @@ class IDPMinEffort(VecTask):
         self._jnt_stiffness = to_torch(self._jnt_stiffness, device=self.device)
         self._jnt_damping = to_torch(self._jnt_damping, device=self.device)
 
-        # displacement: Anterior(+), Ventral(-)
+        # displacement: Anterior(+), Posterior(-)
         # angle: Flexion(+), Extension(-) (WARNING: Sign convention is inverted from the paper)
         if self.const_type == "cop":
             self.const_max_val = to_torch([0.16, -0.04], device=self.device)
@@ -783,7 +783,7 @@ def compute_postural_reward(
     else:
         raise Exception(f"Unexpected ankle limit type")
 
-    ventral_const = torch.clamp(const_var, min=0., max=const_max_val[0])
+    posterior_const = torch.clamp(const_var, min=0., max=const_max_val[0])
     anterior_const = torch.clamp(const_var, min=const_max_val[1], max=0.)
     r_penalty = const_ratio * lim_level * (-1 / (lim_level + 1) + 1 / ((anterior_const / const_max_val[1] - 1) ** 2 + lim_level))
 
