@@ -362,7 +362,7 @@ class IDPMinEffort(VecTask):
             self.reset_idx(env_ids)
 
         self.get_current_ptbs()
-        actions = self.process_actions(actions)
+        actions = process_actions_jit(actions, self.delayed_act_buf, self.act_delay_idx, self.avg_coeff)
         current_actions, self.delayed_act_buf[...] = compute_current_action(
             self.dof_pos,
             self.dof_vel,
@@ -450,17 +450,6 @@ class IDPMinEffort(VecTask):
 
         m_tree.write(filepath)
         return filepath
-
-    def process_actions(self, actions):
-        self.extras['sampled_action'] = actions.clone()
-        return _process_actions_jit(
-            actions,
-            self.delayed_act_buf,
-            self.act_delay_idx,
-            self.avg_coeff,
-            self.num_envs,
-            self.device
-        )
 
     def get_current_ptbs(self):
         self.ptb_forces = _get_current_ptbs_jit(self.mass, self._ptb, self.progress_buf, self.ptb_forces)
@@ -786,6 +775,7 @@ def compute_postural_reward(
     posterior_const = torch.clamp(const_var, min=0., max=const_max_val[0])
     anterior_const = torch.clamp(const_var, min=const_max_val[1], max=0.)
     r_penalty = const_ratio * lim_level * (-1 / (lim_level + 1) + 1 / ((anterior_const / const_max_val[1] - 1) ** 2 + lim_level))
+    # r_penalty = const_ratio * anterior_const ** 2
 
     fall_reset = torch.where(low[0] > obs_buf[:, 0], torch.ones_like(reset), torch.zeros_like(reset))
     fall_reset = torch.where(obs_buf[:, 0] > high[0], torch.ones_like(reset), fall_reset)
@@ -876,21 +866,22 @@ def _compute_extras_jit(
     torque_rate = (actions - prev_actions) / dt
     ddtq = torque_rate - old_torque_rate
 
-    i = torch.arange(delayed_act_buf.shape[0]).to(device).view(-1, 1, 1)
-    j = torch.arange(delayed_act_buf.shape[1]).to(device).view(1, -1, 1)
-    k = act_delay_idx.view(-1, 1, 1)
+    N, A, T = delayed_act_buf.shape
 
-    # delayed_act_buf에서 값을 가져올 때 인덱싱 범위 확인
-    # k-2가 0보다 작아지는 것을 방지하기 위해 k를 2 이상으로 클램핑하여 인덱싱
-    k_safe = torch.clamp(k, min=2)
+    k = act_delay_idx.view(N, 1, 1)
 
-    dd_acts_new = (
-            (delayed_act_buf[i, j, k_safe] - delayed_act_buf[i, j, k_safe - 1]) / dt -
-            (delayed_act_buf[i, j, k_safe - 1] - delayed_act_buf[i, j, k_safe - 2]) / dt
-    ).squeeze(-1)
+    k_idx_0 = k.expand(N, A, 1)
+    k_idx_1 = (k - 1).expand(N, A, 1)
+    k_idx_2 = (k - 2).expand(N, A, 1)
 
-    # k가 2보다 작은 경우, 원래 dd_acts 값을 유지하여 오류 방지
-    # k<2인 인덱스를 찾아서 해당 위치의 dd_acts_new 값을 old_dd_acts 값으로 대체
+    val_k   = torch.gather(delayed_act_buf, 2, k_idx_0)
+    val_k_1 = torch.gather(delayed_act_buf, 2, k_idx_1)
+    val_k_2 = torch.gather(delayed_act_buf, 2, k_idx_2)
+
+    dt1 = (val_k - val_k_1) / dt
+    dt2 = (val_k_1 - val_k_2) / dt
+    dd_acts_new = (dt1 - dt2).squeeze(-1)
+
     mask = (k < 2).squeeze()
     dd_acts_new[mask] = old_dd_acts[mask]
 
@@ -898,15 +889,18 @@ def _compute_extras_jit(
 
     return ddtq, dd_acts, torque_rate
 
-
 @torch.jit.script
-def _process_actions_jit(actions, delayed_act_buf, act_delay_idx, avg_coeff: float, num_envs: int, device: torch.device):
-    i = torch.arange(num_envs).to(device).view(-1, 1, 1)
-    j = torch.arange(actions.shape[1]).to(device).view(1, -1, 1)
-    k = act_delay_idx.view(-1, 1, 1) - 1
-
-    processed_actions = actions * avg_coeff + (1 - avg_coeff) * delayed_act_buf[i, j, k].clone().squeeze(-1)
-    return processed_actions
+def process_actions_jit(
+        actions: torch.Tensor,
+        delayed_act_buf: torch.Tensor,  # Shape: (N, A, T)
+        act_delay_idx: torch.Tensor,  # Shape: (N, 1)
+        avg_coeff: float
+) -> torch.Tensor:
+    N, A, T = delayed_act_buf.shape
+    k = (act_delay_idx - 1).view(N, 1, 1)
+    k_idx = k.expand(N, A, 1)
+    prev_action = torch.gather(delayed_act_buf, 2, k_idx).squeeze(-1)
+    return actions * avg_coeff + (1 - avg_coeff) * prev_action
 
 @torch.jit.script
 def _get_current_ptbs_jit(mass, ptb_buf, progress_buf, ptb_forces):
