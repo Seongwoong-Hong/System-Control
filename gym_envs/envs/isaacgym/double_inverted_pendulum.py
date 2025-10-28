@@ -38,7 +38,7 @@ class IDPMinEffort(VecTask):
         if self.action_as_state:
             self.cfg['env']['numObservations'] += self.cfg['env']['numActions'] * round(self.act_delay_time / self.cfg['sim']['dt'])
         super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device, graphics_device_id=graphics_device_id, headless=headless, virtual_screen_capture=virtual_screen_capture, force_render=force_render)
-        self.act_space = spaces.Box(np.ones(self.num_actions) * -1., np.ones(self.num_actions) * 1.)
+        self.act_space = spaces.Box(-self.clip_actions*np.ones(self.num_actions), np.ones(self.num_actions) * self.clip_actions)
 
         self.high = to_torch(np.deg2rad([45, 120]), dtype=torch.float, device=self.device)
         self.low = to_torch(np.deg2rad([-45, -60]), dtype=torch.float, device=self.device)
@@ -72,8 +72,10 @@ class IDPMinEffort(VecTask):
         # angle: Flexion(+), Extension(-) (WARNING: Sign convention is inverted from the paper)
         if self.const_type == "cop":
             self.const_max_val = to_torch([0.16, -0.04], device=self.device)
+            self.ank_torque_max_val = to_torch([0.16, -0.04], device=self.device)
         elif self.const_type == "ankle_torque":
-            self.const_max_val = to_torch(self.clip_actions * np.array([0.4*self.ankle_torque_max, -self.ankle_torque_max]), device=self.device) / self.joint_gears[0]
+            self.const_max_val = to_torch(np.array([0.4*self.ankle_torque_max, -self.ankle_torque_max]), device=self.device) / self.joint_gears[0]
+            self.ank_torque_max_val = to_torch(self.clip_actions * np.array([0.4*self.ankle_torque_max, -self.ankle_torque_max]), device=self.device) / self.joint_gears[0]
         else:
             raise Exception("undefined constraint type")
 
@@ -254,7 +256,7 @@ class IDPMinEffort(VecTask):
             self.reset_buf, self.progress_buf, self.ptb_st_idx,
             self.stcost_ratio, self.tqcost_ratio, self.tqrate_ratio, self.const_ratio,
             self.ank_ratio, self.vel_ratio, self.tq_ratio,
-            self.ankle_limit, self.const_max_val, self.limLevel,
+            self.ankle_limit, self.const_max_val, self.ank_torque_max_val, self.limLevel,
             self.high, self.low, self.max_episode_length,
             self.com, self.mass, self.len, self.const_type, self.cost_type, self.tqr_limit
         )
@@ -719,7 +721,7 @@ def compute_postural_reward(
         reset_buf, progress_buf, ptb_st_idx,
         stcost_ratio: float, tqcost_ratio: float, tqrate_ratio: float, const_ratio: float,
         ank_ratio: float, vel_ratio: float, tq_ratio: float,
-        ankle_limit_type: str, const_max_val, lim_level: float,
+        ankle_limit_type: str, const_max_val, ank_torque_max_val, lim_level: float,
         high, low, max_episode_length: int,
         com_len, mass, seg_len, const_type: str, cost_type: str, tqr_limit: float
 ):
@@ -767,8 +769,8 @@ def compute_postural_reward(
     if ankle_limit_type == "satu":
         reset = reset_buf.clone()
     elif ankle_limit_type == "hard":
-        reset = torch.where(const_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
-        reset = torch.where(const_var >= const_max_val[0], torch.ones_like(reset_buf), reset)
+        reset = torch.where(ank_torque_max_val[1] >= const_var, torch.ones_like(reset_buf), reset_buf)
+        reset = torch.where(const_var >= ank_torque_max_val[0], torch.ones_like(reset_buf), reset)
     else:
         raise Exception(f"Unexpected ankle limit type")
 
