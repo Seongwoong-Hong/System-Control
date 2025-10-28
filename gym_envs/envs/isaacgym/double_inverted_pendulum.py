@@ -364,7 +364,7 @@ class IDPMinEffort(VecTask):
             self.reset_idx(env_ids)
 
         self.get_current_ptbs()
-        actions = process_actions_jit(actions, self.delayed_act_buf, self.act_delay_idx, self.avg_coeff)
+        actions = self.process_actions(actions)
         current_actions, self.delayed_act_buf[...] = compute_current_action(
             self.dof_pos,
             self.dof_vel,
@@ -452,6 +452,11 @@ class IDPMinEffort(VecTask):
 
         m_tree.write(filepath)
         return filepath
+
+    def process_actions(self, actions):
+        i, j, k = np.arange(self.num_envs).reshape(-1, 1, 1), np.arange(2).reshape(1, -1, 1), self.act_delay_idx.reshape(-1, 1, 1) - 1
+        self.extras['sampled_action'] = actions.clone()
+        return actions * self.avg_coeff + (1 - self.avg_coeff) * self.delayed_act_buf[i, j, k].to(self.device).clone().squeeze(-1)
 
     def get_current_ptbs(self):
         self.ptb_forces = _get_current_ptbs_jit(self.mass, self._ptb, self.progress_buf, self.ptb_forces)
@@ -890,19 +895,6 @@ def _compute_extras_jit(
     dd_acts = avg_coeff * dd_acts_new + (1 - avg_coeff) * old_dd_acts
 
     return ddtq, dd_acts, torque_rate
-
-@torch.jit.script
-def process_actions_jit(
-        actions: torch.Tensor,
-        delayed_act_buf: torch.Tensor,  # Shape: (N, A, T)
-        act_delay_idx: torch.Tensor,  # Shape: (N, 1)
-        avg_coeff: float
-) -> torch.Tensor:
-    N, A, T = delayed_act_buf.shape
-    k = (act_delay_idx - 1).view(N, 1, 1)
-    k_idx = k.expand(N, A, 1)
-    prev_action = torch.gather(delayed_act_buf, 2, k_idx).squeeze(-1)
-    return actions * avg_coeff + (1 - avg_coeff) * prev_action
 
 @torch.jit.script
 def _get_current_ptbs_jit(mass, ptb_buf, progress_buf, ptb_forces):
