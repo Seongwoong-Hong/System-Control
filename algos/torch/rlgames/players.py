@@ -2,6 +2,7 @@ import time
 
 import isaacgym
 from rl_games.algos_torch.players import PpoPlayerContinuous
+from rl_games.common.tr_helpers import unsqueeze_obs
 
 import torch as th
 
@@ -11,6 +12,33 @@ class PpoPlayerCustom(PpoPlayerContinuous):
         self.player_observer = params['config']['features']['observer']
         super().__init__(params)
         self.player_observer.after_init(self)
+
+    def get_action(self, obs, is_deterministic = False):
+        if self.has_batch_dimension == False:
+            obs = unsqueeze_obs(obs)
+        obs = self._preproc_obs(obs)
+        input_dict = {
+            'is_train': False,
+            'prev_actions': None,
+            'obs' : obs,
+            'rnn_states' : self.states
+        }
+        with th.no_grad():
+            res_dict = self.model(input_dict)
+        mu = res_dict['mus']
+        action = res_dict['actions']
+        self.states = res_dict['rnn_states']
+        if is_deterministic:
+            current_action = mu
+        else:
+            current_action = action
+        if self.has_batch_dimension == False:
+            current_action = th.squeeze(current_action.detach())
+
+        if self.clip_actions:
+            return th.clamp(current_action, self.actions_low, self.actions_high)
+        else:
+            return current_action
 
     def run(self):
         n_games = self.games_num
