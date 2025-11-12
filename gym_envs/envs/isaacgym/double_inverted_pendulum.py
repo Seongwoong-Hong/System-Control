@@ -54,7 +54,6 @@ class IDPMinEffort(VecTask):
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         self.ptb_forces = to_torch(np.zeros([self.num_envs, self.num_bodies, 3]), device=self.device)
         self._ptb_range = to_torch(self._cal_ptb_acc(-self._ptb_range.reshape(1, -1)), device=self.device)
-        self._ptb_act_idx = to_torch(round(self._ptb_act_time / self.dt), dtype=torch.int64, device=self.device)
         self.ptb_st_idx = to_torch(np.zeros([self.num_envs, 1]), dtype=torch.int64, device=self.device)
 
         if 'upright_type' in cfg['env']:
@@ -289,7 +288,6 @@ class IDPMinEffort(VecTask):
             env_ids,
             self._ptb[env_ids],
             self._ptb_range,
-            self._ptb_act_idx,
             self.max_episode_length,
             self.cuda_arange,
         )
@@ -802,7 +800,6 @@ def compute_postural_reward(
 
     return rew, reset
 
-
 @torch.jit.script
 def fill_delayed_act_buf(
         dof_pos,
@@ -846,13 +843,12 @@ def reset_ptb_acc(
         env_ids,
         ptb_acc,
         ptb_acc_range,
-        ptb_act_idx,
         max_episode_length: int,
         cuda_arange,
 ):
     _ptb_idx = torch.randint(0, ptb_acc_range.shape[0], (len(env_ids), 1))
-    ptb_st_idx = torch.randint(0, max_episode_length // 2 - ptb_act_idx, (len(env_ids), 1))
-    offsets = torch.arange(ptb_act_idx).unsqueeze(0) + ptb_st_idx
+    ptb_st_idx = torch.randint(0, max_episode_length // 2 - ptb_acc_range.shape[1], (len(env_ids), 1))
+    offsets = torch.arange(ptb_acc_range.shape[1]).unsqueeze(0) + ptb_st_idx
     ptb_acc[:] = 0
     ptb_acc[torch.arange(len(env_ids)).unsqueeze(1), offsets] = ptb_acc_range[_ptb_idx, torch.arange(ptb_acc_range.shape[1]).unsqueeze(0)]
     return ptb_acc, cuda_arange[ptb_st_idx]
