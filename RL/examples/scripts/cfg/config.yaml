@@ -89,7 +89,7 @@ avg_coeff: 1.0
 upright_type: 0.0
 save_mat: False
 save_fig: False
-show_fig: True
+show_fig: False
 fig_path: ''
 mat_path: ''
 # set sigma when restoring network
