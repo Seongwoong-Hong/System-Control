@@ -1,6 +1,11 @@
+#1114 실행에러 수정
+import os
+os.environ.setdefault("MPLBACKEND", "Agg")
+
 import hydra
 
 from datetime import datetime
+import time
 
 import isaacgym
 from isaacgymenvs.pbt.pbt import PbtAlgoObserver, initial_pbt_check
@@ -11,7 +16,14 @@ from isaacgymenvs.utils.utils import set_np_formatting, set_seed
 
 from isaacgymenvs.utils.rlgames_utils import RLGPUEnv, RLGPUAlgoObserver, MultiObserver
 from isaacgymenvs.utils.wandb_utils import WandbAlgoObserver
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
+
+# --- Matplotlib 창을 non‑blocking 으로 띄우기 ---------- # 1114 지우래 training이 안되네
+# import matplotlib
+# matplotlib.use('TkAgg')       # 없는 경우 TkAgg 로 바꿔도 OK
+import matplotlib.pyplot as plt
+# plt.ion()   
+
 from rl_games.common import env_configurations, vecenv
 from rl_games.common.algo_observer import AlgoObserver
 from rl_games.torch_runner import Runner
@@ -31,32 +43,90 @@ from gym_envs.envs.isaacgym import *
 load_dir = MAIN_DIR / "RL" / "examples" / "scripts" / "cfg"
 target_dir = MAIN_DIR / "RL" / "examples" / "scripts"
 
+
+# IsaacgymLearning.py
+
+# 1026 observer casting
 class CurriculumUpdator(AlgoObserver):
+    def _as_float(self, x):
+        # tensor면 .item(), 아니면 float()로 통일
+        try:
+            return float(x.item()) if hasattr(x, 'item') else float(x)
+        except Exception:
+            return float(x)
+
     def after_init(self, algo):
         self.algo = algo
         self.env = algo.vec_env.env
         self.param = self.env.cfg['env']['curriculum']
         self.update_freq = 10
-        self.ac_reduced_rate = np.exp(np.log(self.param['min_avg_coeff'] / self.env.avg_coeff) / (self.param['end_epoch'] / self.update_freq))
-        self.tqr_reduced_rate = np.exp(np.log(self.param['min_tqr_limit'] / self.env.tqr_limit.item()) / (self.param['end_epoch'] / self.update_freq))
-        self.la_increment = np.deg2rad(self.param['max_lean_angle'] / (self.param['end_epoch'] / self.update_freq))
+
+        # 평균 계수/토크레이트 한계의 감소율 계산
+        ac0 = self._as_float(self.env.avg_coeff)
+        tqr0 = self._as_float(self.env.tqr_limit)
+        epochs = (self.param['end_epoch'] / self.update_freq)
+
+        self.ac_reduced_rate  = np.exp(np.log(self.param['min_avg_coeff'] / ac0)  / epochs)
+        self.tqr_reduced_rate = np.exp(np.log(self.param['min_tqr_limit'] / tqr0) / epochs)
+        self.la_increment     = np.deg2rad(self.param['max_lean_angle'] / epochs)
 
     def after_print_stats(self, frame, epoch_num, total_time):
         if epoch_num % self.update_freq == 0 and self.env.use_curriculum:
             crr_params = {}
-            if self.algo.game_lengths.get_mean() > 0.8*self.env.max_episode_length.cpu().item():
-                self.env.cfg['env']['edptb'] = min(self.param['max_edptb'], self.env.cfg['env']['edptb'] + 0.03)
-                ptb_range = np.arange(0, round((self.env.cfg['env']['edptb'] - self.env.cfg['env']['stptb']) / self.env.cfg['env']['ptb_step']) + 1) * self.env.cfg['env']['ptb_step'] + self.env.cfg['env']['stptb']
+
+            if self.algo.game_lengths.get_mean() > 0.8 * self.env.max_episode_length.cpu().item():
+                self.env.cfg['env']['edptb'] = min(self.param['max_edptb'],
+                                                   self.env.cfg['env']['edptb'] + 0.03)
+                ptb_range = np.arange(
+                    0,
+                    round((self.env.cfg['env']['edptb'] - self.env.cfg['env']['stptb']) /
+                          self.env.cfg['env']['ptb_step']) + 1
+                ) * self.env.cfg['env']['ptb_step'] + self.env.cfg['env']['stptb']
+
                 if self.env.cfg['env']['edptb'] >= self.param["max_edptb"]:
                     lean_angle = self.env.lean_angle + np.deg2rad(0.5)
                 else:
                     lean_angle = self.env.lean_angle
+
                 crr_params["lean_angle"] = min(np.deg2rad(self.param['max_lean_angle']), lean_angle)
                 crr_params["_ptb_range"] = ptb_range
-            crr_params["tqr_limit"] = max(self.param['min_tqr_limit'], self.env.tqr_limit * self.tqr_reduced_rate)
-            crr_params["avg_coeff"] = max(self.param['min_avg_coeff'], self.env.avg_coeff * self.ac_reduced_rate)
+
+            # 여기서도 항상 float로 계산
+            cur_tqr = self._as_float(self.env.tqr_limit)
+            cur_avg = self._as_float(self.env.avg_coeff)
+
+            crr_params["tqr_limit"] = max(self.param['min_tqr_limit'], cur_tqr * self.tqr_reduced_rate)
+            crr_params["avg_coeff"]  = max(self.param['min_avg_coeff'],  cur_avg * self.ac_reduced_rate)
 
             self.env.update_curriculum(**crr_params)
+
+
+# class CurriculumUpdator(AlgoObserver):
+#     def after_init(self, algo):
+#         self.algo = algo
+#         self.env = algo.vec_env.env
+#         self.param = self.env.cfg['env']['curriculum']
+#         self.update_freq = 10
+#         self.ac_reduced_rate = np.exp(np.log(self.param['min_avg_coeff'] / self.env.avg_coeff) / (self.param['end_epoch'] / self.update_freq))
+#         self.tqr_reduced_rate = np.exp(np.log(self.param['min_tqr_limit'] / self.env.tqr_limit.item()) / (self.param['end_epoch'] / self.update_freq))
+#         self.la_increment = np.deg2rad(self.param['max_lean_angle'] / (self.param['end_epoch'] / self.update_freq))
+
+#     def after_print_stats(self, frame, epoch_num, total_time):
+#         if epoch_num % self.update_freq == 0 and self.env.use_curriculum:
+#             crr_params = {}
+#             if self.algo.game_lengths.get_mean() > 0.8*self.env.max_episode_length.cpu().item():
+#                 self.env.cfg['env']['edptb'] = min(self.param['max_edptb'], self.env.cfg['env']['edptb'] + 0.03)
+#                 ptb_range = np.arange(0, round((self.env.cfg['env']['edptb'] - self.env.cfg['env']['stptb']) / self.env.cfg['env']['ptb_step']) + 1) * self.env.cfg['env']['ptb_step'] + self.env.cfg['env']['stptb']
+#                 if self.env.cfg['env']['edptb'] >= self.param["max_edptb"]:
+#                     lean_angle = self.env.lean_angle + np.deg2rad(0.5)
+#                 else:
+#                     lean_angle = self.env.lean_angle
+#                 crr_params["lean_angle"] = min(np.deg2rad(self.param['max_lean_angle']), lean_angle)
+#                 crr_params["_ptb_range"] = ptb_range
+#             crr_params["tqr_limit"] = max(self.param['min_tqr_limit'], self.env.tqr_limit * self.tqr_reduced_rate)
+#             crr_params["avg_coeff"] = max(self.param['min_avg_coeff'], self.env.avg_coeff * self.ac_reduced_rate)
+
+#             self.env.update_curriculum(**crr_params)
 
 class RunnerTrajectoryObserver(AlgoObserver):
     def __init__(self, num_trajs=10):
@@ -95,7 +165,12 @@ class RunnerTrajectoryObserver(AlgoObserver):
                     self.fig.axes[i].set_ylim(low[i], high[i])
                 self.fig.axes[i].set_xlim(0, 3)
             self.fig.tight_layout()
-            self.algo.writer.add_figure('performance/trajectories', self.fig, frame)
+            self.algo.writer.add_figure('performance/trajectories', self.fig, frame) #tensorboard 관련
+
+            # figure 갱신
+            # self.fig.canvas.draw_idle()
+            # self.fig.canvas.flush_events()
+            # plt.pause(0.001)
 
 
 class PosturalControlObserver(DrawTimeTrajObserver):
@@ -210,16 +285,28 @@ class PosturalControlObserver(DrawTimeTrajObserver):
 
         self.drawn_plt_num += n_plots
 
+        # # figure 갱신
+        # self.fig.canvas.draw_idle()
+        # self.fig.canvas.flush_events()
+        # plt.pause(0.001)
 
     def after_run(self):
         super().after_run()
+        
         print("\nAttempting to clean up Isaac Gym resources...")
+
         if hasattr(self.algo, 'env'):
+
             try:
+                # wait_s = 100          # 원하는 대기 시간(초)로 변경
+                # print(f"Viewer will stay open for {wait_s} seconds…")
+                # time.sleep(wait_s)   # ← ① 10 초 대기
+
                 self.algo.env.close()
                 print("Isaac Gym environment closed successfully via runner.vec_env.close().")
             except Exception as cleanup_e:
                 print(f"!!!!!!!! Error during environment cleanup: {cleanup_e} !!!!!!!!")
+            
                 try:
                     if hasattr(self.algo, 'env') and hasattr(self.algo.env, 'gym') and hasattr(self.algo.env, 'sim') and 'cuda' in self.algo.env.device:
                         print("Attempting direct sim destruction...")
@@ -390,7 +477,98 @@ def launch_rlg_hydra(cfg: DictConfig):
         'checkpoint': cfg.checkpoint,
         'sigma': cfg.sigma if cfg.sigma != '' else None
     })
+    try:
+        # ── Isaac‑Gym 포인터 얻기 ──────────────────────────────
+        viewer = None
+        algo   = getattr(runner, 'algo',  None)
+        if algo and hasattr(algo, 'vec_env'):
+            env  = algo.vec_env.env
+            viewer = getattr(env, 'viewer', None)
+            gym   = getattr(env, 'gym',    None)
+            sim   = getattr(env, 'sim',    None)
+
+        print("\n<Esc 또는 창의 X 버튼으로 모두 닫을 때까지 대기합니다>")
+        while True:
+            # 1) Isaac‑Gym Viewer 새 프레임
+            if viewer is not None and not gym.query_viewer_has_closed(viewer):
+                gym.draw_viewer(viewer, sim, True)
+                gym.sync_frame_time(sim)
+            # 2) Matplotlib figure 갱신
+            if plt.get_fignums():
+                plt.pause(0.01)          # 10 ms
+            # 3) 둘 다 닫혔으면 탈출
+            if (viewer is None or gym.query_viewer_has_closed(viewer)) and not plt.get_fignums():
+                break
+        # ── 정리 ──────────────────────────────────────────────
+        if viewer is not None and not gym.query_viewer_has_closed(viewer):
+            gym.destroy_viewer(viewer)
+    except KeyboardInterrupt:
+        if viewer is not None:
+            gym.destroy_viewer(viewer)
+            
+
+    # # 1) Matplotlib: 열린 Figure 가 있으면 사용자가 닫을 때까지 블로킹
+    # if plt.get_fignums():                    # 하나라도 열려 있으면
+    #     print("[INFO] Matplotlib 창을 닫을 때까지 대기합니다…")
+    #     try:
+    #         plt.show(block=True)             # Figure 1 이 여기서 뜸
+    #     except Exception as e:
+    #         print(f"[WARN] plt.show() 중 오류: {e}")
+
+    # # 2) Isaac‑Gym Viewer: headless=False 일 때만 존재
+    # try:
+    #     algo = getattr(runner, 'algo', None)           # run() 이후에 생성됨
+    #     if algo and hasattr(algo, 'vec_env'):
+    #         env   = algo.vec_env.env
+    #         viewer = getattr(env, 'viewer', None)
+    #         if viewer is not None:                     # Viewer 가 실제로 있을 때
+    #             gym = env.gym
+    #             sim = env.sim
+    #             print("[INFO] Isaac Gym Viewer를 닫을 때까지 대기합니다…")
+    #             while not gym.query_viewer_has_closed(viewer):
+    #                 gym.draw_viewer(viewer, sim, True) # 화면 업데이트
+    #                 gym.sync_frame_time(sim)
+    #                 time.sleep(0.01)                   # CPU 점유율 완화
+    #             gym.destroy_viewer(viewer)
+    #             print("[INFO] Viewer closed.")
+    # except Exception as e:
+    #     print(f"[WARN] Viewer 유지 루프에서 예외: {e}")
+
+        # =========================================================
+    # #  Isaac‑Gym Viewer + Matplotlib Figures가 모두 닫힐 때까지 대기
+    # # =========================================================
+    # try:
+    #     # 1) Isaac‑Gym 포인터 가져오기 (있을 수도, 없을 수도 있음)
+    #     viewer = gym = sim = None
+    #     algo   = getattr(runner, 'algo',  None)
+    #     if algo and hasattr(algo, 'vec_env'):
+    #         _env = algo.vec_env.env
+    #         viewer = getattr(_env, 'viewer', None)
+    #         gym    = getattr(_env, 'gym',    None)
+    #         sim    = getattr(_env, 'sim',    None)
+
+    #     print("\n[INFO]   <Esc 또는 X 버튼으로 창을 닫으세요>")
+    #     while True:
+    #         # ── Isaac‑Gym Viewer 프레임 업데이트 ───────────────────
+    #         if viewer is not None and not gym.query_viewer_has_closed(viewer):
+    #             gym.draw_viewer(viewer, sim, True)
+    #             gym.sync_frame_time(sim)
+    #         # ── Matplotlib Figure 이벤트 처리 ─────────────────────
+    #         if plt.get_fignums():
+    #             plt.pause(0.01)                # 10 ms
+    #         # ── 둘 다 닫혔으면 루프 탈출 ──────────────────────────
+    #         if (viewer is None or gym.query_viewer_has_closed(viewer)) and not plt.get_fignums():
+    #             break
+    #     # Viewer 정리
+    #     if viewer is not None and not gym.query_viewer_has_closed(viewer):
+    #         gym.destroy_viewer(viewer)
+    # except KeyboardInterrupt:
+    #     print("\n[INTERRUPT] 사용자 강제 종료 – 창을 정리합니다.")
+    #     if viewer is not None:
+    #         gym.destroy_viewer(viewer)
 
 
 if __name__ == "__main__":
     launch_rlg_hydra()
+
+

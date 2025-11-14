@@ -29,7 +29,7 @@ const_ratio: 1.0
 ank_ratio: ''
 vel_ratio: ''
 tq_ratio: ''
-ankle_limit: 'soft'
+ankle_limit: 'satu'
 stptb: ''
 edptb: ''
 ptb_act_time: 0.275
@@ -75,8 +75,10 @@ num_subscenes: 4 # Splits the simulation into N physics scenes and runs each one
 
 # RLGames Arguments
 # test - if set, run policy in inference mode (requires setting checkpoint to load)
-test: True
+# test: True
+test: False
 load_checkpoint: False
+# load_checkpoint: True
 # used to set checkpoint path
 checkpoint: 'runs/isaacgym_example_result/nn/IDP.pth'
 const_type: 'ankle_torque'

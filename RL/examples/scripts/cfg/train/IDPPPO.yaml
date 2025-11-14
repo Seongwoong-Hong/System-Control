@@ -70,7 +70,7 @@ params:
     clip_value: True
     bounds_loss_coef: 0.0001
     player:
-      games_num: 7
+      games_num: 2 # num of plot option
       n_game_life: 1
       save_mat: ${resolve_default:False,${.....save_mat}}
       show_fig: ${resolve_default:True,${.....show_fig}}
