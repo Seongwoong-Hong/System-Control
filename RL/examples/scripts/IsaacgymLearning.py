@@ -38,13 +38,13 @@ class CurriculumUpdator(AlgoObserver):
         self.param = self.env.cfg['env']['curriculum']
         self.update_freq = 10
         self.ac_reduced_rate = np.exp(np.log(self.param['min_avg_coeff'] / self.env.avg_coeff) / (self.param['end_epoch'] / self.update_freq))
-        self.tqr_reduced_rate = np.exp(np.log(self.param['min_tqr_limit'] / self.env.tqr_limit.item()) / (self.param['end_epoch'] / self.update_freq))
+        self.tqr_reduced_rate = np.exp(np.log(self.param['min_tqr_limit'] / self.env.tqr_limit) / (self.param['end_epoch'] / self.update_freq))
         self.la_increment = np.deg2rad(self.param['max_lean_angle'] / (self.param['end_epoch'] / self.update_freq))
 
     def after_print_stats(self, frame, epoch_num, total_time):
         if epoch_num % self.update_freq == 0 and self.env.use_curriculum:
             crr_params = {}
-            if self.algo.game_lengths.get_mean() > 0.8*self.env.max_episode_length.cpu().item():
+            if self.algo.game_lengths.get_mean() > 0.8*self.env.max_episode_length:
                 self.env.cfg['env']['edptb'] = min(self.param['max_edptb'], self.env.cfg['env']['edptb'] + 0.03)
                 ptb_range = np.arange(0, round((self.env.cfg['env']['edptb'] - self.env.cfg['env']['stptb']) / self.env.cfg['env']['ptb_step']) + 1) * self.env.cfg['env']['ptb_step'] + self.env.cfg['env']['stptb']
                 if self.env.cfg['env']['edptb'] >= self.param["max_edptb"]:
@@ -333,7 +333,10 @@ def launch_rlg_hydra(cfg: DictConfig):
     # sets seed. if seed is -1 will pick a random one
     cfg.seed = set_seed(cfg.seed, torch_deterministic=cfg.torch_deterministic, rank=global_rank)
     cfg_task_dict = omegaconf_to_dict(cfg.task)
-    cfg.full_experiment_name = cfg.experiment_name
+    if len(cfg.experiment_name) == 0:
+        cfg.full_experiment_name = cfg.experiment_name = "test"
+    else:
+        cfg.full_experiment_name = cfg.experiment_name
     if "IDP" in cfg.task.name:
         cfg_task_dict['env']['bsp_path'] = (MAIN_DIR / "demos" / cfg.task.env_type / cfg.task.subj / f"{cfg.task.subj}i1.mat")
         if cfg.task.env.ankle_limit == "satu":
