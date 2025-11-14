@@ -2,7 +2,7 @@
   "PYTHON_SCRIPT": "IsaacgymLearning.py",
   "NUM_RUNS": 1,
   "NUM_THREADS": 1,
-  "EXP_NAME": "TQRExp",
+  "EXP_NAME": "TQRExpTest",
   "sampling": "False",
   "num_names_add": 2,
   "learn_config": {
