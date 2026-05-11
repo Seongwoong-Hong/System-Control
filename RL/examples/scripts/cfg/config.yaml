@@ -21,11 +21,11 @@ fixed_sigma: ''
 lr_schedule: ''
 lr: ''
 # learning parameter study
-lim_level: 0.5
-tqrate_ratio: 0.0
+lim_level: 1.5
+tqrate_ratio: 0.03
 tqcost_ratio: 1.0
 stcost_ratio: 1.0
-const_ratio: 1.0
+const_ratio: 10.0
 ank_ratio: ''
 vel_ratio: ''
 tq_ratio: ''
@@ -33,21 +33,27 @@ ankle_limit: 'satu'
 stptb: ''
 edptb: ''
 ptb_act_time: 0.275
+# ptb_act_time: 0.33333
+
 ptb_type: '5th'
 delay_randomize: 0.0
 delay: True
 delayed_time: 0.1
+# delayed_time: 0.2
 tqr_regularize_type: 'torque_rate'
 action_as_state: False
 use_curriculum: ''
 cost_type: ''
 tqr_limit: 1
+fixed_ptb_idx: 4
+
 # curriculum parameter
 min_tqr_limit: ''
 min_avg_coeff: ''
 max_lean_angle: ''
 max_edptb: ''
 end_epoch: ''
+
 
 # seed - set to -1 to choose random seed
 seed: -1
@@ -80,16 +86,36 @@ test: False
 load_checkpoint: False
 # load_checkpoint: True
 # used to set checkpoint path
-checkpoint: 'runs/isaacgym_example_result/nn/IDP.pth'
+# checkpoint: 'runs/state_noise/noise_freq360_noise_scale0.05/limSatuLevel100_upright10/atm100_as300/IDP_2026-02-08_15-48-35/nn/IDP.pth'
+checkpoint: 'runs/state_noise/noise_freq10_noise_scale0.05/limSatuLevel100_upright10/atm100_as300/IDP_2026-02-08_14-13-04/nn/IDP.pth'
+
 const_type: 'ankle_torque'
 stiff_ank: 250
+damp_ank: 30
+stiff_hip: ''
+damp_hip: ''
+# stiff_ank: 300
 ankle_torque_max: 100
+# ankle_torque_max: 90
+
+noise_theta: -1
+noise_scale: -1
+noise_mean: 0
+# Signal-Dependent Noise (SDN) on motor output
+motor_noise: False
+k_sdn_ankle: 0.5
+k_sdn_hip: 0.5
+sdn_cutoff_hz: 3.0
+
 clipActions: 1.0
-avg_coeff: 1.0
+avg_coeff: 0.07
 upright_type: 0.0
 save_mat: False
 save_fig: False
 show_fig: False
+save_psd: False
+save_shade: False
+
 fig_path: ''
 mat_path: ''
 # set sigma when restoring network

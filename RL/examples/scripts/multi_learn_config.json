@@ -1,37 +1,52 @@
 {
   "PYTHON_SCRIPT": "IsaacgymLearning.py",
-  "NUM_RUNS": 1,
+  "NUM_RUNS": 32,
   "NUM_THREADS": 1,
-  "EXP_NAME": "TQRExp",
+  "EXP_NAME": "motornoise_0507_256",
   "sampling": "False",
-  "num_names_add": 2,
+  "num_names_add": 3,
   "learn_config": {
-    "edptb": [0.165],
-    "avg_coeff": [1.0],
+
+    "seed": ["115-130"],
+    "delay_randomize": [0.0,0.2],
+    "vel_ratio": [0.1],
+
+    "lim_level": [1.5],
+    "noise_theta": [-1],
+    "noise_scale": [-1],
+    "motor_noise": ["True"],
+
+    "ankle_torque_max": [100],
+
+    "delayed_time": [0.1],
+    "k_sdn_ankle": [0.5],
+    "k_sdn_hip": [0.5],
+    "sdn_cutoff_hz": [10.0],
+
+    "clipActions": [1.0],
+    "stiff_ank": [250],
+    "noise_mean": [0],
+    "damp_ank": [30],
+
     "upright_type": [0.0],
     "stcost_ratio": [1.0],
     "tqcost_ratio": [1.0],
-    "tqrate_ratio": [0.0],
+    "avg_coeff": [0.07],
+    "tqrate_ratio": [0.03],
+
     "ank_ratio": [0.5],
-    "vel_ratio": [0.01],
+
     "tq_ratio": [0.5],
-    "const_ratio": [1],
-    "min_avg_coeff": [0.07],
+    "const_ratio": [10.0],
+
     "tqr_limit": [1],
-    "min_tqr_limit": [1],
-    "max_lean_angle": [0],
-    "max_edptb": [0.0],
-    "end_epoch": [1000],
     "task_name": ["IDPMinEffort"],
-    "ankle_limit": ["hard"],
+    "ankle_limit": ["satu"],
     "const_type": ["ankle_torque"],
     "use_curriculum": ["False"],
     "ptb_type": ["5th"],
     "ptb_act_time": [0.33333],
-    "lim_level": [1.0],
-    "ankle_torque_max": [100],
-    "clipActions": [1.0],
-    "delay_randomize": [0.2],
     "max_iterations": [3000]
+
   }
 }

@@ -1,7 +1,7 @@
 FROM nvcr.io/nvidia/pytorch:22.12-py3
 ENV DEBIAN_FRONTEND=noninteractive
 
-ARG USERNAME=hsw
+ARG USERNAME=user
 ARG UID=1027
 ENV USERNAME=${USERNAME}
 ENV UID=${UID}

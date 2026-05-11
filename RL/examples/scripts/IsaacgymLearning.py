@@ -1,6 +1,6 @@
-#1114 실행에러 수정
-import os
-os.environ.setdefault("MPLBACKEND", "Agg")
+# #1114 실행에러 수정
+# import os
+# os.environ.setdefault("MPLBACKEND", "Agg")
 
 import hydra
 
@@ -88,32 +88,7 @@ class CurriculumUpdator(AlgoObserver):
             self.env.update_curriculum(**crr_params)
 
 
-# class CurriculumUpdator(AlgoObserver):
-#     def after_init(self, algo):
-#         self.algo = algo
-#         self.env = algo.vec_env.env
-#         self.param = self.env.cfg['env']['curriculum']
-#         self.update_freq = 10
-#         self.ac_reduced_rate = np.exp(np.log(self.param['min_avg_coeff'] / self.env.avg_coeff) / (self.param['end_epoch'] / self.update_freq))
-#         self.tqr_reduced_rate = np.exp(np.log(self.param['min_tqr_limit'] / self.env.tqr_limit.item()) / (self.param['end_epoch'] / self.update_freq))
-#         self.la_increment = np.deg2rad(self.param['max_lean_angle'] / (self.param['end_epoch'] / self.update_freq))
 
-#     def after_print_stats(self, frame, epoch_num, total_time):
-#         if epoch_num % self.update_freq == 0 and self.env.use_curriculum:
-#             crr_params = {}
-#             if self.algo.game_lengths.get_mean() > 0.8*self.env.max_episode_length.cpu().item():
-#                 self.env.cfg['env']['edptb'] = min(self.param['max_edptb'], self.env.cfg['env']['edptb'] + 0.03)
-#                 ptb_range = np.arange(0, round((self.env.cfg['env']['edptb'] - self.env.cfg['env']['stptb']) / self.env.cfg['env']['ptb_step']) + 1) * self.env.cfg['env']['ptb_step'] + self.env.cfg['env']['stptb']
-#                 if self.env.cfg['env']['edptb'] >= self.param["max_edptb"]:
-#                     lean_angle = self.env.lean_angle + np.deg2rad(0.5)
-#                 else:
-#                     lean_angle = self.env.lean_angle
-#                 crr_params["lean_angle"] = min(np.deg2rad(self.param['max_lean_angle']), lean_angle)
-#                 crr_params["_ptb_range"] = ptb_range
-#             crr_params["tqr_limit"] = max(self.param['min_tqr_limit'], self.env.tqr_limit * self.tqr_reduced_rate)
-#             crr_params["avg_coeff"] = max(self.param['min_avg_coeff'], self.env.avg_coeff * self.ac_reduced_rate)
-
-#             self.env.update_curriculum(**crr_params)
 
 class RunnerTrajectoryObserver(AlgoObserver):
     def __init__(self, num_trajs=10):
@@ -126,7 +101,7 @@ class RunnerTrajectoryObserver(AlgoObserver):
         for i in range(8):
             self.fig.add_subplot(4, 2, i + 1)
 
-    def after_print_stats(self, frame, epoch_num, total_time):
+    def after_print_stats(self, frame, epoch_num, total_time):  # 이건 내가 수정한거라 실행이 제대로 안되고있는듯?
         if (self.algo.save_freq > 0) and ((epoch_num + 1) % self.algo.save_freq == 0):
             done_traj_idx = torch.where(self.algo.vec_env.env.reset_buf)[0]
             num_sample = min(self.num_trajs, len(done_traj_idx))
@@ -136,6 +111,7 @@ class RunnerTrajectoryObserver(AlgoObserver):
             act_traj = self.algo.vec_env.env.act_traj[traj_idx]
             tqr_traj = self.algo.vec_env.env.tqr_traj[traj_idx]
             ptb_acc = self.algo.vec_env.env._ptb[traj_idx]
+
             tspan = np.linspace(0, (obs_traj.shape[1] - 1) * self.algo.vec_env.env.dt, obs_traj.shape[1])
             for i in range(8):
                 self.fig.axes[i].cla()
@@ -145,12 +121,27 @@ class RunnerTrajectoryObserver(AlgoObserver):
                 self.fig.axes[i + 4].plot(tspan, (-act_traj[..., i].T * self.algo.vec_env.env.joint_gears[i]).cpu(), linewidth=2)
             for i in range(2):
                 self.fig.axes[i + 6].plot(tspan, tqr_traj[..., i].T.cpu(), linewidth=2)
+
+            # 제목 추가
+            titles = [
+                "Ankle angle (deg)", "Hip angle (deg)",
+                "Ankle ang. vel (deg/s)", "Hip ang. vel (deg/s)",
+                "Ankle torque (Nm)", "Hip torque (Nm)",
+                "Ankle torque rate (Nm/s)", "Hip torque rate (Nm/s)"
+            ]
+            for i, ax in enumerate(self.fig.axes):
+                ax.set_title(titles[i], fontsize=9)
+                ax.axhline(0, color='0.5', linewidth=0.8)
+            self.fig.axes[6].set_xlabel("Time (s)")
+            self.fig.axes[7].set_xlabel("Time (s)")
+
+
             high = [5, 10, 50, 100, 120, 85, 500, 500]
             low = [-10, -30, -50, -100, -50, -25, -300, -300]
             for i in range(8):
                 if i < 6:
                     self.fig.axes[i].set_ylim(low[i], high[i])
-                self.fig.axes[i].set_xlim(0, 3)
+                self.fig.axes[i].set_xlim(0, 5)
             self.fig.tight_layout()
             self.algo.writer.add_figure('performance/trajectories', self.fig, frame) #tensorboard 관련
 
@@ -174,9 +165,9 @@ class PosturalControlObserver(DrawTimeTrajObserver):
         self.save_mat = self.algo.player_config.get("save_mat", False)
         if self.save_mat:
             self.trial_idx = 0
-        self.fig = plt.figure(figsize=[14.0, 10.0])
-        for i in range(12):
-            self.fig.add_subplot(4, 3, i + 1)
+        self.fig = plt.figure(figsize=[14.0, 15.0])
+        for i in range(18):
+            self.fig.add_subplot(6, 3, i + 1)
         if self.save_fig and self.fig_path is None:
             (target_dir / "fig").parent.mkdir(exist_ok=True)
             fig_idx = 0
@@ -184,6 +175,78 @@ class PosturalControlObserver(DrawTimeTrajObserver):
             while self.fig_path.exists():
                 fig_idx += 1
                 self.fig_path = (target_dir / "fig") / f"result{fig_idx}.png"
+
+    def _save_psd_figure(self):
+        from scipy import signal as sp_signal
+        from pathlib import Path
+
+        noise_all = np.concatenate(self._noise_data, axis=1)
+        fs = 1.0 / self.algo.env.dt
+        n_plots = noise_all.shape[1]
+        nperseg = min(256, noise_all.shape[0] // 2)  # 고정
+
+        fig_psd, axes = plt.subplots(1, 2, figsize=[12, 5])
+        labels = ['θ₁ noise', 'θ₂ noise']
+
+        for ch in range(2):
+            psds = []
+            for i in range(n_plots):
+                sig = noise_all[:, i, ch]
+                sig = sig[~np.isnan(sig)]
+                if len(sig) < nperseg:
+                    continue
+                freqs, psd = sp_signal.welch(sig, fs=fs, nperseg=nperseg)
+                psds.append(psd)
+                axes[ch].loglog(freqs[1:], psd[1:], alpha=0.3, linewidth=0.8, color='gray')
+
+
+            if psds:
+                mean_psd = np.mean(psds, axis=0)
+                axes[ch].loglog(freqs[1:], mean_psd[1:], linewidth=2.5, color='C0', label='Mean PSD')
+
+                # # β 추정 (1~40Hz 구간)
+                # mask = (freqs >= 0.1) & (freqs <= 25)
+                # if mask.sum() > 2:
+                #     coeffs = np.polyfit(np.log10(freqs[mask]), np.log10(mean_psd[mask]), 1)
+                #     beta = -coeffs[0]
+                #     fit_f = np.logspace(0, np.log10(40), 50)
+                #     fit_psd = 10 ** np.polyval(coeffs, np.log10(fit_f))
+                #     axes[ch].loglog(fit_f, fit_psd, '--', color='red', linewidth=2,
+                #                     label=f'β = {beta:.2f}')
+                    
+                mask = (freqs >= 0.1) & (freqs <= 25) & (mean_psd > 0)
+                if mask.sum() > 2:
+                    log_f = np.log10(freqs[mask])
+                    log_p = np.log10(mean_psd[mask])
+                    if np.all(np.isfinite(log_f)) and np.all(np.isfinite(log_p)):
+                        coeffs = np.polyfit(log_f, log_p, 1)
+                        beta = -coeffs[0]
+                        fit_f = np.logspace(np.log10(0.1), np.log10(25), 50)  # 0.1~25Hz
+                        fit_psd = 10 ** np.polyval(coeffs, np.log10(fit_f))
+                        axes[ch].loglog(fit_f, fit_psd, '--', color='red', linewidth=2,
+                                        label=f'β = {beta:.2f}')
+
+
+            axes[ch].set_xlabel('Frequency (Hz)')
+            axes[ch].set_ylabel('PSD')
+            axes[ch].set_title(labels[ch])
+            axes[ch].legend()
+            axes[ch].grid(True, alpha=0.3, which='both')
+            axes[ch].set_xlim(0.5, 1e2)
+            axes[ch].set_ylim(1e-5, 5)
+
+        # 제목에 noise_mean 추가하기
+        fig_psd.suptitle(f'Noise PSD (noise_change_index={1/self.algo.env.noise_theta:.2f}, '
+                         f'noise_scale={self.algo.env.noise_scale})', fontweight='bold')
+        fig_psd.tight_layout()
+
+        # fig_path에서 _psd 붙여서 저장
+        psd_path = Path(str(self.fig_path).replace('.png', '_psd.png'))
+        fig_psd.savefig(str(psd_path), dpi=150, bbox_inches='tight')
+        plt.close(fig_psd)
+        print(f"PSD figure saved: {psd_path}")
+
+
 
     def after_play(self):
         tspan = np.linspace(0, self.obs.shape[0], self.obs.shape[0]) * self.algo.env.dt
@@ -193,46 +256,224 @@ class PosturalControlObserver(DrawTimeTrajObserver):
         time_indices = torch.arange(self.obs.shape[0]).unsqueeze(1)  # 시간 인덱스 텐서 (T, 1)
         mask = (time_indices <= self.algo.end_idx.unsqueeze(0))[:, :n_plots].to(self.algo.env.device).unsqueeze(-1)  # (T, n_plots) 형태의 마스크 생성
 
+
         masked_obs = torch.where(mask, self.obs[:, :n_plots, :], torch.tensor(float('nan'), device=self.algo.env.device))
+        print(self.obs.shape) #torch.Size([361, 7, 4])
+        print(masked_obs.shape) #torch.Size([361, 7, 4])
+
         masked_acts = torch.where(mask, self.acts[:, :n_plots, :], torch.tensor(float('nan'), device=self.algo.env.device))
         masked_tqr = torch.where(mask, self.infos['torque_rate'][:, :n_plots, :], torch.tensor(float('nan'), device=self.algo.env.device))
         masked_ffc = torch.where(mask, self.infos['foot_forces'][:, :n_plots, :], torch.tensor(float('nan'), device=self.algo.env.device))
 
-        state_cost = torch.nansum(masked_obs ** 2, dim=0)
-        action_cost = torch.nansum(masked_acts ** 2, dim=0)
-        tqrate_cost = torch.nansum(torch.max((masked_tqr / 3) ** 2 - 1, torch.tensor(0.0)), dim=0)
+        # reward 계산 추가
+        print(self.rews.shape) #torch.Size([361, 7])
+        # masked_rew = torch.where(mask, self.rews[:, :n_plots, :], torch.tensor(float('nan'), device=self.algo.env.device))
+        masked_rew = self.rews[:, :n_plots] # mask 작동안됨
 
+
+
+        #0219 시각화구현
+        nan = torch.tensor(float('nan'), device=self.algo.env.device)
+        # 신규: env extras로부터 clean/noise/noisy 가져오기
+        masked_theta_clean = torch.where(mask, self.infos['theta_clean'][:, :n_plots, :], nan)
+        masked_theta_noise = torch.where(mask, self.infos['theta_noise'][:, :n_plots, :], nan)
+        masked_theta_noisy = torch.where(mask, self.infos['theta_noisy'][:, :n_plots, :], nan)
+
+        # motor noise extras
+        masked_motor_noise = torch.where(mask, self.infos['motor_noise'][:, :n_plots, :], nan)
+        masked_action_noisy = torch.where(mask, self.infos['action_noisy'][:, :n_plots, :], nan)
+        masked_sampled_action = torch.where(mask, self.infos['sampled_action'][:, :n_plots, :], nan)
+
+        gears = self.algo.env.joint_gears.reshape(1, 1, -1)
+
+        # 6행(총 12채널) 구성
         vals = torch.concat([
-            torch.rad2deg(-masked_obs),
-            -masked_acts*self.algo.env.joint_gears.reshape(1, 1, -1),
-            -masked_tqr*self.algo.env.joint_gears.reshape(1, 1, -1),
-            ], dim=-1).cpu().numpy()
-        rews = torch.concat([state_cost, action_cost, tqrate_cost], dim=-1).cpu().numpy()
+            torch.rad2deg(-masked_theta_clean),          # 1행: clean θ1, θ2
+            torch.rad2deg(-masked_theta_noise),          # 2행: state noise θ1, θ2
+            torch.rad2deg(-masked_theta_noisy),          # 3행: noisy θ1, θ2
+            -masked_motor_noise * gears,                 # 4행: motor noise (torque)
+            -masked_action_noisy * gears,                # 5행: action + motor noise (torque)
+            -masked_acts * gears,                        # 6행: EMA 적용 후 최종 action (torque) — mat 저장과 동일
+        ], dim=-1).cpu().numpy()
+
+        # bar plot용 cost도 12채널에 맞춰 구성
+        clean_cost = torch.nansum(masked_theta_clean ** 2, dim=0)           # (n_plots, 2)
+        noise_cost = torch.nansum(masked_theta_noise ** 2, dim=0)           # (n_plots, 2)
+        noisy_cost = torch.nansum(masked_theta_noisy ** 2, dim=0)           # (n_plots, 2)
+        motor_noise_cost = torch.nansum(masked_motor_noise ** 2, dim=0)     # (n_plots, 2)
+        action_noisy_cost = torch.nansum(masked_action_noisy ** 2, dim=0)   # (n_plots, 2)
+        sampled_action_cost = torch.nansum(masked_sampled_action ** 2, dim=0) # (n_plots, 2)
+
+        rews = torch.concat([clean_cost, noise_cost, noisy_cost,
+                             motor_noise_cost, action_noisy_cost, sampled_action_cost], dim=-1).cpu().numpy()
+
         pert_x = np.arange(self.drawn_plt_num, self.drawn_plt_num + n_plots)
         bar_width = 0.35
         bar_colors = ['b', 'r']
         traj_colors = np.tile(0.1*np.linspace(7, 1, 7)[:, None] * np.ones([7, 3]), (5, 1))
+
         for pi in range(self.drawn_plt_num, n_plots):
             for i in range(vals.shape[-1]):
                 self.fig.axes[3*(i // 2) + i % 2].plot(tspan, vals[:, pi, i], linewidth=1.5, color=traj_colors[pi])
                 self.fig.axes[3*(i // 2) + 2].bar(pert_x + ((i % 2) - 1/2)*bar_width, rews[:, i], bar_width, color=bar_colors[i % 2])
+
+        # y-limit은 새 신호에 맞춰 조정 권장(예시)
+        # high = [20, 20, 15,   10, 10, 8,   20, 20, 15,   600, 600, 1.2]
+        # low  = [-20,-20, 0,  -10,-10, 0,  -20,-20, 0,  -600,-600, 0]
+
         high = [7.5, 10, 15,
-                100, 100, 150,
-                120, 150, 45,
-                600, 600, 1.2]
+                5, 5, 10,
+                7.5, 10, 15,
+                20, 20, 10,
+               120, 150, 45,
+               120, 150, 45]
         low = [-15, -50, 0,
-               -50, -200, 0,
-               -50, -25, 0,
-               -400, -400, 0]
-        not_adjust_lim = [11]
-        for i in range(12):
+               -5, -5, 0,
+               -15, -50, 0,
+               -20, -20, 0,
+               -120, -150, 0,
+               -120, -150, 0]
+
+        not_adjust_lim = [17]
+        for i in range(18):
             if not i in not_adjust_lim:
                 self.fig.axes[i].set_ylim(low[i], high[i])
             if i % 3 != 2:
-                self.fig.axes[i].set_xlim(0, 3)
+                self.fig.axes[i].set_xlim(0, 5)
                 self.fig.axes[i].axvline(0.33333, linestyle='--', color='k', linewidth=0.75)
                 self.fig.axes[i].axvline(0.60833, linestyle='--', color='k', linewidth=0.75)
+        
 
+        self.save_shade = self.algo.player_config.get("save_shade", False)
+        # ── save_shade option ──────────────────────────────────────────────
+        # vals shape: (T, n_plots, 12)
+        #   ch 0,1   : clean θ1, θ2
+        #   ch 2,3   : state noise θ1, θ2
+        #   ch 4,5   : noisy θ1, θ2
+        #   ch 6,7   : motor noise (torque)
+        #   ch 8,9   : action + motor noise (torque)
+        #   ch 10,11 : clean action (torque)
+        #
+        # figure 구성 (4행 × 2열):
+        #   row 0 : clean θ  mean ± std shade
+        #   row 1 : clean θ  std 궤적
+        #   row 2 : clean action torque mean ± std shade (TQNORM 정규화)
+        #   row 3 : clean action torque std 궤적 (TQNORM 정규화)
+        if self.save_shade:
+            TQNORM_sub10 = 1147.9003   # young sub10 TQNORM (from MATLAB visualize_unified.m)
+
+            line_color  = 'k'
+            shade_color = '0.6'
+            shade_alpha = 0.4
+
+            # n_plots 차원(axis=1)에서 mean/std 계산 (NaN 무시)
+            shade_mean = np.nanmean(vals, axis=1)   # (T, 12)
+            shade_std  = np.nanstd(vals,  axis=1)   # (T, 12)
+
+            # torque 채널(ch 6~11)을 TQNORM으로 정규화
+            shade_mean_plot = shade_mean.copy()
+            shade_std_plot  = shade_std.copy()
+            shade_mean_plot[:, 6:12] = shade_mean[:, 6:12] / TQNORM_sub10
+            shade_std_plot[:, 6:12]  = shade_std[:, 6:12]  / TQNORM_sub10
+
+            fig_shade, axes_shade = plt.subplots(
+                4, 2,
+                figsize=(10, 12),
+                tight_layout=True,
+            )
+
+            # (row, col, channel, ylabel, is_std, (ymin, ymax))
+            subplot_cfg = [
+                # row 0: clean θ mean±std
+                (0, 0, 0,  r'Clean $\theta_1$ (°)',            False, (-15,    7.5 )),
+                (0, 1, 1,  r'Clean $\theta_2$ (°)',            False, (-50,   10.0 )),
+                # row 1: clean θ std 궤적
+                (1, 0, 0,  r'Std $\theta_1$ (°)',              True,  (  0,    5.0 )),
+                (1, 1, 1,  r'Std $\theta_2$ (°)',              True,  (  0,   20.0 )),
+                # row 2: clean action torque mean±std (normalized) — ch 10,11
+                (2, 0, 10, r'Norm. Torque 1 ($\tau$/TQNORM)',  False, (-0.05,  0.1 )),
+                (2, 1, 11, r'Norm. Torque 2 ($\tau$/TQNORM)',  False, (-0.05,  0.1 )),
+                # row 3: clean action torque std 궤적 (normalized) — ch 10,11
+                (3, 0, 10, r'Std Norm. Torque 1',              True,  (0,  0.04 )),
+                (3, 1, 11, r'Std Norm. Torque 2',              True,  (0,  0.04 )),
+            ]
+
+            for (r, c, ch, ylabel, is_std, ylim) in subplot_cfg:
+                ax  = axes_shade[r, c]
+                mu  = shade_mean_plot[:, ch]
+                sig = shade_std_plot[:, ch]
+
+                if is_std:
+                    ax.fill_between(tspan, 0, sig,
+                                    color=shade_color, alpha=shade_alpha, linewidth=0)
+                    ax.plot(tspan, sig, color=line_color, linewidth=1.5)
+                else:
+                    ax.fill_between(tspan, mu - sig, mu + sig,
+                                    color=shade_color, alpha=shade_alpha, linewidth=0)
+                    ax.plot(tspan, mu,       color=line_color, linewidth=1.8, label='mean')
+                    ax.plot(tspan, mu + sig, color=line_color, linewidth=0.8,
+                            linestyle='--', alpha=0.5)
+                    ax.plot(tspan, mu - sig, color=line_color, linewidth=0.8,
+                            linestyle='--', alpha=0.5)
+                    ax.legend(fontsize=8)
+
+                ax.axvline(0.33333, linestyle='--', color='k', linewidth=0.75)
+                ax.axvline(0.60833, linestyle='--', color='k', linewidth=0.75)
+                ax.set_xlim(0, 5)
+                ax.set_ylim(ylim)
+                ax.set_xlabel('Time (s)', fontsize=10)
+                ax.set_ylabel(ylabel, fontsize=10)
+
+            fig_shade.suptitle(
+                f'Mean ± Std  &  Std trajectory  (clean θ & norm. torque, TQNORM={TQNORM_sub10:.1f})',
+                fontsize=11)
+
+            shade_path = Path(str(self.fig_path).replace('.png', '_shade.png'))
+            fig_shade.savefig(str(shade_path), dpi=150, bbox_inches='tight')
+            plt.close(fig_shade)
+
+
+        # # 이전시각화 코드 # vals가 구현을 담당
+        # state_cost = torch.nansum(masked_obs ** 2, dim=0)
+        # action_cost = torch.nansum(masked_acts ** 2, dim=0)
+        # tqrate_cost = torch.nansum(torch.max((masked_tqr / 3) ** 2 - 1, torch.tensor(0.0)), dim=0)
+
+        # rews = torch.concat([state_cost, action_cost, tqrate_cost], dim=-1).cpu().numpy()
+        # pert_x = np.arange(self.drawn_plt_num, self.drawn_plt_num + n_plots)
+        # bar_width = 0.35
+        # bar_colors = ['b', 'r']
+        # traj_colors = np.tile(0.1*np.linspace(7, 1, 7)[:, None] * np.ones([7, 3]), (5, 1))
+
+        # vals = torch.concat([
+        #     torch.rad2deg(-masked_obs),
+        #     -masked_acts*self.algo.env.joint_gears.reshape(1, 1, -1),
+        #     -masked_tqr*self.algo.env.joint_gears.reshape(1, 1, -1),
+        #     ], dim=-1).cpu().numpy()
+        
+        # for pi in range(self.drawn_plt_num, n_plots):
+        #     for i in range(vals.shape[-1]):
+        #         self.fig.axes[3*(i // 2) + i % 2].plot(tspan, vals[:, pi, i], linewidth=1.5, color=traj_colors[pi])
+        #         self.fig.axes[3*(i // 2) + 2].bar(pert_x + ((i % 2) - 1/2)*bar_width, rews[:, i], bar_width, color=bar_colors[i % 2])
+        # high = [7.5, 10, 15,
+        #         100, 100, 150,
+        #         120, 150, 45,
+        #         600, 600, 1.2]
+        # low = [-15, -50, 0,
+        #        -50, -200, 0,
+        #        -50, -25, 0,
+        #        -400, -400, 0]
+        # not_adjust_lim = [11]
+        # for i in range(12):
+        #     if not i in not_adjust_lim:
+        #         self.fig.axes[i].set_ylim(low[i], high[i])
+        #     if i % 3 != 2:
+        #         self.fig.axes[i].set_xlim(0, 5)
+        #         self.fig.axes[i].axvline(0.33333, linestyle='--', color='k', linewidth=0.75)
+        #         self.fig.axes[i].axvline(0.60833, linestyle='--', color='k', linewidth=0.75)
+
+
+
+        # matlab 데이터 저장 코드
         if self.save_mat:
             if self.mat_path is None:
                 self.mat_path = MAIN_DIR / "RL" / "analysis" / "MATLAB"
@@ -246,17 +487,25 @@ class PosturalControlObserver(DrawTimeTrajObserver):
                 l1c = (bsp[2, 0] * bsp[2, 2] + bsp[3, 0] * (bsp[2, 1] + bsp[3, 2])) / sum(bsp[2:4, 0])
                 l1 = sum(bsp[2:4, 1])
                 l2c = bsp[6, 2]
-                state = np.ones([360, 4]) * np.nan
-                torque = np.ones([360, 2]) * np.nan
-                len_t = min(360, masked_obs.shape[0])
+                nFrames = round(self.algo.env.max_episode_length)
+                state = np.ones([nFrames, 4]) * np.nan
+                torque = np.ones([nFrames, 2]) * np.nan
+                rewards = np.ones([nFrames, 1]) * np.nan
+
+                len_t = min(nFrames, masked_obs.shape[0])
                 state[:len_t, :] = -masked_obs[:len_t, i, :].cpu().numpy()
                 torque[:len_t, :] = -(masked_acts[:len_t, i, :] * self.algo.env.joint_gears).cpu().numpy()
+
+                # rewardterm
+                # rewards[:len_t] = masked_rew[:len_t,i].cpu().numpy()
+                rewards[:len_t] = masked_rew[:len_t, i].cpu().numpy().reshape(-1, 1)
+
                 pltq1 = (m1*l1c*np.cos(state[:, 0]) + m2*l1*np.cos(state[:, 0]) + m2*l2c*np.cos(state[:, 1]))*pltdd
                 pltq2 = m2 * l2c * np.cos(state[:, 1]) * pltdd
                 pltq = np.array([pltq1, pltq2]).T
                 com = ((m1*l1c*np.sin(state[:, 0]) + m2*(l1*np.sin(state[:, 0]) + l2c*np.sin(state[:, :2].sum(axis=1))))
                        / (m1 + m2))
-                cop = np.ones([360,]) * np.nan
+                cop = np.ones([nFrames,]) * np.nan
                 cop[:len_t] = ((masked_ffc[:len_t, i, 4] + 0.08 * masked_ffc[:len_t, i, 0]) / -masked_ffc[:len_t, i, 2]).cpu().numpy()
 
                 data = {
@@ -267,8 +516,15 @@ class PosturalControlObserver(DrawTimeTrajObserver):
                     'tq': torque.astype(np.float64),
                     'com': com.astype(np.float64),
                     'cop': cop.astype(np.float64),
+                    'reward' : rewards.astype(np.float64)
                 }
                 io.savemat(f"{self.mat_path}/sub10i{self.trial_idx}.mat", data)
+
+
+        # PSD용 노이즈 데이터 저장
+        if not hasattr(self, '_noise_data'):
+            self._noise_data = []
+        self._noise_data.append(torch.rad2deg(-masked_theta_noise[:, :n_plots, :]).cpu().numpy())
 
         self.drawn_plt_num += n_plots
 
@@ -278,6 +534,13 @@ class PosturalControlObserver(DrawTimeTrajObserver):
         # plt.pause(0.001)
 
     def after_run(self):
+        
+        # PSD figure 생성
+        self.save_psd = self.algo.player_config.get("save_psd", False)
+        if self.save_psd and hasattr(self, '_noise_data') and self.fig_path is not None:
+            self._save_psd_figure()
+
+
         super().after_run()
         
         print("\nAttempting to clean up Isaac Gym resources...")
@@ -467,8 +730,39 @@ def launch_rlg_hydra(cfg: DictConfig):
         'checkpoint': cfg.checkpoint,
         'sigma': cfg.sigma if cfg.sigma != '' else None
     })
+
+    # save_result코드 자동실행 위함 1129
+    # try:
+    #     # ── Isaac‑Gym 포인터 얻기 ──────────────────────────────
+    #     viewer = None
+    #     algo   = getattr(runner, 'algo',  None)
+    #     if algo and hasattr(algo, 'vec_env'):
+    #         env  = algo.vec_env.env
+    #         viewer = getattr(env, 'viewer', None)
+    #         gym   = getattr(env, 'gym',    None)
+    #         sim   = getattr(env, 'sim',    None)
+
+    #     print("\n<Esc 또는 창의 X 버튼으로 모두 닫을 때까지 대기합니다>")
+    #     while True:
+    #         # 1) Isaac‑Gym Viewer 새 프레임
+    #         if viewer is not None and not gym.query_viewer_has_closed(viewer):
+    #             gym.draw_viewer(viewer, sim, True)
+    #             gym.sync_frame_time(sim)
+    #         # 2) Matplotlib figure 갱신
+    #         if plt.get_fignums():
+    #             plt.pause(0.01)          # 10 ms
+    #         # 3) 둘 다 닫혔으면 탈출
+    #         if (viewer is None or gym.query_viewer_has_closed(viewer)) and not plt.get_fignums():
+    #             break
+    #     # ── 정리 ──────────────────────────────────────────────
+    #     if viewer is not None and not gym.query_viewer_has_closed(viewer):
+    #         gym.destroy_viewer(viewer)
+    # except KeyboardInterrupt:
+    #     if viewer is not None:
+    #         gym.destroy_viewer(viewer)
+
     try:
-        # ── Isaac‑Gym 포인터 얻기 ──────────────────────────────
+        # ── Isaac-Gym 포인터 얻기 ──────────────────────────────
         viewer = None
         algo   = getattr(runner, 'algo',  None)
         if algo and hasattr(algo, 'vec_env'):
@@ -477,85 +771,42 @@ def launch_rlg_hydra(cfg: DictConfig):
             gym   = getattr(env, 'gym',    None)
             sim   = getattr(env, 'sim',    None)
 
+        # [추가 ①] 백엔드 판정: 비-GUI면 즉시 모든 figure 닫기
+        import matplotlib
+        _backend  = matplotlib.get_backend().lower()
+        _non_gui  = _backend in (
+            "agg", "pdf", "ps", "svg", "cairo", "template",
+            "module://matplotlib_inline.backend_inline"
+        )
+        if _non_gui:
+            plt.close("all")
+
         print("\n<Esc 또는 창의 X 버튼으로 모두 닫을 때까지 대기합니다>")
         while True:
-            # 1) Isaac‑Gym Viewer 새 프레임
+            # 1) Isaac-Gym Viewer 새 프레임
             if viewer is not None and not gym.query_viewer_has_closed(viewer):
                 gym.draw_viewer(viewer, sim, True)
                 gym.sync_frame_time(sim)
+
             # 2) Matplotlib figure 갱신
-            if plt.get_fignums():
-                plt.pause(0.01)          # 10 ms
+            # [수정 ②] 비-GUI 백엔드에서는 pause 호출 금지
+            if (not _non_gui) and plt.get_fignums():
+                plt.pause(0.01)
+
             # 3) 둘 다 닫혔으면 탈출
-            if (viewer is None or gym.query_viewer_has_closed(viewer)) and not plt.get_fignums():
+            # [수정 ③] 비-GUI면 figure 조건을 즉시 참으로 간주
+            if (viewer is None or gym.query_viewer_has_closed(viewer)) and \
+               (_non_gui or not plt.get_fignums()):
                 break
+
         # ── 정리 ──────────────────────────────────────────────
         if viewer is not None and not gym.query_viewer_has_closed(viewer):
             gym.destroy_viewer(viewer)
     except KeyboardInterrupt:
         if viewer is not None:
             gym.destroy_viewer(viewer)
+
             
-
-    # # 1) Matplotlib: 열린 Figure 가 있으면 사용자가 닫을 때까지 블로킹
-    # if plt.get_fignums():                    # 하나라도 열려 있으면
-    #     print("[INFO] Matplotlib 창을 닫을 때까지 대기합니다…")
-    #     try:
-    #         plt.show(block=True)             # Figure 1 이 여기서 뜸
-    #     except Exception as e:
-    #         print(f"[WARN] plt.show() 중 오류: {e}")
-
-    # # 2) Isaac‑Gym Viewer: headless=False 일 때만 존재
-    # try:
-    #     algo = getattr(runner, 'algo', None)           # run() 이후에 생성됨
-    #     if algo and hasattr(algo, 'vec_env'):
-    #         env   = algo.vec_env.env
-    #         viewer = getattr(env, 'viewer', None)
-    #         if viewer is not None:                     # Viewer 가 실제로 있을 때
-    #             gym = env.gym
-    #             sim = env.sim
-    #             print("[INFO] Isaac Gym Viewer를 닫을 때까지 대기합니다…")
-    #             while not gym.query_viewer_has_closed(viewer):
-    #                 gym.draw_viewer(viewer, sim, True) # 화면 업데이트
-    #                 gym.sync_frame_time(sim)
-    #                 time.sleep(0.01)                   # CPU 점유율 완화
-    #             gym.destroy_viewer(viewer)
-    #             print("[INFO] Viewer closed.")
-    # except Exception as e:
-    #     print(f"[WARN] Viewer 유지 루프에서 예외: {e}")
-
-        # =========================================================
-    # #  Isaac‑Gym Viewer + Matplotlib Figures가 모두 닫힐 때까지 대기
-    # # =========================================================
-    # try:
-    #     # 1) Isaac‑Gym 포인터 가져오기 (있을 수도, 없을 수도 있음)
-    #     viewer = gym = sim = None
-    #     algo   = getattr(runner, 'algo',  None)
-    #     if algo and hasattr(algo, 'vec_env'):
-    #         _env = algo.vec_env.env
-    #         viewer = getattr(_env, 'viewer', None)
-    #         gym    = getattr(_env, 'gym',    None)
-    #         sim    = getattr(_env, 'sim',    None)
-
-    #     print("\n[INFO]   <Esc 또는 X 버튼으로 창을 닫으세요>")
-    #     while True:
-    #         # ── Isaac‑Gym Viewer 프레임 업데이트 ───────────────────
-    #         if viewer is not None and not gym.query_viewer_has_closed(viewer):
-    #             gym.draw_viewer(viewer, sim, True)
-    #             gym.sync_frame_time(sim)
-    #         # ── Matplotlib Figure 이벤트 처리 ─────────────────────
-    #         if plt.get_fignums():
-    #             plt.pause(0.01)                # 10 ms
-    #         # ── 둘 다 닫혔으면 루프 탈출 ──────────────────────────
-    #         if (viewer is None or gym.query_viewer_has_closed(viewer)) and not plt.get_fignums():
-    #             break
-    #     # Viewer 정리
-    #     if viewer is not None and not gym.query_viewer_has_closed(viewer):
-    #         gym.destroy_viewer(viewer)
-    # except KeyboardInterrupt:
-    #     print("\n[INTERRUPT] 사용자 강제 종료 – 창을 정리합니다.")
-    #     if viewer is not None:
-    #         gym.destroy_viewer(viewer)
 
 
 if __name__ == "__main__":

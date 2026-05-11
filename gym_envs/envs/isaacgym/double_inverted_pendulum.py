@@ -67,6 +67,13 @@ class IDPMinEffort(VecTask):
         self._jnt_stiffness = to_torch(self._jnt_stiffness, device=self.device)
         self._jnt_damping = to_torch(self._jnt_damping, device=self.device)
 
+        # SDN 계수 텐서 (관절별: ankle, hip)
+        self._k_sdn = to_torch([self.k_sdn_ankle, self.k_sdn_hip], device=self.device)
+        # Band-limited SDN noise state
+        if self.sdn_cutoff_hz > 0:
+            self._sdn_alpha = 1.0 - np.exp(-2.0 * np.pi * self.sdn_cutoff_hz * self.cfg['sim']['dt'])
+            self._sdn_noise_state = torch.zeros(self.num_envs, 2, device=self.device)
+
         # displacement: Anterior(+), Posterior(-)
         # angle: Flexion(+), Extension(-) (WARNING: Sign convention is inverted from the paper)
         if self.const_type == "cop":
@@ -87,6 +94,9 @@ class IDPMinEffort(VecTask):
             self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
         self.actions = to_torch(np.zeros([self.num_envs, 2]), device=self.device)
+        self._obs_noise = torch.zeros(self.num_envs, 4, device=self.device)
+        self.obs_rew = torch.zeros_like(self.obs_buf)
+
         self.prev_actions = self.actions.clone()
         self.prev_passive_actions = self.actions.clone()
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
@@ -101,6 +111,14 @@ class IDPMinEffort(VecTask):
         self.extras["ddtq"] = (self.actions - self.prev_actions) / self.dt - self.extras["torque_rate"]
         self.extras["dd_acts"] = (self.actions - self.prev_actions) / self.dt - self.extras["torque_rate"]
         self.extras["sampled_action"] = self.actions.clone()
+        self.extras["motor_noise"] = torch.zeros((self.num_envs, 2), device=self.device)
+        self.extras["action_noisy"] = self.actions.clone()
+
+        # 추가: 관측 노이즈 시각화용
+        self.extras["theta_clean"] = torch.zeros((self.num_envs, 2), device=self.device)
+        self.extras["theta_noise"] = torch.zeros((self.num_envs, 2), device=self.device)
+        self.extras["theta_noisy"] = torch.zeros((self.num_envs, 2), device=self.device)
+
 
     def _set_env_cfg(
             self,
@@ -131,6 +149,16 @@ class IDPMinEffort(VecTask):
             damp_ank: float = 0.,
             stiff_hip: float = 0.,
             damp_hip: float = 0.,
+
+            noise_theta: float = 0.0,
+            noise_scale: float = 0.0,
+            noise_mean: float = 0.0,
+
+            motor_noise: bool = False,
+            k_sdn_ankle: float = 0.0,
+            k_sdn_hip: float = 0.0,
+            sdn_cutoff_hz: float = 0.0,
+
             tqr_limit: float = None,
             use_curriculum = False,
             cost_type = None,
@@ -179,6 +207,18 @@ class IDPMinEffort(VecTask):
         self.vel_ratio = vel_ratio
         self.tq_ratio = tq_ratio
         self.avg_coeff = avg_coeff
+
+        self.noise_theta=noise_theta
+        self.noise_scale=noise_scale
+        self.noise_mean=noise_mean
+
+        # Signal-Dependent Noise (SDN) on motor output
+        self.motor_noise = motor_noise
+        self.k_sdn_ankle = k_sdn_ankle
+        self.k_sdn_hip = k_sdn_hip
+        self.sdn_cutoff_hz = sdn_cutoff_hz
+
+
         self.use_curriculum = use_curriculum
         assert 0 <= self.ank_ratio <= 1 and 0 <= self.tq_ratio <= 1 and 0 <= self.vel_ratio <= 1
         self._ptb_range = self._ptb_data_range.copy()
@@ -248,7 +288,7 @@ class IDPMinEffort(VecTask):
 
     def compute_reward(self):
         self.rew_buf[:], self.reset_buf[:] = compute_postural_reward(
-            self.obs_buf,
+            self.obs_rew,
             self.actions,
             self.extras[self.tqr_regularize_type],
             self.foot_forces,
@@ -265,17 +305,57 @@ class IDPMinEffort(VecTask):
             env_ids = np.arange(self.num_envs)
 
         self.gym.refresh_dof_state_tensor(self.sim)
+        
+        # clean state를 obs_buf에 채움
         self.obs_buf[env_ids, 0] = self.dof_pos[env_ids, 0].squeeze()
         self.obs_buf[env_ids, 1] = self.dof_pos[env_ids, 1].squeeze()
         self.obs_buf[env_ids, 2] = self.dof_vel[env_ids, 0].squeeze()
         self.obs_buf[env_ids, 3] = self.dof_vel[env_ids, 1].squeeze()
-        if self.action_as_state:
-            self.obs_buf[env_ids, 4:] = self.delayed_act_buf[env_ids, :, :-1].permute(0, 2, 1).reshape(len(env_ids), -1)
-        self.gym.refresh_force_sensor_tensor(self.sim)
 
+        # 보상용 obs는 clean을 유지(기존 코드 유지)
+        self.obs_rew[env_ids, 0] = self.dof_pos[env_ids, 0].squeeze()
+        self.obs_rew[env_ids, 1] = self.dof_pos[env_ids, 1].squeeze()
+        self.obs_rew[env_ids, 2] = self.dof_vel[env_ids, 0].squeeze()
+        self.obs_rew[env_ids, 3] = self.dof_vel[env_ids, 1].squeeze()
+
+        # clean theta 저장(노이즈 더하기 전)
+        theta_clean = self.obs_buf[env_ids, :2].clone()
+
+        # traj 저장(기존 코드 유지, 이때 obs_traj는 clean이 저장됨)
         self.obs_traj[env_ids, self.progress_buf, :] = self.obs_buf
         self.act_traj[env_ids, self.progress_buf, :] = self.actions
         self.tqr_traj[env_ids, self.progress_buf, :] = self.extras['torque_rate']
+
+        # 해결했으나 theta가 scale에 영향주는 문제 생김
+        # * (2 * theta) ** 0.5 * (dt ** 0.5) * white
+        #* (dt ** 0.5) * white
+                # + self.noise_scale * (self.obs_buf[env_ids, :4])
+
+
+        if self.noise_scale > 0 and self.noise_theta > 0:
+            dt = self.dt
+            theta = 1.0 / (self.noise_theta * dt)
+            white = torch.randn(len(env_ids), 4, device=self.device)
+            self._obs_noise[env_ids] += (
+                -theta * (self._obs_noise[env_ids]-self.noise_mean)* dt
+                + self.noise_scale * (torch.ones(1, 4, device=self.device))*0.08
+                # * (dt ** 0.5) * white
+                * (2 * theta) ** 0.5 * (dt ** 0.5) * white
+            )
+            self.obs_buf[env_ids, :4] += self._obs_noise[env_ids]
+
+        # noise와 noisy를 계산해서 extras로 내보냄
+        theta_noise = self._obs_noise[env_ids, :2].clone()
+        theta_noisy = theta_clean + theta_noise
+
+        self.extras["theta_clean"][env_ids, :] = theta_clean
+        self.extras["theta_noise"][env_ids, :] = theta_noise
+        self.extras["theta_noisy"][env_ids, :] = theta_noisy
+
+
+        if self.action_as_state:
+            self.obs_buf[env_ids, 4:] = self.delayed_act_buf[env_ids, :, :-1].permute(0, 2, 1).reshape(len(env_ids), -1)
+        self.gym.refresh_force_sensor_tensor(self.sim)
 
         return self.obs_buf
 
@@ -363,6 +443,7 @@ class IDPMinEffort(VecTask):
 
         self.get_current_ptbs()
         actions = self.process_actions(actions)
+        
         current_actions, self.delayed_act_buf[...] = compute_current_action(
             self.dof_pos,
             self.dof_vel,
@@ -384,6 +465,7 @@ class IDPMinEffort(VecTask):
             self.prev_actions,
             self.extras['torque_rate'],
             self.extras['dd_acts'],
+
             self.dt,
             self.avg_coeff,
             self.device
@@ -454,6 +536,22 @@ class IDPMinEffort(VecTask):
     def process_actions(self, actions):
         i, j, k = np.arange(self.num_envs).reshape(-1, 1, 1), np.arange(2).reshape(1, -1, 1), self.act_delay_idx.reshape(-1, 1, 1) - 1
         self.extras['sampled_action'] = actions.clone()
+        # SDN: 모터 출력에 신호 크기에 비례하는 노이즈 추가 (EMA smoothing 전)
+        if self.motor_noise and (self.k_sdn_ankle > 0.0 or self.k_sdn_hip > 0.0):
+            if self.sdn_cutoff_hz > 0:
+                white = torch.randn_like(actions)
+                self._sdn_noise_state = (self._sdn_alpha * white
+                                         + (1.0 - self._sdn_alpha) * self._sdn_noise_state)
+                noise = self._sdn_noise_state
+            else:
+                noise = torch.randn_like(actions)
+            sdn_noise = self._k_sdn * torch.abs(actions) * noise
+            actions = actions + sdn_noise
+            self.extras['motor_noise'] = sdn_noise.clone()
+            self.extras['action_noisy'] = actions.clone()
+        else:
+            self.extras['motor_noise'] = torch.zeros_like(actions)
+            self.extras['action_noisy'] = actions.clone()
         return actions * self.avg_coeff + (1 - self.avg_coeff) * self.delayed_act_buf[i, j, k].to(self.device).clone().squeeze(-1)
 
     def get_current_ptbs(self):
@@ -472,6 +570,10 @@ class IDPMinEffort(VecTask):
         self.extras['torque_rate'][env_ids] = 0
         self.extras['ddtq'][env_ids] = 0
         self.extras['sampled_action'][env_ids] = 0
+        self.extras['motor_noise'][env_ids] = 0
+        self.extras['action_noisy'][env_ids] = 0
+
+        self._obs_noise[env_ids] = self.noise_mean
 
     def update_curriculum(self, **kwargs):
         for k, v in kwargs.items():
@@ -495,7 +597,7 @@ class IDPMinEffort(VecTask):
 class IDPMinEffortDet(IDPMinEffort):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.max_episode_length = round(3 / self.dt)
+        self.max_episode_length = round(5 / self.dt)
         self._ptb = to_torch(np.zeros([self.num_envs, self.max_episode_length + 1]), device=self.device)
         if self.lean_angle > 0.0:
             self._ptb_range = to_torch(
@@ -507,7 +609,24 @@ class IDPMinEffortDet(IDPMinEffort):
                 self._cal_ptb_acc(-np.array([0.03, 0.045, 0.06, 0.075, 0.09, 0.12, 0.15]).reshape(1, -1)),
                 device=self.device,
             )
-        self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
+
+        raw_idx = kwargs['cfg']['env'].get('fixed_ptb_idx', None)
+        if str(raw_idx).lower() in ['none', 'null']:
+            self.fixed_ptb_idx = None
+        else:
+            self.fixed_ptb_idx = raw_idx
+
+
+        if self.fixed_ptb_idx is not None:
+            print(f"Variance Test Mode: Fixing perturbation index to {self.fixed_ptb_idx}")
+            self.ptb_idx = to_torch(
+                np.full(self.num_envs, self.fixed_ptb_idx),
+                dtype=torch.int64,
+                device=self.device
+            )
+        else:
+            self.ptb_idx = to_torch(np.arange(self.num_envs) % self._ptb_range.shape[0], dtype=torch.int64, device=self.device)
+
         self.delayed_time = 0.1
         if "st_ptb_idx" in kwargs['cfg']['env'].keys():
             self.ptb_idx += kwargs['cfg']['env']["st_ptb_idx"]
@@ -518,7 +637,11 @@ class IDPMinEffortDet(IDPMinEffort):
         self.ptb_st_idx[env_ids] = st_idx
         self._ptb[env_ids] = 0
         self._ptb[env_ids, st_idx:ed_idx] = self._ptb_range[self.ptb_idx[env_ids.unsqueeze(1)], np.arange(self._ptb_range.shape[1])]
-        self.ptb_idx[env_ids] = (self.ptb_idx[env_ids] + self.num_envs) % self._ptb_range.shape[0]
+        # [수정 3] 인덱스 업데이트 로직 조건부 실행
+        # 고정 모드(fixed_ptb_idx is not None)일 때는 인덱스를 바꾸지 않고 그대로 둡니다.
+        if self.fixed_ptb_idx is None:
+            self.ptb_idx[env_ids] = (self.ptb_idx[env_ids] + self.num_envs) % self._ptb_range.shape[0]
+
 
         self.dof_pos[env_ids, :] = self.lean_angle_torch[env_ids, :]
         self.dof_vel[env_ids, :] = 0.0
@@ -527,6 +650,15 @@ class IDPMinEffortDet(IDPMinEffort):
         self.gym.set_dof_state_tensor_indexed(self.sim,
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+
+        # per-env delay randomize (delay_randomize > 0일 때만 실행하여 RNG state 보존)
+        if self.delay_randomize > 0:
+            act_delay_time = torch_rand_float(
+                self.act_delay_time * (1 - self.delay_randomize),
+                self.act_delay_time * (1 + self.delay_randomize),
+                shape=(len(env_ids), 1), device=self.device,
+            )
+            self.act_delay_idx[env_ids] = (act_delay_time / self.dt).round().to(dtype=torch.int64, device=self.device)
 
         self.delayed_act_buf[env_ids, ...] = fill_delayed_act_buf(
             self.dof_pos[env_ids, :],

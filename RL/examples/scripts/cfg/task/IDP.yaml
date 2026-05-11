@@ -12,7 +12,7 @@ env:
   ptb_act_time: ${resolve_default:0.275,${...ptb_act_time}}
   ankle_limit: ${resolve_default:"satu",${...ankle_limit}}
   stptb: ${resolve_default:0.0,${...stptb}}
-  edptb: ${resolve_default:0.165,${...edptb}}
+  edptb: ${resolve_default:0.15,${...edptb}}
   ptb_step: 0.005
   st_ptb_idx: 0
   ptb_type: ${resolve_default:'5th',${...ptb_type}}
@@ -38,10 +38,22 @@ env:
   clipActions: ${resolve_default:1.0,${...clipActions}}
   ankle_torque_max: ${resolve_default:100,${...ankle_torque_max}}
   stiff_ank: ${resolve_default:250,${...stiff_ank}}
-  damp_ank: 20
-  stiff_hip: 50
-  damp_hip: 5
+  damp_ank: ${resolve_default:20,${...damp_ank}}
+  stiff_hip: ${resolve_default:50,${...stiff_hip}}
+    # stiff_hip: 50
+  damp_hip: ${resolve_default:5,${...damp_hip}}
   tqr_limit: ${resolve_default:300,${...tqr_limit}}
+
+  noise_theta: ${resolve_default:10,${...noise_theta}}
+  noise_scale: ${resolve_default:0.05,${...noise_scale}}
+  noise_mean: ${resolve_default:0.01,${...noise_mean}}
+  # Signal-Dependent Noise (SDN) on motor output
+  motor_noise: ${resolve_default:False,${...motor_noise}}
+  k_sdn_ankle: ${resolve_default:0.0,${...k_sdn_ankle}}
+  k_sdn_hip: ${resolve_default:0.0,${...k_sdn_hip}}
+  sdn_cutoff_hz: ${resolve_default:0.0,${...sdn_cutoff_hz}}
+  fixed_ptb_idx: ${resolve_default:None,${...fixed_ptb_idx}}
+
   use_curriculum: ${resolve_default:False,${...use_curriculum}}
   upright_type: ${resolve_default:0,${...upright_type}}
   exp_time: ${resolve_default:5,${...exp_time}}

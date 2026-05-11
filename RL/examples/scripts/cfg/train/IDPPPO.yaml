@@ -22,7 +22,7 @@ params:
           val: 0
         fixed_sigma: ${resolve_default:True,${......fixed_sigma}}
     mlp:
-      units: [128, 128]
+      units: [256, 256]
       activation: relu
       d2rl: False
 
@@ -70,9 +70,11 @@ params:
     clip_value: True
     bounds_loss_coef: 0.0001
     player:
-      games_num: 2 # num of plot option
+      games_num: 7 # num of plot option
       n_game_life: 1
       save_mat: ${resolve_default:False,${.....save_mat}}
-      show_fig: ${resolve_default:True,${.....show_fig}}
+      show_fig: ${resolve_default:False,${.....show_fig}}
       save_fig: ${resolve_default:False,${.....save_fig}}
+      save_psd: ${resolve_default:False,${.....save_psd}}
+      save_shade: ${resolve_default:False,${.....save_shade}}
       deterministic: True

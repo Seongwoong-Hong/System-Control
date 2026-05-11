@@ -15,6 +15,18 @@ if __name__ == '__main__':
     NUM_THREADS = config["NUM_THREADS"]
     DEFAULT = ["test=False", "pipeline=gpu", "rl_device=cuda", "sim_device=cuda"]
 
+    # "100-150" 형식의 문자열을 range로 풀어주기
+    for k, v in config["learn_config"].items():
+        expanded = []
+        for item in v:
+            if isinstance(item, str) and '-' in item:
+                parts = item.split('-')
+                if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    expanded.extend(list(range(int(parts[0]), int(parts[1]) + 1)))
+                    continue
+            expanded.append(item)
+        config["learn_config"][k] = expanded
+
     comb_keys = [*config["learn_config"].keys()]
     all_combinations = list(itertools.product(*config["learn_config"].values()))
 
